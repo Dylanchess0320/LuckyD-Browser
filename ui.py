@@ -40,7 +40,9 @@ ANSI = {
     "red": "\033[31m",
     "magenta": "\033[35m",
     "white": "\033[37m",
+    "bright_white": "\033[97m",
     "gray": "\033[90m",
+    "bright_blue": "\033[94m",
 }
 
 # ── Brand colors ──────────────────────────────────────────────────────
@@ -53,6 +55,9 @@ BRAND = {
     "error": "#F87171",
     "warn": "#FBBF24",
     "surface": "#1E293B",
+    # Readability scheme: reasoning in blue, answers in clean white.
+    "think": "#6CB6FF",
+    "answer": "#FFFFFF",
 }
 
 if _RICH_AVAILABLE:
@@ -72,6 +77,27 @@ if _RICH_AVAILABLE:
             "repr.none": BRAND["muted"],
         }
     )
+
+
+# ── Slash commands (shared by /help and the web GUI) ─────────────────────────
+
+SLASH_COMMANDS: list[tuple[str, str]] = [
+    ("/help", "Show this help"),
+    ("/clear", "Clear conversation + screen"),
+    ("/history", "Conversation summary"),
+    ("/tools", "List available tools"),
+    ("/memory", "Show stored memories"),
+    ("/model", "Show or switch model (free vs paid)"),
+    ("/refresh", "Refresh model cache"),
+    ("/save", "Save conversation to JSON"),
+    ("/cost", "Show token usage and cost"),
+    ("/undo", "Undo last file change"),
+    ("/sessions", "List saved sessions"),
+    ("/resume", "Resume a saved session"),
+    ("/mcp", "Show MCP server status"),
+    ("/version", "Show version"),
+    ("/quit", "Exit"),
+]
 
 
 class TerminalUI:
@@ -230,9 +256,14 @@ class TerminalUI:
     def show_question(self, question: str) -> None:
         """Echo the user question before streaming the response."""
         if self.rich:
-            self._console.print(f"\n  {self._dim('you')}  {question}")
+            self._console.print(
+                f"\n  {self._dim('you')}  [{BRAND['answer']}]{question}[/]"
+            )
         else:
-            print(f"\n  {ANSI['dim']}you{ANSI['reset']}  {question}")
+            print(
+                f"\n  {ANSI['dim']}you{ANSI['reset']}  "
+                f"{ANSI['bright_white']}{question}{ANSI['reset']}"
+            )
 
     def begin_thinking(self) -> None:
         """Start the thinking section before reasoning tokens arrive."""
@@ -251,15 +282,15 @@ class TerminalUI:
             self._live.start()
             self._live.update(
                 Panel(
-                    Text("…", style=BRAND["muted"]),
-                    title="thinking",
-                    border_style=BRAND["muted"],
+                    Text("…", style=BRAND["think"]),
+                    title=Text("thinking", style=BRAND["think"]),
+                    border_style=BRAND["think"],
                     title_align="left",
                     padding=(0, 1),
                 )
             )
         else:
-            print(f"  {ANSI['dim']}thinking…{ANSI['reset']}")
+            print(f"  {ANSI['bright_blue']}thinking…{ANSI['reset']}")
 
     def stream_think_token(self, token: str) -> None:
         """Push a reasoning token to the thinking display."""
@@ -272,15 +303,15 @@ class TerminalUI:
             with contextlib.suppress(Exception):
                 self._live.update(
                     Panel(
-                        Text(preview, style=BRAND["muted"]),
-                        title="thinking",
-                        border_style=BRAND["muted"],
+                        Text(preview, style=BRAND["think"]),
+                        title=Text("thinking", style=BRAND["think"]),
+                        border_style=BRAND["think"],
                         title_align="left",
                         padding=(0, 1),
                     )
                 )
         elif not self.rich:
-            sys.stdout.write(f"{ANSI['dim']}{token}{ANSI['reset']}")
+            sys.stdout.write(f"{ANSI['bright_blue']}{token}{ANSI['reset']}")
             sys.stdout.flush()
 
     def end_thinking(self) -> None:
@@ -296,6 +327,9 @@ class TerminalUI:
         """Push a token directly to the terminal as plain, incremental text."""
         if self._thinking:
             self.end_thinking()
+        if not self._stream_buffer:
+            # First answer token — switch the stream to clean white.
+            sys.stdout.write(ANSI["bright_white"])
         self._stream_buffer += token
         sys.stdout.write(token)
         sys.stdout.flush()
@@ -318,6 +352,9 @@ class TerminalUI:
         if self.rich and self._live:
             self._live.stop()
             self._live = None
+        # Reset the white answer color started by the first streamed token.
+        sys.stdout.write(ANSI["reset"])
+        sys.stdout.flush()
         print()
         print()
 
@@ -326,7 +363,7 @@ class TerminalUI:
         if self._streaming:
             return
         if full_text and self.rich:
-            self._console.print(Markdown(full_text))
+            self._console.print(Markdown(full_text), style=BRAND["answer"])
         elif full_text:
             self._ansi_markdown(full_text)
 
@@ -336,7 +373,7 @@ class TerminalUI:
         if not text:
             return
         if self.rich:
-            self._console.print(Markdown(text))
+            self._console.print(Markdown(text), style=BRAND["answer"])
         else:
             self._ansi_markdown(text)
 
@@ -356,29 +393,32 @@ class TerminalUI:
                 print(f"  {ANSI['cyan']}{line}{ANSI['reset']}")
                 continue
             if line.startswith("### "):
-                print(f"\n{ANSI['bold']}{ANSI['yellow']}{line[4:]}{ANSI['reset']}")
+                print(f"\n{ANSI['bold']}{ANSI['bright_white']}{line[4:]}{ANSI['reset']}")
             elif line.startswith("## "):
-                print(f"\n{ANSI['bold']}{ANSI['magenta']}{line[3:]}{ANSI['reset']}")
+                print(f"\n{ANSI['bold']}{ANSI['bright_white']}{line[3:]}{ANSI['reset']}")
             elif line.startswith("# "):
                 print(f"\n{ANSI['bold']}{ANSI['cyan']}{line[2:]}{ANSI['reset']}")
             elif "**" in line:
                 line = re.sub(
                     r"\*\*(.*?)\*\*",
-                    f"{ANSI['bold']}\\1{ANSI['reset']}",
+                    f"{ANSI['bold']}\\1{ANSI['reset']}{ANSI['bright_white']}",
                     line,
                 )
-                print(line)
+                print(f"{ANSI['bright_white']}{line}{ANSI['reset']}")
             elif "`" in line:
                 line = re.sub(
                     r"`(.*?)`",
-                    f"{ANSI['cyan']}\\1{ANSI['reset']}",
+                    f"{ANSI['cyan']}\\1{ANSI['bright_white']}",
                     line,
                 )
-                print(line)
+                print(f"{ANSI['bright_white']}{line}{ANSI['reset']}")
             elif line.strip().startswith("- "):
-                print(f"  {ANSI['dim']}•{ANSI['reset']} {line.strip()[2:]}")
+                print(
+                    f"  {ANSI['dim']}•{ANSI['reset']} "
+                    f"{ANSI['bright_white']}{line.strip()[2:]}{ANSI['reset']}"
+                )
             else:
-                print(line)
+                print(f"{ANSI['bright_white']}{line}{ANSI['reset']}")
 
     # ── Tool calls ─────────────────────────────────────────────────
 
@@ -452,23 +492,7 @@ class TerminalUI:
     # ── Help ───────────────────────────────────────────────────────
 
     def show_help(self) -> None:
-        cmds = [
-            ("/help", "Show this help"),
-            ("/clear", "Clear conversation + screen"),
-            ("/history", "Conversation summary"),
-            ("/tools", "List available tools"),
-            ("/memory", "Show stored memories"),
-            ("/model", "Show or switch model"),
-            ("/refresh", "Refresh model cache"),
-            ("/save", "Save conversation to JSON"),
-            ("/cost", "Show token usage and cost"),
-            ("/undo", "Undo last file change"),
-            ("/sessions", "List saved sessions"),
-            ("/resume", "Resume a saved session"),
-            ("/mcp", "Show MCP server status"),
-            ("/version", "Show version"),
-            ("/quit", "Exit"),
-        ]
+        cmds = SLASH_COMMANDS
         if self.rich:
             table = Table(box=None, show_header=False, padding=(0, 2))
             table.add_column(style=BRAND["primary"], no_wrap=True)
@@ -501,27 +525,47 @@ class TerminalUI:
                 print(f"    {ANSI['dim']}•{ANSI['reset']} {name}")
             print()
 
-    def show_models(self, options: list[tuple[str, list[str]]]) -> None:
-        """Display available model options by provider."""
+    def show_models(self, sections: list[dict]) -> None:
+        """Display the model catalog organized by cost tier (free vs paid).
+
+        ``sections`` is a JSON-shaped list::
+            [{"tier": "free"|"paid", "label": str,
+              "groups": [{"provider": str, "models": [str, ...]}, ...]}, ...]
+        Built by main.model_catalog().
+        """
         if self.rich:
             self._console.print()
             self._console.print(f"  {self._primary('Models')}")
-            for provider, models in options:
-                self._console.print(f"    {self._dim(provider)}")
-                for m in models:
-                    self._console.print(f"      {self._primary(m)}")
+            for section in sections:
+                color = BRAND["success"] if section.get("tier") == "free" else BRAND["warn"]
+                self._console.print(f"    [{color}]{section.get('label', '')}[/]")
+                for group in section.get("groups", []):
+                    self._console.print(f"      {self._dim(group.get('provider', ''))}")
+                    for m in group.get("models", []):
+                        self._console.print(f"        {self._primary(m)}")
             self._console.print()
-            self._console.print(f"  {self._dim('Usage: /model <provider> <model>')}")
-            self._console.print(f"  {self._dim('Example: /model openai gpt-4o')}")
+            self._console.print(
+                f"  {self._dim('Switch: /model <model-id>          e.g. /model kimi-k3')}"
+            )
+            self._console.print(
+                f"  {self._dim('    or: /model <provider> <name>  e.g. /model openai gpt-4o')}"
+            )
             self._console.print()
         else:
             print(f"\n  {ANSI['bold']}{ANSI['cyan']}Models{ANSI['reset']}")
-            for provider, models in options:
-                print(f"    {ANSI['dim']}{provider}{ANSI['reset']}")
-                for m in models:
-                    print(f"      {ANSI['cyan']}{m}{ANSI['reset']}")
-            print(f"\n  {ANSI['dim']}Usage: /model <provider> <model>{ANSI['reset']}")
-            print(f"  {ANSI['dim']}Example: /model openai gpt-4o{ANSI['reset']}\n")
+            for section in sections:
+                c = ANSI["green"] if section.get("tier") == "free" else ANSI["yellow"]
+                print(f"    {c}{section.get('label', '')}{ANSI['reset']}")
+                for group in section.get("groups", []):
+                    print(f"      {ANSI['dim']}{group.get('provider', '')}{ANSI['reset']}")
+                    for m in group.get("models", []):
+                        print(f"        {ANSI['cyan']}{m}{ANSI['reset']}")
+            print(
+                f"\n  {ANSI['dim']}Switch: /model <model-id>          e.g. /model kimi-k3{ANSI['reset']}"
+            )
+            print(
+                f"  {ANSI['dim']}    or: /model <provider> <name>  e.g. /model openai gpt-4o{ANSI['reset']}\n"
+            )
 
     # ── Input prompt ───────────────────────────────────────────────
 
@@ -537,6 +581,226 @@ class TerminalUI:
             return input(f"{ANSI['bold']}{ANSI['cyan']}› {ANSI['reset']}")
         except (EOFError, KeyboardInterrupt):
             return ""
+
+
+# ── Web UI (browser front end over WebSocket) ────────────────────────────────
+
+
+class WebUI:
+    """Drop-in replacement for TerminalUI that streams JSON events to the
+    browser over a WebSocket instead of printing to the terminal.
+
+    The event sink is attached per connection by web_gui.serve(). Every method
+    is a safe no-op while no browser is connected, and safe to call from any
+    thread (agent loop, hook worker threads) — the sink handles scheduling.
+    """
+
+    def __init__(self) -> None:
+        self.rich = False
+        self._send = None
+        self._stream_buffer = ""
+        self._think_buffer = ""
+        self._streaming = False
+        self._thinking = False
+        self._tool_count = 0
+        self._session_start = time.time()
+        self._cost_summary = ""
+        self._project_name = ""
+        self._provider_name = ""
+        self._model_name = ""
+
+    # ── Connection wiring (called by web_gui) ──────────────────────
+
+    def attach(self, send) -> None:
+        """Attach the per-connection event sink: ``send(event_dict) -> None``."""
+        self._send = send
+
+    def detach(self) -> None:
+        self._send = None
+
+    def _emit(self, event: dict) -> None:
+        send = self._send
+        if send is None:
+            return
+        try:
+            send(event)
+        except Exception:
+            pass
+
+    # ── Session info ─────────────────────────────────────────────
+
+    def set_session_info(
+        self,
+        project_name: str = "",
+        provider: str = "",
+        cost: str = "",
+        model: str = "",
+    ) -> None:
+        """Update session state and push it to the browser status bar."""
+        if project_name:
+            self._project_name = project_name
+        if provider:
+            self._provider_name = provider
+        if cost:
+            self._cost_summary = cost
+        if model:
+            self._model_name = model
+        self._emit(
+            {
+                "type": "session",
+                "project": self._project_name,
+                "provider": self._provider_name,
+                "model": self._model_name,
+                "cost": self._cost_summary,
+            }
+        )
+
+    # ── Banner / exit ────────────────────────────────────────────
+
+    def enhanced_banner(self) -> None:
+        """Startup banner → session event + tip in the browser."""
+        self.set_session_info()  # re-emit current state
+        self._emit(
+            {"type": "status", "level": "info", "text": "Type a task, or /help for commands"}
+        )
+
+    banner = enhanced_banner
+
+    def goodbye(self, cost_summary: str = "") -> None:
+        parts = [f"{self._tool_count} tools"]
+        if cost_summary:
+            parts.append(cost_summary)
+        elapsed = int(time.time() - self._session_start)
+        if elapsed >= 60:
+            parts.append(f"{elapsed // 60}m {elapsed % 60}s")
+        elif elapsed > 0:
+            parts.append(f"{elapsed}s")
+        self._emit({"type": "goodbye", "text": " · ".join(parts)})
+
+    # ── Streaming ────────────────────────────────────────────────
+
+    @property
+    def streamed_chars(self) -> int:
+        """How many characters were actually streamed (not counting thinking)."""
+        return len(self._stream_buffer)
+
+    def start_streaming(self) -> None:
+        self._stream_buffer = ""
+        self._streaming = True
+        self._thinking = False
+        self._think_buffer = ""
+        self._emit({"type": "stream_start"})
+
+    def stream_token(self, token: str) -> None:
+        if not self._streaming:
+            self.start_streaming()
+        self._stream_buffer += token
+        self._emit({"type": "token", "text": token})
+
+    def end_streaming(self) -> None:
+        self._streaming = False
+        if self._thinking:
+            self.end_thinking()
+        self._emit({"type": "stream_end"})
+
+    def show_question(self, question: str) -> None:
+        pass  # the browser renders its own user bubble
+
+    def begin_thinking(self) -> None:
+        self._thinking = True
+        self._think_buffer = ""
+        self._emit({"type": "think_start"})
+
+    def stream_think_token(self, token: str) -> None:
+        if not self._thinking:
+            self.begin_thinking()
+        self._think_buffer += token
+        self._emit({"type": "thinking", "text": token})
+
+    def end_thinking(self) -> None:
+        self._thinking = False
+        self._emit({"type": "think_end"})
+
+    def play_done_sound(self) -> None:
+        pass
+
+    def finish_response(self, full_text: str) -> None:
+        if self._streaming:
+            return
+        if full_text:
+            self.markdown(full_text)
+
+    # ── Markdown ─────────────────────────────────────────────────
+
+    def markdown(self, text: str) -> None:
+        if text:
+            self._emit({"type": "markdown", "text": text})
+
+    # ── Tool calls ───────────────────────────────────────────────
+
+    @staticmethod
+    def _clean_args(args: dict | None) -> dict:
+        """JSON-safe copy of tool args, internal keys stripped, values truncated."""
+        clean: dict = {}
+        for k, v in (args or {}).items():
+            if str(k).startswith("_"):
+                continue
+            if isinstance(v, (int, float, bool)) or v is None:
+                clean[k] = v
+            else:
+                s = str(v)
+                clean[k] = s[:400] + "…" if len(s) > 400 else s
+        return clean
+
+    def tool_call_start(self, tool_name: str, args: dict | None = None) -> None:
+        self._tool_count += 1
+        self._emit(
+            {"type": "tool_start", "name": tool_name, "args": self._clean_args(args)}
+        )
+
+    def tool_call_result(
+        self, tool_name: str, elapsed: float, ok: bool, preview: str
+    ) -> None:
+        self._emit(
+            {
+                "type": "tool_result",
+                "name": tool_name,
+                "elapsed": round(float(elapsed or 0.0), 2),
+                "ok": bool(ok),
+                "preview": (preview or "")[:400],
+            }
+        )
+
+    # ── Messages ─────────────────────────────────────────────────
+
+    def info(self, msg: str) -> None:
+        self._emit({"type": "status", "level": "info", "text": msg})
+
+    def warn(self, msg: str) -> None:
+        self._emit({"type": "status", "level": "warn", "text": msg})
+
+    def error(self, msg: str) -> None:
+        self._emit({"type": "status", "level": "error", "text": msg})
+
+    def success(self, msg: str) -> None:
+        self._emit({"type": "status", "level": "success", "text": msg})
+
+    # ── Displays ─────────────────────────────────────────────────
+
+    def show_help(self) -> None:
+        self._emit({"type": "help", "commands": [[c, d] for c, d in SLASH_COMMANDS]})
+
+    def show_tools(self, tools: list[str]) -> None:
+        self._emit({"type": "tools", "tools": list(tools)})
+
+    def show_models(self, sections: list[dict]) -> None:
+        """Send the tiered model catalog to the browser's models panel."""
+        self._emit({"type": "models", "sections": sections})
+
+    # ── Input prompt ─────────────────────────────────────────────
+
+    def prompt(self) -> str:
+        return ""  # input arrives over the WebSocket, never via stdin
 
 
 # ── Global instance ──────────────────────────────────────────────────

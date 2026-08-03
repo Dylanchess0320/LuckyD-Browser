@@ -13,10 +13,10 @@ class OpenAIClient(LLMClient):
     """OpenAI API client with streaming."""
 
     async def chat(self, messages: list[dict], tools: list[dict] | None = None) -> LLMResult:
-        headers = {
-            "Authorization": f"Bearer {self.config.api_key}",
-            "Content-Type": "application/json",
-        }
+        headers = {"Content-Type": "application/json"}
+        _k = (self.config.api_key or "").strip()
+        if _k:
+            headers["Authorization"] = f"Bearer {_k}"
         body = {
             "model": self.config.model,
             "messages": self._fmt(messages),
@@ -35,6 +35,11 @@ class OpenAIClient(LLMClient):
             )
             resp.raise_for_status()
             data = resp.json()
+            # Some gateways (e.g. the ClinePass/OpenRouter-style aggregator) wrap
+            # the standard chat-completion payload in a top-level envelope:
+            # {"success": true, "data": {...}}. Unwrap it when present.
+            if "choices" not in data and isinstance(data.get("data"), dict):
+                data = data["data"]
             choice = data["choices"][0]
             msg = choice.get("message", {})
             self.cost_tracker.add_usage(data.get("usage", {}), self.config.model)
@@ -47,10 +52,10 @@ class OpenAIClient(LLMClient):
             )
 
     async def chat_stream(self, messages, tools=None, on_token=None, on_think=None) -> LLMResult:
-        headers = {
-            "Authorization": f"Bearer {self.config.api_key}",
-            "Content-Type": "application/json",
-        }
+        headers = {"Content-Type": "application/json"}
+        _k = (self.config.api_key or "").strip()
+        if _k:
+            headers["Authorization"] = f"Bearer {_k}"
         body = {
             "model": self.config.model,
             "messages": self._fmt(messages),

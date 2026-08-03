@@ -44,6 +44,38 @@ class LLMClient:
         self.retryable_codes = {429, 500, 502, 503, 504}
         self.context_manager = context_manager or ContextManager()
 
+    def _retry_delay(self, resp, attempt: int) -> float:
+        """Seconds to wait before retrying a retryable HTTP error.
+
+        Honors the server's ``Retry-After`` header (delta-seconds or HTTP
+        date) when present — essential for 429 rate limits, where a fixed
+        short backoff retries too soon and burns all attempts. Falls back to
+        exponential backoff, capped so a single retry never hangs too long.
+        """
+        wait = 0.0
+        if resp is not None:
+            try:
+                ra = (resp.headers.get("retry-after") or "").strip()
+            except Exception:
+                ra = ""
+            if ra:
+                try:
+                    wait = float(ra)  # delta-seconds form
+                except ValueError:
+                    try:
+                        from datetime import datetime, timezone
+                        from email.utils import parsedate_to_datetime
+
+                        dt = parsedate_to_datetime(ra)
+                        if dt is not None:
+                            wait = max(
+                                0.0, (dt - datetime.now(timezone.utc)).total_seconds()
+                            )
+                    except Exception:
+                        wait = 0.0
+        backoff = self.base_delay * (2**attempt)
+        return min(max(wait, backoff), 30.0)
+
     async def chat_stream(
         self,
         messages: list[dict],
@@ -53,10 +85,10 @@ class LLMClient:
     ) -> dict | None:
         """Streaming LLM call. Returns the assembled assistant message."""
         url = f"{self.base_url}/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json",
-        }
+        headers = {"Content-Type": "application/json"}
+        _k = (self.api_key or "").strip()
+        if _k:
+            headers["Authorization"] = f"Bearer {_k}"
 
         messages = await self.context_manager.compact(messages)
         payload = self._build_payload(messages, tools, stream=True)
@@ -79,7 +111,7 @@ class LLMClient:
                 httpx.ConnectTimeout,
             ) as e:
                 if attempt < self.max_retries:
-                    delay = self.base_delay * (2**attempt)
+                    delay = self._retry_delay(None, attempt)
                     print(
                         f"\n  [RETRY] {type(e).__name__}: {e} in {delay:.1f}s ({attempt + 2}/{self.max_retries + 1})"
                     )
@@ -137,7 +169,7 @@ class LLMClient:
             client.stream("POST", url, headers=headers, json=payload) as resp,
         ):
             if resp.status_code in self.retryable_codes and attempt < self.max_retries:
-                delay = self.base_delay * (2**attempt)
+                delay = self._retry_delay(resp, attempt)
                 print(
                     f"\n  [RETRY] HTTP {resp.status_code} in {delay:.1f}s ({attempt + 2}/{self.max_retries + 1})"
                 )
@@ -219,31 +251,104 @@ class LLMClient:
                 )
         return message
 
+    @staticmethod
+    def _extract_error_detail(resp) -> str:
+        """Best-effort human-readable message from a provider error response.
+
+        Providers disagree on shape: OpenAI uses {"error":{"message","code"}},
+        others {"message"}/{"detail"}/{"error":"..."}. Returns "" when nothing
+        useful is found so callers can fall back to the raw status code.
+        """
+        try:
+            data = resp.json()
+        except Exception:
+            try:
+                return (resp.text or "").strip()[:300]
+            except Exception:
+                return ""
+        if isinstance(data, dict):
+            err = data.get("error")
+            if isinstance(err, dict):
+                msg = str(err.get("message") or "").strip()
+                ecode = str(err.get("code") or "").strip()
+                if msg and ecode:
+                    return f"{ecode}: {msg}"[:300]
+                if msg or ecode:
+                    return (msg or ecode)[:300]
+            if isinstance(err, str) and err.strip():
+                return err.strip()[:300]
+            for k in ("message", "detail", "error_description"):
+                v = data.get(k)
+                if v and str(v).strip():
+                    return str(v).strip()[:300]
+        try:
+            return (resp.text or "").strip()[:300]
+        except Exception:
+            return ""
+
     def _handle_http_error(self, e: httpx.HTTPStatusError, attempt: int) -> dict | None:
         if e.response.status_code in self.retryable_codes and attempt < self.max_retries:
-            delay = self.base_delay * (2**attempt)
+            delay = self._retry_delay(e.response, attempt)
             print(
                 f"\n  [RETRY] HTTP {e.response.status_code} in {delay:.1f}s ({attempt + 2}/{self.max_retries + 1})"
             )
             return None
+        code = e.response.status_code
+        detail = self._extract_error_detail(e.response)
         try:
             err_text = e.response.text[:500]
         except Exception:
             err_text = "(unknown - response not read)"
-        print(f"\n  [ERR] API Error ({e.response.status_code}): {err_text}")
-        return {"role": "assistant", "content": f"[API Error: {e.response.status_code}]"}
+        print(f"\n  [ERR] API Error ({code}): {detail or err_text}")
+        if code in (401, 403):
+            if "cline.bot" in (self.base_url or "") and not detail:
+                # Bare 401 from api.cline.bot almost always means the Cline
+                # session token was rejected/expired (often because
+                # fresh_token() failed silently upstream in providers.py).
+                why = "The Cline session token was rejected or has expired."
+                hint = (
+                    "Run `cline` (or `cline auth`) to re-login, or set "
+                    "CLINEPASS_API_KEY in .env."
+                )
+            else:
+                why = detail or "The API key was rejected by the provider."
+                hint = (
+                    "Check the key in your repo .env, or switch to ClinePass "
+                    "(CODING_AGENT_PROVIDER=clinepass) to use your logged-in Cline account."
+                )
+            return {
+                "role": "assistant",
+                "content": f"[API Error: {code} — authentication failed] {why} {hint}",
+            }
+        if code == 429:
+            why = f"{detail} " if detail else ""
+            return {
+                "role": "assistant",
+                "content": (
+                    f"[API Error: 429 — rate limited] {why}"
+                    "Wait and retry, or use /model to switch to a different model."
+                ),
+            }
+        why = f" {detail}" if detail else ""
+        return {"role": "assistant", "content": f"[API Error: {code}]{why}"}
 
     async def chat_nonstreaming(
         self, messages, tools=None, stream_callback=None, think_callback=None
     ) -> dict | None:
         """Non-streaming fallback"""
         url = f"{self.base_url}/chat/completions"
-        headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
+        headers = {"Content-Type": "application/json"}
+        _k = (self.api_key or "").strip()
+        if _k:
+            headers["Authorization"] = f"Bearer {_k}"
         messages = await self.context_manager.compact(messages)
         payload = self._build_payload(messages, tools, stream=False)
         try:
             resp = await self._http_post(url, headers, payload)
             data = resp.json()
+            # Some gateways (e.g. ClinePass) wrap the completion in {"data": {...}}.
+            if "choices" not in data and isinstance(data.get("data"), dict):
+                data = data["data"]
             choice = data.get("choices", [{}])[0]
             msg = choice.get("message", {})
             reasoning = msg.get("reasoning_content", "")
@@ -270,7 +375,7 @@ class LLMClient:
                 async with httpx.AsyncClient(timeout=timeout) as client:
                     resp = await client.post(url, headers=headers, json=payload)
                     if resp.status_code in self.retryable_codes and attempt < self.max_retries:
-                        delay = self.base_delay * (2**attempt)
+                        delay = self._retry_delay(resp, attempt)
                         print(
                             f"\n  [RETRY] HTTP {resp.status_code} in {delay:.1f}s ({attempt + 2}/{self.max_retries + 1})"
                         )
@@ -286,7 +391,7 @@ class LLMClient:
             ) as e:
                 last_exc = e
                 if attempt < self.max_retries:
-                    delay = self.base_delay * (2**attempt)
+                    delay = self._retry_delay(None, attempt)
                     print(
                         f"\n  [RETRY] Connection: {e} in {delay:.1f}s ({attempt + 2}/{self.max_retries + 1})"
                     )

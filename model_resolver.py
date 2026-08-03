@@ -43,11 +43,14 @@ def _cache_set(data: dict) -> None:
 def _fetch_models(api_key: str, base_url: str) -> list[str]:
     """Fetch available model IDs from DeepSeek API."""
     try:
+        key = (api_key or "").strip()
+        if not key:
+            return []  # no key -> no catalog; avoid "Illegal header value"
         timeout = httpx.Timeout(connect=10.0, read=10.0, write=5.0, pool=5.0)
         with httpx.Client(timeout=timeout) as client:
             resp = client.get(
                 f"{base_url}/models",
-                headers={"Authorization": f"Bearer {api_key}"},
+                headers={"Authorization": f"Bearer {key}"},
             )
             resp.raise_for_status()
             models = [m["id"] for m in resp.json().get("data", [])]

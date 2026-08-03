@@ -77,3 +77,9 @@ installers/
 # Local-only artifacts (kept on disk, not in repo)
 luckyd-code.exe
 Switch-ClineAccount.bat
+
+# LuckyD Browser runtime data + build artifacts
+browser/data/
+browser/build/
+browser/dist/
+*.spec

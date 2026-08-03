@@ -8,7 +8,10 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-import yaml
+try:
+    import yaml
+except ImportError:  # optional - frozen harness excludes PyYAML
+    yaml = None
 
 from .base import ToolBase, ToolOutput
 from .registry import register_tool
@@ -28,6 +31,8 @@ def _parse_skill(filepath: Path) -> dict | None:
     if not match:
         return None
 
+    if yaml is None:
+        return None  # PyYAML unavailable (frozen harness)
     try:
         frontmatter = yaml.safe_load(match.group(1))
     except yaml.YAMLError:

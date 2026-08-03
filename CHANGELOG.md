@@ -4,6 +4,58 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [2.2.0] - 2026-07-27
+
+### Added
+- **Browser Control API** (`browser/browser_core/control_server.py`) — localhost
+  HTTP control of the live LuckyD Browser (`127.0.0.1:9777`): status, tabs,
+  navigate, page snapshots (same element indexing the AI agent uses),
+  click/type/press/select/scroll actions, CDP screenshots, raw JS eval, and
+  page-grounded AI answers. Optional bearer-token auth; Tools-menu toggle.
+  Lets the `luckyd-code.exe` harness, the terminal agent, and scripts drive
+  real tabs — "exe brain, browser hands".
+- **Harness mode for the browser AI sidebar** — agent tasks can now run on the
+  `luckyd-code.exe` backend (98 tools, memory graph, orchestration) via a new
+  checkbox. The exe auto-starts when missing, runs via `/api/background/*`
+  with live progress, and tasks auto-include Browser Control API instructions.
+- `browser/test_control_server.py` — 23 checks for the Control API HTTP layer
+  (fake backend, no Qt needed).
+- **Harness mode is now the DEFAULT agent path** — no button to press;
+  the checkbox (persisted via the `harness_mode` setting) is now an opt-out.
+- **Vision steps are automatic** — `AIBridge.supports_vision()` detects
+  image-capable models by family (gpt-4o/4.1, gemini, claude-3/4, gemma3,
+  qwen-vl, llava, pixtral, …); the sidebar auto-enables per-step
+  screenshots for them and hard-gates image payloads away from
+  text-only models.
+- `browser/selftest.py` grew from 15 to 22 checks (Control API module + live
+  end-to-end API calls against the running browser).
+
+### Fixed
+- **PyInstaller build** — excluded `PIL` from `LuckyDBrowser.spec`: Pillow
+  12.3's `Image.py` crashes Python 3.10.0's `dis` during modulegraph scanning
+  (`IndexError: tuple index out of range`); the browser never imports PIL at
+  runtime. `websockets` pinned as a hidden import.
+- Harness-mode checkbox was dead code — `_start_agent` never routed to it.
+- Harness worker emitted `None` on a `Signal(str)`, dropped the orchestrate
+  result on the floor, and stopped via `terminate()` — replaced with a
+  cooperative-cancel worker that renders results in chat.
+- `default_provider()` always preferred `cline-usage` (registered even with no
+  credentials), so keyless local providers could never be the default —
+  restored the documented local-first order, Cline providers only when
+  authed.
+- Control API `close_tab` read a closure variable before assignment
+  (would crash when closing the current tab).
+- `main_window.py` duplicate `show_downloads` definition removed.
+- `_body_gemini` / `_body_anthropic` now forward image parts
+  (`inlineData` / base64 image blocks) — vision previously only worked
+  on OpenAI-compatible endpoints; images were silently dropped.
+
+### Changed
+- Browser version bumped to 1.2.0; `browser_api_enabled` (default on),
+  `browser_api_port`, `browser_api_token`, `harness_mode` (default on)
+  settings added.
+
 ## [2.1.0] - 2026-07-22
 
 ### Added

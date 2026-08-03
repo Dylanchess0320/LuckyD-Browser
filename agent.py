@@ -27,6 +27,7 @@ import tools.datetime_tools
 import tools.file_tools
 import tools.git_tools
 import tools.graphify_tool
+import tools.harness_tool
 import tools.lsp_tools
 import tools.memory_tools
 import tools.plan_tools

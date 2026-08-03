@@ -5,8 +5,8 @@ Like Claude Computer Use but for your actual desktop.
 
 from __future__ import annotations
 
-import time
 import asyncio
+import time
 from pathlib import Path
 
 from .base import ToolBase, ToolOutput
@@ -36,7 +36,6 @@ class DesktopScreenshotTool(ToolBase):
                 path = f"desktop_{int(time.time())}.png"
 
             def _capture(p, r):
-                import mss
                 with mss.mss() as sct:
                     if r == "full":
                         sct.shot(output=p)

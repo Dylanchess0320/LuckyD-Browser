@@ -10,7 +10,10 @@ from dataclasses import dataclass
 
 # ── Provider constants ────────────────────────────────────────────────
 
-VALID_PROVIDERS = {"openai", "anthropic", "google", "ollama", "deepseek", "zai", "openrouter"}
+VALID_PROVIDERS = {
+    "openai", "anthropic", "google", "ollama", "deepseek", "zai", "openrouter",
+    "clinepass", "cline-usage",
+}
 
 PROVIDER_NAMES = {
     "deepseek": "DeepSeek",
@@ -20,6 +23,8 @@ PROVIDER_NAMES = {
     "ollama": "Ollama",
     "zai": "Z.ai (GLM)",
     "openrouter": "OpenRouter",
+    "clinepass": "ClinePass",
+    "cline-usage": "Cline (usage)",
 }
 
 PROVIDER_DEFAULTS = {
@@ -72,6 +77,26 @@ PROVIDER_DEFAULTS = {
         "default_base": "https://openrouter.ai/api/v1",
         "default_model": "deepseek/deepseek-chat-v3.1",
     },
+    # ClinePass (Cline flat-subscription gateway) — OpenAI-compatible.
+    # Key comes from CLINEPASS_API_KEY, else the logged-in Cline CLI session.
+    "clinepass": {
+        "env_key": "CLINEPASS_API_KEY",
+        "env_base": "CLINEPASS_BASE_URL",
+        "env_model": "CLINEPASS_MODEL",
+        "default_base": "https://api.cline.bot/api/v1",
+        "default_model": "cline-pass/deepseek-v4-pro",
+    },
+    # Cline Usage (credit-billed / free tier) — same api.cline.bot gateway and
+    # same auth as ClinePass (CLINEPASS_API_KEY, else the logged-in Cline CLI
+    # session), but model ids are provider-prefixed (e.g. deepseek/deepseek-chat)
+    # and usage is billed per-request. Free-tier models cost $0 (rate-limited).
+    "cline-usage": {
+        "env_key": "CLINEPASS_API_KEY",
+        "env_base": "CLINEPASS_BASE_URL",
+        "env_model": "CLINE_USAGE_MODEL",
+        "default_base": "https://api.cline.bot/api/v1",
+        "default_model": "deepseek/deepseek-chat",
+    },
 }
 
 
@@ -103,6 +128,8 @@ def detect_provider() -> str | None:
 
     # Check env vars in priority order
     checks = [
+        ("clinepass", "CLINEPASS_API_KEY"),
+        ("cline-usage", "CLINE_USAGE_MODEL"),
         ("openai", "OPENAI_API_KEY"),
         ("anthropic", "ANTHROPIC_API_KEY"),
         ("google", "GOOGLE_API_KEY"),
@@ -121,10 +148,58 @@ def detect_provider() -> str | None:
     return None
 
 
+def _assistant_browser_settings() -> dict:
+    """Read the LuckyD browser assistant's saved provider/model picks.
+
+    The AI sidebar persists its selection in browser/data/settings.json under
+    "ai_provider" ("" / missing = auto) and "ai_model_overrides" ({provider: model}).
+    Returns {} when the file can't be read.
+    """
+    try:
+        import json as _json
+        import sys as _sys
+        from pathlib import Path as _P
+
+        if getattr(_sys, "frozen", False):
+            root = _P(_sys.executable).resolve().parent
+        else:
+            root = _P(__file__).resolve().parent.parent
+        path = root / "browser" / "data" / "settings.json"
+        if not path.exists():
+            return {}
+        # utf-8-sig strips a leading BOM (the browser SettingsStore writes one).
+        data = _json.loads(path.read_text(encoding="utf-8-sig"))
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
 def resolve_provider_config(provider: str | None = None) -> dict:
-    """Build a full provider config dict. Returns the standard config fields."""
+    """Build a full provider config dict. Returns the standard config fields.
+
+    When no explicit CODING_AGENT_PROVIDER is set, the HQ mirrors whatever
+    provider + model the browser AI assistant is currently using (read from
+    browser/data/settings.json). An explicit CODING_AGENT_PROVIDER still wins.
+    """
+    mirror_model: str | None = None
+    explicit = os.environ.get("CODING_AGENT_PROVIDER", "").lower().strip()
+
     if not provider:
-        provider = detect_provider() or "deepseek"
+        if explicit in VALID_PROVIDERS:
+            provider = explicit
+        else:
+            # Mirror the browser AI assistant's chosen provider (and model).
+            bs = _assistant_browser_settings()
+            ap = str(bs.get("ai_provider", "") or "").lower().strip()
+            if ap in VALID_PROVIDERS:
+                provider = ap
+                overrides = bs.get("ai_model_overrides", {})
+                if isinstance(overrides, dict):
+                    m = str(overrides.get(provider, "") or "").strip()
+                    if m:
+                        mirror_model = m
+            else:
+                provider = detect_provider() or "deepseek"
 
     provider = provider.lower()
     defaults = PROVIDER_DEFAULTS.get(provider, PROVIDER_DEFAULTS["deepseek"])
@@ -135,8 +210,44 @@ def resolve_provider_config(provider: str | None = None) -> dict:
             "CODING_AGENT_API_KEY", ""
         )
 
+    # ClinePass: fall back to the logged-in Cline CLI session (WorkOS token,
+    # auto-refreshed) when no explicit key is set — same as the browser.
+    if provider in ("clinepass", "cline-usage") and not api_key:
+        try:
+            import sys
+            from pathlib import Path
+
+            # cline_session is bundled into the exe (hidden import) or, in the
+            # source tree, lives under browser/browser_core/. Try a plain import
+            # first (works when bundled), then add the source path as a fallback.
+            try:
+                import cline_session  # type: ignore
+            except ImportError:
+                bc = str(
+                    Path(__file__).resolve().parent.parent / "browser" / "browser_core"
+                )
+                if bc not in sys.path:
+                    sys.path.insert(0, bc)
+                import cline_session  # type: ignore
+
+            api_key = cline_session.fresh_token()
+        except Exception as exc:
+            # Surface the real reason instead of silently producing an empty key
+            # that later turns into a confusing 401 in the agent reply.
+            api_key = ""
+            print(
+                f"\n  [AUTH] Cline session unavailable — {type(exc).__name__}: {exc}\n"
+                "         Run `cline` (or `cline auth`) to log in, or set "
+                "CLINEPASS_API_KEY in .env."
+            )
+
     base_url = os.environ.get(defaults["env_base"], defaults["default_base"])
     model_name = os.environ.get(defaults["env_model"], defaults["default_model"])
+
+    # When mirroring the browser assistant, its model pick wins (unless the user
+    # also set an explicit model override for this provider in the repo .env).
+    if mirror_model and defaults["env_model"] not in os.environ:
+        model_name = mirror_model
 
     # For DeepSeek, resolve "auto" model
     if provider == "deepseek":
@@ -191,5 +302,7 @@ def detect_api_format(provider: str) -> str:
         "deepseek": "openai",  # DeepSeek uses OpenAI-compatible
         "zai": "openai",  # Z.ai GLM uses OpenAI-compatible endpoint
         "openrouter": "openai",  # OpenRouter uses OpenAI-compatible
+        "clinepass": "openai",  # ClinePass gateway is OpenAI-compatible
+        "cline-usage": "openai",  # same gateway, usage-billed model ids
     }
     return formats.get(provider, "openai")

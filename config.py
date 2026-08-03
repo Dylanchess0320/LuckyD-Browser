@@ -12,11 +12,22 @@ Backward-compatible aliases (do NOT remove):
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
 from core.providers import resolve_provider_config
 
-PROJECT_DIR = Path(__file__).parent.resolve()
+
+def _project_dir() -> Path:
+    """Working root. In a frozen (PyInstaller) build, __file__ points inside the
+    bundle, which is wrong for locating the user's live .env and runtime data.
+    Use the exe's directory so a shipped app reads the .env sitting next to it."""
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).parent.resolve()
+
+
+PROJECT_DIR = _project_dir()
 ENV_FILE = PROJECT_DIR / ".env"
 
 # Runtime data lives under data/ so the repo root stays clean

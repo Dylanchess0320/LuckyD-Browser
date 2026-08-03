@@ -21,6 +21,10 @@ from pathlib import Path
 AGENT_DIR = Path(__file__).parent
 sys.path.insert(0, str(AGENT_DIR))
 
+# Load .env FIRST -- it sets CODING_AGENT_PROVIDER / *_API_KEY that
+# core/providers.py reads from os.environ. Importing config before any
+# other module that pulls in providers guarantees the .env provider/key win.
+import config as _config  # noqa: F401  (runs load_env() on import)
 from agent import CodingAgent
 from config import PROJECT_DIR, get_config
 from core.approval_hook import ApprovalHook
@@ -28,7 +32,6 @@ from core.hooks import get_hooks, register_plugin
 from core.mcp_client import MCPManager
 from core.session_store import get_session_store
 from model_resolver import invalidate_cache, resolve_model
-from tools.mcp_tools import register_mcp_tools
 from tools.registry import registry
 from ui import ui
 
@@ -40,7 +43,149 @@ _PROVIDER_DISPLAY_NAMES = {
     "ollama": "Ollama",
     "zai": "Z.ai",
     "openrouter": "OpenRouter",
+    "clinepass": "ClinePass",
+    "cline-usage": "Cline (usage)",
 }
+
+# ── Cline model catalogs ───────────────────────────────────────────────
+# Mirror of browser/browser_core/ai_bridge.py — keep the two in sync.
+# Source of truth: https://docs.cline.bot/getting-started/clinepass
+# (api.cline.bot has no public model-list endpoint, so these are curated.)
+
+# ClinePass flat-subscription models — these work with a $0 (even negative)
+# credit balance; usage counts against the subscription quota.
+_CLINEPASS_CATALOG = [
+    "cline-pass/kimi-k3",
+    "cline-pass/deepseek-v4-flash",
+    "cline-pass/kimi-k2.7-code",
+    "cline-pass/kimi-k2.6",
+    "cline-pass/deepseek-v4-pro",
+    "cline-pass/mimo-v2.5",
+    "cline-pass/mimo-v2.5-pro",
+    "cline-pass/minimax-m3",
+    "cline-pass/qwen3.7-max",
+    "cline-pass/qwen3.7-plus",
+]
+
+# Cline Usage (credit-billed / free tier) — same gateway, usage-based billing.
+# Free-tier models work at $0.00 but are rate-limited; credit models deduct
+# from your Cline Credits balance.
+_CLINE_USAGE_CATALOG = [
+    # ── Free tier (rate-limited, $0.00 — needs non-negative credit balance)
+    "minimax/minimax-m2.5",
+    "deepseek/deepseek-chat",
+    "deepseek/deepseek-r1",
+    "meta-llama/llama-3.2-3b-instruct",
+    "google/gemini-2.0-flash",
+    "qwen/qwen3-8b",
+    # ── Credit-billed — deduct from Cline Credits balance
+    "google/gemini-2.5-pro",
+    "anthropic/claude-sonnet-4-6",
+    "openai/gpt-4o",
+    "openai/gpt-4o-mini",
+    "mistral/mistral-large",
+]
+
+_CLINE_USAGE_FREE_TIER = frozenset(_CLINE_USAGE_CATALOG[:6])
+
+# ClinePass has no free-tier model — every ClinePass model counts against the
+# flat-subscription quota.
+_CLINEPASS_FREE_TIER = frozenset()
+
+# Aliases accepted in "/model <provider> <name>" on top of canonical names.
+_PROVIDER_ALIASES = {
+    "cline-pass": "clinepass",
+    "cline": "cline-usage",
+}
+
+
+def model_catalog() -> list[dict]:
+    """Tiered model catalog for ui.show_models() and the web /api/models panel.
+
+    Returns a list of sections, each with a cost ``tier`` ("free" | "paid"),
+    a human ``label``, and ``groups`` of {provider, models}. Free covers local
+    Ollama + the Cline Usage rate-limited free tier; everything else is paid.
+    """
+    cline_free = [m for m in _CLINE_USAGE_CATALOG if m in _CLINE_USAGE_FREE_TIER]
+    cline_paid = [m for m in _CLINE_USAGE_CATALOG if m not in _CLINE_USAGE_FREE_TIER]
+    clinepass_paid = list(_CLINEPASS_CATALOG)
+    return [
+        {
+            "tier": "free",
+            "label": "Free — $0",
+            "groups": [
+                {"provider": "Ollama", "models": ["codellama", "llama3.1", "mistral", "phi3"]},
+                {"provider": "Cline Usage (free tier)", "models": cline_free},
+            ],
+        },
+        {
+            "tier": "paid",
+            "label": "Paid — costs money",
+            "groups": [
+                {"provider": "OpenAI", "models": ["gpt-4o", "gpt-4o-mini", "o1-preview", "o1-mini"]},
+                {"provider": "Anthropic", "models": [
+                    "claude-sonnet-4-20250514",
+                    "claude-opus-4-20250514",
+                    "claude-3-5-haiku-20241022",
+                ]},
+                {"provider": "Google", "models": ["gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"]},
+                {"provider": "DeepSeek", "models": ["deepseek-chat", "deepseek-reasoner", "deepseek-coder"]},
+                {"provider": "Z.ai", "models": ["glm-4.6", "glm-4.5", "glm-4.5-air"]},
+                {"provider": "OpenRouter", "models": [
+                    "deepseek/deepseek-chat-v3.1",
+                    "anthropic/claude-sonnet-4",
+                    "google/gemini-2.0-flash-001",
+                ]},
+                {"provider": "ClinePass (subscription)", "models": clinepass_paid},
+                {"provider": "Cline Usage (credit-billed)", "models": cline_paid},
+            ],
+        },
+    ]
+
+
+def _cline_model_entries() -> list[tuple[str, str]]:
+    """(provider, full model id) for every curated Cline gateway model."""
+    return [("clinepass", m) for m in _CLINEPASS_CATALOG] + [
+        ("cline-usage", m) for m in _CLINE_USAGE_CATALOG
+    ]
+
+
+def _match_cline_model(desired: str) -> tuple[str, str] | None:
+    """Resolve a partial model name against the Cline catalogs.
+
+    Returns (provider, full_model_id) on a confident match. On ambiguity or
+    no match, prints the reason and returns None — never guesses a provider.
+    """
+    desired = desired.strip().lower()
+    entries = _cline_model_entries()
+
+    exact = [e for e in entries if e[1].lower() == desired]
+    if exact:
+        return exact[0]
+
+    suffix = [e for e in entries if e[1].lower().endswith("/" + desired)]
+    if len(suffix) == 1:
+        return suffix[0]
+    candidates = suffix
+
+    if not candidates:
+        candidates = [e for e in entries if desired in e[1].lower()]
+
+    if len(candidates) == 1:
+        return candidates[0]
+    if len(candidates) > 1:
+        ui.warn(f"Ambiguous model: {desired}  ->  matches:")
+        for _p, m in candidates:
+            print(f"  {m}")
+        print("  Re-run with the full id, e.g. /model " + candidates[0][1])
+        return None
+
+    ui.warn(f"Unknown model: {desired}")
+    print("  Pick from /model (no args), or force any model with:")
+    print("    /model <provider> <name>   e.g. /model cline-usage openai/gpt-4o")
+    print("  Providers: openai, anthropic, google, ollama, deepseek, zai,")
+    print("             openrouter, clinepass (subscription), cline-usage (free/credits)")
+    return None
 
 
 def _prompt_and_save_api_key(env_var: str, provider_name: str) -> str:
@@ -98,19 +243,51 @@ def _resolve_provider(provider_hint: str | None, model_name: str) -> dict:
         "ollama": (None, "OLLAMA_HOST", "OLLAMA_MODEL"),
         "zai": ("ZAI_API_KEY", "ZAI_BASE_URL", "ZAI_MODEL"),
         "openrouter": ("OPENROUTER_API_KEY", "OPENROUTER_BASE_URL", "OPENROUTER_MODEL"),
+        "clinepass": ("CLINEPASS_API_KEY", "CLINEPASS_BASE_URL", "CLINEPASS_MODEL"),
+        # Same gateway + auth as ClinePass; only the model env var differs.
+        "cline-usage": ("CLINEPASS_API_KEY", "CLINEPASS_BASE_URL", "CLINE_USAGE_MODEL"),
     }
 
     if provider_hint and provider_hint in provider_map:
         env_key, env_base, env_model = provider_map[provider_hint]
         api_key = os.environ.get(env_key, "") if env_key else ""
-        # If a key-required provider is selected and key is missing, prompt interactively
+        # ClinePass: no key set -> try the logged-in Cline CLI session before
+        # ever prompting for a raw API key (mirrors core/providers.py).
+        if provider_hint in ("clinepass", "cline-usage") and not api_key:
+            try:
+                import sys as _sys
+                from pathlib import Path as _Path
+
+                try:
+                    import cline_session  # type: ignore
+                except ImportError:
+                    bc = str(_Path(__file__).resolve().parent / "browser" / "browser_core")
+                    if bc not in _sys.path:
+                        _sys.path.insert(0, bc)
+                    import cline_session  # type: ignore
+                api_key = cline_session.fresh_token()
+            except Exception as exc:
+                ui.warn(f"ClinePass session unavailable ({exc}).")
+        # If a key-required provider is still missing a key, prompt interactively
         if env_key and not api_key and sys.stdin.isatty():
             api_key = _prompt_and_save_api_key(
                 env_key,
                 _PROVIDER_DISPLAY_NAMES.get(provider_hint, provider_hint),
             )
-        base_url = os.environ.get(env_base, "")
-        resolved_model = model_name or os.environ.get(env_model, "")
+        _base_defaults = {
+            "clinepass": "https://api.cline.bot/api/v1",
+            "cline-usage": "https://api.cline.bot/api/v1",
+        }
+        base_url = os.environ.get(env_base, "") or _base_defaults.get(provider_hint, "")
+        _model_defaults = {
+            "clinepass": "cline-pass/kimi-k3",
+            "cline-usage": "deepseek/deepseek-chat",
+        }
+        resolved_model = (
+            model_name
+            or os.environ.get(env_model, "")
+            or _model_defaults.get(provider_hint, "")
+        )
         if not resolved_model:
             ui.warn(f"{provider_hint} model name required. Try: /model {provider_hint} <name>")
             return None
@@ -271,39 +448,27 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
             # Parse "provider model_id" or just "model_id"
             provider = None
             desired = raw
-            for p in ("openai", "anthropic", "google", "ollama", "deepseek", "zai", "openrouter"):
+            for p in (
+                "cline-usage", "cline-pass", "clinepass", "cline",
+                "openrouter", "anthropic", "deepseek", "openai",
+                "google", "ollama", "zai",
+            ):
                 if raw.lower().startswith(p + " "):
-                    provider = p
+                    provider = _PROVIDER_ALIASES.get(p, p)
                     desired = raw[len(p) + 1 :].strip()
                     break
-            _switch_model(agent, provider=provider, model_name=desired)
+            if provider:
+                _switch_model(agent, provider=provider, model_name=desired)
+            else:
+                # No provider given — resolve against the Cline catalogs so
+                # "/model kimi-k3" -> clinepass, "/model deepseek-chat" ->
+                # cline-usage. Unknown names are rejected, never guessed.
+                hit = _match_cline_model(desired)
+                if hit:
+                    _switch_model(agent, provider=hit[0], model_name=hit[1])
         else:
             ui.info(f"Model: {agent.model}")
-            ui.show_models(
-                [
-                    ("OpenAI", ["gpt-4o", "gpt-4o-mini", "o1-preview", "o1-mini"]),
-                    (
-                        "Anthropic",
-                        [
-                            "claude-sonnet-4-20250514",
-                            "claude-opus-4-20250514",
-                            "claude-3-5-haiku-20241022",
-                        ],
-                    ),
-                    ("Google", ["gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"]),
-                    ("Ollama", ["codellama", "llama3.1", "mistral", "phi3"]),
-                    ("DeepSeek", ["deepseek-chat", "deepseek-reasoner", "deepseek-coder"]),
-                    ("Z.ai", ["glm-4.6", "glm-4.5", "glm-4.5-air"]),
-                    (
-                        "OpenRouter",
-                        [
-                            "deepseek/deepseek-chat-v3.1",
-                            "anthropic/claude-sonnet-4",
-                            "google/gemini-2.0-flash-001",
-                        ],
-                    ),
-                ]
-            )
+            ui.show_models(model_catalog())
 
     elif cmd == "refresh":
         invalidate_cache()
@@ -485,12 +650,131 @@ async def run_repl(agent: CodingAgent):
             ui.markdown(result)
 
 
+# ── "model" CLI subcommand ─────────────────────────────────────────────
+
+
+def _cli_model(args):
+    """luckyd-code model [list | <model-id>]
+
+    Without arguments: show the current model from .env / resolved config.
+    With 'list':       print the ClinePass + Cline Usage model catalog.
+    With a model id:   validate it against the catalog (module-level
+                       _CLINEPASS_CATALOG / _CLINE_USAGE_CATALOG) and write
+                       the matching env vars — CLINEPASS_MODEL or
+                       CLINE_USAGE_MODEL, plus CODING_AGENT_PROVIDER — to
+                       .env permanently.
+    """
+    from config import ENV_FILE
+
+    def _read_env_pairs() -> dict:
+        pairs = {}
+        if ENV_FILE.exists():
+            for line in ENV_FILE.read_text(encoding="utf-8-sig").splitlines():
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, _, val = line.partition("=")
+                pairs[key.strip()] = val.strip().strip('"').strip("'")
+        return pairs
+
+    def _set_env_key(lines: list[str], key: str, value: str) -> list[str]:
+        """Replace (in place) or append `key=value` in a list of .env lines."""
+        prefix = key + "="
+        for idx, line in enumerate(lines):
+            stripped = line.strip()
+            if stripped.startswith(prefix) and not stripped.startswith("#"):
+                lines[idx] = f"{key}={value}"
+                return lines
+        if lines and lines[-1].strip():
+            lines.append("")
+        lines.append(f"{key}={value}")
+        return lines
+
+    def _current_model():
+        """Best-effort read of the active model identity."""
+        pairs = _read_env_pairs()
+        provider = pairs.get("CODING_AGENT_PROVIDER", "").lower()
+        if provider == "cline-usage":
+            if pairs.get("CLINE_USAGE_MODEL"):
+                return pairs["CLINE_USAGE_MODEL"]
+        elif pairs.get("CLINEPASS_MODEL"):
+            return pairs["CLINEPASS_MODEL"]
+        try:
+            from core.providers import resolve_provider_config
+            cfg = resolve_provider_config()
+            return cfg.get("model", "unknown")
+        except Exception:
+            return "unknown"
+
+    if not args or args == ["list"]:
+        current = _current_model()
+        print(f"Current model: {current}\n")
+        if args == ["list"]:
+            print("── ClinePass subscription models (flat rate) ─────────────────────")
+            for m in _CLINEPASS_CATALOG:
+                marker = " ◀ current" if m == current else ""
+                print(f"  {m}{marker}")
+            print("\n── Cline Usage — free tier ($0.00, rate-limited) ─────────────────")
+            for m in _CLINE_USAGE_CATALOG:
+                if m not in _CLINE_USAGE_FREE_TIER:
+                    continue
+                marker = " ◀ current" if m == current else ""
+                print(f"  {m}{marker}")
+            print("\n── Cline Usage — credit-billed ───────────────────────────────────")
+            for m in _CLINE_USAGE_CATALOG:
+                if m in _CLINE_USAGE_FREE_TIER:
+                    continue
+                marker = " ◀ current" if m == current else ""
+                print(f"  {m}{marker}")
+            print("\nSet one with:  lucky-code model <model-id>")
+        else:
+            print("Usage: lucky-code model list          — show full catalog")
+            print("       lucky-code model <model-id>    — switch permanently")
+        return
+
+    # ── Switch model ───────────────────────────────────────────────────
+    desired = args[0].strip()
+    hit = _match_cline_model(desired)
+    if not hit:
+        print("Run: lucky-code model list  to see available models")
+        return
+
+    provider, picked = hit
+
+    lines = []
+    if ENV_FILE.exists():
+        lines = ENV_FILE.read_text(encoding="utf-8-sig").splitlines()
+
+    if provider == "clinepass":
+        lines = _set_env_key(lines, "CLINEPASS_MODEL", picked)
+        lines = _set_env_key(lines, "CODING_AGENT_PROVIDER", "clinepass")
+    else:
+        lines = _set_env_key(lines, "CLINE_USAGE_MODEL", picked)
+        lines = _set_env_key(lines, "CODING_AGENT_PROVIDER", "cline-usage")
+
+    ENV_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8-sig")
+    if provider == "clinepass":
+        tier = "ClinePass subscription"
+    elif picked in _CLINE_USAGE_FREE_TIER:
+        tier = "Cline Usage — free tier"
+    else:
+        tier = "Cline Usage — credit-billed"
+    print(f"Model set to: {picked}  [{tier}]")
+    print("Restart the terminal for the change to take effect.")
+
+
 # ── Entry point ────────────────────────────────────────────────────────
 
 
 def main():
     # Parse CLI args
     args = sys.argv[1:]
+
+    # Dispatch "model" subcommand early (no API key needed)
+    if args and args[0] == "model":
+        _cli_model(args[1:])
+        return
+
     cfg = get_config()
     model = cfg["model"]
     temperature = cfg["temperature"]
@@ -578,16 +862,29 @@ Environment:
             break
 
     # Validate API key
-    if not cfg["api_key"] or cfg["api_key"] == "sk-your-api-key-here":
+    provider = cfg.get("provider", "deepseek")
+    if provider != "ollama" and (
+        not cfg["api_key"] or cfg["api_key"] == "sk-your-api-key-here"
+    ):
+        from core.providers import PROVIDER_DEFAULTS, PROVIDER_NAMES
+
+        provider_defaults = PROVIDER_DEFAULTS.get(provider, PROVIDER_DEFAULTS["deepseek"])
+        env_var = provider_defaults.get("env_key") or (provider.upper() + "_API_KEY")
+        display_name = PROVIDER_NAMES.get(provider, provider.title())
+
         if one_shot:
             # One-shot mode -- cannot interact; exit with instructions
-            ui.error("DEEPSEEK_API_KEY not set.")
+            ui.error(f"{env_var} not set.")
             print(f"  Set it in {PROJECT_DIR / '.env'} or as an environment variable.")
-            print("  Get a key: https://platform.deepseek.com/api_keys")
+            if provider == "deepseek":
+                print("  Get a key: https://platform.deepseek.com/api_keys")
+            elif provider in ("clinepass", "cline-usage"):
+                print("  Run 'cline auth' to log into your Cline account, or")
+                print("  set CLINEPASS_API_KEY in .env for a manual API key.")
             sys.exit(1)
         else:
             # REPL mode -- prompt the user interactively
-            _prompt_and_save_api_key("DEEPSEEK_API_KEY", "DeepSeek")
+            _prompt_and_save_api_key(env_var, display_name)
             # Re-resolve config with the new key and model
             cfg = get_config()
             model = cfg["model"]

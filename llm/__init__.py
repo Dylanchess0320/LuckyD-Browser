@@ -81,6 +81,30 @@ class LLMConfig:
                 temperature=float(os.environ.get("CODING_AGENT_TEMP", "0.0")),
                 max_tokens=int(os.environ.get("CODING_AGENT_MAX_TOKENS", "8192")),
             )
+        if explicit == "clinepass" or (not explicit and os.environ.get("CLINEPASS_API_KEY")):
+            from core.providers import resolve_provider_config
+
+            cfg = resolve_provider_config("clinepass")
+            return cls(
+                api_key=cfg["api_key"],
+                base_url=cfg["base_url"],
+                model=cfg["model"],
+                provider="clinepass",
+                temperature=float(os.environ.get("CODING_AGENT_TEMP", "0.0")),
+                max_tokens=int(os.environ.get("CODING_AGENT_MAX_TOKENS", "8192")),
+            )
+        if explicit == "cline-usage":
+            from core.providers import resolve_provider_config
+
+            cfg = resolve_provider_config("cline-usage")
+            return cls(
+                api_key=cfg["api_key"],
+                base_url=cfg["base_url"],
+                model=cfg["model"],
+                provider="cline-usage",
+                temperature=float(os.environ.get("CODING_AGENT_TEMP", "0.0")),
+                max_tokens=int(os.environ.get("CODING_AGENT_MAX_TOKENS", "8192")),
+            )
 
         # Fallback: DeepSeek (original default)
         from config import get_config
@@ -232,7 +256,7 @@ class LLMClient(ABC):
             from .ollama_client import OllamaClient
 
             return OllamaClient(config)
-        elif config.provider == "zai" or config.provider == "openrouter":
+        elif config.provider in ("zai", "openrouter", "clinepass", "cline-usage"):
             from .openai_client import OpenAIClient
 
             return OpenAIClient(config)

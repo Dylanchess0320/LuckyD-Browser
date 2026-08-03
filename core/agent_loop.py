@@ -13,8 +13,8 @@ from __future__ import annotations
 
 import asyncio
 import json
-import time
 import os
+import time
 import traceback
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
@@ -165,6 +165,10 @@ class CodingAgent:
             "anthropic": "Anthropic",
             "google": "Google",
             "ollama": "Ollama",
+            "zai": "Z.ai",
+            "openrouter": "OpenRouter",
+            "clinepass": "ClinePass",
+            "cline-usage": "Cline (usage)",
         }
         return names.get(self._provider_config.provider, self._provider_config.provider)
 
@@ -173,11 +177,25 @@ class CodingAgent:
 
         Public API for model switching so callers (main.py, bridges) don't
         need to reach into private internals. Rebinds the provider router
-        and updates the display model name.
+        (display + cost tracking) AND the inference client (self.llm_client)
+        so /model actually routes requests to the new provider — not just
+        the display name.
         """
         self._provider_config = config
         self._router.switch(config)
         self.model = config.model
+        self.api_key = config.api_key
+        self.base_url = config.base_url
+        self.llm_client = LLMClient(
+            api_key=config.api_key,
+            base_url=config.base_url,
+            model=config.model,
+            temperature=config.temperature,
+            max_tokens=config.max_tokens,
+            timeout_sec=self.timeout_sec,
+            max_retries=self.max_retries,
+            base_delay=self.base_delay,
+        )
 
     def _emit_event(self, event_type: AgentEventType, payload: dict | None = None) -> None:
         """Emit an agent event through the callbacks system."""
@@ -338,7 +356,10 @@ class CodingAgent:
     async def _call_llm_for_extraction(self, messages: list[dict]) -> dict | None:
         """Simple LLM call for memory extraction â€” non-streaming, minimal retry."""
         url = f"{self.base_url}/chat/completions"
-        headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
+        headers = {"Content-Type": "application/json"}
+        _k = (self.api_key or "").strip()
+        if _k:
+            headers["Authorization"] = f"Bearer {_k}"
         payload = {
             "model": self.model,
             "messages": messages,

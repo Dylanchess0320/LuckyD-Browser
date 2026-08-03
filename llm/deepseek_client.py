@@ -13,10 +13,10 @@ class DeepSeekClient(LLMClient):
     """DeepSeek API client with streaming."""
 
     async def chat(self, messages: list[dict], tools: list[dict] | None = None) -> LLMResult:
-        headers = {
-            "Authorization": f"Bearer {self.config.api_key}",
-            "Content-Type": "application/json",
-        }
+        headers = {"Content-Type": "application/json"}
+        _k = (self.config.api_key or "").strip()
+        if _k:
+            headers["Authorization"] = f"Bearer {_k}"
         body = {
             "model": self.config.model,
             "messages": messages,
@@ -55,10 +55,10 @@ class DeepSeekClient(LLMClient):
         on_token=None,
         on_think=None,
     ) -> LLMResult:
-        headers = {
-            "Authorization": f"Bearer {self.config.api_key}",
-            "Content-Type": "application/json",
-        }
+        headers = {"Content-Type": "application/json"}
+        _k = (self.config.api_key or "").strip()
+        if _k:
+            headers["Authorization"] = f"Bearer {_k}"
         body = {
             "model": self.config.model,
             "messages": messages,

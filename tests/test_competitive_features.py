@@ -29,8 +29,15 @@ class TestProviders:
         from core.providers import detect_provider
 
         os.environ["ZAI_API_KEY"] = "sk-test-zai"
-        # Clear other provider keys that conftest sets
-        for key in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GOOGLE_API_KEY", "OPENROUTER_API_KEY"):
+        # Clear other provider keys that conftest sets, plus any explicit
+        # override coming from the local .env, so detection is deterministic.
+        for key in (
+            "OPENAI_API_KEY",
+            "ANTHROPIC_API_KEY",
+            "GOOGLE_API_KEY",
+            "OPENROUTER_API_KEY",
+            "CODING_AGENT_PROVIDER",
+        ):
             os.environ.pop(key, None)
         assert detect_provider() == "zai"
 
