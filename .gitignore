@@ -78,7 +78,6 @@ main.py.bak.*
 *.bak
 New Text Document.txt
 $null
-{
 _extract.json
 _nav.json
 _res.json
