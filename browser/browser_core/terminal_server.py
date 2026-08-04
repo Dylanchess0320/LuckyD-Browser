@@ -57,7 +57,7 @@ def _desktop_exe() -> Path | None:
     except Exception:
         pass
     home = Path.home()
-    one_drive = os.environ.get("OneDrive", "").strip()
+    one_drive = os.environ.get("ONEDRIVE", "").strip()  # Windows env names are case-insensitive
     candidates += [
         home / "Desktop" / "luckyd-code.exe",
         home / "OneDrive" / "Desktop" / "luckyd-code.exe",

@@ -13,6 +13,8 @@ Custom tab bar features:
 
 from __future__ import annotations
 
+import contextlib
+
 from PySide6.QtCore import QPoint, QRect, Qt, QTimer
 from PySide6.QtGui import QColor, QGuiApplication, QIcon, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
@@ -176,11 +178,10 @@ class BrowserTabWidget(QTabWidget):
         self._muted: set[int] = set()
         self._spin_angle = 0
 
-        try:
+        # Fall back to the stock tab bar on failure (loses preview/wheel extras).
+        with contextlib.suppress(Exception):
             # protected in C++, exposed as public by PySide6
             self.setTabBar(BrowserTabBar(self))
-        except Exception:
-            pass  # fall back to the stock tab bar (loses preview/wheel extras)
 
         plus = QToolButton(self)
         plus.setObjectName("tab_plus")
@@ -374,10 +375,9 @@ class BrowserTabWidget(QTabWidget):
         page = view.page()
         page.linkHovered.connect(self._mw.on_link_hovered)
         page.fullScreenRequested.connect(self._mw.on_fullscreen_requested)
-        try:
+        # older Qt versions lack the media-audible signal
+        with contextlib.suppress(AttributeError):
             page.recentlyAudibleChanged.connect(lambda audible, v=view: self._retitle(v, v.title()))
-        except AttributeError:
-            pass  # older Qt without the media-audible signal
 
     def _on_load_started(self, view: WebView) -> None:
         self._start_loading(view)

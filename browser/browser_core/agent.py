@@ -504,5 +504,5 @@ class AgentSession:
                 "press Enter/Tab, navigate directly, or finish with done.",
             ]
         if history:
-            parts += ["", "PREVIOUS STEPS:"] + history[-5:]
+            parts += ["", "PREVIOUS STEPS:", *history[-5:]]
         return "\n".join(parts)

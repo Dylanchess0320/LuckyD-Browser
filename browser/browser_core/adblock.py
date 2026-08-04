@@ -131,10 +131,7 @@ class AdBlockInterceptor(QWebEngineUrlRequestInterceptor):
         return False
 
     def _url_matches_ad_pattern(self, url_str: str) -> bool:
-        for pattern in _YT_AD_PATTERNS:
-            if pattern.search(url_str):
-                return True
-        return False
+        return any(pattern.search(url_str) for pattern in _YT_AD_PATTERNS)
 
     # ── Qt interceptor ────────────────────────────────────────────────
 

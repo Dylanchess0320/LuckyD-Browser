@@ -116,12 +116,9 @@ class HarnessBridge:
             flags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
             # A .py launcher must be run through the Python interpreter; a
             # frozen .exe runs directly.
-            if exe.suffix.lower() == ".py":
-                cmd = [sys.executable, str(exe)]
-            else:
-                cmd = [str(exe)]
+            cmd = [sys.executable, str(exe)] if exe.suffix.lower() == ".py" else [str(exe)]
             self._harness_proc = subprocess.Popen(
-                cmd + ["--web", "--port", str(self.port), "--host", self.host],
+                [*cmd, "--web", "--port", str(self.port), "--host", self.host],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 creationflags=flags,

@@ -29,16 +29,17 @@ from __future__ import annotations
 
 import json
 import re
-import urllib.request
 import urllib.error
+import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
 
 from PySide6.QtCore import QThread, Signal
 
 try:
-    from browser import __version__ as CURRENT_VERSION
+    from browser import __version__
+
+    CURRENT_VERSION = __version__
 except Exception:  # frozen build without package context
     CURRENT_VERSION = "1.0.0"
 
@@ -108,7 +109,7 @@ class GitHubReleasesSource:
             name=data.get("name") or tag,
         )
         # Pick the installer asset (first .exe whose name mentions "setup").
-        assets: List[dict] = data.get("assets") or []
+        assets: list[dict] = data.get("assets") or []
 
         def _score(a: dict) -> int:
             name = (a.get("name") or "").lower()
@@ -127,29 +128,29 @@ class UpdateChecker(QThread):
 
     Signals
     -------
-    updateAvailable(ReleaseInfo-like dict)
+    update_available(ReleaseInfo-like dict)
         A strictly newer version was found.
-    upToDate()
+    up_to_date()
         The running version is the latest.
     failed(str)
         The check could not be completed (offline, 404, bad JSON, …).
     """
 
-    updateAvailable = Signal(dict)
-    upToDate = Signal()
+    update_available = Signal(dict)
+    up_to_date = Signal()
     failed = Signal(str)
 
-    def __init__(self, source: Optional[GitHubReleasesSource] = None, parent=None):
+    def __init__(self, source: GitHubReleasesSource | None = None, parent=None):
         super().__init__(parent)
         self.source = source or GitHubReleasesSource()
 
-    def run(self) -> None:  # noqa: D401 - thread entry point
+    def run(self) -> None:
         try:
             info = self.source.fetch_latest()
         except urllib.error.HTTPError as exc:
             # 404 simply means the repo has no releases yet.
             if exc.code == 404:
-                self.upToDate.emit()
+                self.up_to_date.emit()
             else:
                 self.failed.emit(f"HTTP {exc.code}")
             return
@@ -158,7 +159,7 @@ class UpdateChecker(QThread):
             return
 
         if info.version and is_newer(info.version):
-            self.updateAvailable.emit(
+            self.update_available.emit(
                 {
                     "version": info.version,
                     "url": info.url,
@@ -169,7 +170,7 @@ class UpdateChecker(QThread):
                 }
             )
         else:
-            self.upToDate.emit()
+            self.up_to_date.emit()
 
 
 class ReleaseDownloader(QThread):
@@ -178,12 +179,12 @@ class ReleaseDownloader(QThread):
     Signals
     -------
     progress(int received, int total)
-    finishedOk(str path)
+    finished_ok(str path)
     failed(str message)
     """
 
     progress = Signal(int, int)
-    finishedOk = Signal(str)
+    finished_ok = Signal(str)
     failed = Signal(str)
 
     def __init__(self, url: str, dest: Path, expected_size: int = 0, parent=None):
@@ -192,7 +193,7 @@ class ReleaseDownloader(QThread):
         self.dest = Path(dest)
         self.expected_size = expected_size
 
-    def run(self) -> None:  # noqa: D401 - thread entry point
+    def run(self) -> None:
         try:
             req = urllib.request.Request(self.url, headers={"User-Agent": _USER_AGENT})
             self.dest.parent.mkdir(parents=True, exist_ok=True)
@@ -211,6 +212,6 @@ class ReleaseDownloader(QThread):
                 self.failed.emit("Download incomplete")
                 return
             tmp.replace(self.dest)
-            self.finishedOk.emit(str(self.dest))
+            self.finished_ok.emit(str(self.dest))
         except Exception as exc:
             self.failed.emit(str(exc))

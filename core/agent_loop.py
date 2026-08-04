@@ -259,10 +259,10 @@ class CodingAgent:
                 print(f"\n  [HOOK ERR] before_tool hook failed: {e}")
 
         # Execute the tool with a real timeout (per-tool override | global default)
-        DEFAULT_TOOL_TIMEOUT = float(os.environ.get("CODING_AGENT_TOOL_TIMEOUT", "180"))
+        default_tool_timeout = float(os.environ.get("CODING_AGENT_TOOL_TIMEOUT", "180"))
         tool_timeout = getattr(tool, "timeout_sec", None)
         if tool_timeout is None:
-            tool_timeout = DEFAULT_TOOL_TIMEOUT
+            tool_timeout = default_tool_timeout
         try:
             clean_args = {k: v for k, v in tool_args.items() if not k.startswith("_")}
             result = await asyncio.wait_for(tool.execute(**clean_args), timeout=tool_timeout)

@@ -115,6 +115,8 @@ def make_approval_callback(ui, approvals: ApprovalManager, hook):
 
 # ── Tool display plugin ──────────────────────────────────────────────────────
 
+import contextlib
+
 from core.hooks import AgentPlugin
 
 
@@ -260,10 +262,8 @@ async def serve(
                         ui.end_streaming()
                     if result and not ui.streamed_chars:
                         ui.markdown(result)
-                    try:
+                    with contextlib.suppress(Exception):
                         ui.set_session_info(cost=agent.cost_tracker.summary())
-                    except Exception:
-                        pass
                     ui._emit({"type": "done"})
             except Exception as exc:  # never let the worker die silently
                 try:

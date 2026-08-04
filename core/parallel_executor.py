@@ -21,7 +21,6 @@ from typing import Any
 
 from tools.registry import registry
 
-
 # ── Tool Dependency Classification ────────────────────────────────────
 
 # Tools that only read state — always safe to run in parallel
@@ -211,7 +210,7 @@ class ParallelExecutor:
                 *[self._execute_one(call) for call in parallel_calls],
                 return_exceptions=True,
             )
-            for call, result in zip(parallel_calls, parallel_results):
+            for call, result in zip(parallel_calls, parallel_results, strict=False):
                 if isinstance(result, Exception):
                     results[call.id] = ToolResult(
                         id=call.id,

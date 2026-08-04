@@ -803,7 +803,6 @@ def main():
     model = cfg["model"]
     temperature = cfg["temperature"]
     one_shot = ""
-    auto_approve = False
     resume_session_id = ""
 
     json_mode = False
@@ -830,7 +829,6 @@ def main():
             temperature = float(args[i + 1])
             i += 2
         elif args[i] in ("-y", "--yes", "--auto-approve"):
-            auto_approve = True
             os.environ["CODING_AGENT_AUTO_APPROVE"] = "1"
             i += 1
         elif args[i] == "--max-turns" and i + 1 < len(args):

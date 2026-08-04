@@ -165,12 +165,12 @@ def _assistant_browser_settings() -> dict:
     try:
         import json as _json
         import sys as _sys
-        from pathlib import Path as _P
+        from pathlib import Path
 
         if getattr(_sys, "frozen", False):
-            root = _P(_sys.executable).resolve().parent
+            root = Path(_sys.executable).resolve().parent
         else:
-            root = _P(__file__).resolve().parent.parent
+            root = Path(__file__).resolve().parent.parent
         path = root / "browser" / "data" / "settings.json"
         if not path.exists():
             return {}

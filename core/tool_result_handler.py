@@ -23,7 +23,6 @@ from typing import Any
 
 from core.types import ToolResult
 
-
 # ──────────────────────────────────────────────────────────────────────────────
 # Data classes
 # ──────────────────────────────────────────────────────────────────────────────
@@ -292,10 +291,13 @@ class ToolResultTruncator:
 
             # Detect diff hunks
             if line.startswith("@@"):
-                if hunk_buffer and current_size + sum(len(l) + 1 for l in hunk_buffer) > max_chars:
+                if (
+                    hunk_buffer
+                    and current_size + sum(len(line) + 1 for line in hunk_buffer) > max_chars
+                ):
                     # Flush buffer if it fits
                     result_lines.extend(hunk_buffer)
-                    current_size += sum(len(l) + 1 for l in hunk_buffer)
+                    current_size += sum(len(line) + 1 for line in hunk_buffer)
                 hunk_buffer = [line]
                 in_hunk = True
             elif in_hunk and line.startswith(("+", "-", " ")):
@@ -464,9 +466,11 @@ class BackpressureController:
                 return False, f"Rate limited: {self.rate_limit_per_sec}/s max"
 
         # Size cap
-        if strategy in (BackpressureStrategy.SIZE_CAP, BackpressureStrategy.ADAPTIVE):
-            if self._session_chars + result_size > self.max_session_chars:
-                return False, f"Session size cap reached ({self.max_session_chars} chars)"
+        if (
+            strategy in (BackpressureStrategy.SIZE_CAP, BackpressureStrategy.ADAPTIVE)
+            and self._session_chars + result_size > self.max_session_chars
+        ):
+            return False, f"Session size cap reached ({self.max_session_chars} chars)"
 
         # Token budget
         if strategy in (BackpressureStrategy.TOKEN_BUDGET, BackpressureStrategy.ADAPTIVE):
@@ -477,10 +481,12 @@ class BackpressureController:
         # Adaptive: reduce limit if recent results are large
         if strategy == BackpressureStrategy.ADAPTIVE and self._result_sizes:
             avg_recent = sum(self._result_sizes) / len(self._result_sizes)
-            if avg_recent > self.max_result_chars * 0.8:
-                # Recent results are large — be more conservative
-                if result_size > self.max_result_chars * 0.5:
-                    return False, "Adaptive backpressure: recent results large, truncating"
+            # Recent results are large — be more conservative
+            if (
+                avg_recent > self.max_result_chars * 0.8
+                and result_size > self.max_result_chars * 0.5
+            ):
+                return False, "Adaptive backpressure: recent results large, truncating"
 
         return True, ""
 

@@ -13,9 +13,9 @@ Supports: OpenRouter, Anthropic, OpenAI, local models via Ollama.
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Callable
 
 
 class TaskComplexity(Enum):
@@ -307,7 +307,7 @@ class ModelRouter:
 
         # Sort by score descending
         candidates.sort(key=lambda x: x[0], reverse=True)
-        best_score, best_model = candidates[0]
+        _best_score, best_model = candidates[0]
 
         # Build fallback chain
         fallbacks = [m for _, m in candidates[1:4]] if self.fallback_enabled else []
@@ -333,7 +333,7 @@ class ModelRouter:
         Tries the primary model, falls back to chain on failure.
         """
         decision = self.route(request, context_size, latency_req)
-        models_to_try = [decision.model] + decision.fallback_chain
+        models_to_try = [decision.model, *decision.fallback_chain]
 
         last_error = None
         for i, model in enumerate(models_to_try):

@@ -5,6 +5,7 @@ Edge's ExtensionInstallForcelist policy can fetch and verify the extension.
 Run this (auto-started by the installer) before launching Edge.
 """
 
+import contextlib
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -50,10 +51,8 @@ def main() -> int:
         return 1
     srv = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
     print(f"update server on http://127.0.0.1:{PORT}/update.xml")
-    try:
+    with contextlib.suppress(KeyboardInterrupt):
         srv.serve_forever()
-    except KeyboardInterrupt:
-        pass
     return 0
 
 

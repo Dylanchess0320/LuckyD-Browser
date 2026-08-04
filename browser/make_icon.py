@@ -8,7 +8,7 @@ ASSETS = Path(__file__).resolve().parent / "assets"
 
 
 def lerp(a, b, t):
-    return tuple(int(round(a[i] + (b[i] - a[i]) * t)) for i in range(3))
+    return tuple(round(a[i] + (b[i] - a[i]) * t) for i in range(3))
 
 
 img = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
@@ -32,16 +32,16 @@ CX, CY = 128, 118
 def clover_leaf(d, ang, length, width, c0, c1, steps=40):
     ux, uy = math.cos(ang), math.sin(ang)
     px, py = -uy, ux
-    L, R = [], []
+    left, right = [], []
     for i in range(steps + 1):
         t = i / steps
         dist = length * t
         prof = math.sin(math.pi * (t**0.85))
         w = width * prof
         bx, by = CX + ux * dist, CY + uy * dist
-        L.append((bx + px * w, by + py * w))
-        R.append((bx - px * w, by - py * w))
-    poly = L + R[::-1]
+        left.append((bx + px * w, by + py * w))
+        right.append((bx - px * w, by - py * w))
+    poly = left + right[::-1]
     for i in range(steps):
         t = (i + 0.5) / steps
         col = lerp(c0, c1, t)
@@ -61,7 +61,9 @@ d.line([(CX, CY), (96, 214)], fill=(0x2E, 0x8B, 0x2E, 255), width=9)
 d.line([(CX, CY), (96, 214)], fill=(0x6F, 0xD0, 0x3A, 255), width=4)
 
 
-def horseshoe(d, cx, cy, R, thick, gapdeg, rot, gold=(0xF5, 0xC1, 0x18), dark=(0xB8, 0x86, 0x0B)):
+def horseshoe(
+    d, cx, cy, radius, thick, gapdeg, rot, gold=(0xF5, 0xC1, 0x18), dark=(0xB8, 0x86, 0x0B)
+):
     gap = math.radians(gapdeg)
     half = gap / 2.0
     steps = 40
@@ -70,11 +72,11 @@ def horseshoe(d, cx, cy, R, thick, gapdeg, rot, gold=(0xF5, 0xC1, 0x18), dark=(0
         a1 = rot + half + (2 * math.pi - gap) * ((i + 1) / steps)
         t = (i + 0.5) / steps
         col = lerp(gold, dark, 0.5 + 0.5 * math.cos((t - 0.5) * math.pi))
-        p0 = (cx + R * math.cos(a0), cy + R * math.sin(a0))
-        p1 = (cx + R * math.cos(a1), cy + R * math.sin(a1))
+        p0 = (cx + radius * math.cos(a0), cy + radius * math.sin(a0))
+        p1 = (cx + radius * math.cos(a1), cy + radius * math.sin(a1))
         d.line([p0, p1], fill=(col[0], col[1], col[2], 255), width=thick)
     for a in (rot + half, rot - half):
-        tx, ty = cx + R * math.cos(a), cy + R * math.sin(a)
+        tx, ty = cx + radius * math.cos(a), cy + radius * math.sin(a)
         rr = thick // 2 + 1
         d.ellipse([tx - rr, ty - rr, tx + rr, ty + rr], fill=(dark[0], dark[1], dark[2], 255))
 
@@ -82,11 +84,11 @@ def horseshoe(d, cx, cy, R, thick, gapdeg, rot, gold=(0xF5, 0xC1, 0x18), dark=(0
 horseshoe(d, 66, 62, 26, 9, 95, math.radians(-90))
 
 
-def star4(d, cx, cy, R, rot, color=(0xFF, 0xD6, 0x33)):
-    r = R * 0.30
+def star4(d, cx, cy, radius, rot, color=(0xFF, 0xD6, 0x33)):
+    r = radius * 0.30
     pts = []
     for i in range(8):
-        rad = R if i % 2 == 0 else r
+        rad = radius if i % 2 == 0 else r
         a = rot + math.pi * i / 4.0
         pts.append((cx + rad * math.cos(a), cy + rad * math.sin(a)))
     d.polygon(pts, fill=(color[0], color[1], color[2], 255))

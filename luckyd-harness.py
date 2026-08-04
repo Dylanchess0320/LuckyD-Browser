@@ -72,7 +72,7 @@ def _frozen_fallback() -> None:
     env["PYTHONPATH"] = backend_dir + os.pathsep + env.get("PYTHONPATH", "")
     for py in ("python", "python3", "py"):
         try:
-            subprocess.run([py, script] + sys.argv[1:], check=False, cwd=backend_dir, env=env)
+            subprocess.run([py, script, *sys.argv[1:]], check=False, cwd=backend_dir, env=env)
             return
         except FileNotFoundError:
             continue

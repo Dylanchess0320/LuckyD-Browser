@@ -82,7 +82,7 @@ class CommandPalette(QWidget):
             )
         for u, t, *_ in self._mw.storage.recent(100):
             self._items.append(("history", t or u, None, lambda uu=u: self._mw.open_in_new_tab(uu)))
-        for L, A in [
+        for label, action in [
             ("New Tab", self._mw.new_tab),
             ("AI Assistant", self._mw.show_assistant),
             ("Coding Agent", self._mw.open_hq),
@@ -90,7 +90,7 @@ class CommandPalette(QWidget):
             ("History", self._mw.open_history),
             ("Settings", self._mw.open_settings),
         ]:
-            self._items.append((L.lower(), L, None, A))
+            self._items.append((label.lower(), label, None, action))
 
     def show_palette(self) -> None:
         self._e.clear()
@@ -102,7 +102,7 @@ class CommandPalette(QWidget):
         self.show()
         self.raise_()
         self._e.setFocus()
-        for kw, lbl, ico, act in self._items:
+        for _kw, lbl, ico, act in self._items:
             it = QListWidgetItem(lbl)
             it.setData(Qt.ItemDataRole.UserRole, act)
             if ico:
@@ -120,7 +120,7 @@ class CommandPalette(QWidget):
     def _filter(self, text: str) -> None:
         q = text.lower()
         self._lst.clear()
-        for kw, lbl, ico, act in self._items:
+        for _kw, lbl, ico, act in self._items:
             if q in lbl.lower():
                 it = QListWidgetItem(lbl)
                 it.setData(Qt.ItemDataRole.UserRole, act)
@@ -140,7 +140,7 @@ class CommandPalette(QWidget):
         self.closed.emit()
         self.hide()
 
-    def keyPressEvent(self, e) -> None:
+    def keyPressEvent(self, e) -> None:  # noqa: N802  # Qt virtual override
         if e.key() == Qt.Key.Key_Escape:
             self.close_palette()
             return

@@ -17,10 +17,10 @@ from __future__ import annotations
 
 import json
 import time
-import traceback
-from dataclasses import dataclass, field, asdict
+from collections.abc import Callable
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 
 @dataclass
@@ -79,7 +79,7 @@ class BenchmarkReport:
     results: list[TaskResult] = field(default_factory=list)
     timestamp: str = ""
 
-    def compare_to(self, baseline: "BenchmarkReport") -> dict[str, Any]:
+    def compare_to(self, baseline: BenchmarkReport) -> dict[str, Any]:
         """Compare this report to a baseline, identifying regressions."""
         comparison = {
             "success_rate_delta": self.success_rate - baseline.success_rate,
@@ -403,16 +403,11 @@ class BenchmarkRunner:
     def _check_success(self, task: BenchmarkTask, output: str) -> bool:
         """Check if a task was completed successfully."""
         # Check expected output (substring match)
-        if task.expected_output:
-            if task.expected_output.lower() not in output.lower():
-                return False
+        if task.expected_output and task.expected_output.lower() not in output.lower():
+            return False
 
         # Check expected files
-        for file_path in task.expected_files:
-            if not Path(file_path).exists():
-                return False
-
-        return True
+        return all(Path(file_path).exists() for file_path in task.expected_files)
 
     def save_report(self, report: BenchmarkReport, filename: str | None = None):
         """Save a benchmark report to JSON."""
@@ -472,7 +467,7 @@ async def main():
         baseline = runner.load_baseline(args.baseline)
         if baseline:
             comparison = report.compare_to(baseline)
-            print(f"\nBaseline comparison:")
+            print("\nBaseline comparison:")
             print(f"  Success rate: {comparison['success_rate_delta']:+.0%}")
             print(f"  Latency: {comparison['latency_delta_ms']:+.0f}ms")
             if comparison["regressions"]:

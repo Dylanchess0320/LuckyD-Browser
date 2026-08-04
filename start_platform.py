@@ -24,6 +24,7 @@ Usage:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import subprocess
 import sys
 import time
@@ -162,10 +163,8 @@ async def launch(harness: bool = True, browser: bool = True):
                 p.terminate()
                 p.wait(timeout=5.0)
             except Exception:
-                try:
+                with contextlib.suppress(Exception):
                     p.kill()
-                except Exception:
-                    pass
 
 
 def main():

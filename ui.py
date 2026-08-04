@@ -642,10 +642,8 @@ class WebUI:
         send = self._send
         if send is None:
             return
-        try:
+        with contextlib.suppress(Exception):
             send(event)
-        except Exception:
-            pass
 
     # ── Session info ─────────────────────────────────────────────
 

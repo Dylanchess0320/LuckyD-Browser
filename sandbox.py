@@ -6,6 +6,7 @@ Guards against destructive operations — the heart of principle #3.
 import platform
 import re
 import subprocess
+from pathlib import Path
 from typing import NamedTuple
 
 from config import COMMAND_TIMEOUT_SEC, MAX_OUTPUT_CHARS, PROJECT_DIR
@@ -176,8 +177,8 @@ def execute_batch(commands: list[str], cwd: str | None = None) -> list[CommandRe
 
 # ── E2B-style Isolated Execution ───────────────────────────────────────
 
-import tempfile
 import shutil
+import tempfile
 from contextlib import contextmanager
 
 

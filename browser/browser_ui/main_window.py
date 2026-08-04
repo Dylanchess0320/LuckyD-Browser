@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import contextlib
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
 from browser_core.profile import incognito_profile
-from browser_core.updater import UpdateChecker, ReleaseDownloader, ReleaseInfo
+from browser_core.updater import ReleaseDownloader, ReleaseInfo, UpdateChecker
 from PySide6.QtCore import Qt, QTimer, QUrl
 from PySide6.QtGui import QAction, QKeySequence, QShortcut
 from PySide6.QtWebEngineCore import QWebEnginePage
@@ -104,10 +105,8 @@ class MainWindow(QMainWindow):
         """Show a transient toast notification (if the toast manager is up)."""
         toasts = getattr(self, "toasts", None)
         if toasts is not None:
-            try:
+            with contextlib.suppress(Exception):
                 toasts.show(message, kind)
-            except Exception:
-                pass
 
     def _toggle_assistant(self) -> None:
         """Toggle the AI assistant sidebar."""
@@ -862,10 +861,10 @@ class MainWindow(QMainWindow):
     def show_about(self) -> None:
         from PySide6.QtWidgets import (
             QDialog,
-            QVBoxLayout,
-            QLabel,
             QDialogButtonBox,
+            QLabel,
             QPushButton,
+            QVBoxLayout,
         )
 
         try:
@@ -876,11 +875,8 @@ class MainWindow(QMainWindow):
         channel = "Standalone build" if getattr(sys, "frozen", False) else "Source (dev)"
         last_checked = str(self.settings.get("update_last_checked", "") or "").strip()
         skipped = str(self.settings.get("update_skipped_version", "") or "").strip()
-        if last_checked:
-            # Trim ISO timestamp to a friendlier "YYYY-MM-DD HH:MM" form.
-            last_checked = last_checked.replace("T", " ")[:16]
-        else:
-            last_checked = "Never"
+        # Trim ISO timestamp to a friendlier "YYYY-MM-DD HH:MM" form.
+        last_checked = last_checked.replace("T", " ")[:16] if last_checked else "Never"
 
         dlg = QDialog(self)
         dlg.setWindowTitle(f"About {APP_DISPLAY}")
@@ -950,18 +946,16 @@ class MainWindow(QMainWindow):
                 pass
 
         # Record the attempt so "last checked" is always fresh.
-        try:
+        with contextlib.suppress(Exception):
             self.settings.set(
                 "update_last_checked",
                 __import__("datetime").datetime.now().isoformat(timespec="seconds"),
             )
-        except Exception:
-            pass
 
         current = self._current_version()
         checker = UpdateChecker(current, parent=self)
         self._update_checker = checker
-        checker.updateAvailable.connect(lambda info: self._on_update_available(info, silent))
+        checker.update_available.connect(lambda info: self._on_update_available(info, silent))
         checker.noUpdate.connect(lambda: self._on_no_update(silent))
         checker.failed.connect(lambda msg: self._on_update_failed(msg, silent))
         checker.finished.connect(self._on_update_checker_finished)
@@ -972,10 +966,8 @@ class MainWindow(QMainWindow):
         checker = self.sender()
         if self._update_checker is checker:
             self._update_checker = None
-        try:
+        with contextlib.suppress(Exception):
             checker.deleteLater()
-        except Exception:
-            pass
 
     def _on_no_update(self, silent: bool) -> None:
         if not silent:
@@ -1070,7 +1062,7 @@ class MainWindow(QMainWindow):
             self.toast(f"Update download failed: {msg}", "error")
 
         dl.progress.connect(_on_progress)
-        dl.finishedOk.connect(_on_done)
+        dl.finished_ok.connect(_on_done)
         dl.failed.connect(_on_error)
         progress.canceled.connect(dl.terminate)
         dl.start()
@@ -1080,17 +1072,16 @@ class MainWindow(QMainWindow):
 
         current_exe = Path(sys.executable).resolve()
         new_exe = Path(installer_path).resolve()
-        script = tempfile.NamedTemporaryFile(
+        with tempfile.NamedTemporaryFile(
             mode="w", suffix=".bat", delete=False, encoding="utf-8"
-        )
-        script.write(
-            "@echo off\r\n"
-            "timeout /t 2 /nobreak >nul\r\n"
-            f'move /y "{new_exe}" "{current_exe}"\r\n'
-            f'start "" "{current_exe}"\r\n'
-            'del "%~f0"\r\n'
-        )
-        script.close()
+        ) as script:
+            script.write(
+                "@echo off\r\n"
+                "timeout /t 2 /nobreak >nul\r\n"
+                f'move /y "{new_exe}" "{current_exe}"\r\n'
+                f'start "" "{current_exe}"\r\n'
+                'del "%~f0"\r\n'
+            )
 
         QMessageBox.information(
             self,

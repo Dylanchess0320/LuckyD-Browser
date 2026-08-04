@@ -14,6 +14,7 @@ Connection notes (learned the hard way):
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 
 import httpx
@@ -62,10 +63,9 @@ class CdpPage:
         )
         page = cls(ws)
         await page.cmd("Page.enable")
-        try:
+        # Runtime.evaluate works without Runtime.enable on Qt WebEngine
+        with contextlib.suppress(RuntimeError):
             await page.cmd("Runtime.enable")
-        except RuntimeError:
-            pass  # Runtime.evaluate works without it on Qt WebEngine
         return page
 
     async def cmd(self, method: str, params: dict | None = None) -> dict:
@@ -115,10 +115,8 @@ class CdpPage:
             )
 
     async def close(self) -> None:
-        try:
+        with contextlib.suppress(Exception):
             await self._ws.close()
-        except Exception:
-            pass
 
 
 class CdpDriver:
@@ -156,10 +154,9 @@ class CdpDriver:
         ):
             snap.setdefault(key, default)
         if self._vision:
-            try:
+            # vision is best-effort; the DOM snapshot still works
+            with contextlib.suppress(Exception):
                 snap["shot_b64"] = await self._page.screenshot_b64()
-            except Exception:
-                pass  # vision is best-effort; the DOM snapshot still works
         return snap
 
     async def act(self, action: dict) -> str:
