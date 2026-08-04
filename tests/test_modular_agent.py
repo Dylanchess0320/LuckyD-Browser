@@ -6,6 +6,9 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+# Intentionally fake API key for tests (not a real secret).
+TEST_API_KEY = "test-api-key"
+
 
 @pytest.fixture
 def modular_agent():
@@ -13,7 +16,7 @@ def modular_agent():
     with patch("llm.ProviderRouter"):
         from core.agent_loop import CodingAgent
 
-        ag = CodingAgent(api_key="sk-test-key", model="test-model", temperature=0.0, max_tokens=100)
+        ag = CodingAgent(api_key=TEST_API_KEY, model="test-model", temperature=0.0, max_tokens=100)
         return ag
 
 
