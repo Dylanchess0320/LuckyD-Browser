@@ -99,6 +99,6 @@ browser/version_info.txt
 browser/_dbg_src.js
 browser/test_*.py
 *.spec
-"browser/LuckyD-Launch/*.exe"  
-"browser/installer/output/*.exe"  
-`nbrowser/installer/output/
+browser/LuckyD-Launch/*.exe
+browser/installer/output/*.exe
+browser/installer/output/
