@@ -1,0 +1,26 @@
+========================================================
+  LUCKYD BROWSER — LAUNCH PACKAGE (everything you need)
+========================================================
+
+CONTENTS
+  README.md                     -> push to the repo root (rename target: README.md)
+  RELEASE_NOTES.md              -> paste into the GitHub Release (SHA-256 already filled in)
+  PROMO_KIT.md                  -> Show HN / Reddit / X / Product Hunt posts, ready to paste
+  LuckyDBrowserSetup-1.3.0.exe  -> attach this to the Release (164.7 MB)
+  sha256.txt                    -> the installer's checksum
+  docs\screenshots\sidebar.png  -> hero image (also: repo Settings -> Social preview)
+  docs\screenshots\hq.png       -> second screenshot
+
+LAUNCH CHECKLIST
+  1. Push README.md + docs\screenshots\ to github.com/Dylanchess0320/LuckyD-Browser
+  2. Repo -> About (gear icon): paste the description + topics from PROMO_KIT.md,
+     and upload sidebar.png as the Social preview image
+  3. Releases -> Draft new release -> tag v1.3.0 -> paste RELEASE_NOTES.md,
+     attach LuckyDBrowserSetup-1.3.0.exe -> Publish
+  4. Post the Show HN (Tue-Thu, 8-10am ET) + r/LocalLLaMA same day (texts in PROMO_KIT.md)
+  5. Reply to every comment for the first 3 hours
+
+SHA-256 (LuckyDBrowserSetup-1.3.0.exe)
+  02B756A6EE90619B80E615DA8545CA8DAE4D3522C0FD31B50ED64ED7EC86CA3F
+
+Good luck!

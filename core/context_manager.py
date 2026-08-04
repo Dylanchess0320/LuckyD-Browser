@@ -160,11 +160,13 @@ class ContextManager:
         max_messages: int = 40,
         keep_recent: int = 20,
         summarizer_fn: Callable[[str], str] | None = None,
+        max_tool_result_chars: int = 2000,
     ):
         self.strategy = strategy
         self.max_messages = max_messages
         self.keep_recent = keep_recent
         self.summarizer_fn = summarizer_fn
+        self.max_tool_result_chars = max_tool_result_chars
 
     def set_strategy(self, strategy: CompactionStrategy):
         self.strategy = strategy
@@ -174,7 +176,12 @@ class ContextManager:
         if self.strategy == CompactionStrategy.NONE:
             return messages
         elif self.strategy == CompactionStrategy.TRUNCATE:
-            return truncate_messages(messages, self.max_messages, self.keep_recent)
+            return truncate_messages(
+                messages,
+                self.max_messages,
+                self.keep_recent,
+                max_tool_output_chars=self.max_tool_result_chars,
+            )
         elif self.strategy == CompactionStrategy.SUMMARIZE:
             return await summarize_messages(
                 messages, self.max_messages, self.keep_recent, self.summarizer_fn
@@ -186,8 +193,50 @@ class ContextManager:
                 )
                 if len(result) <= self.max_messages:
                     return result
-            return truncate_messages(messages, self.max_messages, self.keep_recent)
+            return truncate_messages(
+                messages,
+                self.max_messages,
+                self.keep_recent,
+                max_tool_output_chars=self.max_tool_result_chars,
+            )
+        elif self.strategy == CompactionStrategy.MICROCOMPACT:
+            return await self._microcompact(messages)
         return messages
+
+    async def _microcompact(self, messages: list[dict]) -> list[dict]:
+        """Aggressive micro-compaction: shrink large tool results in older messages.
+
+        Keeps the most recent ``keep_recent`` messages intact. For older messages,
+        any ``tool`` role message whose content exceeds ``max_tool_result_chars``
+        is replaced with a short placeholder noting the tool_call_id and original
+        length. Non-tool messages are left alone. Falls back to truncation if the
+        result is still over ``max_messages``.
+        """
+        result: list[dict] = []
+        cutoff = max(0, len(messages) - self.keep_recent)
+        for i, msg in enumerate(messages):
+            if i >= cutoff or msg.get("role") != "tool":
+                result.append(msg)
+                continue
+            content = msg.get("content", "")
+            if not isinstance(content, str) or len(content) <= self.max_tool_result_chars:
+                result.append(msg)
+                continue
+            call_id = msg.get("tool_call_id", "?")
+            compacted = dict(msg)
+            compacted["content"] = (
+                f"[microcompact] tool result {call_id} elided "
+                f"({len(content)} chars, originally returned successfully)"
+            )
+            result.append(compacted)
+        if len(result) > self.max_messages:
+            return truncate_messages(
+                result,
+                self.max_messages,
+                self.keep_recent,
+                max_tool_output_chars=self.max_tool_result_chars,
+            )
+        return result
 
     @staticmethod
     def estimate_tokens(text: str) -> int:

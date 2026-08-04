@@ -11,6 +11,28 @@ import shutil
 import sys
 import time
 
+# ── Windows ANSI/VT support ───────────────────────────────────────
+# On Windows, ANSI escape codes only work if Virtual Terminal Processing
+# is explicitly enabled on the console handle. Do this once at import time
+# so both the Rich and ANSI-fallback paths render colors correctly.
+if platform.system() == "Windows":
+    try:
+        import ctypes
+
+        _kernel32 = ctypes.windll.kernel32
+        # STD_OUTPUT_HANDLE = -11, ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004
+        for _handle_id in (-11, -12):  # stdout, stderr
+            _handle = _kernel32.GetStdHandle(_handle_id)
+            _mode = ctypes.c_ulong()
+            if _kernel32.GetConsoleMode(_handle, ctypes.byref(_mode)):
+                _kernel32.SetConsoleMode(_handle, _mode.value | 0x0004)
+    except Exception:
+        # Fall back to colorama if raw ctypes fails
+        with contextlib.suppress(Exception):
+            import colorama
+
+            colorama.init()
+
 # ── Rich detection ────────────────────────────────────────────────────
 
 _RICH_AVAILABLE = False
@@ -256,9 +278,7 @@ class TerminalUI:
     def show_question(self, question: str) -> None:
         """Echo the user question before streaming the response."""
         if self.rich:
-            self._console.print(
-                f"\n  {self._dim('you')}  [{BRAND['answer']}]{question}[/]"
-            )
+            self._console.print(f"\n  {self._dim('you')}  [{BRAND['answer']}]{question}[/]")
         else:
             print(
                 f"\n  {ANSI['dim']}you{ANSI['reset']}  "
@@ -754,13 +774,9 @@ class WebUI:
 
     def tool_call_start(self, tool_name: str, args: dict | None = None) -> None:
         self._tool_count += 1
-        self._emit(
-            {"type": "tool_start", "name": tool_name, "args": self._clean_args(args)}
-        )
+        self._emit({"type": "tool_start", "name": tool_name, "args": self._clean_args(args)})
 
-    def tool_call_result(
-        self, tool_name: str, elapsed: float, ok: bool, preview: str
-    ) -> None:
+    def tool_call_result(self, tool_name: str, elapsed: float, ok: bool, preview: str) -> None:
         self._emit(
             {
                 "type": "tool_result",

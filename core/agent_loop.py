@@ -91,6 +91,10 @@ class CodingAgent:
         self.max_retries = 3
         self.base_delay = 1.0
 
+        # Track consecutive turns with no tool calls to detect premature stopping
+        self._no_tool_call_turns: int = 0
+        self._max_no_tool_call_turns: int = 2  # Allow 1 retry before giving up
+
         # Cost tracking (for /cost, goodbye)
         self._cost_tracker = CostTracker()
 
@@ -128,6 +132,20 @@ class CodingAgent:
         )
         self.message_builder = MessageBuilder()
         self.hooks = get_hooks()
+
+        # Advanced tool result processing
+        try:
+            from core.tool_result_handler import get_tool_result_handler
+
+            self._result_handler = get_tool_result_handler(
+                max_output_chars=self.max_output_chars,
+                max_session_chars=cfg.get("max_session_chars", 100000),
+                enable_continuation=cfg.get("enable_continuation", True),
+                enable_truncation=cfg.get("enable_truncation", True),
+                enable_backpressure=cfg.get("enable_backpressure", True),
+            )
+        except Exception:
+            self._result_handler = None
 
         # Project intelligence
         try:
@@ -266,10 +284,40 @@ class CodingAgent:
             }
 
         content = result.text
-        if len(content) > self.max_output_chars:
-            content = content[: self.max_output_chars] + "\n... [output truncated]"
         if result.error and not content.startswith("Error"):
             content = f"Error: {content}"
+
+        # ── Advanced tool result processing pipeline ──────────────────────
+        # Stage 1: Backpressure — rate limit, size cap, token budget
+        # Stage 2: Truncation — semantic, diff-aware, head/tail
+        # Stage 3: Continuation — multi-part results with offset/limit
+        if self._result_handler is not None:
+            from core.tool_result_handler import ToolResult
+
+            tool_result = ToolResult(text=content, error=result.error)
+            processed = self._result_handler.process(
+                tool_result, tool_name, call_id, max_chars=self.max_output_chars
+            )
+            content = processed.text
+            # Register continuation if result was truncated
+            if len(result.text) > self.max_output_chars and not result.error:
+                self._emit_event(
+                    AgentEventType.TOOL_RESULT_TRUNCATED,
+                    {
+                        "tool": tool_name,
+                        "call_id": call_id,
+                        "original_size": len(result.text),
+                        "truncated_size": len(content),
+                        "has_continuation": self._result_handler.continuation.get_continuation(
+                            call_id
+                        )
+                        is not None,
+                    },
+                )
+        else:
+            # Legacy simple truncation
+            if len(content) > self.max_output_chars:
+                content = content[: self.max_output_chars] + "\n... [output truncated]"
 
         tool_result_msg = {"role": "tool", "tool_call_id": call_id, "content": content}
 
@@ -377,6 +425,44 @@ class CodingAgent:
             return choice.get("message", {})
         except Exception:
             return None
+
+    def _should_continue(self, assistant_msg: dict) -> str | None:
+        """Return a continuation prompt if the agent stopped prematurely, else None.
+
+        Detects two premature-stop cases:
+        1. finish_reason == "length" (output truncated by max_tokens)
+        2. Content ends with a continuation phrase ("Continuing", "Let me continue", etc.)
+        """
+        # Case 1: truncated by token limit
+        finish_reason = assistant_msg.get("_finish_reason", "") or assistant_msg.get(
+            "finish_reason", ""
+        )
+        if finish_reason == "length":
+            return (
+                "Your previous response was cut off due to the token limit. "
+                "Please continue from where you left off."
+            )
+
+        # Case 2: ends with a continuation phrase
+        content = (assistant_msg.get("content") or "").strip()
+        if content:
+            lower = content.lower()
+            continuation_phrases = [
+                "continuing",
+                "let me continue",
+                "i'll continue",
+                "to be continued",
+                "continuing from where",
+                "let me keep going",
+                "moving on to",
+            ]
+            for phrase in continuation_phrases:
+                # Check if the phrase appears in the last 80 chars
+                tail = lower[-80:]
+                if phrase in tail:
+                    return "Please continue from where you left off."
+
+        return None
 
     async def run(self, user_message: str, max_turns: int | None = None) -> str:
         """Run the full agent loop with hooks, events, checkpointing, and memory extraction.
@@ -514,9 +600,29 @@ class CodingAgent:
             tool_calls = assistant_msg.get("tool_calls", [])
 
             if not tool_calls:
+                # Check whether the agent stopped prematurely and should keep going
+                continuation = self._should_continue(assistant_msg)
+                if continuation and self._no_tool_call_turns < self._max_no_tool_call_turns:
+                    self._no_tool_call_turns += 1
+                    self._emit_event(
+                        AgentEventType.TURN_END,
+                        {"final": False, "continuation": True, "turn": self.turn_count},
+                    )
+                    print(
+                        f"\n  [CONT] Response appears incomplete — requesting continuation "
+                        f"({self._no_tool_call_turns}/{self._max_no_tool_call_turns})"
+                    )
+                    self.messages.append({"role": "user", "content": continuation})
+                    continue
+
+                # Genuine final answer
+                self._no_tool_call_turns = 0
                 final_text = content
                 self._emit_event(AgentEventType.TURN_END, {"final": True})
                 break
+
+            # Tool calls present — reset the no-tool-call counter
+            self._no_tool_call_turns = 0
 
             tool_results = []
             hint_messages = []
@@ -643,4 +749,3 @@ class CodingAgent:
         from core.hooks import reset_hooks
 
         reset_hooks()
-

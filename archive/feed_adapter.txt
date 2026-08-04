@@ -1,0 +1,215 @@
+﻿package com.dylan.whattowatch.feed
+
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
+import android.view.GestureDetector
+import android.view.HapticFeedbackConstants
+import android.view.LayoutInflater
+import android.view.MotionEvent
+import android.view.View
+import android.view.ViewGroup
+import android.widget.ImageView
+import androidx.recyclerview.widget.RecyclerView
+import coil.Coil
+import coil.load
+import coil.request.ImageRequest
+import com.dylan.whattowatch.R
+import com.dylan.whattowatch.data.GenreMap
+import com.dylan.whattowatch.data.Title
+import com.dylan.whattowatch.data.compactCount
+import com.dylan.whattowatch.databinding.ItemFeedBinding
+
+/** RecyclerView adapter backing the vertical TikTok-style pager. */
+class FeedAdapter(
+    private val onAction: (action: Action, title: Title, position: Int) -> Unit,
+    private val onSingleTap: (title: Title, position: Int) -> Unit,
+    private val onDoubleTap: (title: Title, position: Int, binding: ItemFeedBinding, x: Float, y: Float) -> Unit,
+    private val isLiked: (String) -> Boolean,
+    private val isWatched: (String) -> Boolean,
+    private val isWatchlisted: (String) -> Boolean,
+    private val matchPercent: ((Title) -> Int)? = null,
+) : RecyclerView.Adapter<FeedAdapter.VH>() {
+
+    enum class Action { LIKE, WATCHED, SKIP, WATCHLIST, TRAILER, DETAILS }
+
+    private val items = ArrayList<Title>()
+
+    fun append(newItems: List<Title>) {
+        if (newItems.isEmpty()) return
+        val start = items.size
+        items += newItems
+        notifyItemRangeInserted(start, newItems.size)
+    }
+
+    fun clearAll() {
+        val n = items.size
+        items.clear()
+        notifyItemRangeRemoved(0, n)
+    }
+
+    fun getItem(position: Int): Title? = items.getOrNull(position)
+
+    override fun getItemCount(): Int = items.size
+
+    /** Re-apply rail button state without rebinding images (no flicker). */
+    fun refreshState(position: Int) {
+        if (position in items.indices) notifyItemChanged(position, PAYLOAD_STATE)
+    }
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH =
+        VH(ItemFeedBinding.inflate(LayoutInflater.from(parent.context), parent, false))
+
+    override fun onBindViewHolder(holder: VH, position: Int) {
+        holder.bind(items[position])
+        prefetchAhead(holder, position)
+    }
+
+    override fun onBindViewHolder(holder: VH, position: Int, payloads: MutableList<Any>) {
+        if (payloads.contains(PAYLOAD_STATE)) {
+            holder.updateState(items[position])
+        } else {
+            super.onBindViewHolder(holder, position, payloads)
+        }
+    }
+
+    /** Warm Coil's cache for the next few pages so swiping feels instant. */
+    private fun prefetchAhead(holder: VH, position: Int) {
+        val context = holder.binding.root.context
+        val loader = Coil.imageLoader(context)
+        val end = minOf(position + PREFETCH_COUNT, items.lastIndex)
+        for (i in position + 1..end) {
+            val url = items[i].backdropUrl() ?: continue
+            loader.enqueue(ImageRequest.Builder(context).data(url).build())
+        }
+    }
+
+    inner class VH(val binding: ItemFeedBinding) : RecyclerView.ViewHolder(binding.root) {
+
+        @android.annotation.SuppressLint("ClickableViewAccessibility")
+        fun bind(t: Title) {
+            val placeholder = ColorDrawable(Color.parseColor("#16161F"))
+                        binding.backdrop.load(t.backdropUrl()) {
+                crossfade(250)
+                placeholder(placeholder)
+                error(placeholder)
+            }
+            binding.ratingText.text = if (t.rating > 0) "%.1f".format(t.rating) else "–"
+                        binding.meta.text = buildString {
+                if (t.votes > 0) append(compactCount(t.votes)).append(" votes")
+                else append("New")
+                append("  ·  ").append(t.year)
+                append("  ·  ").append(if (t.mediaType == "movie") "Movie" else "TV")
+            }
+            binding.genres.text = GenreMap.names(t.mediaType, t.genreIds)
+                .take(3).joinToString("  ·  ")
+            binding.overview.text = t.overview
+
+            val mp = matchPercent?.invoke(t)?.takeIf { it > 52 }
+            binding.matchText.apply {
+                if (mp != null) {
+                    visibility = View.VISIBLE
+                    text = "✨ ${mp}% match"
+                } else {
+                    visibility = View.GONE
+                }
+            }
+
+            // Reset any leftover heart animation from a recycled page
+            binding.heartBurst.apply {
+                animate().cancel()
+                visibility = View.INVISIBLE
+                alpha = 1f
+                translationX = 0f
+                translationY = 0f
+                scaleX = 1f
+                scaleY = 1f
+            }
+
+            updateState(t)
+
+            binding.btnLike.setOnClickListener {
+                bounce(it)
+                it.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
+                val pos = bindingAdapterPosition
+                if (pos != RecyclerView.NO_POSITION) onAction(Action.LIKE, t, pos)
+            }
+            binding.btnWatched.setOnClickListener {
+                bounce(it)
+                it.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
+                val pos = bindingAdapterPosition
+                if (pos != RecyclerView.NO_POSITION) onAction(Action.WATCHED, t, pos)
+            }
+            binding.btnSkip.setOnClickListener {
+                it.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
+                val pos = bindingAdapterPosition
+                if (pos != RecyclerView.NO_POSITION) onAction(Action.SKIP, t, pos)
+            }
+            binding.btnWatchlist.setOnClickListener {
+                bounce(it)
+                it.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
+                val pos = bindingAdapterPosition
+                if (pos != RecyclerView.NO_POSITION) onAction(Action.WATCHLIST, t, pos)
+            }
+            binding.btnTrailer.setOnClickListener {
+                it.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
+                val pos = bindingAdapterPosition
+                if (pos != RecyclerView.NO_POSITION) onAction(Action.TRAILER, t, pos)
+            }
+            binding.btnInfo.setOnClickListener {
+                it.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
+                val pos = bindingAdapterPosition
+                if (pos != RecyclerView.NO_POSITION) onAction(Action.DETAILS, t, pos)
+            }
+
+            // Tap / double-tap layer. Returning true on DOWN is safe: ViewPager2's
+            // RecyclerView still intercepts vertical drags via onInterceptTouchEvent.
+            val detector = GestureDetector(binding.root.context,
+                object : GestureDetector.SimpleOnGestureListener() {
+                    override fun onDown(e: MotionEvent): Boolean = true
+
+                    override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
+                        val pos = bindingAdapterPosition
+                        if (pos != RecyclerView.NO_POSITION) onSingleTap(t, pos)
+                        return true
+                    }
+
+                    override fun onDoubleTap(e: MotionEvent): Boolean {
+                        val pos = bindingAdapterPosition
+                        if (pos != RecyclerView.NO_POSITION) {
+                            onDoubleTap(t, pos, binding, e.x, e.y)
+                        }
+                        return true
+                    }
+                })
+            binding.touchLayer.setOnTouchListener { _, ev -> detector.onTouchEvent(ev) }
+        }
+
+        /** Reflect persisted profile state on the rail buttons. */
+        fun updateState(t: Title) {
+            val liked = isLiked(t.key)
+            binding.btnLikeImg.setImageResource(if (liked) R.drawable.ic_heart_filled else R.drawable.ic_heart_outline)
+            binding.btnLikeImg.setColorFilter(Color.parseColor(if (liked) "#FF2D55" else "#FFFFFF"))
+
+            val watched = isWatched(t.key)
+            binding.btnWatchedImg.setColorFilter(Color.parseColor(if (watched) "#00E68C" else "#FFFFFF"))
+            binding.btnWatchedImg.alpha = if (watched) 1f else 0.75f
+
+            val saved = isWatchlisted(t.key)
+            binding.btnWatchlistImg.setImageResource(if (saved) R.drawable.ic_bookmark_filled else R.drawable.ic_bookmark_outline)
+            binding.btnWatchlistImg.setColorFilter(Color.parseColor(if (saved) "#F5C518" else "#FFFFFF"))
+        }
+
+        private fun bounce(v: View) {
+            v.animate().cancel()
+            v.animate().scaleX(1.35f).scaleY(1.35f).setDuration(110).withEndAction {
+                v.animate().scaleX(1f).scaleY(1f).setDuration(140).start()
+            }.start()
+        }
+    }
+
+    companion object {
+        private const val PAYLOAD_STATE = "state"
+        private const val PREFETCH_COUNT = 3
+    }
+}
+

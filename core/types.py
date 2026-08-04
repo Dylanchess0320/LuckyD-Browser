@@ -44,6 +44,9 @@ class AgentEventType(Enum):
     CONTEXT_TRUNCATED = "context_truncated"
     MEMORY_REFRESH = "memory_refresh"
     CHECKPOINT_CREATED = "checkpoint_created"
+    TOOL_RESULT_TRUNCATED = "tool_result_truncated"
+    TOOL_CONTINUATION = "tool_continuation"
+    BACKPRESSURE_APPLIED = "backpressure_applied"
 
 
 class CompactionStrategy(Enum):
@@ -53,6 +56,7 @@ class CompactionStrategy(Enum):
     TRUNCATE = "truncate"  # Simple truncation (current default)
     SUMMARIZE = "summarize"  # LLM-based summarization of old turns
     HYBRID = "hybrid"  # Summarize old, keep recent intact
+    MICROCOMPACT = "microcompact"  # Aggressive micro-compaction of tool results
 
 
 class ToolPermissionLevel(Enum):
@@ -109,6 +113,18 @@ class ToolApprovalResult:
 
     approved: bool
     reason: str | None = None
+
+
+@dataclass
+class ToolResult:
+    """Standardized tool result with metadata."""
+
+    text: str
+    error: bool = False
+    metadata: dict[str, Any] = field(default_factory=dict)
+    duration_ms: float = 0.0
+    truncated: bool = False
+    has_continuation: bool = False
 
 
 # ── Agent state ───────────────────────────────────────────────────────

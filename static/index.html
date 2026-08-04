@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LuckyD Code</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90' fill='%2300E5FF'>◆</text></svg>">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+</head>
+<body>
+
+<header id="topbar">
+  <div class="brand">◆ LuckyD Code <span class="ver">v2.1.0</span> <span class="pill">web</span></div>
+  <div class="session" id="session-info">connecting…</div>
+  <div class="top-actions">
+    <span id="cost-pill" class="cost" title="Session token usage / cost"></span>
+    <label class="toggle" title="Auto-approve all tool calls without asking">
+      <input type="checkbox" id="auto-approve"><span>auto-approve</span>
+    </label>
+    <span id="ws-dot" class="dot disconnected" title="Connection status"></span>
+    <button id="panel-toggle" class="ghost" title="Toggle side panel">☰</button>
+  </div>
+</header>
+
+<main id="main">
+  <div id="chat-wrap">
+    <div id="chat"></div>
+    <div id="input-area">
+      <div id="slash-popup" class="hidden"></div>
+      <textarea id="input" rows="1"
+        placeholder="Message LuckyD Code…   ( / for commands · Enter to send · Shift+Enter for newline )"></textarea>
+      <button id="send" title="Send (Enter)">➤</button>
+    </div>
+  </div>
+
+  <aside id="panel" class="hidden">
+    <nav id="panel-tabs">
+      <button data-tab="commands" class="active">Commands</button>
+      <button data-tab="models">Models</button>
+      <button data-tab="tools">Tools</button>
+    </nav>
+    <div id="tab-commands" class="tab"></div>
+    <div id="tab-models" class="tab hidden"></div>
+    <div id="tab-tools" class="tab hidden"></div>
+  </aside>
+</main>
+
+<div id="approval-modal" class="modal hidden">
+  <div class="modal-card">
+    <div class="modal-title">⚠ Tool approval required</div>
+    <div class="modal-tool" id="approval-tool"></div>
+    <pre id="approval-args"></pre>
+    <div class="modal-actions">
+      <button id="approve-y" class="btn-ok">Approve</button>
+      <button id="approve-n" class="btn-no">Deny</button>
+      <button id="approve-a" class="btn-always">Always allow</button>
+    </div>
+    <div class="modal-hint">Times out (denied) after 5 minutes</div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.5/dist/purify.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

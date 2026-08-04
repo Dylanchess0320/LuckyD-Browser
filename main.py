@@ -122,20 +122,35 @@ def model_catalog() -> list[dict]:
             "tier": "paid",
             "label": "Paid — costs money",
             "groups": [
-                {"provider": "OpenAI", "models": ["gpt-4o", "gpt-4o-mini", "o1-preview", "o1-mini"]},
-                {"provider": "Anthropic", "models": [
-                    "claude-sonnet-4-20250514",
-                    "claude-opus-4-20250514",
-                    "claude-3-5-haiku-20241022",
-                ]},
-                {"provider": "Google", "models": ["gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"]},
-                {"provider": "DeepSeek", "models": ["deepseek-chat", "deepseek-reasoner", "deepseek-coder"]},
+                {
+                    "provider": "OpenAI",
+                    "models": ["gpt-4o", "gpt-4o-mini", "o1-preview", "o1-mini"],
+                },
+                {
+                    "provider": "Anthropic",
+                    "models": [
+                        "claude-sonnet-4-20250514",
+                        "claude-opus-4-20250514",
+                        "claude-3-5-haiku-20241022",
+                    ],
+                },
+                {
+                    "provider": "Google",
+                    "models": ["gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"],
+                },
+                {
+                    "provider": "DeepSeek",
+                    "models": ["deepseek-chat", "deepseek-reasoner", "deepseek-coder"],
+                },
                 {"provider": "Z.ai", "models": ["glm-4.6", "glm-4.5", "glm-4.5-air"]},
-                {"provider": "OpenRouter", "models": [
-                    "deepseek/deepseek-chat-v3.1",
-                    "anthropic/claude-sonnet-4",
-                    "google/gemini-2.0-flash-001",
-                ]},
+                {
+                    "provider": "OpenRouter",
+                    "models": [
+                        "deepseek/deepseek-chat-v3.1",
+                        "anthropic/claude-sonnet-4",
+                        "google/gemini-2.0-flash-001",
+                    ],
+                },
                 {"provider": "ClinePass (subscription)", "models": clinepass_paid},
                 {"provider": "Cline Usage (credit-billed)", "models": cline_paid},
             ],
@@ -284,9 +299,7 @@ def _resolve_provider(provider_hint: str | None, model_name: str) -> dict:
             "cline-usage": "deepseek/deepseek-chat",
         }
         resolved_model = (
-            model_name
-            or os.environ.get(env_model, "")
-            or _model_defaults.get(provider_hint, "")
+            model_name or os.environ.get(env_model, "") or _model_defaults.get(provider_hint, "")
         )
         if not resolved_model:
             ui.warn(f"{provider_hint} model name required. Try: /model {provider_hint} <name>")
@@ -395,6 +408,7 @@ def _console_approval(request) -> type(None):
         "content": "Tool execution denied by user.",
     }
 
+
 async def handle_command(agent: CodingAgent, cmd: str) -> bool:
     """
     Handle a slash command. Returns True if the REPL should exit,
@@ -449,9 +463,17 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
             provider = None
             desired = raw
             for p in (
-                "cline-usage", "cline-pass", "clinepass", "cline",
-                "openrouter", "anthropic", "deepseek", "openai",
-                "google", "ollama", "zai",
+                "cline-usage",
+                "cline-pass",
+                "clinepass",
+                "cline",
+                "openrouter",
+                "anthropic",
+                "deepseek",
+                "openai",
+                "google",
+                "ollama",
+                "zai",
             ):
                 if raw.lower().startswith(p + " "):
                     provider = _PROVIDER_ALIASES.get(p, p)
@@ -595,6 +617,7 @@ async def run_repl(agent: CodingAgent):
             n_srv = await mcp_manager.connect_all()
             if n_srv:
                 from tools.mcp_tools import register_mcp_tools
+
                 n_tools = register_mcp_tools(mcp_manager)
                 print(f"  [MCP] {n_srv} server(s), {n_tools} tool(s) registered")
     except Exception as e:
@@ -701,6 +724,7 @@ def _cli_model(args):
             return pairs["CLINEPASS_MODEL"]
         try:
             from core.providers import resolve_provider_config
+
             cfg = resolve_provider_config()
             return cfg.get("model", "unknown")
         except Exception:
@@ -863,9 +887,7 @@ Environment:
 
     # Validate API key
     provider = cfg.get("provider", "deepseek")
-    if provider != "ollama" and (
-        not cfg["api_key"] or cfg["api_key"] == "sk-your-api-key-here"
-    ):
+    if provider != "ollama" and (not cfg["api_key"] or cfg["api_key"] == "sk-your-api-key-here"):
         from core.providers import PROVIDER_DEFAULTS, PROVIDER_NAMES
 
         provider_defaults = PROVIDER_DEFAULTS.get(provider, PROVIDER_DEFAULTS["deepseek"])

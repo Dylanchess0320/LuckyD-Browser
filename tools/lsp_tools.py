@@ -46,7 +46,9 @@ class LspDefinitionTool(ToolBase):
                 return ToolOutput(text=f"File not found: {file_path}", error=True)
 
             source = path.read_text()
-            results = await asyncio.to_thread(lambda: jedi.Script(code=source, path=str(path)).goto(line=line, column=character))
+            results = await asyncio.to_thread(
+                lambda: jedi.Script(code=source, path=str(path)).goto(line=line, column=character)
+            )
 
             if not results:
                 return ToolOutput(text="No definition found.", title="Go to Definition")
@@ -84,7 +86,11 @@ class LspReferencesTool(ToolBase):
             jedi = _get_jedi()
             path = _resolve_path(file_path)
             source = path.read_text()
-            results = await asyncio.to_thread(lambda: jedi.Script(code=source, path=str(path)).get_references(line=line, column=character))
+            results = await asyncio.to_thread(
+                lambda: jedi.Script(code=source, path=str(path)).get_references(
+                    line=line, column=character
+                )
+            )
 
             if not results:
                 return ToolOutput(text="No references found.", title="Find References")
@@ -219,7 +225,11 @@ class LspDocumentSymbolsTool(ToolBase):
             jedi = _get_jedi()
             path = _resolve_path(file_path)
             source = path.read_text()
-            names = await asyncio.to_thread(lambda: jedi.Script(code=source, path=str(path)).get_names(all_scopes=True, definitions=True))
+            names = await asyncio.to_thread(
+                lambda: jedi.Script(code=source, path=str(path)).get_names(
+                    all_scopes=True, definitions=True
+                )
+            )
 
             parts = []
             for n in names:
@@ -352,13 +362,16 @@ class LspIncomingCallsTool(ToolBase):
             jedi = _get_jedi()
             path = _resolve_path(file_path)
             source = path.read_text()
-            results = await asyncio.to_thread(lambda: jedi.Script(code=source, path=str(path)).goto(line=line, column=character))
+            script = jedi.Script(code=source, path=str(path))
+            results = await asyncio.to_thread(lambda: script.goto(line=line, column=character))
 
             if not results:
                 return ToolOutput(text="No callers found.", title="Callers")
 
             name = results[0].name
-            callers = script.get_references(line=line, column=character, include_builtins=False)
+            callers = await asyncio.to_thread(
+                lambda: script.get_references(line=line, column=character, include_builtins=False)
+            )
 
             parts = []
             for c in callers[:30]:

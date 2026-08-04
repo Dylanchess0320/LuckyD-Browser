@@ -1,0 +1,52 @@
+# LuckyD Browser — built-in ad/tracker domain blocklist
+# One domain per line. Subdomains are matched automatically.
+# Add your own entries, then use Tools -> Reload Ad-Block List.
+#
+# ── General ad/tracker networks ──────────────────────────────────────
+doubleclick.net
+googlesyndication.com
+google-analytics.com
+adservice.google.com
+pagead2.googlesyndication.com
+tpc.googlesyndication.com
+adnxs.com
+adsrvr.org
+adform.net
+advertising.com
+amazon-adsystem.com
+taboola.com
+outbrain.com
+criteo.com
+criteo.net
+pubmatic.com
+rubiconproject.com
+openx.net
+scorecardresearch.com
+quantserve.com
+moatads.com
+doubleverify.com
+ads.yahoo.com
+tracking.yahoo.com
+facebook.net
+hotjar.com
+mouseflow.com
+luckyorange.com
+smartlook.com
+fullstory.com
+
+# ── YouTube-specific ad & tracking domains ────────────────────────────
+# NOTE: googlevideo.com and ytimg.com are NOT listed here because they
+# serve actual video content + thumbnails.  YouTube ad URLs on those
+# domains are handled by the URL pattern engine in adblock.py.
+googleadservices.com
+googleads.g.doubleclick.net
+securepubads.g.doubleclick.net
+ad.doubleclick.net
+static.doubleclick.net
+fundingchoicesmessages.google.com
+googletagmanager.com
+googleoptimize.com
+imasdk.googleapis.com
+partneradserver.dailymotion.com
+2mdn.net
+consent.youtube.com

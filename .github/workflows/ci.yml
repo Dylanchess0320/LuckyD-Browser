@@ -10,29 +10,30 @@ on:
     tags: ["v*"]
   pull_request:
     branches: [main, master]
-  workflow_dispatch: # Allow manual trigger
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   PYTHON_VERSION: "3.10"
-  POETRY_VERSION: "1.8.0"
 
 jobs:
   # ── Quality Checks ──────────────────────────────────────────────────
   quality:
     name: "Code Quality"
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.10", "3.11", "3.12"]
+    timeout-minutes: 10
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Python ${{ matrix.python-version }}
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: ${{ env.PYTHON_VERSION }}
           cache: "pip"
           cache-dependency-path: |
             requirements.txt
@@ -50,18 +51,21 @@ jobs:
         run: ruff check .
 
       - name: Type Check (Mypy)
-        run: mypy tools llm memory project features || true
+        run: mypy tools llm memory project features core browser || true
         continue-on-error: true
 
   # ── Security Scan ───────────────────────────────────────────────────
   security:
     name: "Security Scan"
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: [quality]
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -73,17 +77,25 @@ jobs:
         run: |
           pip install -r requirements-dev.txt
 
+      - name: Secret Scanning (Gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
       - name: Dependency Scanning (Safety)
-        run: safety check -r requirements.txt --continue-on-error || true
+        run: safety scan -r requirements.txt --disable-telemetry || true
+        continue-on-error: true
 
       - name: SAST (Bandit)
-        run: bandit -r tools llm memory project --severity medium --quiet || true
+        run: bandit -r tools llm memory project features core browser --severity medium --quiet || true
         continue-on-error: true
 
   # ── Tests ───────────────────────────────────────────────────────────
   test:
     name: "Tests (Python ${{ matrix.python-version }})"
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
     needs: [quality]
     strategy:
       fail-fast: false
@@ -115,20 +127,25 @@ jobs:
           --cov=llm
           --cov=memory
           --cov=project
+          --cov=core
+          --cov=browser
           --cov-report=xml
           --cov-report=term
           -m "not llm and not slow"
+          --timeout=300
 
       - name: Upload Coverage
         uses: codecov/codecov-action@v4
         with:
           file: ./coverage.xml
           fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   # ── Build ───────────────────────────────────────────────────────────
   build:
     name: "Build Package"
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: [test, security]
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v'))
 
@@ -159,6 +176,7 @@ jobs:
   publish:
     name: "Publish to PyPI"
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: [build]
     if: startsWith(github.ref, 'refs/tags/v')
 
@@ -179,6 +197,7 @@ jobs:
   docker:
     name: "Docker Build"
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: [test]
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     continue-on-error: true
@@ -190,7 +209,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Secrets context isn't allowed in job/step `if`, so probe it in a step.
       - name: Check Docker Hub credentials
         id: docker-creds
         run: |
@@ -213,8 +231,21 @@ jobs:
         with:
           context: .
           push: ${{ steps.docker-creds.outputs.available == 'true' }}
-          tags: |
-            luckyd/coding-agent:latest
-            luckyd/coding-agent:${{ github.ref_name }}
+          tags: luckyd/coding-agent:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # ── Status Check ────────────────────────────────────────────────────
+  status:
+    name: "CI Status"
+    runs-on: ubuntu-latest
+    needs: [quality, security, test]
+    if: always()
+    steps:
+      - name: Check result
+        run: |
+          if [[ "${{ needs.test.result }}" == "failure" ]]; then
+            echo "::error::Tests failed"
+            exit 1
+          fi
+          echo "CI pipeline completed"

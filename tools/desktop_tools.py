@@ -46,6 +46,7 @@ class DesktopScreenshotTool(ToolBase):
                             sct.shot(output=p, region=mon)
                         else:
                             raise ValueError("Region must be x,y,w,h or full")
+
             await asyncio.to_thread(_capture, path, region)
 
             size = Path(path).stat().st_size

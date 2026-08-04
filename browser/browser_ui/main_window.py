@@ -1,0 +1,1106 @@
+"""Main browser window: toolbar, tabs, docks, menus, shortcuts."""
+
+from __future__ import annotations
+
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+from browser_core.profile import incognito_profile
+from browser_core.updater import UpdateChecker, ReleaseDownloader, ReleaseInfo
+from PySide6.QtCore import Qt, QTimer, QUrl
+from PySide6.QtGui import QAction, QKeySequence, QShortcut
+from PySide6.QtWebEngineCore import QWebEnginePage
+from PySide6.QtWebEngineWidgets import QWebEngineView
+from PySide6.QtWidgets import (
+    QDialog,
+    QFileDialog,
+    QLabel,
+    QLineEdit,
+    QMainWindow,
+    QMessageBox,
+    QProgressBar,
+    QToolBar,
+    QVBoxLayout,
+)
+
+from .ai_sidebar import AiSidebar
+from .dialogs import (
+    BookmarksDialog,
+    HistoryDialog,
+    ScriptsDialog,
+    SettingsDialog,
+)
+from .downloads import DownloadsDock
+from .omnibox import Omnibox
+from .palette import CommandPalette
+from .tab_widget import BrowserTabWidget
+from .theme import apply_to_app
+from .toasts import ToastManager
+
+ASSETS_DIR = Path(__file__).resolve().parent.parent / "assets"
+NEWTAB_PATH = ASSETS_DIR / "newtab.html"
+APP_DISPLAY = "LuckyD Browser"
+
+
+class MainWindow(QMainWindow):
+    def __init__(self, app, incognito: bool = False):
+        super().__init__()
+        self._app = app
+        self.settings = app.settings
+        self.storage = app.storage
+        self.incognito = incognito
+
+        if incognito:
+            # Off-the-record profile: cookies/cache vanish when window closes.
+            self.profile = incognito_profile(self)
+            self.profile.setUrlRequestInterceptor(app.adblock)
+            self.profile.downloadRequested.connect(self.downloads_handle)
+        else:
+            self.profile = app.profile
+
+        self.resize(1280, 800)
+        self._dev_window = None
+        self._dev_view = None
+
+        self.tabs = BrowserTabWidget(self)
+        self.setCentralWidget(self.tabs)
+
+        self._build_toolbar()
+        self._build_statusbar()
+        self._build_findbar()
+        self._build_docks()
+        self._build_menus()
+        self._build_shortcuts()
+
+        self.new_tab()
+        self._update_title()
+
+        # ── futuristic UI features ─────────────────────────────────────
+        self._apply_theme()
+        self.toasts = ToastManager(self)
+        # Background update checker / downloader (created lazily on first use).
+        self._update_checker = None
+        self._release_dl = None
+        self._palette = CommandPalette(self)
+        self._palette.closed.connect(lambda: self._palette.hide())
+
+        self.tabs.tabCloseRequested.connect(self._on_tab_closed)
+
+        # ── silent update check shortly after startup ─────────────────
+        if self.settings.get("update_auto_check", True):
+            QTimer.singleShot(8000, lambda: self.check_for_updates(silent=True))
+
+    def _apply_theme(self) -> None:
+        """Apply the current theme (called on startup and when theme changes)."""
+        apply_to_app(self._app.qapp, self.settings)
+        # Keep the AI sidebar's chat bubbles/code in step with the new palette.
+        sidebar = getattr(self, "ai_sidebar", None)
+        if sidebar is not None:
+            sidebar._apply_theme()
+
+    def toast(self, message: str, kind: str = "info") -> None:
+        """Show a transient toast notification (if the toast manager is up)."""
+        toasts = getattr(self, "toasts", None)
+        if toasts is not None:
+            try:
+                toasts.show(message, kind)
+            except Exception:
+                pass
+
+    def _toggle_assistant(self) -> None:
+        """Toggle the AI assistant sidebar."""
+        if self.ai_sidebar.isVisible():
+            self.ai_sidebar.hide()
+        else:
+            self.ai_sidebar.show()
+            self.ai_sidebar.raise_()
+            self.ai_sidebar.input.setFocus()
+
+    def show_assistant(self) -> None:
+        """Show the AI assistant sidebar and focus the input."""
+        self.ai_sidebar.show()
+        self.ai_sidebar.raise_()
+        self.ai_sidebar.input.setFocus()
+        self.ai_act.setChecked(True)
+
+    def show_downloads(self) -> None:
+        """Show the downloads dock."""
+        self.downloads.show()
+        self.downloads.raise_()
+
+    def show_palette(self) -> None:
+        """Show the command palette (Ctrl+K)."""
+        self._palette.show_palette()
+
+    def on_pins_changed(self) -> None:
+        """Called when pinned tabs change."""
+        pass  # placeholder for future use
+
+    def _on_tab_closed(self, index: int) -> None:
+        """Track recently closed tabs for Ctrl+Shift+T restore."""
+        pass  # handled in BrowserTabWidget
+
+    # ── UI builders ──────────────────────────────────────────────────
+
+    def _build_toolbar(self) -> None:
+        bar = QToolBar("Navigation", self)
+        bar.setObjectName("nav_toolbar")
+        bar.setMovable(False)
+        self.addToolBar(bar)
+
+        self.back_act = QAction("←", self)
+        self.back_act.setToolTip("Back (Alt+Left)")
+        self.back_act.triggered.connect(lambda: self._nav("back"))
+        bar.addAction(self.back_act)
+
+        self.forward_act = QAction("→", self)
+        self.forward_act.setToolTip("Forward (Alt+Right)")
+        self.forward_act.triggered.connect(lambda: self._nav("forward"))
+        bar.addAction(self.forward_act)
+
+        self.reload_act = QAction("⟳", self)
+        self.reload_act.setToolTip("Reload (F5)")
+        self.reload_act.triggered.connect(lambda: self._nav("reload"))
+        bar.addAction(self.reload_act)
+
+        home_act = QAction("🏠", self)
+        home_act.setToolTip("Home")
+        home_act.triggered.connect(self.go_home)
+        bar.addAction(home_act)
+
+        self.omnibox = Omnibox(self.settings, self.storage, self)
+        self.omnibox.navigate.connect(self.load_in_current_tab)
+        bar.addWidget(self.omnibox)
+
+        self.star_act = QAction("☆", self)
+        self.star_act.setToolTip("Bookmark this page (Ctrl+D)")
+        self.star_act.triggered.connect(self.toggle_bookmark)
+        bar.addAction(self.star_act)
+
+        # ── AI Assistant ───────────────────────────────────────────────
+        bar.addSeparator()
+        self.ai_act = QAction("🤖", self)
+        self.ai_act.setToolTip("AI Assistant (Ctrl+Shift+A)")
+        self.ai_act.setCheckable(True)
+        self.ai_act.triggered.connect(self._toggle_assistant)
+        bar.addAction(self.ai_act)
+
+        # ── Coding Agent ───────────────────────────────────────────────
+        hq_act = QAction("⚡", self)
+        hq_act.setToolTip("Open the coding agent workspace (Ctrl+Shift+H)")
+        hq_act.triggered.connect(self.open_hq)
+        bar.addAction(hq_act)
+
+        term_act = QAction("🖥", self)
+        term_act.setToolTip("Open a live LuckyD Code terminal (Ctrl+Shift+T)")
+        term_act.triggered.connect(self.open_terminal)
+        bar.addAction(term_act)
+
+        if self.incognito:
+            incog_label = QLabel(" 🕶 Incognito", self)
+            incog_label.setStyleSheet(
+                "color: #34d399; font-weight: 600; font-size: 11px; "
+                "padding: 0 8px; background: transparent;"
+            )
+            bar.addWidget(incog_label)
+
+    def _build_statusbar(self) -> None:
+        self.progress = QProgressBar(self)
+        self.progress.setMaximumWidth(160)
+        self.progress.setTextVisible(False)
+        self.progress.setRange(0, 100)
+        self.progress.hide()
+
+        self.zoom_label = QLabel("100%", self)
+        self.zoom_label.setMinimumWidth(48)
+        self.zoom_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.zoom_label.setStyleSheet("color: #8b93a7; font-size: 11px; padding: 0 6px;")
+        self.zoom_label.hide()
+
+        self.lock_label = QLabel("", self)
+        self.lock_label.setMinimumWidth(20)
+        self.lock_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lock_label.setStyleSheet("font-size: 14px; padding: 0 4px;")
+
+        self.statusBar().addPermanentWidget(self.lock_label)
+        self.statusBar().addPermanentWidget(self.zoom_label)
+        self.statusBar().addPermanentWidget(self.progress)
+
+    def _build_findbar(self) -> None:
+        self.find_bar = QToolBar("Find", self)
+        self.find_bar.setObjectName("find_bar")
+        self.find_bar.setMovable(False)
+        self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, self.find_bar)
+
+        self.find_bar.addWidget(QLabel(" Find: "))
+        self.find_edit = QLineEdit(self)
+        self.find_edit.setMaximumWidth(260)
+        self.find_edit.textChanged.connect(self._find_text_changed)
+        self.find_edit.returnPressed.connect(self.find_next)
+        self.find_bar.addWidget(self.find_edit)
+
+        self._add(self.find_bar, "Next", self.find_next)
+        self._add(self.find_bar, "Prev", self.find_prev)
+        self._add(self.find_bar, "✕", self.find_bar.hide)
+        self.find_bar.hide()
+
+    def _build_docks(self) -> None:
+        self.downloads = DownloadsDock(self.settings, self)
+        self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.downloads)
+        self.downloads.hide()
+
+        self.ai_sidebar = AiSidebar(self)
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.ai_sidebar)
+        # "Remember my setup": reopen the assistant on launch so the AI is
+        # ready out of the box; hide it for a clean browser when disabled.
+        if bool(self.settings.get("assistant_visible_startup", True)):
+            self.ai_sidebar.show()
+        else:
+            self.ai_sidebar.hide()
+        # Sync the toolbar button state with the sidebar visibility.
+        self.ai_sidebar.visibilityChanged.connect(lambda visible: self.ai_act.setChecked(visible))
+        self.ai_act.setChecked(self.ai_sidebar.isVisible())
+
+    @staticmethod
+    def _add(menu, text, slot, shortcut=None):
+        act = QAction(text, menu)
+        if shortcut:
+            act.setShortcut(QKeySequence(shortcut))
+        act.triggered.connect(slot)
+        menu.addAction(act)
+        return act
+
+    def _build_menus(self) -> None:
+        mbar = self.menuBar()
+
+        file_menu = mbar.addMenu("&File")
+        self._add(file_menu, "New Tab", self.new_tab, "Ctrl+T")
+        self._add(file_menu, "New Window", self.new_window, "Ctrl+N")
+        self._add(
+            file_menu,
+            "New Incognito Window",
+            self.new_incognito_window,
+            "Ctrl+Shift+N",
+        )
+        file_menu.addSeparator()
+        self._add(file_menu, "Open File…", self.open_file, "Ctrl+O")
+        file_menu.addSeparator()
+        self._add(file_menu, "Print…", self.print_page, "Ctrl+P")
+        self._add(file_menu, "Save Page As…", self.save_page, "Ctrl+S")
+        file_menu.addSeparator()
+        self._add(file_menu, "Close Tab", self.close_current_tab, "Ctrl+W")
+        self._add(file_menu, "Quit", self.close, "Ctrl+Q")
+
+        history_menu = mbar.addMenu("&History")
+        self._add(history_menu, "Show All History", self.open_history, "Ctrl+H")
+        self._add(history_menu, "Clear All History…", self.clear_history)
+
+        self.bookmarks_menu = mbar.addMenu("&Bookmarks")
+        self.bookmarks_menu.aboutToShow.connect(self._rebuild_bookmarks_menu)
+
+        view_menu = mbar.addMenu("&View")
+        self._add(view_menu, "Zoom In", self.zoom_in, "Ctrl+=")
+        self._add(view_menu, "Zoom Out", self.zoom_out, "Ctrl+-")
+        self._add(view_menu, "Actual Size", self.zoom_reset, "Ctrl+0")
+        view_menu.addSeparator()
+        self._add(view_menu, "Find in Page…", self.show_find_bar, "Ctrl+F")
+        self._add(view_menu, "View Page Source", self.view_source, "Ctrl+U")
+        self._add(view_menu, "Developer Tools", self.open_devtools, "F12")
+        view_menu.addSeparator()
+        self._add(view_menu, "Fullscreen", self.toggle_fullscreen, "F11")
+        view_menu.addSeparator()
+        self._add(view_menu, "Downloads", self.show_downloads, "Ctrl+J")
+        ai_toggle = self.ai_sidebar.toggleViewAction()
+        ai_toggle.setText("AI Assistant")
+        ai_toggle.setShortcut(QKeySequence("Ctrl+Shift+A"))
+        view_menu.addAction(ai_toggle)
+
+        tools_menu = mbar.addMenu("&Tools")
+        self._add(tools_menu, "Coding Agent", self.open_hq, "Ctrl+Shift+H")
+        self._add(tools_menu, "Terminal", self.open_terminal, "Ctrl+Shift+T")
+        tools_menu.addSeparator()
+        self.adblock_act = QAction("Ad-Block Enabled", self, checkable=True)
+        self.adblock_act.setChecked(bool(self.settings.get("adblock_enabled", True)))
+        self.adblock_act.toggled.connect(self._app.apply_adblock)
+        tools_menu.addAction(self.adblock_act)
+        self._add(tools_menu, "Reload Ad-Block List", self._app.adblock.reload)
+        tools_menu.addSeparator()
+        self.browser_api_act = QAction("Browser Control API", self, checkable=True)
+        self.browser_api_act.setChecked(bool(self.settings.get("browser_api_enabled", True)))
+        self.browser_api_act.setToolTip(
+            "Localhost API (127.0.0.1:9777) letting the coding agent "
+            "and local scripts drive this browser's tabs"
+        )
+        self.browser_api_act.toggled.connect(self._app.set_browser_api_enabled)
+        tools_menu.addAction(self.browser_api_act)
+        tools_menu.addSeparator()
+        self._add(tools_menu, "Extensions…", self.open_extensions, "Ctrl+Shift+E")
+        tools_menu.addSeparator()
+        self._add(tools_menu, "Settings…", self.open_settings, "Ctrl+,")
+
+        help_menu = mbar.addMenu("&Help")
+        self._add(help_menu, "Check for Updates…", self.check_for_updates)
+        help_menu.addSeparator()
+        self._add(help_menu, "Keyboard Shortcuts…", self.show_shortcuts, "Ctrl+/")
+        help_menu.addSeparator()
+        self._add(help_menu, "About", self.show_about)
+
+    def _rebuild_bookmarks_menu(self) -> None:
+        self.bookmarks_menu.clear()
+        self._add(self.bookmarks_menu, "Bookmark This Page", self.toggle_bookmark, "Ctrl+D")
+        self._add(
+            self.bookmarks_menu,
+            "Show All Bookmarks",
+            self.open_bookmarks,
+            "Ctrl+Shift+O",
+        )
+        self.bookmarks_menu.addSeparator()
+        bookmarks = self.storage.bookmarks()[:25]
+        if not bookmarks:
+            empty = QAction("(no bookmarks yet)", self)
+            empty.setEnabled(False)
+            self.bookmarks_menu.addAction(empty)
+            return
+        for url, title, _folder, _created in bookmarks:
+            label = (title or url)[:60]
+            self.bookmarks_menu.addAction(
+                label,
+                lambda checked=False, u=url: self.open_in_new_tab(QUrl(u)),
+            )
+
+    def _build_shortcuts(self) -> None:
+        QShortcut(QKeySequence("Ctrl+L"), self, activated=self.focus_omnibox)
+        QShortcut(QKeySequence("Alt+Left"), self, activated=lambda: self._nav("back"))
+        QShortcut(QKeySequence("Alt+Right"), self, activated=lambda: self._nav("forward"))
+        QShortcut(QKeySequence("F5"), self, activated=lambda: self._nav("reload"))
+        QShortcut(QKeySequence("Esc"), self, activated=self._escape)
+        QShortcut(QKeySequence("Ctrl+Tab"), self, activated=lambda: self._cycle_tab(1))
+        QShortcut(
+            QKeySequence("Ctrl+Shift+Tab"),
+            self,
+            activated=lambda: self._cycle_tab(-1),
+        )
+        QShortcut(
+            QKeySequence("Ctrl+9"),
+            self,
+            activated=lambda: self.tabs.setCurrentIndex(self.tabs.count() - 1),
+        )
+        for i in range(1, 9):
+            QShortcut(
+                QKeySequence(f"Ctrl+{i}"),
+                self,
+                activated=lambda i=i: self._jump_tab(i),
+            )
+        # Command palette (Ctrl+K)
+        QShortcut(QKeySequence("Ctrl+K"), self, activated=self.show_palette)
+        # Reopen closed tab (Ctrl+Shift+T)
+        QShortcut(
+            QKeySequence("Ctrl+Shift+T"),
+            self,
+            activated=lambda: self.tabs.reopen_last_closed(),
+        )
+
+    # ── tab / navigation API ─────────────────────────────────────────
+
+    def new_tab(self, url=None):
+        target = url if url is not None else self._newtab_url()
+        view = self.tabs.new_tab(target)
+        if url is None:
+            self.focus_omnibox()
+        return view
+
+    def _newtab_url(self) -> QUrl:
+        """New-tab target: the live dashboard when the Control API is up."""
+        server = getattr(self._app, "control_server", None)
+        if (
+            server is not None
+            and server.running
+            and bool(self.settings.get("dashboard_newtab", True))
+        ):
+            return QUrl(server.base_url + "/dashboard")
+        return QUrl.fromLocalFile(str(NEWTAB_PATH))
+
+    def open_hq(self) -> None:
+        """Open the Coding Agent HQ (the exe's full UI) in a tab.
+
+        Goes through the Control API's /hq gateway: instant redirect when the
+        backend is up, auto-start + splash when it isn't. Falls back to the
+        raw harness URL when the Control API is disabled.
+        """
+        server = getattr(self._app, "control_server", None)
+        if server is not None and server.running:
+            self.open_in_new_tab(QUrl(server.base_url + "/hq"))
+            return
+        harness = getattr(self._app, "harness", None)
+        if harness is not None:
+            harness.ensure_started()
+            self.open_in_new_tab(QUrl(harness.url))
+        else:
+            self.toasts.show("Coding agent backend unavailable", kind="error")
+
+    def open_terminal(self) -> None:
+        """Open the live LuckyD Code terminal in a tab.
+
+        Goes through the Control API's /terminal page (xterm.js), which talks
+        to the WS→PTY bridge the app started on 127.0.0.1:9881. If the bridge
+        is down, kick it once and still open the tab — the page auto-retries.
+        """
+        term = getattr(self._app, "terminal_server", None)
+        if term is None or not term.running:
+            starter = getattr(self._app, "start_terminal_server", None)
+            if callable(starter):
+                starter()
+        server = getattr(self._app, "control_server", None)
+        if server is not None and server.running:
+            self.open_in_new_tab(QUrl(server.base_url + "/terminal"))
+        else:
+            self.toasts.show(
+                "Terminal needs the Browser Control API (Tools → Browser Control API)",
+                kind="error",
+            )
+
+    def create_popup_view(self):
+        """Called by WebView.createWindow for target=_blank / window.open."""
+        return self.tabs.new_tab(make_current=True)
+
+    def open_in_new_tab(self, url):
+        return self.tabs.new_tab(url)
+
+    def load_in_current_tab(self, url) -> None:
+        view = self.tabs.current_view()
+        if view is not None:
+            view.setUrl(url)
+
+    def search_for(self, text: str) -> None:
+        self.tabs.new_tab(QUrl(self.settings.search_url_for(text)))
+
+    def close_current_tab(self) -> None:
+        index = self.tabs.currentIndex()
+        if index >= 0:
+            self.tabs.close_tab(index)
+
+    def new_window(self) -> None:
+        self._app.new_window()
+
+    def new_incognito_window(self) -> None:
+        self._app.new_window(incognito=True)
+
+    def go_home(self) -> None:
+        home = self.settings.get("homepage", "newtab")
+        if home == "newtab":
+            self.load_in_current_tab(self._newtab_url())
+        else:
+            self.load_in_current_tab(self.omnibox.to_url(home))
+
+    def _nav(self, kind: str) -> None:
+        view = self.tabs.current_view()
+        if view is not None:
+            getattr(view, kind)()
+
+    def _cycle_tab(self, step: int) -> None:
+        count = self.tabs.count()
+        if count > 1:
+            self.tabs.setCurrentIndex((self.tabs.currentIndex() + step) % count)
+
+    def _jump_tab(self, n: int) -> None:
+        if n <= self.tabs.count():
+            self.tabs.setCurrentIndex(n - 1)
+
+    def focus_omnibox(self) -> None:
+        self.omnibox.setFocus()
+        self.omnibox.selectAll()
+
+    def _escape(self) -> None:
+        view = self.tabs.current_view()
+        if view is not None:
+            view.stop()
+        self.find_bar.hide()
+
+    # ── tab signal handlers (called by BrowserTabWidget) ─────────────
+
+    def on_load_started(self, view) -> None:
+        if view is self.tabs.current_view():
+            self.progress.setValue(0)
+            self.progress.show()
+
+    def on_load_progress(self, view, pct: int) -> None:
+        if view is self.tabs.current_view():
+            self.progress.setValue(pct)
+
+    def on_load_finished(self, view, ok: bool) -> None:
+        if view is self.tabs.current_view():
+            self.progress.hide()
+            self._update_nav_state(view)
+            self._update_zoom_label(view)
+            self._update_security(view)
+        url = view.url()
+        if ok and url.scheme() in ("http", "https"):
+            self.storage.add_visit(url.toString(), view.title())
+            self.omnibox.refresh_completions()
+
+    def on_url_changed(self, url) -> None:
+        if not self.omnibox.hasFocus():
+            self.omnibox.setText(url.toString())
+        self._update_star()
+
+    def on_title_changed(self, title: str) -> None:
+        self._update_title(title)
+
+    def on_tab_switched(self, view) -> None:
+        self.on_url_changed(view.url())
+        self._update_title(view.title())
+        self._update_nav_state(view)
+        self._update_zoom_label(view)
+        self._update_security(view)
+        if view.page().isLoading():
+            self.progress.show()
+        else:
+            self.progress.hide()
+
+    def on_link_hovered(self, text: str) -> None:
+        self.statusBar().showMessage(text)
+
+    def on_fullscreen_requested(self, request) -> None:
+        request.accept()
+        if request.toggleOn():
+            self.showFullScreen()
+        else:
+            self.showNormal()
+
+    def _update_title(self, title: str = "") -> None:
+        suffix = " — Incognito" if self.incognito else ""
+        if title:
+            self.setWindowTitle(f"{title} — {APP_DISPLAY}{suffix}")
+        else:
+            self.setWindowTitle(f"{APP_DISPLAY}{suffix}")
+
+    def _update_nav_state(self, view) -> None:
+        self.back_act.setEnabled(view.history().canGoBack())
+        self.forward_act.setEnabled(view.history().canGoForward())
+
+    # ── bookmarks ────────────────────────────────────────────────────
+
+    def toggle_bookmark(self) -> None:
+        view = self.tabs.current_view()
+        if view is None:
+            return
+        url = view.url().toString()
+        if not url.startswith(("http://", "https://")):
+            return
+        if self.storage.is_bookmarked(url):
+            self.storage.remove_bookmark(url)
+            self.toasts.show("Bookmark removed", kind="info")
+        else:
+            self.storage.add_bookmark(url, view.title())
+            self.toasts.show("Bookmark added", kind="ok")
+        self._update_star()
+
+    def _update_star(self) -> None:
+        view = self.tabs.current_view()
+        url = view.url().toString() if view is not None else ""
+        starred = url.startswith(("http://", "https://")) and self.storage.is_bookmarked(url)
+        self.star_act.setText("★" if starred else "☆")
+
+    def open_bookmarks(self) -> None:
+        BookmarksDialog(self.storage, self.open_in_new_tab, self).exec()
+
+    def open_extensions(self) -> None:
+        ScriptsDialog(self._app.scripts, self).exec()
+
+    # ── history ──────────────────────────────────────────────────────
+
+    def open_history(self) -> None:
+        HistoryDialog(self.storage, self.open_in_new_tab, self).exec()
+
+    def clear_history(self) -> None:
+        answer = QMessageBox.question(self, "Clear History", "Delete all browsing history?")
+        if answer == QMessageBox.StandardButton.Yes:
+            self.storage.clear_history()
+            self.omnibox.refresh_completions()
+            self.toasts.show("History cleared", kind="ok")
+
+    # ── find in page ─────────────────────────────────────────────────
+
+    def show_find_bar(self) -> None:
+        self.find_bar.show()
+        view = self.tabs.current_view()
+        if view is not None and view.selectedText():
+            self.find_edit.setText(view.selectedText())
+        self.find_edit.setFocus()
+        self.find_edit.selectAll()
+
+    def _find_text_changed(self, text: str) -> None:
+        view = self.tabs.current_view()
+        if view is None:
+            return
+        view.findText("")  # clear previous highlight
+        if text:
+            view.findText(text)
+
+    def find_next(self) -> None:
+        view = self.tabs.current_view()
+        if view is not None and self.find_edit.text():
+            view.findText(self.find_edit.text())
+
+    def find_prev(self) -> None:
+        view = self.tabs.current_view()
+        if view is not None and self.find_edit.text():
+            view.findText(self.find_edit.text(), QWebEnginePage.FindFlag.FindBackward)
+
+    # ── view ─────────────────────────────────────────────────────────
+
+    def zoom_in(self) -> None:
+        view = self.tabs.current_view()
+        if view is not None:
+            view.setZoomFactor(min(view.zoomFactor() + 0.1, 5.0))
+            self._update_zoom_label(view)
+
+    def zoom_out(self) -> None:
+        view = self.tabs.current_view()
+        if view is not None:
+            view.setZoomFactor(max(view.zoomFactor() - 0.1, 0.25))
+            self._update_zoom_label(view)
+
+    def zoom_reset(self) -> None:
+        view = self.tabs.current_view()
+        if view is not None:
+            view.setZoomFactor(1.0)
+            self._update_zoom_label(view)
+
+    def _update_zoom_label(self, view) -> None:
+        pct = int(view.zoomFactor() * 100)
+        self.zoom_label.setText(f"{pct}%")
+        self.zoom_label.show()
+        if pct != 100:
+            self.zoom_label.setStyleSheet(
+                "color: #fbbf24; font-size: 11px; padding: 0 6px; font-weight: 600;"
+            )
+        else:
+            self.zoom_label.setStyleSheet("color: #8b93a7; font-size: 11px; padding: 0 6px;")
+        QTimer.singleShot(
+            3000, lambda: self.zoom_label.hide() if self.zoom_label.text() == "100%" else None
+        )
+
+    def _update_security(self, view) -> None:
+        """Update the lock icon based on the page's security."""
+        try:
+            cert_errors = view.page().certificateErrorCount()
+            url = view.url().toString()
+            if cert_errors and cert_errors > 0:
+                self.lock_label.setText("⚠")
+                self.lock_label.setStyleSheet("color: #ff5b6e; font-size: 14px; padding: 0 4px;")
+                self.lock_label.setToolTip("Connection not secure — certificate error")
+            elif url.startswith("https://"):
+                self.lock_label.setText("🔒")
+                self.lock_label.setStyleSheet("color: #34d399; font-size: 14px; padding: 0 4px;")
+                self.lock_label.setToolTip("Connection secure (HTTPS)")
+            else:
+                self.lock_label.setText("")
+                self.lock_label.setStyleSheet("font-size: 14px; padding: 0 4px;")
+                self.lock_label.setToolTip("")
+        except Exception:
+            self.lock_label.setText("")
+
+    def view_source(self) -> None:
+        view = self.tabs.current_view()
+        if view is not None:
+            self.open_in_new_tab(QUrl("view-source:" + view.url().toString()))
+
+    def open_devtools(self) -> None:
+        view = self.tabs.current_view()
+        if view is None:
+            return
+        if self._dev_window is None:
+            dlg = QDialog(self)
+            dlg.setWindowTitle("Developer Tools")
+            dlg.resize(1000, 700)
+            layout = QVBoxLayout(dlg)
+            self._dev_view = QWebEngineView(dlg)
+            layout.addWidget(self._dev_view)
+            self._dev_window = dlg
+        view.page().setDevToolsPage(self._dev_view.page())
+        self._dev_window.show()
+        self._dev_window.raise_()
+
+    def toggle_fullscreen(self) -> None:
+        if self.isFullScreen():
+            self.showNormal()
+        else:
+            self.showFullScreen()
+
+    # ── downloads / files ────────────────────────────────────────────
+
+    def downloads_handle(self, download) -> None:
+        self.downloads.handle_download(download)
+
+    def open_file(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(self, "Open File")
+        if path:
+            self.load_in_current_tab(QUrl.fromLocalFile(path))
+
+    def print_page(self) -> None:
+        """Print the current page (Ctrl+P)."""
+        view = self.tabs.current_view()
+        if view is None:
+            return
+        from PySide6.QtPrintSupport import QPrintDialog
+
+        printer = QPrintDialog(self)
+        if printer.exec() == QPrintDialog.DialogCode.Accepted:
+            view.page().print(printer.printer(), lambda ok: None)
+
+    def save_page(self) -> None:
+        """Save the current page as a single file (Ctrl+S)."""
+        view = self.tabs.current_view()
+        if view is None:
+            return
+        from PySide6.QtCore import QSaveFile
+
+        suggested = (view.title() or "page").replace("/", "_").replace("\\", "_")[:80] + ".html"
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save Page As", suggested, "HTML Files (*.html *.htm);;All Files (*)"
+        )
+        if not path:
+            return
+        self.toasts.show("Saving page…", kind="info")
+
+        def _saved(html: str) -> None:
+            try:
+                file = QSaveFile(path)
+                if file.open(file.WriteOnly | file.Text):
+                    file.write(html.encode("utf-8"))
+                    file.commit()
+                    safe_name = path.rsplit("/", 1)[-1].rsplit("\\", 1)[-1]
+                    self.toasts.show(f"Page saved to {safe_name}", kind="ok")
+                else:
+                    self.toasts.show("Could not save page", kind="error")
+            except Exception as exc:
+                self.toasts.show(f"Save error: {exc}", kind="error")
+
+        view.page().toHtml(_saved)
+
+    # ── settings / about ─────────────────────────────────────────────
+
+    def open_settings(self) -> None:
+        dialog = SettingsDialog(self.settings, self.profile, self)
+        if dialog.exec():
+            self.adblock_act.setChecked(bool(self.settings.get("adblock_enabled", True)))
+
+    def open_internal_page(self, name: str) -> None:
+        """Handle luckyd:// internal links (dashboard tiles, new-tab footer)."""
+        actions = {
+            "history": self.open_history,
+            "bookmarks": self.open_bookmarks,
+            "downloads": self.show_downloads,
+            "settings": self.open_settings,
+            "assistant": self.show_assistant,
+            "extensions": self.open_extensions,
+            "shortcuts": self.show_shortcuts,
+            "hq": self.open_hq,
+            "dashboard": lambda: self.open_in_new_tab(self._newtab_url()),
+        }
+        handler = actions.get(name.strip("/").lower())
+        if handler:
+            handler()
+
+    def show_shortcuts(self) -> None:
+        """Display a keyboard shortcuts reference dialog."""
+        shortcuts = """
+        <style>
+          td, th { padding: 3px 16px 3px 4px; text-align: left; font-size: 12px; }
+          th { color: #5b9dff; font-weight: 600; font-size: 13px; padding-top: 10px; }
+          .kbd { background: #1a2132; border: 1px solid #232c42; border-radius: 4px;
+                 padding: 1px 7px; font-family: monospace; font-size: 11px; }
+        </style>
+        <b>Keyboard Shortcuts</b><br><br>
+        <table>
+        <tr><th colspan='2'>Tabs &amp; Windows</th></tr>
+        <tr><td><span class='kbd'>Ctrl+T</span></td><td>New tab</td></tr>
+        <tr><td><span class='kbd'>Ctrl+W</span></td><td>Close tab</td></tr>
+        <tr><td><span class='kbd'>Ctrl+Tab</span></td><td>Next tab</td></tr>
+        <tr><td><span class='kbd'>Ctrl+Shift+Tab</span></td><td>Previous tab</td></tr>
+        <tr><td><span class='kbd'>Ctrl+1-9</span></td><td>Jump to tab</td></tr>
+        <tr><td><span class='kbd'>Ctrl+Shift+T</span></td><td>Reopen closed tab</td></tr>
+        <tr><td><span class='kbd'>Ctrl+N</span></td><td>New window</td></tr>
+        <tr><td><span class='kbd'>Ctrl+Shift+N</span></td><td>New incognito window</td></tr>
+        <tr><th colspan='2'>Navigation</th></tr>
+        <tr><td><span class='kbd'>Ctrl+L</span></td><td>Focus address bar</td></tr>
+        <tr><td><span class='kbd'>Alt+Left</span></td><td>Back</td></tr>
+        <tr><td><span class='kbd'>Alt+Right</span></td><td>Forward</td></tr>
+        <tr><td><span class='kbd'>F5</span></td><td>Reload</td></tr>
+        <tr><td><span class='kbd'>Esc</span></td><td>Stop loading</td></tr>
+        <tr><th colspan='2'>View</th></tr>
+        <tr><td><span class='kbd'>Ctrl+=</span></td><td>Zoom in</td></tr>
+        <tr><td><span class='kbd'>Ctrl+-</span></td><td>Zoom out</td></tr>
+        <tr><td><span class='kbd'>Ctrl+0</span></td><td>Reset zoom</td></tr>
+        <tr><td><span class='kbd'>F11</span></td><td>Full screen</td></tr>
+        <tr><td><span class='kbd'>F12</span></td><td>Developer tools</td></tr>
+        <tr><td><span class='kbd'>Ctrl+U</span></td><td>View page source</td></tr>
+        <tr><th colspan='2'>Features</th></tr>
+        <tr><td><span class='kbd'>Ctrl+F</span></td><td>Find in page</td></tr>
+        <tr><td><span class='kbd'>Ctrl+D</span></td><td>Bookmark / unbookmark page</td></tr>
+        <tr><td><span class='kbd'>Ctrl+H</span></td><td>History</td></tr>
+        <tr><td><span class='kbd'>Ctrl+J</span></td><td>Downloads</td></tr>
+        <tr><td><span class='kbd'>Ctrl+Shift+O</span></td><td>Bookmarks manager</td></tr>
+        <tr><td><span class='kbd'>Ctrl+Shift+A</span></td><td>AI assistant</td></tr>
+        <tr><td><span class='kbd'>Ctrl+Shift+H</span></td><td>Coding agent</td></tr>
+        <tr><td><span class='kbd'>Ctrl+K</span></td><td>Command palette</td></tr>
+        <tr><td><span class='kbd'>Ctrl+,</span></td><td>Settings</td></tr>
+        <tr><td><span class='kbd'>Ctrl+P</span></td><td>Print</td></tr>
+        <tr><td><span class='kbd'>Ctrl+S</span></td><td>Save page as</td></tr>
+        <tr><td><span class='kbd'>Ctrl+O</span></td><td>Open file</td></tr>
+        <tr><td><span class='kbd'>Ctrl+Q</span></td><td>Quit</td></tr>
+        <tr><td><span class='kbd'>Ctrl+/</span></td><td>Show this help</td></tr>
+        </table>
+        """
+        from PySide6.QtWidgets import QMessageBox
+
+        QMessageBox.about(self, f"{APP_DISPLAY} — Shortcuts", shortcuts)
+
+    def show_about(self) -> None:
+        from PySide6.QtWidgets import (
+            QDialog,
+            QVBoxLayout,
+            QLabel,
+            QDialogButtonBox,
+            QPushButton,
+        )
+
+        try:
+            from browser import __version__
+        except Exception:
+            __version__ = "1.0.0"  # frozen build without package context
+
+        channel = "Standalone build" if getattr(sys, "frozen", False) else "Source (dev)"
+        last_checked = str(self.settings.get("update_last_checked", "") or "").strip()
+        skipped = str(self.settings.get("update_skipped_version", "") or "").strip()
+        if last_checked:
+            # Trim ISO timestamp to a friendlier "YYYY-MM-DD HH:MM" form.
+            last_checked = last_checked.replace("T", " ")[:16]
+        else:
+            last_checked = "Never"
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle(f"About {APP_DISPLAY}")
+        lay = QVBoxLayout(dlg)
+        text = QLabel(
+            f"<h3>🍀 {APP_DISPLAY}</h3>"
+            f"<p><b>Version:</b> {__version__}<br>"
+            f"<b>Channel:</b> {channel}<br>"
+            f"<b>Last checked for updates:</b> {last_checked}</p>"
+            + (f"<p><i>Update to version {skipped} was skipped.</i></p>" if skipped else "")
+            + "<p>A privacy-first, ad-free web browser built on Qt WebEngine.</p>"
+            "<p>Free, open source, no telemetry.</p>"
+            "<p>Tabs · Bookmarks · History · Downloads · Incognito · "
+            "Find-in-page · Ad-block · DevTools</p>",
+            dlg,
+        )
+        text.setTextFormat(Qt.TextFormat.RichText)
+        text.setWordWrap(True)
+        lay.addWidget(text)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close, dlg)
+        check_btn = QPushButton("Check for Updates", dlg)
+        buttons.addButton(check_btn, QDialogButtonBox.ButtonRole.ActionRole)
+        buttons.rejected.connect(dlg.reject)
+
+        def _check() -> None:
+            dlg.accept()
+            self.check_for_updates(silent=False)
+
+        check_btn.clicked.connect(_check)
+        lay.addWidget(buttons)
+        dlg.resize(440, dlg.sizeHint().height())
+        dlg.exec()
+
+    # ── self-updater ────────────────────────────────────────────────────
+
+    def _current_version(self) -> str:
+        try:
+            from browser import __version__
+
+            return __version__
+        except Exception:
+            return "1.0.0"
+
+    def check_for_updates(self, silent: bool = False) -> None:
+        """Check GitHub for a newer release; offer to download + install."""
+        from PySide6.QtWidgets import QMessageBox
+
+        if not getattr(sys, "frozen", False):
+            if not silent:
+                QMessageBox.information(
+                    self,
+                    "Updates",
+                    "You're running from source.\n\n" "Update with:\n  git pull",
+                )
+            return
+
+        if self._update_checker is not None and self._update_checker.isRunning():
+            return  # a check is already in flight
+
+        # Defensive: silent (startup) checks honor the settings toggle.
+        if silent:
+            try:
+                if not bool(self.settings.get("update_auto_check", True)):
+                    return
+            except Exception:
+                pass
+
+        # Record the attempt so "last checked" is always fresh.
+        try:
+            self.settings.set(
+                "update_last_checked",
+                __import__("datetime").datetime.now().isoformat(timespec="seconds"),
+            )
+        except Exception:
+            pass
+
+        current = self._current_version()
+        checker = UpdateChecker(current, parent=self)
+        self._update_checker = checker
+        checker.updateAvailable.connect(lambda info: self._on_update_available(info, silent))
+        checker.noUpdate.connect(lambda: self._on_no_update(silent))
+        checker.failed.connect(lambda msg: self._on_update_failed(msg, silent))
+        checker.finished.connect(self._on_update_checker_finished)
+        checker.start()
+
+    def _on_update_checker_finished(self) -> None:
+        """Release the checker reference once its thread has finished."""
+        checker = self.sender()
+        if self._update_checker is checker:
+            self._update_checker = None
+        try:
+            checker.deleteLater()
+        except Exception:
+            pass
+
+    def _on_no_update(self, silent: bool) -> None:
+        if not silent:
+            from PySide6.QtWidgets import QMessageBox
+
+            QMessageBox.information(
+                self,
+                "No Updates",
+                f"You're running the latest version " f"(v{self._current_version()}).",
+            )
+
+    def _on_update_failed(self, message: str, silent: bool) -> None:
+        if not silent:
+            from PySide6.QtWidgets import QMessageBox
+
+            QMessageBox.warning(
+                self,
+                "Update Check Failed",
+                f"Could not check for updates:\n{message}",
+            )
+
+    def _on_update_available(self, info: ReleaseInfo, silent: bool) -> None:
+        from PySide6.QtWidgets import QMessageBox
+
+        version = str(info.version or "?")
+
+        # If the user previously skipped this version, don't nag again.
+        try:
+            skipped = str(self.settings.get("update_skipped_version", "") or "")
+        except Exception:
+            skipped = ""
+        if skipped and skipped == str(version):
+            return
+
+        size_mb = float(info.installer_size) / (1024 * 1024)
+
+        box = QMessageBox(self)
+        box.setWindowTitle("Update Available")
+        box.setIcon(QMessageBox.Icon.Question)
+        box.setTextFormat(Qt.TextFormat.RichText)
+        box.setText(
+            f"<b>Version {version}</b> is available "
+            f"(you have v{self._current_version()}).<br><br>"
+            f"Download size: {size_mb:.1f} MB<br><br>"
+            "Download and install now? The browser will restart to "
+            "apply the update."
+        )
+        btn_update = box.addButton("Update Now", QMessageBox.ButtonRole.AcceptRole)
+        box.addButton("Remind Me Later", QMessageBox.ButtonRole.RejectRole)
+        btn_skip = box.addButton("Skip This Version", QMessageBox.ButtonRole.DestructiveRole)
+        box.setDefaultButton(btn_update)
+        box.exec()
+
+        clicked = box.clickedButton()
+        if clicked is btn_update:
+            self._start_update_download(info)
+        elif clicked is btn_skip:
+            try:
+                self.settings.set("update_skipped_version", str(version))
+                self.toast(f"Will skip version {version}", "info")
+            except Exception:
+                pass
+
+    def _start_update_download(self, info: ReleaseInfo) -> None:
+        url = info.installer_url
+        if not url:
+            self.toast("Update asset missing download URL", "error")
+            return
+
+        from PySide6.QtWidgets import QProgressDialog
+
+        progress = QProgressDialog("Downloading update…", "Cancel", 0, 100, self)
+        progress.setWindowTitle(f"Updating {APP_DISPLAY}")
+        progress.setWindowModality(Qt.WindowModality.WindowModal)
+        progress.setMinimumDuration(0)
+        progress.setValue(0)
+
+        dest = Path(tempfile.gettempdir()) / f"{APP_DISPLAY}-update-{info.version}.exe"
+        dl = ReleaseDownloader(url, dest, info.installer_size, parent=self)
+        self._release_dl = dl
+
+        def _on_progress(received: int, total: int) -> None:
+            if total:
+                progress.setValue(int(received * 100 / total))
+
+        def _on_done(path: str) -> None:
+            progress.close()
+            self._apply_update(path, str(info.version or ""))
+
+        def _on_error(msg: str) -> None:
+            progress.close()
+            self.toast(f"Update download failed: {msg}", "error")
+
+        dl.progress.connect(_on_progress)
+        dl.finishedOk.connect(_on_done)
+        dl.failed.connect(_on_error)
+        progress.canceled.connect(dl.terminate)
+        dl.start()
+
+    def _apply_update(self, installer_path: str, version: str) -> None:
+        from PySide6.QtWidgets import QMessageBox
+
+        current_exe = Path(sys.executable).resolve()
+        new_exe = Path(installer_path).resolve()
+        script = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".bat", delete=False, encoding="utf-8"
+        )
+        script.write(
+            "@echo off\r\n"
+            "timeout /t 2 /nobreak >nul\r\n"
+            f'move /y "{new_exe}" "{current_exe}"\r\n'
+            f'start "" "{current_exe}"\r\n'
+            'del "%~f0"\r\n'
+        )
+        script.close()
+
+        QMessageBox.information(
+            self,
+            "Ready to Update",
+            f"Version {version} has been downloaded.\n\n"
+            "The browser will now close and update itself.",
+        )
+        subprocess.Popen(
+            ["cmd", "/c", script.name],
+            creationflags=subprocess.CREATE_NO_WINDOW,
+            close_fds=True,
+        )
+        self.close()

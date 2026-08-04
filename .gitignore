@@ -71,8 +71,20 @@ log/
 # ── Scratch / Local Build Artifacts ─────────────────────────────────────
 /_*.py
 /_diag_*.txt
+/_*.txt
 nul
 installers/
+main.py.bak.*
+*.bak
+New Text Document.txt
+$null
+{
+_extract.json
+_nav.json
+_res.json
+extract.json
+nav.json
+res.json
 
 # Local-only artifacts (kept on disk, not in repo)
 luckyd-code.exe
@@ -82,4 +94,9 @@ Switch-ClineAccount.bat
 browser/data/
 browser/build/
 browser/dist/
+browser/build_err.txt
+browser/build_log.txt
+browser/version_info.txt
+browser/_dbg_src.js
+browser/test_*.py
 *.spec

@@ -161,12 +161,14 @@ class ProcessTool(ToolBase):
                 if process_id not in _processes:
                     return ToolOutput(text=f"Process not found: {process_id}", error=True)
                 proc = _processes[process_id]
+
                 # Non-blocking read via thread (cross-platform)
                 def _collect_output(p):
                     collected = []
                     if p.stdout:
                         try:
                             import select
+
                             while True:
                                 r, _, _ = select.select([p.stdout], [], [], 0.1)
                                 if not r:
@@ -178,6 +180,7 @@ class ProcessTool(ToolBase):
                         except OSError:
                             # Windows: select only works on sockets
                             import time
+
                             deadline = time.time() + 2.0
                             while time.time() < deadline:
                                 line = p.stdout.readline()

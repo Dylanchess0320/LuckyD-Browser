@@ -11,8 +11,15 @@ from dataclasses import dataclass
 # ── Provider constants ────────────────────────────────────────────────
 
 VALID_PROVIDERS = {
-    "openai", "anthropic", "google", "ollama", "deepseek", "zai", "openrouter",
-    "clinepass", "cline-usage",
+    "openai",
+    "anthropic",
+    "google",
+    "ollama",
+    "deepseek",
+    "zai",
+    "openrouter",
+    "clinepass",
+    "cline-usage",
 }
 
 PROVIDER_NAMES = {
@@ -223,9 +230,7 @@ def resolve_provider_config(provider: str | None = None) -> dict:
             try:
                 import cline_session  # type: ignore
             except ImportError:
-                bc = str(
-                    Path(__file__).resolve().parent.parent / "browser" / "browser_core"
-                )
+                bc = str(Path(__file__).resolve().parent.parent / "browser" / "browser_core")
                 if bc not in sys.path:
                     sys.path.insert(0, bc)
                 import cline_session  # type: ignore

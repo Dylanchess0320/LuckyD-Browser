@@ -1,0 +1,76 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    width: 264px; margin: 0; padding: 16px;
+    background: #0f1115; color: #e6e9ef;
+    font: 13px/1.45 "Segoe UI", system-ui, sans-serif;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .brand img { width: 28px; height: 28px; border-radius: 6px; }
+  .brand h1 { font-size: 14px; margin: 0; font-weight: 600; letter-spacing: .2px; }
+  .brand .sub { font-size: 11px; color: #8a93a6; margin: 0; }
+  .card {
+    background: #171a21; border: 1px solid #232733; border-radius: 10px;
+    padding: 12px; margin-bottom: 10px;
+  }
+  .row { display: flex; justify-content: space-between; align-items: center; }
+  .num { font-size: 22px; font-weight: 700; color: #5ad6a0; }
+  .lbl { color: #98a1b3; }
+  /* toggle */
+  .switch { position: relative; width: 40px; height: 22px; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .track {
+    position: absolute; inset: 0; background: #2a3040; border-radius: 22px;
+    transition: .18s; cursor: pointer;
+  }
+  .track::before {
+    content: ""; position: absolute; width: 16px; height: 16px; left: 3px; top: 3px;
+    background: #e6e9ef; border-radius: 50%; transition: .18s;
+  }
+  .switch input:checked + .track { background: #2fbf71; }
+  .switch input:checked + .track::before { transform: translateX(18px); }
+  .foot { text-align: center; color: #6b7385; font-size: 11px; margin-top: 6px; }
+  .hint { color: #7c8698; font-size: 11px; margin-top: 8px; }
+</style>
+</head>
+<body>
+  <div class="brand">
+    <img src="icons/icon128.png" alt="LuckyD" />
+    <div>
+      <h1>LuckyD AdBlock</h1>
+      <p class="sub">Ad-free YouTube</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <span class="lbl">Blocking</span>
+      <label class="switch">
+        <input type="checkbox" id="enabled" checked />
+        <span class="track"></span>
+      </label>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row" style="margin-bottom:8px">
+      <span class="lbl">Network ads blocked</span>
+      <span class="num" id="netBlocked">0</span>
+    </div>
+    <div class="row">
+      <span class="lbl">Video ads removed</span>
+      <span class="num" id="shortCircuits">0</span>
+    </div>
+    <div class="hint">Counts reset when the tab navigates.</div>
+  </div>
+
+  <div class="foot">Reload a YouTube tab after toggling.</div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

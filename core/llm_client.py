@@ -68,9 +68,7 @@ class LLMClient:
 
                         dt = parsedate_to_datetime(ra)
                         if dt is not None:
-                            wait = max(
-                                0.0, (dt - datetime.now(timezone.utc)).total_seconds()
-                            )
+                            wait = max(0.0, (dt - datetime.now(timezone.utc)).total_seconds())
                     except Exception:
                         wait = 0.0
         backoff = self.base_delay * (2**attempt)
@@ -188,6 +186,7 @@ class LLMClient:
         reasoning_chunks: list[str] = []
         tool_calls_map: dict[int, dict] = {}
         usage: dict = {}
+        finish_reason: str = ""
         async for line in resp.aiter_lines():
             if not line or not line.startswith("data: "):
                 continue
@@ -204,7 +203,12 @@ class LLMClient:
             choices = chunk.get("choices", [])
             if not choices:
                 continue
-            delta = choices[0].get("delta", {})
+            choice0 = choices[0]
+            # Capture finish_reason when present (e.g. "stop", "length", "tool_calls")
+            fr = choice0.get("finish_reason")
+            if fr:
+                finish_reason = fr
+            delta = choice0.get("delta", {})
             think_token = delta.get("reasoning_content", "")
             if think_token:
                 reasoning_chunks.append(think_token)
@@ -229,6 +233,8 @@ class LLMClient:
         msg = self._assemble_message(content_chunks, reasoning_chunks, tool_calls_map)
         if usage:
             msg["_usage"] = usage
+        if finish_reason:
+            msg["_finish_reason"] = finish_reason
         return msg
 
     @staticmethod
@@ -361,6 +367,9 @@ class LLMClient:
             usage = data.get("usage", {})
             if usage:
                 msg["_usage"] = usage
+            fr = choice.get("finish_reason")
+            if fr:
+                msg["_finish_reason"] = fr
             return msg
         except Exception as e:
             print(f"\n  [ERR] Non-streaming fallback also failed: {e}")

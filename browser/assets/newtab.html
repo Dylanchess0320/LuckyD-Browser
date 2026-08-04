@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>New Tab</title>
+<style>
+  :root { --card: rgba(255,255,255,.06); --border: rgba(255,255,255,.10); --text: #e8eaf2; --muted: #9aa1b5; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  input, select, button { font: inherit; }
+  body {
+    font-family: 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
+    font-weight: 600;
+    color: var(--text); min-height: 100vh; overflow-x: hidden;
+    background: linear-gradient(135deg, #0b1020 0%, #101a30 45%, #1a1030 100%);
+    background-size: 200% 200%; animation: drift 24s ease-in-out infinite;
+  }
+  @keyframes drift { 0%,100% { background-position: 0% 0%; } 50% { background-position: 100% 100%; } }
+  header { display: flex; justify-content: flex-end; align-items: center; padding: 22px 32px; }
+  #clock { text-align: right; }
+  #clock .time { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  #clock .date { font-size: 12px; color: var(--muted); }
+  main { max-width: 760px; margin: 9vh auto 0; padding: 0 24px; }
+  .search { display: flex; background: var(--card); border: 1px solid var(--border);
+    border-radius: 16px; backdrop-filter: blur(14px); overflow: hidden;
+    transition: border-color .15s, box-shadow .15s; }
+  .search:focus-within { border-color: #4f9cf9; box-shadow: 0 8px 32px rgba(79,156,249,.18); }
+  .search select { background: transparent; color: var(--muted); border: none; outline: none;
+    padding: 0 10px 0 16px; font-size: 14px; cursor: pointer; }
+  .search select option { background: #141a2e; }
+  .search input { flex: 1; background: transparent; border: none; outline: none;
+    color: var(--text); font-size: 16px; padding: 16px 8px; }
+  .search button { background: #4f9cf9; border: none; color: #fff; font-size: 15px;
+    padding: 0 26px; cursor: pointer; }
+  .search button:hover { background: #6aa8fa; }
+  .grid { margin-top: 40px; display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
+  .tile { display: flex; flex-direction: column; align-items: center; gap: 9px;
+    padding: 15px 4px 12px; background: var(--card); border: 1px solid var(--border);
+    border-radius: 14px; text-decoration: none; color: var(--text); font-size: 12px;
+    position: relative; transition: transform .12s, border-color .12s, background .12s; }
+  .tile:hover { transform: translateY(-2px); border-color: rgba(120,170,255,.5); background: rgba(255,255,255,.09); }
+  .tile img { width: 26px; height: 26px; border-radius: 6px; }
+  .tile .del { position: absolute; top: 3px; right: 6px; color: var(--muted); font-size: 13px;
+    opacity: 0; cursor: pointer; }
+  .tile:hover .del { opacity: 1; }
+  .tile.add { color: var(--muted); font-size: 24px; justify-content: center; cursor: pointer; }
+  .tile.add span { font-size: 11px; }
+  #addform { margin-top: 14px; display: none; gap: 8px; }
+  #addform input { flex: 1; background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; color: var(--text); padding: 10px 12px; font-size: 13px; outline: none; }
+  #addform button { background: #4f9cf9; border: none; color: #fff; border-radius: 10px;
+    padding: 0 16px; cursor: pointer; }
+  footer { display: none; }
+</style>
+</head>
+<body>
+<header>
+  <div id="clock"><div class="time" id="time"></div><div class="date" id="date"></div></div>
+</header>
+<main>
+  <form class="search" id="searchform">
+    <select id="engine">
+      <option value="google">Google</option>
+      <option value="bing">Bing</option>
+      <option value="ddg">DuckDuckGo</option>
+      <option value="brave">Brave</option>
+    </select>
+    <input id="q" placeholder="Search the web" autocomplete="off" autofocus>
+    <button type="submit">Search</button>
+  </form>
+  <div class="grid" id="grid"></div>
+  <div id="addform">
+    <input id="newname" placeholder="Name (e.g. Stack Overflow)">
+    <input id="newurl" placeholder="URL (e.g. https://stackoverflow.com)">
+    <button id="addbtn" type="button">Add</button>
+  </div>
+</main>
+<footer>
+</footer>
+<script>
+const ENGINES = { google: 'https://www.google.com/search?q=', bing: 'https://www.bing.com/search?q=',
+  ddg: 'https://duckduckgo.com/?q=', brave: 'https://search.brave.com/search?q=' };
+const DEFAULTS = [
+  ['Google','https://www.google.com'], ['YouTube','https://www.youtube.com'],
+  ['GitHub','https://github.com'], ['ChatGPT','https://chatgpt.com'],
+  ['Perplexity','https://www.perplexity.ai'], ['Wikipedia','https://www.wikipedia.org'],
+  ['Reddit','https://www.reddit.com']
+];
+let shortcuts = JSON.parse(localStorage.getItem('ld_shortcuts') || 'null') || DEFAULTS;
+// One-time cleanup: drop the retired FMHY tile from saved shortcuts.
+shortcuts = shortcuts.filter(([n, u]) => !/fmhy/i.test(n + u));
+localStorage.setItem('ld_shortcuts', JSON.stringify(shortcuts));
+document.getElementById('engine').value = localStorage.getItem('ld_engine') || 'google';
+
+function tick() {
+  const now = new Date();
+  document.getElementById('time').textContent =
+    now.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+  document.getElementById('date').textContent =
+    now.toLocaleDateString([], {weekday: 'long', month: 'long', day: 'numeric'});
+}
+tick(); setInterval(tick, 10000);
+
+function render() {
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+  shortcuts.forEach(([name, url], idx) => {
+    const a = document.createElement('a');
+    a.className = 'tile'; a.href = url;
+    let host = ''; try { host = new URL(url).hostname; } catch (e) {}
+    a.innerHTML = '<img src="https://www.google.com/s2/favicons?domain=' + host +
+      '&sz=64" onerror="this.style.visibility=\'hidden\'"><span></span>' +
+      '<span class="del" title="Remove">&#10005;</span>';
+    a.querySelector('span').textContent = name;
+    a.querySelector('.del').addEventListener('click', ev => {
+      ev.preventDefault(); ev.stopPropagation();
+      shortcuts.splice(idx, 1); save(); render();
+    });
+    grid.appendChild(a);
+  });
+  const add = document.createElement('div');
+  add.className = 'tile add'; add.innerHTML = '<div>+<span>Add</span></div>';
+  add.addEventListener('click', () => {
+    const f = document.getElementById('addform');
+    f.style.display = f.style.display === 'flex' ? 'none' : 'flex';
+  });
+  grid.appendChild(add);
+}
+function save() { localStorage.setItem('ld_shortcuts', JSON.stringify(shortcuts)); }
+
+document.getElementById('searchform').addEventListener('submit', ev => {
+  ev.preventDefault();
+  const q = document.getElementById('q').value.trim();
+  if (!q) return;
+  const engine = document.getElementById('engine').value;
+  localStorage.setItem('ld_engine', engine);
+  if (/^[^\s]+\.[^\s]{2,}$/.test(q)) { location.href = q.startsWith('http') ? q : 'https://' + q; }
+  else { location.href = ENGINES[engine] + encodeURIComponent(q); }
+});
+document.getElementById('addbtn').addEventListener('click', () => {
+  const name = document.getElementById('newname').value.trim();
+  let url = document.getElementById('newurl').value.trim();
+  if (!name || !url) return;
+  if (!/^https?:\/\//.test(url)) url = 'https://' + url;
+  shortcuts.push([name, url]); save(); render();
+  document.getElementById('newname').value = '';
+  document.getElementById('newurl').value = '';
+});
+render();
+</script>
+</body>
+</html>

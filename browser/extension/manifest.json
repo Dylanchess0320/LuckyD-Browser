@@ -1,0 +1,76 @@
+{
+  "manifest_version": 3,
+  "name": "LuckyD YouTube AdBlock",
+  "version": "1.0.0",
+  "description": "Ad-free YouTube by LuckyD \u2014 removes video ads, banners and trackers, and auto-skips. Network (declarativeNetRequest) + main-world player patching.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "permissions": [
+    "declarativeNetRequest",
+    "declarativeNetRequestWithHostAccess",
+    "declarativeNetRequestFeedback",
+    "storage",
+    "tabs",
+    "scripting"
+  ],
+  "host_permissions": [
+    "*://*.youtube.com/*",
+    "*://*.youtube-nocookie.com/*",
+    "*://*.googlevideo.com/*",
+    "*://*.doubleclick.net/*",
+    "*://*.googlesyndication.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "*://www.youtube.com/*",
+        "*://m.youtube.com/*",
+        "*://music.youtube.com/*",
+        "*://www.youtube-nocookie.com/*"
+      ],
+      "js": [
+        "injected.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN",
+      "all_frames": true
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "injected.js"
+      ],
+      "matches": [
+        "*://www.youtube.com/*",
+        "*://m.youtube.com/*",
+        "*://music.youtube.com/*",
+        "*://www.youtube-nocookie.com/*"
+      ]
+    }
+  ],
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "yt_ads",
+        "enabled": true,
+        "path": "rules.json"
+      }
+    ]
+  },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxkI048wLmTebamBNwfuzEy0zgHZXNA1x/w2Aj9fkV/7jb1PPu0Zi/WXZuXZLDfgi1vL3YL/mQwONGiO4dN2iydZmquD/2AoKOgJrYiWP6g7GALtGVK6khsx8bT+xuZN9EEkk+cu3pbJVNHZAXUO8NOMY2ZCQ3KbuGE5EyB6LY9ChWhFcbL+g7sNuCLtnfqm/ZKipaD/ghQOYCZd1fYK8IvBuhRx0dxO8TGCrY+8TnAKdC//XACJxEO3QAsjN2fgIsW4r4NuE+FSvpQ+/dAxH5ovW1UN5ys82JdCLULTgBFZpZABTuh9DiQ1wHOAS5QlHbrDfEaT/UFy8aj7NECA6MQIDAQAB"
+}
