@@ -138,7 +138,7 @@ class ApprovalHook(AgentPlugin):
     def get_permission(self, tool_name: str) -> ToolPermissionLevel:
         return _TOOL_PERMISSIONS.get(tool_name, ToolPermissionLevel.NORMAL)
 
-    def before_tool(self, tool_name: str, tool_args: dict, ctx: HookContext) -> None | dict:
+    def before_tool(self, tool_name: str, tool_args: dict, ctx: HookContext) -> dict | None:
         level = self.get_permission(tool_name)
         if level == ToolPermissionLevel.BLOCKED:
             return {
