@@ -100,3 +100,4 @@ browser/version_info.txt
 browser/_dbg_src.js
 browser/test_*.py
 *.spec
+"browser/LuckyD-Launch/*.exe"  
