@@ -9,10 +9,11 @@ from browser_core.adblock import AdBlockInterceptor
 from browser_core.harness_bridge import HarnessSupervisor
 from browser_core.profile import default_profile
 from browser_core.scripts import ScriptEngine
+from browser_core.session import SessionStore
 from browser_core.settings import SettingsStore
 from browser_core.storage import Storage
 from browser_ui.main_window import MainWindow
-from PySide6.QtCore import QObject, Signal
+from PySide6.QtCore import QObject, QTimer, Signal
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 
@@ -38,6 +39,13 @@ class BrowserApp:
 
         self.settings = SettingsStore()
         self.storage = Storage()
+        self.session_store = SessionStore()
+        # Session autosave: windows call schedule_session_save() on every tab
+        # change; one debounced timer snapshots all windows at once.
+        self._session_timer = QTimer(self.qapp)
+        self._session_timer.setSingleShot(True)
+        self._session_timer.setInterval(1200)
+        self._session_timer.timeout.connect(self.save_session)
         self.adblock = AdBlockInterceptor(enabled=bool(self.settings.get("adblock_enabled", True)))
 
         self.profile = default_profile()
@@ -68,7 +76,8 @@ class BrowserApp:
         self.qapp.aboutToQuit.connect(self.stop_terminal_server)
 
         self.windows: list[MainWindow] = []
-        self.new_window()
+        first_window = self.new_window()
+        self._restore_previous_session(first_window)
 
         # Auto-start the coding-agent backend (luckyd-code.exe) in the
         # background — the one-window platform: browser + assistant + agent.
@@ -200,6 +209,46 @@ class BrowserApp:
                 win.ai_sidebar.refresh_harness_status()
             except Exception:
                 pass
+
+    # ── Session restore ("continue where you left off") ─────────────────
+
+    def schedule_session_save(self) -> None:
+        """Debounced autosave — called by windows on every tab/URL change."""
+        self._session_timer.start()
+
+    def save_session(self) -> None:
+        """Snapshot every normal window and persist them (atomic write)."""
+        try:
+            windows = []
+            for win in list(self.windows):
+                try:
+                    snapshot = win._session_snapshot()
+                except Exception:
+                    snapshot = None
+                if snapshot:
+                    windows.append(snapshot)
+            if windows:
+                self.session_store.save(windows)
+            else:
+                # All windows closed (or only incognito left) — next launch
+                # starts fresh instead of resurrecting a stale session.
+                self.session_store.clear()
+        except Exception:
+            pass  # session saving must never take the app down
+
+    def _restore_previous_session(self, first_window: MainWindow) -> None:
+        """Reopen last session's tabs when startup_mode is 'restore'."""
+        try:
+            if str(self.settings.get("startup_mode", "restore")) != "restore":
+                return
+            windows = self.session_store.load().get("windows") or []
+            if not windows:
+                return
+            first_window.restore_session(windows[0])
+            for extra in windows[1:]:
+                self.new_window().restore_session(extra)
+        except Exception as exc:  # a bad session file must never block startup
+            print(f"[browser] session restore skipped: {exc}")
 
     def run(self) -> int:
         return self.qapp.exec()

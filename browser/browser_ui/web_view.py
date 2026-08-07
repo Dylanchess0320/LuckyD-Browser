@@ -67,16 +67,60 @@ _CONNECTING_HTML = (
     "</div></body></html>"
 )
 
-_OFFLINE_HTML = (
-    "<!doctype html><html><head><meta charset='utf-8'><style>"
-    "body{background:#1b1d23;color:#cfd3dc;font:15px system-ui;display:flex;"
-    "height:100vh;align-items:center;justify-content:center;margin:0}"
-    ".wrap{text-align:center;max-width:420px}.icon{font-size:34px}"
-    ".dim{color:#7a7f8a;font-size:12px}</style></head><body><div class='wrap'>"
-    "<div class='icon'>⚠</div><p>Still can't reach this site.</p>"
-    "<p class='dim'>Check your connection, firewall, or VPN — then press "
-    "F5 to try again.</p></div></body></html>"
-)
+# The offline page doubles as a tiny arcade: a canvas endless-runner while
+# you wait for the network (Chrome-dino homage, LuckyD neon skin).
+_OFFLINE_HTML = """<!doctype html><html><head><meta charset='utf-8'><style>
+body{background:#1b1d23;color:#cfd3dc;font:15px system-ui;margin:0;
+  display:flex;min-height:100vh;align-items:center;justify-content:center}
+.wrap{text-align:center;max-width:560px;padding:20px}
+.dim{color:#7a7f8a;font-size:12px}
+canvas{background:#12141a;border:1px solid #2a2f3a;border-radius:12px;
+  margin-top:18px;cursor:pointer;display:block}
+.hint{color:#5b6470;font-size:11px;margin-top:8px}
+b.score{color:#5b9dff}
+</style></head><body><div class='wrap'>
+<div style='font-size:34px'>⚠</div>
+<p>Still can't reach this site.</p>
+<p class='dim'>Check your connection, firewall, or VPN — then press F5 to try again.</p>
+<canvas id='g' width='520' height='150'></canvas>
+<div class='hint'>meanwhile… <b>SPACE / click</b> to hop · best: <b class=score id=best>0</b></div>
+<script>
+const c=document.getElementById('g'),x=c.getContext('2d');
+const W=c.width,H=c.height,G=H-24;
+let dino={x:46,y:G,w:22,h:26,vy:0,air:false},obs=[],t=0,score=0,best=0,speed=4.2,dead=false;
+function hop(){if(dead){reset();return;}if(!dino.air){dino.vy=-9.4;dino.air=true;}}
+addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();hop();}});
+c.addEventListener('pointerdown',hop);
+function reset(){obs=[];t=0;score=0;speed=4.2;dead=false;dino.y=G;dino.vy=0;}
+function spawn(){const h=14+Math.random()*22;obs.push({x:W+10,w:10+Math.random()*10,h:h,y:G+26-h});}
+function tick(){
+ t++;speed+=0.0012;
+ // physics
+ dino.y+=dino.vy;dino.vy+=0.5;
+ if(dino.y>=G){dino.y=G;dino.vy=0;dino.air=false;}
+ // obstacles
+ if(t%Math.max(38,70-Math.floor(speed*3))===0||t===1)spawn();
+ for(const o of obs)o.x-=speed;
+ obs=obs.filter(o=>o.x>-30);
+ // collision
+ for(const o of obs){
+  if(dino.x<o.x+o.w&&dino.x+dino.w>o.x&&dino.y+26>o.y){dead=true;best=Math.max(best,Math.floor(score));document.getElementById('best').textContent=best;}
+ }
+ if(!dead)score+=speed/60;
+ // draw
+ x.clearRect(0,0,W,H);
+ x.strokeStyle='#2a2f3a';x.beginPath();x.moveTo(0,G+27);x.lineTo(W,G+27);x.stroke();
+ x.fillStyle=dead?'#ff5b6e':'#5b9dff';
+ x.fillRect(dino.x,dino.y,dino.w,26);
+ x.fillStyle='#0b0f16';x.fillRect(dino.x+14,dino.y+6,4,4); // eye
+ x.fillStyle='#f9a24f';
+ for(const o of obs)x.fillRect(o.x,o.y,o.w,o.h);
+ x.fillStyle='#7a7f8a';x.font='11px system-ui';
+ x.fillText((dead?'💀 press SPACE to retry · ':'')+Math.floor(score),8,16);
+ requestAnimationFrame(tick);
+}
+tick();
+</script></div></body></html>"""
 
 
 class WebView(QWebEngineView):
@@ -139,6 +183,17 @@ class WebView(QWebEngineView):
         return self._mw.create_popup_view()
 
     # ── mouse back/forward buttons ──────────────────────────────────
+    def wheelEvent(self, event):  # noqa: N802
+        # Ctrl + wheel = zoom (standard browser muscle memory).
+        if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+            if event.angleDelta().y() > 0:
+                self._mw.zoom_in()
+            else:
+                self._mw.zoom_out()
+            event.accept()
+            return
+        super().wheelEvent(event)
+
     def mouseReleaseEvent(self, event):  # noqa: N802
         if event.button() == Qt.MouseButton.XButton1:
             self.back()

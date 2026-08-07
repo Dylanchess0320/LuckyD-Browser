@@ -18,6 +18,7 @@ import contextlib
 from PySide6.QtCore import QPoint, QRect, Qt, QTimer
 from PySide6.QtGui import QColor, QGuiApplication, QIcon, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
+    QHBoxLayout,
     QLabel,
     QMenu,
     QTabBar,
@@ -27,6 +28,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .icons import letter_tile
 from .web_view import WebView
 
 _SPIN_STEP_MS = 70
@@ -76,11 +78,19 @@ class _TabPreview(QWidget):
         )
         layout = QVBoxLayout(card)
         layout.setContentsMargins(12, 10, 12, 10)
+        layout.setSpacing(3)
+        top = QHBoxLayout()
+        top.setSpacing(9)
+        self._tile = QLabel(card)
+        self._tile.setFixedSize(22, 22)
+        self._tile.setScaledContents(True)
+        top.addWidget(self._tile, 0, Qt.AlignmentFlag.AlignTop)
         self._title = QLabel(card)
         self._title.setObjectName("p_title")
+        top.addWidget(self._title, 1)
+        layout.addLayout(top)
         self._url = QLabel(card)
         self._url.setObjectName("p_url")
-        layout.addWidget(self._title)
         layout.addWidget(self._url)
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -88,6 +98,7 @@ class _TabPreview(QWidget):
         self.setMaximumWidth(340)
 
     def show_for(self, title: str, url: str, pos: QPoint) -> None:
+        self._tile.setPixmap(letter_tile(url, 22).pixmap(22, 22))
         self._title.setText(title or "New Tab")
         self._url.setText(url[:90])
         self.adjustSize()
@@ -224,6 +235,7 @@ class BrowserTabWidget(QTabWidget):
         self._loading = {i for i in self._loading if i < self.count()}
         if view is not None:
             view.deleteLater()
+        self._mw.on_tabs_changed()
         if self.count() == 0:
             self._mw.close()
 
@@ -266,18 +278,20 @@ class BrowserTabWidget(QTabWidget):
         self._mw.on_pins_changed()
 
     def _apply_close_button(self, index: int, closable: bool) -> None:
+        # Note: setTabButton/tabButton live on QTabBar in Qt6 (the QTabWidget
+        # forwarding API is gone in PySide6) — always go through tabBar().
         if closable:
             btn = QToolButton(self)
             btn.setText("✕")
             btn.setAutoRaise(True)
             btn.clicked.connect(lambda _=False, b=btn: self._close_for_button(b))
-            self.setTabButton(index, QTabBar.ButtonPosition.RightSide, btn)
+            self.tabBar().setTabButton(index, QTabBar.ButtonPosition.RightSide, btn)
         else:
-            self.setTabButton(index, QTabBar.ButtonPosition.RightSide, None)
+            self.tabBar().setTabButton(index, QTabBar.ButtonPosition.RightSide, None)
 
     def _close_for_button(self, button) -> None:
         for i in range(self.count()):
-            if self.tabButton(i, QTabBar.ButtonPosition.RightSide) is button:
+            if self.tabBar().tabButton(i, QTabBar.ButtonPosition.RightSide) is button:
                 self.close_tab(i)
                 return
 
@@ -369,6 +383,9 @@ class BrowserTabWidget(QTabWidget):
         view.titleChanged.connect(lambda title, v=view: self._retitle(v, title))
         view.iconChanged.connect(lambda icon, v=view: self._icon(v, icon))
         view.urlChanged.connect(lambda url, v=view: self._url(v, url))
+        # Session autosave: background tabs navigate too, and _url() only
+        # fires for the current tab — the session snapshot needs every URL.
+        view.urlChanged.connect(lambda _url, v=view: self._mw.on_tabs_changed())
         view.loadStarted.connect(lambda v=view: self._on_load_started(v))
         view.loadFinished.connect(lambda ok, v=view: self._on_load_finished(v, ok))
         view.loadProgress.connect(lambda p, v=view: self._mw.on_load_progress(v, p))
@@ -418,3 +435,4 @@ class BrowserTabWidget(QTabWidget):
         view = self.currentWidget()
         if view is not None:
             self._mw.on_tab_switched(view)
+        self._mw.on_tabs_changed()  # active index is part of the session

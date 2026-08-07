@@ -71,14 +71,14 @@ rights, Windows 10/11 x64 only**:
 powershell -NoProfile -ExecutionPolicy Bypass -File browser\installer\build_installer.ps1
 ```
 
-Output: `browser\installer\output\LuckyDBrowserSetup-1.3.0.exe`
+Output: `browser\installer\output\LuckyDBrowserSetup-1.5.0.exe`
 
 - Installs per-user to `%LOCALAPPDATA%\Programs\LuckyDBrowser`
 - Start Menu shortcut, optional desktop icon, Settings > Apps uninstall entry
 - Includes everything (Qt WebEngine runtime **and** the `luckyd-code.exe`
   backend) — the target machine needs nothing else
 - Only the *build* machine needs Inno Setup 6: https://jrsoftware.org/isdl.php
-- Silent install for scripting: `LuckyDBrowserSetup-1.3.0.exe /VERYSILENT /NORESTART`
+- Silent install for scripting: `LuckyDBrowserSetup-1.5.0.exe /VERYSILENT /NORESTART`
 - The raw script is `browser\installer\LuckyDBrowser.iss` if you want to tweak
   it (then recompile with `iscc browser\installer\LuckyDBrowser.iss`)
 
@@ -87,22 +87,26 @@ Output: `browser\installer\output\LuckyDBrowserSetup-1.3.0.exe`
 | Area | What you get |
 |------|--------------|
 | Platform | **Live dashboard** new-tab page, **Coding Agent HQ in a tab** (⚡ / Ctrl+Shift+H), harness **auto-start on launch**, shared harness status everywhere |
-| Tabs | New/close/pin-style reorder (drag), Ctrl+T / Ctrl+W / Ctrl+Tab / Ctrl+1-9, `+` button, popups open as tabs, middle-click to close, hover preview cards, wheel cycling, recently-closed stack (Ctrl+Shift+T) |
+| Tabs | New/close/pin-style reorder (drag), Ctrl+T / Ctrl+W / Ctrl+Tab / Ctrl+1-9, `+` button, popups open as tabs, middle-click to close, hover preview cards, wheel cycling, recently-closed stack (Ctrl+Shift+T), **session restore — "continue where you left off" reopens windows, tabs and pinned state** (Settings → On startup) |
 | Omnibox | URLs and searches in one bar, history-based completions, configurable search engine, Ctrl+L to focus |
-| Bookmarks | Ctrl+D star toggle with toast feedback, Bookmarks menu + manager, **import from Chrome/Edge HTML export**, **export to HTML**, per-bookmark delete |
+| Bookmarks | Ctrl+D star toggle with toast feedback, **bookmarks bar (Ctrl+Shift+B, right-click to manage)**, Bookmarks menu + manager, **import from Chrome/Edge HTML export**, **export to HTML**, per-bookmark delete |
 | History | Ctrl+H, searchable, clear-all, **delete individual entries** (right-click), auto-recorded to SQLite |
 | Downloads | Ctrl+J dock with live progress, **cancel button** per download, **right-click context menu**, **Clear Completed button**, custom download folder, double-click to open |
 | Incognito | Ctrl+Shift+N — off-the-record profile, nothing touches disk, **visual 🕶 badge** in toolbar |
 | Find | Ctrl+F in-page find with next/prev |
 | Vision | **📷 Visual Q&A** button: screenshots the tab via raw CDP (works with GPU rendering — `QWidget.grab()` can't) and asks a vision model |
 | Context menu | Right-click links: **Open in New Window, Save Link As, Copy as Markdown**; Media: **Save Media As**; Text: **AI ▸ Explain / Summarize / Translate**; **Back/Forward mouse buttons** (XButton1/XButton2) |
-| View | Zoom (Ctrl +/-/0, **zoom percentage indicator**), F11 fullscreen, Ctrl+U view-source, F12 DevTools, **🔒 HTTPS lock icon** in status bar |
+| View | Zoom (Ctrl +/-/0, **Ctrl+Scroll**, **zoom percentage indicator**), **per-site zoom memory + configurable default zoom**, F11 fullscreen, Ctrl+U view-source, F12 DevTools, **🔒 HTTPS lock icon** in status bar |
 | Privacy | Built-in ad/tracker blocklist (Tools menu), clear cache/cookies in Settings |
 | Reliability | Transient network errors auto-retry up to 3× behind a friendly "Connecting…" page |
-| Print/Save | **Ctrl+P print**, **Ctrl+S save page as HTML**, Ctrl+O open local file |
+| Print/Save | **Ctrl+P print**, **Ctrl+S save page as HTML**, **Ctrl+Shift+S save page screenshot (GPU-safe CDP capture)**, Ctrl+O open local file |
+| Terminal | **Multi-terminal tabs**: every terminal tab is its own ConPTY session — **agent CLI** (Ctrl+\`), **PowerShell** (Ctrl+Shift+\`), or **CMD**, switchable live in the tab's shell bar |
+| Automation | **Workflow recorder/replayer** (Tools → Workflows…): records Control-API actions into named JSON workflows, replays them with **self-healing element re-resolution** (fingerprint scoring when indices drift), manager page with per-step replay log. **POST /extract**: schema-guided AI extraction of structured JSON from the active page |
 | Help | **Ctrl+/ keyboard shortcuts reference**, About dialog |
 | AI | Sidebar (Ctrl+Shift+A): **Markdown chat bubbles**, live **harness status line**, chat with page context, FMHY tool search, autonomous agent that drives your **real visible tab** — watch every step live: orange highlight ring + 🤖 badge on the element it's about to click, step narration in the sidebar, Stop button always available. Popup windows open as normal tabs the agent can read, and JavaScript alert/confirm/prompt dialogs are auto-dismissed mid-task. **Ultra-fast + smart mode:** plan-first reasoning, stuck detection, no API key needed. **Vision steps are AUTO** — screenshots stream to the model every step when the selected model accepts images (gpt-4o, gemini, claude-sonnet, gemma3…), auto-disabled for text-only models, and image payloads now work on Gemini and Anthropic endpoints too |
-| Themes | 4 futuristic themes (Neon Night, Cyber Grove, Solar Dusk, Arctic Light) — live switch in Settings, **themed tab bar + toolbar**, glass toasts, command palette (Ctrl+K) |
+| Themes | 4 futuristic themes (Neon Night, Cyber Grove, Solar Dusk, Arctic Light) + a **secret Synthwave Sunset** (Konami code on the new-tab page) — live switch in Settings or `POST /theme`, **themed tab bar + toolbar**, glass toasts, command palette (Ctrl+K) |
+| Fun | **Offline runner arcade** on the error page, time-aware dashboard greetings, confetti for flawless workflow replays |
+| Updates | **One-click in-app updates**: silent startup check, release-notes preview, background download, restart-to-apply (installer runs silently; session restore brings your tabs back) |
 | Harness | **🔌 Harness mode — DEFAULT ON** (AI sidebar): agent tasks run on the `luckyd-code.exe` backend — 98 tools, memory graph, orchestration — auto-started when needed, live progress, results in chat. Tasks auto-include Browser Control API instructions so the exe can drive your live tabs. Uncheck to use the in-browser agent |
 | Control API | **Browser Control API** (`127.0.0.1:9777`, Tools menu): localhost HTTP control of the real browser — status/tabs/navigate/snapshot/act/screenshot/eval/ask — for the harness, the terminal agent, and scripts |
 

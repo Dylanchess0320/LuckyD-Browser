@@ -78,6 +78,24 @@ THEMES: dict[str, dict[str, str]] = {
         "tab_inactive": "#dde5f2",
         "scroll": "#b3c0d8",
     },
+    # The secret fifth — unlock it with the Konami code on the new-tab page
+    # (↑↑↓↓←→←→BA) or just pick it in Settings like a normal person.
+    "synthwave": {
+        "label": "Synthwave Sunset",
+        "window": "#12081f",
+        "panel": "#180b29",
+        "panel2": "#1f1033",
+        "card": "#251640",
+        "border": "#3a1f5c",
+        "text": "#f3e9ff",
+        "muted": "#9d8bb8",
+        "accent": "#ff71ce",
+        "accent2": "#01cdfe",
+        "danger": "#ff5b6e",
+        "ok": "#05ffa1",
+        "tab_inactive": "#160a26",
+        "scroll": "#40215f",
+    },
 }
 
 DEFAULT_THEME = "neon"
@@ -227,6 +245,44 @@ QToolBar QToolButton#tab_plus {
 QToolBar QToolButton#tab_plus:hover {
     color: $accent;
 }
+
+/* ── bookmark bar: quiet strip, pill hover, per-site tiles ─────────── */
+QToolBar#bookmark_bar {
+    background: $panel;
+    border: none;
+    border-bottom: 1px solid $border;
+    padding: 1px 8px;
+    spacing: 2px;
+}
+QToolBar#bookmark_bar QToolButton {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    padding: 3px 9px;
+    color: $text;
+    font-size: 12px;
+    font-weight: 600;
+}
+QToolBar#bookmark_bar QToolButton:hover {
+    background: $card;
+    border-color: $border;
+    color: $accent;
+}
+QToolBar#bookmark_bar QToolButton:pressed { background: $panel2; }
+QToolBar#bookmark_bar QToolButton:disabled { color: $muted; font-style: italic; }
+
+/* ── zoom pill (status bar) ────────────────────────────────────────── */
+QPushButton#zoom_pill {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    padding: 2px 10px;
+    color: $muted;
+    font-size: 11.5px;
+    font-weight: 600;
+}
+QPushButton#zoom_pill:hover { background: $card; border-color: $border; color: $accent; }
+QPushButton#zoom_pill[zoomed="true"] { color: $accent2; border-color: $border; }
 
 /* ── tab bar ──────────────────────────────────────────────────────── */
 QTabWidget::pane {

@@ -65,7 +65,7 @@ def _glob_to_regex(pattern: str) -> str:
     for ch in pattern:
         if ch == "*":
             out.append(".*")
-        elif ch in ".+?^${}()|[]\\":
+        elif ch in ".+?^${}()|[]\\/":  # "/" MUST escape — the source is wrapped in /…/
             out.append("\\" + ch)
         else:
             out.append(ch)

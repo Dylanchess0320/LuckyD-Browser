@@ -52,6 +52,14 @@ _HEAD = r"""<!DOCTYPE html>
   #clock { text-align: right; }
   #clock .time { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
   #clock .date { font-size: 12px; color: var(--muted); }
+  #hello-line { font-size: 12.5px; color: var(--muted); margin-top: 3px; }
+  #hello-line b { color: var(--text); }
+  #party { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+    pointer-events: none; z-index: 99; }
+  #party .burst { font-size: 30px; font-weight: 800; padding: 22px 38px; border-radius: 18px;
+    background: var(--card); border: 1px solid var(--accent); color: var(--text);
+    box-shadow: 0 0 60px var(--accent); animation: pop .5s ease-out; }
+  @keyframes pop { 0% { transform: scale(.6); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
   main { max-width: 780px; margin: 5vh auto 40px; padding: 0 24px; }
 """
 _CSS = r"""  .search { display: flex; background: var(--card); border: 1px solid var(--border);
@@ -96,8 +104,10 @@ _BODY = r"""<body>
     <span class="pill ok" id="pill-api"><span class="dot"></span><span>browser API</span></span>
     <span class="pill" id="pill-ai"><span class="dot"></span><span>AI…</span></span>
   </div>
-  <div id="clock"><div class="time" id="time"></div><div class="date" id="date"></div></div>
+  <div id="clock"><div class="time" id="time"></div><div class="date" id="date"></div>
+    <div id="hello-line"><b id="hello"></b> <span id="tagline"></span></div></div>
 </header>
+<div id="party"><div class="burst" id="partytext"></div></div>
 <main>
   <form class="search" id="searchform">
     <select id="engine">
@@ -155,6 +165,45 @@ function tick() {
     now.toLocaleDateString([], {weekday: 'long', month: 'long', day: 'numeric'});
 }
 tick(); setInterval(tick, 10000);
+
+// Time-aware greeting with a rotating LuckyD wink.
+const TAGLINES = [
+  'your tabs missed you', 'no accounts, no keys, no worries', 'the agent is ready when you are',
+  'press Ctrl+K for everything', 'tip: Ctrl+` opens a terminal', 'surf different',
+  'tip: Ctrl+Shift+S screenshots the page', 'workflows replay your best moves',
+];
+(function greet() {
+  const h = new Date().getHours();
+  document.getElementById('hello').textContent =
+    (h < 5 ? 'Up late' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening') + ' —';
+  document.getElementById('tagline').textContent = TAGLINES[Math.floor(Math.random() * TAGLINES.length)];
+})();
+
+// Konami code (↑↑↓↓←→←→BA) unlocks the secret Synthwave Sunset theme.
+const KONAMI = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a'];
+let kpos = 0;
+addEventListener('keydown', e => {
+  if (e.key === KONAMI[kpos]) {
+    kpos++;
+    if (kpos === KONAMI.length) { kpos = 0; unlockSynthwave(); }
+  } else {
+    kpos = (e.key === KONAMI[0]) ? 1 : 0;
+  }
+});
+function party(text) {
+  const p = document.getElementById('party');
+  document.getElementById('partytext').textContent = text;
+  p.style.display = 'flex';
+  setTimeout(() => { p.style.display = 'none'; }, 1600);
+}
+async function unlockSynthwave() {
+  try {
+    await fetch('/theme', {method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name: 'synthwave'})});
+    party('🌆 Synthwave Sunset unlocked!');
+    setTimeout(() => location.reload(), 1400);  // re-render with the new theme vars
+  } catch (e) { party('🌆 nice combo!'); }
+}
 
 function setPill(id, cls, text) {
   const p = document.getElementById(id);
@@ -382,3 +431,193 @@ def hq_shell_html(harness_url: str, settings=None) -> str:
     return _HQ_SHELL_TMPL.replace("__BRAND_VARS__", css_vars(settings), 1).replace(
         "__HARNESS_URL__", harness_url
     )
+
+
+_WORKFLOWS_HTML = r"""<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Workflows</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; background: #0b0f16; color: #e2e8f0;
+         font: 14px/1.5 system-ui, "Segoe UI", sans-serif; padding: 28px 20px; }
+  main { max-width: 760px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: #64748b; font-size: 12.5px; margin-bottom: 20px; }
+  .card { background: #0f1622; border: 1px solid #1e293b; border-radius: 12px;
+          padding: 16px; margin-bottom: 14px; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .row .sp { flex: 1; }
+  input[type=text] { flex: 1; min-width: 180px; background: #1a2132;
+      border: 1px solid #232c42; border-radius: 8px; padding: 9px 12px;
+      color: #e2e8f0; font: inherit; }
+  button { border: 1px solid #1e293b; background: #1a2132; color: #cbd5e1;
+      border-radius: 8px; padding: 9px 14px; font: 600 13px system-ui;
+      cursor: pointer; }
+  button:hover { border-color: #334155; }
+  button.rec { background: #7f1d1d; border-color: #991b1b; color: #fecaca; }
+  button.play { color: #34d399; }
+  button.del { color: #f87171; }
+  button:disabled { opacity: .45; cursor: default; }
+  .pill { font: 600 11.5px system-ui; padding: 4px 10px; border-radius: 999px;
+      background: #1a2132; border: 1px solid #232c42; color: #64748b; }
+  .pill.on { color: #f87171; border-color: #7f1d1d; }
+  .wf { display: flex; align-items: center; gap: 10px; padding: 10px 4px;
+        border-top: 1px solid #1e293b; }
+  .wf:first-of-type { border-top: none; }
+  .wf .name { font-weight: 600; }
+  .wf .meta { color: #64748b; font-size: 12px; }
+  .wf .sp { flex: 1; }
+  #log { font: 12px/1.6 ui-monospace, "Cascadia Mono", Consolas, monospace;
+      white-space: pre-wrap; color: #94a3b8; max-height: 260px; overflow: auto; }
+  #log .ok { color: #34d399; } #log .bad { color: #f87171; }
+  #log .heal { color: #fbbf24; }
+  .empty { color: #475569; text-align: center; padding: 18px 0; }
+</style></head><body>
+<main>
+  <h1>🎬 Workflows</h1>
+  <div class="sub">Record Control-API actions (agent runs, scripts) into named
+    automations, then replay them — element targets re-resolve by fingerprint
+    when the page changes.</div>
+
+  <div class="card">
+    <div class="row">
+      <span id="recpill" class="pill">idle</span>
+      <input id="wfname" type="text" placeholder="workflow name (e.g. daily-report)" maxlength="60">
+      <button id="recbtn" class="rec">⏺ Start Recording</button>
+    </div>
+  </div>
+
+  <div class="card" id="list-card">
+    <div class="row"><b>Saved workflows</b><span class="sp"></span>
+      <button id="refresh">↻ Refresh</button></div>
+    <div id="list"><div class="empty">No workflows yet — record one above.</div></div>
+  </div>
+
+  <div class="card" id="log-card" style="display:none">
+    <b>Replay log</b>
+    <div id="log"></div>
+  </div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+async function api(path, body) {
+  const opt = body === undefined ? {} : {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body)};
+  const r = await fetch(path, opt);
+  return await r.json();
+}
+let recording = false;
+
+function paintRecorder(st) {
+  recording = !!(st && st.recording);
+  $('recpill').textContent = recording
+    ? `⏺ recording "${st.name}" — ${st.steps} steps` : 'idle';
+  $('recpill').className = 'pill' + (recording ? ' on' : '');
+  $('recbtn').textContent = recording ? '⏹ Stop & Save' : '⏺ Start Recording';
+  $('wfname').disabled = recording;
+}
+
+async function refresh() {
+  try {
+    const data = await api('/workflows/list');
+    paintRecorder(data.recording);
+    const rows = data.workflows || [];
+    $('list').innerHTML = rows.length ? '' :
+      '<div class="empty">No workflows yet — record one above.</div>';
+    for (const wf of rows) {
+      const when = wf.created ? new Date(wf.created * 1000).toLocaleString() : '';
+      const div = document.createElement('div');
+      div.className = 'wf';
+      div.innerHTML = `<span class="name"></span>
+        <span class="meta">${wf.steps} steps · ${when}</span>
+        <span class="sp"></span>`;
+      div.querySelector('.name').textContent = wf.name;
+      const play = document.createElement('button');
+      play.className = 'play'; play.textContent = '▶ Replay';
+      play.onclick = () => replay(wf.name, play);
+      const del = document.createElement('button');
+      del.className = 'del'; del.textContent = '🗑';
+      del.title = 'Delete workflow';
+      del.onclick = async () => {
+        if (confirm(`Delete workflow "${wf.name}"?`)) {
+          await api('/workflow/delete', {name: wf.name}); refresh();
+        }
+      };
+      div.append(play, del);
+      $('list').appendChild(div);
+    }
+  } catch (e) { /* control API hiccup — retry on next tick */ }
+}
+
+$('recbtn').onclick = async () => {
+  if (recording) { await api('/workflow/stop', {}); refresh(); return; }
+  const name = $('wfname').value.trim() || 'workflow-' + Date.now();
+  await api('/workflow/record', {name});
+  $('wfname').value = '';
+  refresh();
+};
+$('refresh').onclick = refresh;
+
+async function replay(name, btn) {
+  btn.disabled = true;
+  $('log-card').style.display = '';
+  $('log').innerHTML = `▶ replaying "${name}"…\n`;
+  try {
+    const r = await api('/workflow/replay', {name});
+    const lines = (r.results || []).map(s => {
+      const cls = s.ok ? 'ok' : 'bad';
+      const heal = s.healed ? ' <span class="heal">⟲ healed</span>' : '';
+      return `<span class="${cls}">${s.ok ? '✓' : '✗'} step ${s.step} ${s.action}</span>${heal} — ${s.detail}`;
+    });
+    $('log').innerHTML = lines.join('\n') +
+      `\n\n<b>${r.succeeded}/${r.total}</b> steps succeeded`;
+    if (r.total > 0 && r.succeeded === r.total) confetti();  // flawless run
+  } catch (e) {
+    $('log').innerHTML += 'replay failed: ' + e;
+  }
+  btn.disabled = false;
+}
+
+function confetti() {
+  const cv = document.createElement('canvas');
+  cv.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:99';
+  document.body.appendChild(cv);
+  cv.width = innerWidth; cv.height = innerHeight;
+  const ctx = cv.getContext('2d');
+  const P = [];
+  for (let i = 0; i < 130; i++) P.push({
+    x: innerWidth / 2 + (Math.random() - 0.5) * 120, y: innerHeight * 0.3,
+    vx: (Math.random() - 0.5) * 10, vy: -Math.random() * 9 - 2, g: 0.24,
+    c: `hsl(${Math.random() * 360},92%,62%)`, s: 3 + Math.random() * 4,
+    r: Math.random() * Math.PI,
+  });
+  let frames = 0;
+  (function anim() {
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    for (const p of P) {
+      p.x += p.vx; p.y += p.vy; p.vy += p.g; p.r += 0.12;
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.r);
+      ctx.fillStyle = p.c; ctx.fillRect(-p.s / 2, -p.s / 2, p.s, p.s); ctx.restore();
+    }
+    if (++frames < 150) requestAnimationFrame(anim); else cv.remove();
+  })();
+}
+
+refresh();
+setInterval(refresh, 2500);
+</script>
+</body></html>
+"""
+
+
+def workflows_html() -> str:
+    """The workflow manager page (record / replay / delete saved automations).
+
+    Same-origin with the Control API, so it drives the JSON routes directly —
+    no auth juggling, no external assets.
+    """
+    return _WORKFLOWS_HTML

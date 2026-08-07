@@ -55,13 +55,13 @@ Prefer a cloud model instead? The sidebar supports 9 more providers — see
 
 ## 📦 Download & install
 
-**[⬇ Download the latest installer](https://github.com/Dylanchess0320/LuckyD-Browser/releases)** (`LuckyDBrowserSetup-1.3.0.exe`)
+**[⬇ Download the latest installer](https://github.com/Dylanchess0320/LuckyD-Browser/releases)** (`LuckyDBrowserSetup-1.5.0.exe`)
 
 - Windows 10/11 x64 · per-user install · **no admin rights needed**
 - Installs to `%LOCALAPPDATA%\Programs\LuckyDBrowser`
 - Start Menu shortcut, optional desktop icon, **Settings > Apps** uninstall entry
 - Everything is bundled (Chromium runtime + coding-agent backend) — nothing else required
-- Silent install for scripting: `LuckyDBrowserSetup-1.3.0.exe /VERYSILENT /NORESTART`
+- Silent install for scripting: `LuckyDBrowserSetup-1.5.0.exe /VERYSILENT /NORESTART`
 
 ---
 
@@ -71,8 +71,9 @@ Prefer a cloud model instead? The sidebar supports 9 more providers — see
 |---|---|---|
 | **AI Sidebar** | Chat (Markdown bubbles), per-provider model picker, page-aware Q&A, 📷 visual Q&A, and an **autonomous agent that drives your real tab** — orange highlight ring, step narration, Stop button | `Ctrl+Shift+A` |
 | **Coding Agent HQ** | The full `luckyd-code` workspace as a browser tab: 70+ tools, memory graph, sessions, orchestration, background tasks — auto-starts with the browser | ⚡ button or `Ctrl+Shift+H` |
-| **In-browser Terminal** | A real `luckyd-code` CLI on a Windows ConPTY, rendered with xterm.js — colors, prompts and line editing behave like a native console | Dashboard tile |
-| **Live Dashboard** | New-tab hub: status pills, **Ask LuckyD** box, one-tap tiles, speed dial | New tab |
+| **In-browser Terminal** | Real terminals on Windows ConPTY via xterm.js — the `luckyd-code` agent CLI **and** plain PowerShell/CMD, each tab its own independent session | `Ctrl+`` ` / `Ctrl+Shift+`` ` |
+| **Workflows** | Record Control-API actions into named automations and replay them with self-healing element matching | Tools → Workflows… |
+| **Live Dashboard** | New-tab hub: status pills, **Ask LuckyD** box, one-tap tiles, speed dial, time-aware greetings | New tab |
 
 **Harness mode (default ON):** sidebar agent tasks run on the coding-agent backend, which can drive
 your **live, visible tabs** through the Control API — exe brain, browser hands.
@@ -86,13 +87,17 @@ your **live, visible tabs** through the Control API — exe brain, browser hands
 
 ## 🌐 It's also just a really good browser
 
-Tabs (pin, drag, hover previews, recently-closed) · omnibox with history completion · bookmarks
-(import/export Chrome/Edge HTML) · searchable history · downloads dock with cancel · **incognito
-(🕶 badge, nothing touches disk)** · in-page find · built-in **ad/tracker blocker** · zoom indicator ·
-print / save-page · view-source + DevTools · HTTPS lock icon · auto-retry on network errors ·
-4 futuristic themes with glass toasts · command palette (`Ctrl+K`) · AI right-click actions
-(**Explain / Summarize / Translate**) · **Copy as Markdown** · mouse back/forward buttons ·
-full keyboard-shortcut reference (`Ctrl+/`).
+**Session restore** (continue where you left off — windows, tabs, pinned state) · tabs (pin, drag,
+hover previews, recently-closed) · omnibox with history completion · bookmarks (import/export
+Chrome/Edge HTML) with a **toggleable bookmarks bar** (`Ctrl+Shift+B`) · searchable history ·
+downloads dock with cancel · **incognito (🕶 badge, nothing touches disk)** · in-page find ·
+built-in **ad/tracker blocker** · **per-site zoom memory** with Ctrl+scroll zoom · **one-key
+page screenshots** (`Ctrl+Shift+S`) · **multi-terminal tabs** (agent CLI + PowerShell/CMD,
+`Ctrl+`` / `Ctrl+Shift+``) · **workflow record & replay** with self-healing element matching ·
+**AI data extraction to JSON** · print / save-page · view-source + DevTools · HTTPS lock icon ·
+auto-retry on network errors · 4 futuristic themes with glass toasts · command palette (`Ctrl+K`) ·
+AI right-click actions (**Explain / Summarize / Translate**) · **Copy as Markdown** ·
+mouse back/forward buttons · full keyboard-shortcut reference (`Ctrl+/`).
 
 ---
 
@@ -179,8 +184,9 @@ The installer script (`browser\installer\LuckyDBrowser.iss`) and the AI bootstra
 
 ## ⚙ Configuration
 
-- **Settings UI**: search engine, homepage, ad blocker, download folder, zoom, themes,
-  harness auto-start, Control API port/token.
+- **Settings UI**: search engine, homepage, ad blocker, download folder, zoom, themes
+  (4 + a secret Synthwave one), startup/session restore, harness auto-start, Control
+  API port/token.
 - **Data folder**: `%LOCALAPPDATA%\LuckyDBrowser` (settings, history/bookmarks DB, userscripts).
 - **Provider keys** (optional): set `DEEPSEEK_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`, …
   in a `.env` next to the app, or just use the sidebar picker. No keys = local Ollama.

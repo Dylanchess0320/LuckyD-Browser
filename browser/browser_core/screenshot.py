@@ -14,10 +14,25 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
+from datetime import datetime
+from urllib.parse import urlsplit
 
 import httpx
 
 CDP_HTTP = "http://127.0.0.1:9222"
+
+
+def suggested_name(url: str, *, ext: str = "jpg", now: datetime | None = None) -> str:
+    """Filesystem-safe screenshot filename from a page URL.
+
+    e.g. https://example.com/docs -> screenshot-example.com-20260807-153012.jpg
+    """
+    host = urlsplit(url or "").hostname or "page"
+    slug = re.sub(r"[^A-Za-z0-9.-]+", "-", host).strip("-.") or "page"
+    stamp = (now or datetime.now()).strftime("%Y%m%d-%H%M%S")
+    ext = (ext or "jpg").lstrip(".") or "jpg"
+    return f"screenshot-{slug}-{stamp}.{ext}"
 
 
 async def _cmd(ws, mid: int, method: str, params: dict | None = None) -> dict:

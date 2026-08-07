@@ -11,18 +11,28 @@ STATIC_DIR = Path(__file__).resolve().parent.parent / "assets" / "terminal"
 _WS_HOST = "127.0.0.1"
 _WS_PORT = 9881  # must match browser_app's "terminal_port" default
 
+# Keep in sync with terminal_server.SHELLS (allowlist lives there).
+_SHELL_LABELS = {"agent": "Agent", "powershell": "PowerShell", "cmd": "CMD"}
 
-def terminal_html(settings=None) -> str:
+
+def terminal_html(settings=None, shell: str = "agent") -> str:
     """The terminal tab page. Connects to the PTY bridge over WebSocket.
 
     Honors the browser's ``terminal_port`` setting so the page always dials
-    the same port the WS->PTY bridge actually bound (default 9881).
+    the same port the WS->PTY bridge actually bound (default 9881). ``shell``
+    picks the spawned process — the agent CLI, PowerShell, or CMD; every tab
+    gets its own independent ConPTY session, so terminals multiply freely.
     """
     port = _WS_PORT
     if settings is not None:
         with contextlib.suppress(TypeError, ValueError, AttributeError):
             port = int(settings.get("terminal_port", _WS_PORT) or _WS_PORT)
-    return _HTML.replace("__WS_URL__", f"ws://{_WS_HOST}:{port}")
+    shell = (shell or "agent").strip().lower()
+    if shell not in _SHELL_LABELS:
+        shell = "agent"
+    return _HTML.replace("__WS_URL__", f"ws://{_WS_HOST}:{port}").replace(
+        "__SHELL__", shell
+    )
 
 
 _HTML = """<!doctype html>
@@ -52,8 +62,15 @@ _HTML = """<!doctype html>
   #menu .mi.off{opacity:.38;pointer-events:none}
   #menu .mi span{color:#64748b;font-size:11px}
   #menu .sep{height:1px;background:#1e293b;margin:4px 6px}
+  .sh{border:1px solid #1e293b;background:transparent;color:#64748b;
+      font:600 11px/1 system-ui;padding:4px 10px;border-radius:6px;cursor:pointer}
+  .sh:hover{color:#cbd5e1;border-color:#334155}
+  .sh.on{color:#34d399;border-color:#34d399;background:rgba(52,211,153,.08)}
 </style></head><body>
-<div id="bar"><span id="dot" class="dot"></span><b>&#9000; Terminal</b>
+<div id="bar"><span id="dot" class="dot"></span><b id="title">&#9000; Terminal</b>
+  <button class="sh" data-sh="agent" title="LuckyD Code agent CLI">Agent</button>
+  <button class="sh" data-sh="powershell" title="Plain PowerShell console">PowerShell</button>
+  <button class="sh" data-sh="cmd" title="Plain cmd.exe console">CMD</button>
   <span id="status">connecting&hellip;</span>
   <span id="hint">Ctrl+Shift+C copy &middot; Ctrl+Shift+V paste &middot; right-click for menu</span></div>
 <div id="wrap"><div id="term"></div></div>
@@ -68,8 +85,30 @@ _HTML = """<!doctype html>
 <script src="/static/terminal/xterm-addon-fit.js"></script>
 <script>
 const WS_URL = "__WS_URL__";
+let SHELL = "__SHELL__";
+const SHELL_LABELS = {agent: 'Agent', powershell: 'PowerShell', cmd: 'CMD'};
 const dot = document.getElementById('dot');
 const statusEl = document.getElementById('status');
+const titleEl = document.getElementById('title');
+function paintShell(){
+  document.querySelectorAll('.sh').forEach(b =>
+    b.classList.toggle('on', b.dataset.sh === SHELL));
+  const label = SHELL_LABELS[SHELL] || 'Agent';
+  titleEl.innerHTML = '&#9000; Terminal — ' + label;
+  document.title = 'Terminal — ' + label;
+}
+function switchShell(name){
+  if (!SHELL_LABELS[name] || name === SHELL) return;
+  SHELL = name;  // reconnect spawns a fresh, independent PTY for the shell
+  paintShell();
+  try { if (ws) ws.onclose = null, ws.close(); } catch(e) {}
+  retry = 0;
+  term.reset();
+  connect();
+}
+document.querySelectorAll('.sh').forEach(b =>
+  b.addEventListener('click', () => switchShell(b.dataset.sh)));
+paintShell();
 const term = new Terminal({
   cursorBlink: true, convertEol: false, fontSize: 14,
   fontFamily: 'Cascadia Mono, Consolas, "Courier New", monospace',
@@ -92,7 +131,7 @@ function connect(){
   setState('', 'connecting…');
   // Advertise our real dimensions so the bridge spawns the PTY at the right
   // size — a birth-size mismatch makes fullscreen CLIs wrap off-screen.
-  ws = new WebSocket(WS_URL + '?cols=' + term.cols + '&rows=' + term.rows);
+  ws = new WebSocket(WS_URL + '?cols=' + term.cols + '&rows=' + term.rows + '&shell=' + SHELL);
   ws.onopen = () => { retry = 0; setState('on', 'connected'); refit(); term.focus(); };
   ws.onmessage = (ev) => {
     if (typeof ev.data === 'string') term.write(ev.data);

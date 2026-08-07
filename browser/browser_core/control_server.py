@@ -34,11 +34,21 @@ from browser_core.agent import (
     _SNAPSHOT_JS,
     _TYPE_JS,
 )
-from browser_core.dashboard import dashboard_html, hq_shell_html, hq_splash_html
+from browser_core.dashboard import dashboard_html, hq_shell_html, hq_splash_html, workflows_html
+from browser_core.extract import build_messages, parse_json_loose
 from browser_core.terminal_page import STATIC_DIR, terminal_html
+from browser_core.workflows import (
+    INDEXED_ACTIONS,
+    WorkflowRecorder,
+    WorkflowStore,
+    elements_js,
+    fingerprint_js,
+    resolve_index,
+    step_record,
+)
 
 API_NAME = "Browser Control API"
-API_VERSION = "1.2.0"
+API_VERSION = "1.3.0"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 9777
 
@@ -70,6 +80,18 @@ _ROUTES = (
     ("GET  /screenshot?url=", "base64 JPEG of a tab (CDP; needs websockets)"),
     ("POST /eval", '{"js": "…"} — run JavaScript in the active tab'),
     ("POST /ask", '{"question": "…", "provider": "…" (optional)} — AI + page context'),
+    ("GET  /workflows", "workflow manager page (record/replay saved automations)"),
+    ("GET  /workflows/list", "saved workflows + recorder status (JSON)"),
+    ("POST /workflow/record", '{"name": "…"} — start recording /navigate + /act traffic'),
+    ("POST /workflow/stop", "stop recording and save the workflow"),
+    ("POST /workflow/replay", '{"name": "…"} — replay with self-healing element match'),
+    ("POST /workflow/delete", '{"name": "…"}'),
+    (
+        "POST /extract",
+        '{"instruction": "…", "schema": {…} (optional), "provider": "…" (optional)}'
+        " — structured JSON data from the page (AI)",
+    ),
+    ("POST /theme", '{"name": "neon|cyber|solar|arctic|synthwave"} — live theme switch'),
 )
 
 
@@ -251,7 +273,8 @@ def make_handler(backend, token: str = "", harness=None, settings=None):
                 if path == "/hq":
                     return self._hq(query)
                 if path == "/terminal":
-                    return self._send_html(terminal_html(settings))
+                    shell = (query.get("shell") or ["agent"])[0]
+                    return self._send_html(terminal_html(settings, shell=shell))
                 if path.startswith("/static/terminal/"):
                     return self._terminal_asset(path)
                 if path == "/status":
@@ -261,6 +284,10 @@ def make_handler(backend, token: str = "", harness=None, settings=None):
                 if path == "/screenshot":
                     url = (query.get("url") or [""])[0]
                     return self._ok(image_b64=backend.screenshot(url), mime="image/jpeg")
+                if path == "/workflows":
+                    return self._send_html(workflows_html())
+                if path == "/workflows/list":
+                    return self._ok(**backend.list_workflows())
                 return self._send(404, {"ok": False, "error": f"unknown route {path}"})
             except Exception as exc:
                 return self._fail(500, exc)
@@ -300,6 +327,35 @@ def make_handler(backend, token: str = "", harness=None, settings=None):
                         return self._send(400, {"ok": False, "error": "question required"})
                     provider = str(body.get("provider", "")).strip() or None
                     return self._ok(answer=backend.ask(question, provider))
+                if path == "/workflow/record":
+                    name = str(body.get("name", "")).strip()
+                    if not name:
+                        return self._send(400, {"ok": False, "error": "name required"})
+                    return self._ok(name=backend.start_recording(name))
+                if path == "/workflow/stop":
+                    return self._ok(**backend.stop_recording())
+                if path == "/workflow/replay":
+                    name = str(body.get("name", "")).strip()
+                    if not name:
+                        return self._send(400, {"ok": False, "error": "name required"})
+                    return self._ok(**backend.replay_workflow(name))
+                if path == "/workflow/delete":
+                    name = str(body.get("name", "")).strip()
+                    if not name:
+                        return self._send(400, {"ok": False, "error": "name required"})
+                    return self._ok(deleted=backend.delete_workflow(name))
+                if path == "/extract":
+                    instruction = str(body.get("instruction", "")).strip()
+                    if not instruction:
+                        return self._send(400, {"ok": False, "error": "instruction required"})
+                    schema = body.get("schema") if isinstance(body.get("schema"), dict) else None
+                    provider = str(body.get("provider", "")).strip() or None
+                    return self._ok(data=backend.extract(instruction, schema, provider))
+                if path == "/theme":
+                    name = str(body.get("name", "")).strip()
+                    if not name:
+                        return self._send(400, {"ok": False, "error": "name required"})
+                    return self._ok(theme=backend.set_theme(name))
                 return self._send(404, {"ok": False, "error": f"unknown route {path}"})
             except Exception as exc:
                 return self._fail(500, exc)
@@ -434,7 +490,10 @@ class QtBrowserBackend:
             raise RuntimeError("PySide6 is required for QtBrowserBackend")
         self._app = app
         self._invoker = GuiInvoker()
-        self._ai = None  # lazy AIBridge for /ask
+        self._ai = None  # lazy AIBridge for /ask and /extract
+        self._recorder = WorkflowRecorder()
+        self._wf_store = WorkflowStore()
+        self._replaying = False  # replayed steps must not re-record
 
     # ── GUI-thread helpers ────────────────────────────────────────────
     def _window(self):
@@ -557,7 +616,10 @@ class QtBrowserBackend:
                 view = win.tabs.current_view()
             return view.url().toString() if view else url
 
-        return self._invoker.run(_do)
+        result = self._invoker.run(_do)
+        if self._recorder.active and not self._replaying:
+            self._recorder.add(step_record({"action": "navigate", "url": url}))
+        return result
 
     def new_tab(self, url: str | None = None) -> int:
         def _do():
@@ -605,7 +667,29 @@ class QtBrowserBackend:
         except (json.JSONDecodeError, TypeError) as exc:
             raise RuntimeError(f"snapshot parse failed: {exc}") from exc
 
+    # Results that mean "the action didn't happen" — never recorded.
+    _FAILED_PREFIXES = ("element not found", "refused", "unknown action", "no target")
+
     def act(self, action: dict) -> str:
+        """Record (when active) + execute one agent-style action."""
+        fingerprint = None
+        kind = str(action.get("action", "")).strip().lower()
+        index = int(action.get("index", -1) or -1)
+        if self._recorder.active and not self._replaying and kind in INDEXED_ACTIONS and index >= 0:
+            # Fingerprint BEFORE acting: a click may destroy/navigate the node.
+            with contextlib.suppress(Exception):
+                raw = self.run_js(fingerprint_js(index))
+                fingerprint = json.loads(raw) if raw else None
+        result = self._perform_act(action)
+        if (
+            self._recorder.active
+            and not self._replaying
+            and not str(result).startswith(self._FAILED_PREFIXES)
+        ):
+            self._recorder.add(step_record(action, fingerprint))
+        return result
+
+    def _perform_act(self, action: dict) -> str:
         """One agent-style action (click/type/press/select/scroll/navigate/…)."""
         kind = str(action.get("action", ""))
         index = int(action.get("index", -1) or -1)
@@ -697,3 +781,128 @@ class QtBrowserBackend:
         messages.append({"role": "user", "content": question})
         text, _used = asyncio.run(self._ai.chat(messages, provider=provider))
         return text
+
+    # ── workflows: record / replay with self-healing ───────────────────
+
+    def start_recording(self, name: str) -> str:
+        return self._recorder.start(name)
+
+    def stop_recording(self) -> dict:
+        name, steps = self._recorder.stop()
+        if name is None:
+            return {"saved": False, "name": "", "steps": 0}
+        saved = self._wf_store.save(name, steps) if steps else ""
+        return {"saved": bool(saved), "name": saved or name, "steps": len(steps)}
+
+    def list_workflows(self) -> dict:
+        return {"recording": self._recorder.status(), "workflows": self._wf_store.list()}
+
+    def delete_workflow(self, name: str) -> bool:
+        return self._wf_store.delete(name)
+
+    def replay_workflow(self, name: str) -> dict:
+        """Replay a saved workflow against the live tab.
+
+        Indexed steps re-resolve their target on a fresh snapshot: the
+        recorded fingerprint is scored against the current elements and the
+        best match wins (self-healing), falling back to the recorded index.
+        Stops at the first broken element step rather than clicking blind.
+        """
+        data = self._wf_store.load(name)
+        if data is None:
+            raise KeyError(f"workflow {name!r} not found")
+        steps = data.get("steps", [])
+        results: list[dict] = []
+        self._replaying = True
+        try:
+            for i, step in enumerate(steps):
+                self._wait_ready(timeout=4.0)  # never act into a mid-reload page
+                kind = str(step.get("action", ""))
+                action: dict = {"action": kind}
+                healed = False
+                if kind in INDEXED_ACTIONS:
+                    candidates: list[dict] = []
+                    with contextlib.suppress(Exception):
+                        self.snapshot()  # retags data-ld-agent on the live page
+                        raw = self.run_js(elements_js())
+                        candidates = json.loads(raw) if raw else []
+                    index, healed = resolve_index(
+                        step.get("target"), candidates, int(step.get("index", 0) or 0)
+                    )
+                    action["index"] = index
+                if "text" in step:
+                    action["text"] = step["text"]
+                if "url" in step:
+                    action["url"] = step["url"]
+                try:
+                    detail = self.act(action)
+                    ok = not str(detail).startswith(self._FAILED_PREFIXES)
+                except Exception as exc:
+                    detail, ok = str(exc), False
+                results.append(
+                    {
+                        "step": i + 1,
+                        "action": kind,
+                        "ok": ok,
+                        "healed": healed,
+                        "detail": str(detail)[:200],
+                    }
+                )
+                time.sleep(0.25)  # let the page breathe between steps
+                if not ok and kind in INDEXED_ACTIONS:
+                    break
+        finally:
+            self._replaying = False
+        done = sum(1 for r in results if r["ok"])
+        return {
+            "workflow": data.get("name", name),
+            "total": len(steps),
+            "succeeded": done,
+            "results": results,
+        }
+
+    def _wait_ready(self, timeout: float = 4.0) -> None:
+        """Block until the active page reports readyState complete (bounded)."""
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            try:
+                if self.run_js("document.readyState", timeout=2.0) == "complete":
+                    return
+            except Exception:
+                pass
+            time.sleep(0.2)
+
+    # ── structured extraction (Stagehand-style) ────────────────────────
+
+    def extract(self, instruction: str, schema: dict | None = None, provider: str | None = None):
+        """Pull structured JSON out of the active page with the AI provider."""
+        snap = self.snapshot()
+        if self._ai is None:
+            from browser_core.ai_bridge import AIBridge
+
+            self._ai = AIBridge()
+        meta = f"{snap.get('title', '')} <{snap.get('url', '')}>"
+        messages = build_messages(instruction, schema, snap.get("text", ""), meta)
+        text, _used = asyncio.run(self._ai.chat(messages, provider=provider))
+        data = parse_json_loose(text)
+        if data is None:
+            raise RuntimeError(f"model did not return parseable JSON: {text[:200]}")
+        return data
+
+    # ── theming ───────────────────────────────────────────────────────
+
+    def set_theme(self, name: str) -> str:
+        """Live-switch the app theme on every window (Settings equivalent)."""
+        from browser_ui.theme import THEMES
+
+        if name not in THEMES:
+            raise ValueError(f"unknown theme {name!r}")
+        self._app.settings.set("theme", name)
+
+        def _do():
+            for win in list(self._app.windows):
+                with contextlib.suppress(Exception):
+                    win._apply_theme()
+
+        self._invoker.run(_do)
+        return name

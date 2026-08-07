@@ -30,6 +30,15 @@ DEFAULTS = {
     "adblock_enabled": True,
     "download_dir": "",  # empty = system Downloads folder
     "zoom_factor": 1.0,
+    # Session restore: "restore" reopens last session's tabs on launch,
+    # "newtab" always starts fresh. Incognito windows are never saved.
+    "startup_mode": "restore",
+    # Bookmark bar under the navigation toolbar (Ctrl+Shift+B toggles).
+    "bookmark_bar_visible": True,
+    # Zoom: remember per-site levels (origin -> factor) in addition to the
+    # global "zoom_factor" default above.
+    "zoom_remember": True,
+    "zoom_levels": {},
     # Browser Control API (localhost HTTP control of the live browser —
     # lets the luckyd-code.exe harness drive tabs; see browser/README.md).
     "browser_api_enabled": True,
@@ -44,6 +53,10 @@ DEFAULTS = {
     "update_auto_check": True,
     # A version tag the user chose to skip (don't prompt for it again).
     "update_skipped_version": "",
+    # Userscripts disabled by name. "Dark Mode Everywhere" inverts EVERY page
+    # (images included) — powerful but strictly opt-in; the other built-ins
+    # (YouTube ad-block, video speed) are safe defaults.
+    "userscript_disabled": ["Dark Mode Everywhere"],
 }
 
 

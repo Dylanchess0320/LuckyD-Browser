@@ -8,6 +8,8 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QLineEdit, QListWidget, QListWidgetItem, QVBoxLayout, QWidget
 
+from .icons import letter_tile
+
 _SCORE = 60
 
 
@@ -33,16 +35,12 @@ class CommandPalette(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
         self._mw = mw
-        self.setWindowOpacity(0.95)
+        self.setWindowOpacity(0.97)
 
         cont = QWidget(self)
-        cont.setStyleSheet(
-            """QWidget{background:rgba(16,21,31,235);border:1px solid rgba(255,255,255,30);border-radius:14px;padding:16px;}
-            QLineEdit{background:#1a2132;border:1px solid #232c42;border-radius:10px;padding:8px 12px;}
-            QListWidget{background:transparent;border:none;}
-            QListWidget::item{padding:8px 14px;border-radius:8px;}
-            QListWidget::item:selected{background:rgba(91,157,255,0.35);}"""
-        )
+        cont.setObjectName("palette_card")
+        self._cont = cont
+        self._apply_style()
         lay = QVBoxLayout(cont)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(8)
@@ -62,6 +60,30 @@ class CommandPalette(QWidget):
         self._load_items()
         self.hide()
 
+    def _apply_style(self) -> None:
+        """Theme-synced card styling (re-applied on every open)."""
+        from .theme import palette as theme_palette
+
+        p = theme_palette(self._mw.settings)
+        self._cont.setStyleSheet(
+            f"""
+            QWidget#palette_card {{
+                background: {p["panel"]};
+                border: 1px solid {p["border"]};
+                border-radius: 14px;
+            }}
+            QLineEdit {{
+                background: {p["card"]}; color: {p["text"]};
+                border: 1px solid {p["border"]}; border-radius: 10px;
+                padding: 9px 13px; selection-background-color: {p["accent"]};
+            }}
+            QLineEdit:focus {{ border-color: {p["accent"]}; }}
+            QListWidget {{ background: transparent; border: none; color: {p["text"]}; }}
+            QListWidget::item {{ padding: 8px 14px; border-radius: 8px; }}
+            QListWidget::item:selected {{ background: {p["card"]}; color: {p["accent"]}; }}
+            """
+        )
+
     def _load_items(self) -> None:
         t = self._mw.tabs
         for i in range(t.count()):
@@ -71,28 +93,34 @@ class CommandPalette(QWidget):
                 self._items.append(
                     (
                         f"tab:{i+1}",
-                        f"{tt} — {u[:50]}",
+                        f"⇥ {tt} — {u[:50]}",
                         v.icon(),
-                        lambda vv=v: self._mw.open_in_new_tab(vv.url()),
+                        lambda vv=v: self._mw.tabs.setCurrentWidget(vv),  # switch, don't dupe
                     )
                 )
         for u, t, *_ in self._mw.storage.bookmarks()[:30]:
             self._items.append(
-                ("bookmark", t or u, None, lambda uu=u: self._mw.open_in_new_tab(uu))
+                ("bookmark", t or u, letter_tile(u), lambda uu=u: self._mw.open_in_new_tab(uu))
             )
         for u, t, *_ in self._mw.storage.recent(100):
-            self._items.append(("history", t or u, None, lambda uu=u: self._mw.open_in_new_tab(uu)))
+            self._items.append(("history", t or u, letter_tile(u), lambda uu=u: self._mw.open_in_new_tab(uu)))
         for label, action in [
             ("New Tab", self._mw.new_tab),
             ("AI Assistant", self._mw.show_assistant),
             ("Coding Agent", self._mw.open_hq),
+            ("Agent Terminal", self._mw.open_terminal),
+            ("PowerShell Terminal", lambda: self._mw.open_terminal("powershell")),
+            ("Workflows", self._mw.open_workflows),
+            ("Save Screenshot", self._mw.save_screenshot),
+            ("Toggle Bookmarks Bar", self._mw.bm_bar_act.toggle),
             ("Bookmarks", self._mw.open_bookmarks),
             ("History", self._mw.open_history),
             ("Settings", self._mw.open_settings),
         ]:
-            self._items.append((label.lower(), label, None, action))
+            self._items.append((label.lower(), f"▸ {label}", None, action))
 
     def show_palette(self) -> None:
+        self._apply_style()  # theme may have changed since last open
         self._e.clear()
         self._items = []
         self._load_items()  # reload fresh data

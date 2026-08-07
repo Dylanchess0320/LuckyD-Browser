@@ -130,34 +130,57 @@ def _cli_command(cli_path: str = "") -> list[str]:
     )
 
 
-def _client_size(ws) -> tuple[int, int]:
-    """Terminal dimensions the client advertised in the WS URL query.
+# Shells the terminal tab can spawn. "agent" is the LuckyD Code CLI (the
+# classic terminal); "powershell"/"cmd" are plain system shells — the
+# "second terminal" for everyday commands, side by side with the agent.
+SHELLS = ("agent", "powershell", "cmd")
 
-    The xterm page dials ``ws://host:port/?cols=C&rows=R`` with its fitted
-    size, so the PTY is BORN at the right dimensions — no boot-time reflow
-    race where the CLI paints at 120x30 and then gets resized mid-draw
+
+def _shell_command(shell: str, cli_path: str = "") -> list[str]:
+    """Resolve a shell name to its spawn command (allowlisted — never raw input)."""
+    shell = (shell or "agent").strip().lower()
+    if shell == "powershell":
+        return ["powershell.exe", "-NoLogo", "-NoExit"]
+    if shell == "cmd":
+        return ["cmd.exe"]
+    return _cli_command(cli_path)
+
+
+def _client_options(ws) -> tuple[int, int, str]:
+    """Dimensions + shell the client advertised in the WS URL query.
+
+    The xterm page dials ``ws://host:port/?cols=C&rows=R&shell=S`` with its
+    fitted size, so the PTY is BORN at the right dimensions — no boot-time
+    reflow race where the CLI paints at 120x30 and then gets resized mid-draw
     (fullscreen TUIs wrap their wide rows and scroll themselves off-screen).
+    Unknown shell names fall back to the agent CLI.
     """
-    cols, rows = _COLS, _ROWS
+    cols, rows, shell = _COLS, _ROWS, "agent"
     try:
         path = getattr(getattr(ws, "request", None), "path", "") or ""
         query = parse_qs(urlparse(path).query)
         cols = int(query.get("cols", [cols])[0])
         rows = int(query.get("rows", [rows])[0])
+        shell = query.get("shell", [shell])[0].strip().lower()
     except (TypeError, ValueError, IndexError):
         cols, rows = _COLS, _ROWS
-    return max(20, min(cols, 500)), max(5, min(rows, 200))
+    if shell not in SHELLS:
+        shell = "agent"
+    return max(20, min(cols, 500)), max(5, min(rows, 200)), shell
 
 
-def _spawn_pty(cli_path: str = "", cols: int = _COLS, rows: int = _ROWS):
-    """Spawn the CLI on a ConPTY. Returns a pywinpty PTY handle."""
+def _spawn_pty(cli_path: str = "", shell: str = "agent", cols: int = _COLS, rows: int = _ROWS):
+    """Spawn the chosen shell on a ConPTY. Returns a pywinpty PTY handle."""
     from winpty import PTY  # lazy import so the module loads without pywinpty
 
     pty = PTY(cols, rows)
-    cmd = _cli_command(cli_path)
+    cmd = _shell_command(shell, cli_path)
     appname, rest = cmd[0], cmd[1:]
     cmdline = subprocess.list2cmdline(rest) if rest else None
-    pty.spawn(appname, cmdline=cmdline, cwd=str(_REPO_ROOT), env=None)
+    # Agent sessions boot in the repo (their workspace); system shells open
+    # in the user's home directory like a freshly launched console would.
+    cwd = str(_REPO_ROOT) if shell == "agent" else str(Path.home())
+    pty.spawn(appname, cmdline=cmdline, cwd=cwd, env=None)
     return pty
 
 
@@ -180,8 +203,8 @@ class TerminalServer:
     def _handle(self, ws) -> None:
         """Bridge one WebSocket connection to one fresh PTY."""
         try:
-            cols, rows = _client_size(ws)
-            pty = _spawn_pty(self.cli_path, cols=cols, rows=rows)
+            cols, rows, shell = _client_options(ws)
+            pty = _spawn_pty(self.cli_path, shell=shell, cols=cols, rows=rows)
         except Exception as exc:  # pywinpty missing or spawn failed
             with contextlib.suppress(Exception):
                 ws.send(f"\r\n\x1b[31m[terminal failed to start: {exc}]\x1b[0m\r\n")

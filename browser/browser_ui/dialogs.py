@@ -206,6 +206,17 @@ class SettingsDialog(QDialog):
         self.homepage.setPlaceholderText("newtab  or  https://example.com")
         form.addRow("Homepage", self.homepage)
 
+        self.startup_box = QComboBox(self)
+        self.startup_box.addItem("Continue where you left off", "restore")
+        self.startup_box.addItem("Open the New Tab page", "newtab")
+        self.startup_box.setToolTip(
+            "\"Continue where you left off\" reopens the tabs (and windows) you had\n"
+            "open when you last closed the browser. Incognito is never restored."
+        )
+        mode = str(settings.get("startup_mode", "restore"))
+        self.startup_box.setCurrentIndex(1 if mode == "newtab" else 0)
+        form.addRow("On startup", self.startup_box)
+
         self.engine = QComboBox(self)
         self.engine.addItems(list(SEARCH_ENGINES.keys()))
         self.engine.setCurrentText(settings.get("search_engine", "Google"))
@@ -236,6 +247,10 @@ class SettingsDialog(QDialog):
         self.assistant_startup.setChecked(bool(settings.get("assistant_visible_startup", True)))
         form.addRow(self.assistant_startup)
 
+        self.bm_bar = QCheckBox("Show the bookmarks bar (Ctrl+Shift+B toggles it)", self)
+        self.bm_bar.setChecked(bool(settings.get("bookmark_bar_visible", True)))
+        form.addRow(self.bm_bar)
+
         dir_row = QHBoxLayout()
         self.dl_dir = QLineEdit(settings.get("download_dir", ""))
         self.dl_dir.setPlaceholderText("Default: system Downloads folder")
@@ -244,6 +259,27 @@ class SettingsDialog(QDialog):
         dir_row.addWidget(self.dl_dir)
         dir_row.addWidget(browse)
         form.addRow("Download folder", dir_row)
+
+        # Zoom: global default + per-site memory
+        self.zoom_box = QComboBox(self)
+        self._zoom_values = [0.5, 0.67, 0.75, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75, 2.0]
+        for value in self._zoom_values:
+            self.zoom_box.addItem(f"{round(value * 100)}%", value)
+        try:
+            current_zoom = float(settings.get("zoom_factor", 1.0) or 1.0)
+        except (TypeError, ValueError):
+            current_zoom = 1.0
+        nearest = min(range(len(self._zoom_values)), key=lambda i: abs(self._zoom_values[i] - current_zoom))
+        self.zoom_box.setCurrentIndex(nearest)
+        form.addRow("Default zoom", self.zoom_box)
+
+        self.zoom_memory = QCheckBox("Remember zoom level per website", self)
+        self.zoom_memory.setToolTip(
+            "Zoom a page with Ctrl +/-/0 or Ctrl+Scroll and LuckyD reopens that\n"
+            "site at your level next time. Resetting to 100% forgets the site."
+        )
+        self.zoom_memory.setChecked(bool(settings.get("zoom_remember", True)))
+        form.addRow(self.zoom_memory)
 
         # Theme selection
         self.theme_box = QComboBox(self)
@@ -294,12 +330,16 @@ class SettingsDialog(QDialog):
 
     def accept(self) -> None:
         self._settings.set("homepage", self.homepage.text().strip() or "newtab")
+        self._settings.set("startup_mode", self.startup_box.currentData() or "restore")
         self._settings.set("search_engine", self.engine.currentText())
         self._settings.set("adblock_enabled", self.adblock.isChecked())
         self._settings.set("harness_autostart", self.autostart.isChecked())
         self._settings.set("dashboard_newtab", self.dash.isChecked())
         self._settings.set("assistant_visible_startup", self.assistant_startup.isChecked())
+        self._settings.set("bookmark_bar_visible", self.bm_bar.isChecked())
         self._settings.set("download_dir", self.dl_dir.text().strip())
+        self._settings.set("zoom_factor", float(self.zoom_box.currentData() or 1.0))
+        self._settings.set("zoom_remember", self.zoom_memory.isChecked())
         self._settings.set("update_auto_check", self.auto_update.isChecked())
         # Theme: find the key for the selected label
         selected_label = self.theme_box.currentText()
