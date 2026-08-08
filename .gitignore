@@ -98,6 +98,9 @@ browser/build_log.txt
 browser/version_info.txt
 browser/_dbg_src.js
 browser/test_*.py
+# selftest output captures (dev runs)
+selftest_out.txt
+selftest_err.txt
 *.spec
 # …but the browser's PyInstaller recipe IS source — it carries the curated
 # exclude list (py3.10.0 dis-bug workarounds) and bundle layout.
