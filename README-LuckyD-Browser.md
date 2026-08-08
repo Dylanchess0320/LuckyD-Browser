@@ -61,7 +61,7 @@ Prefer a cloud model instead? The sidebar supports 9 more providers — see
 - Installs to `%LOCALAPPDATA%\Programs\LuckyDBrowser`
 - Start Menu shortcut, optional desktop icon, **Settings > Apps** uninstall entry
 - Everything is bundled (Chromium runtime + coding-agent backend) — nothing else required
-- Silent install for scripting: `LuckyDBrowserSetup-2.0.0.exe /VERYSILENT /NORESTART`
+- Silent install for scripting: `LuckyDBrowserSetup-2.1.0.exe /VERYSILENT /NORESTART`
 
 ---
 

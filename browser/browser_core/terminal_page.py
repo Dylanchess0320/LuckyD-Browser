@@ -12,7 +12,7 @@ _WS_HOST = "127.0.0.1"
 _WS_PORT = 9881  # must match browser_app's "terminal_port" default
 
 # Keep in sync with terminal_server.SHELLS (allowlist lives there).
-_SHELL_LABELS = {"agent": "Agent", "powershell": "PowerShell", "cmd": "CMD"}
+_SHELL_LABELS = {"agent": "Agent", "agent2": "Agent 2", "powershell": "PowerShell", "cmd": "CMD"}
 
 
 def terminal_html(settings=None, shell: str = "agent") -> str:
@@ -67,6 +67,7 @@ _HTML = """<!doctype html>
 </style></head><body>
 <div id="bar"><span id="dot" class="dot"></span><b id="title">&#9000; Terminal</b>
   <button class="sh" data-sh="agent" title="LuckyD Code agent CLI">Agent</button>
+  <button class="sh" data-sh="agent2" title="2nd agent — standalone coding-agent CLI (Desktop shortcut)">Agent 2</button>
   <button class="sh" data-sh="powershell" title="Plain PowerShell console">PowerShell</button>
   <button class="sh" data-sh="cmd" title="Plain cmd.exe console">CMD</button>
   <span id="status">connecting&hellip;</span>
@@ -84,7 +85,7 @@ _HTML = """<!doctype html>
 <script>
 const WS_URL = "__WS_URL__";
 let SHELL = "__SHELL__";
-const SHELL_LABELS = {agent: 'Agent', powershell: 'PowerShell', cmd: 'CMD'};
+const SHELL_LABELS = {agent: 'Agent', agent2: 'Agent 2', powershell: 'PowerShell', cmd: 'CMD'};
 const dot = document.getElementById('dot');
 const statusEl = document.getElementById('status');
 const titleEl = document.getElementById('title');

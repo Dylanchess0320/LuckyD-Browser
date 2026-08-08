@@ -1,7 +1,7 @@
 """Automated functional smoke test for LuckyD Browser (dev tool, not shipped).
 
 Launches the real app, drives it with timers, prints PASS/FAIL per check,
-and exits non-zero if any check fails. Currently runs 103 checks.
+and exits non-zero if any check fails. Currently runs 111 checks.
 
 Run:  python browser/selftest.py
 """
@@ -126,7 +126,7 @@ check("md escapes html", "<script>" not in _md_lite("<script>alert(1)</script>")
 # package metadata (mojibake regression guard)
 import browser as _browser_pkg
 
-check("version 2.0.0", _browser_pkg.__version__ == "2.0.0", _browser_pkg.__version__)
+check("version 2.1.0", _browser_pkg.__version__ == "2.1.0", _browser_pkg.__version__)
 check("docstring has no mojibake", "�" not in (_browser_pkg.__doc__ or ""))
 
 # v1.4.0 — session restore, per-site zoom memory, screenshot naming (pure logic)
@@ -195,6 +195,19 @@ check(
     "terminal page sanitizes shell",
     'let SHELL = "agent"' in terminal_html(None, shell='bogus";alert(1)'),
 )
+_agent2_page = terminal_html(None, shell="agent2")
+check(
+    "terminal page second agent",
+    'let SHELL = "agent2"' in _agent2_page and 'data-sh="agent2"' in _agent2_page,
+)
+from browser_core.terminal_server import SHELLS, _shell_command
+
+check("terminal bridge allowlists 2nd agent", "agent2" in SHELLS)
+try:
+    _cmd2 = _shell_command("agent2")
+    check("2nd agent CLI resolves", bool(_cmd2 and _cmd2[0]), " ".join(_cmd2)[:120])
+except FileNotFoundError as _exc:
+    check("2nd agent CLI resolves", "terminal_cli2" in str(_exc), str(_exc)[:120])
 _wf_page = workflows_html()
 check(
     "workflows page well-formed",
@@ -315,12 +328,20 @@ def _api_checks(port: int) -> None:
         API_RESULTS.append(("control API /eval", e.get("result") == 2, repr(e.get("result"))))
     except Exception as exc:
         API_RESULTS.append(("control API /eval", False, str(exc)))
-    try:
-        snap = post("/snapshot", {})
-        url = (snap.get("snapshot") or {}).get("url", "")
-        API_RESULTS.append(("control API /snapshot", "example.com" in url, url))
-    except Exception as exc:
-        API_RESULTS.append(("control API /snapshot", False, str(exc)))
+    # /snapshot's page JS loses the race when the GUI thread is mid-startup
+    # work (harness spawn, update check) — retry before calling it a failure.
+    _snap_exc: Exception | None = None
+    for _attempt in range(3):
+        try:
+            snap = post("/snapshot", {}, timeout=25)
+            url = (snap.get("snapshot") or {}).get("url", "")
+            API_RESULTS.append(("control API /snapshot", "example.com" in url, url))
+            break
+        except Exception as exc:
+            _snap_exc = exc
+            time.sleep(2)
+    else:
+        API_RESULTS.append(("control API /snapshot", False, str(_snap_exc)))
     try:
         tabs = get("/tabs")
         API_RESULTS.append(
@@ -682,6 +703,31 @@ def finish(api_thread=None) -> None:
             return
         for name, ok, detail in API_RESULTS:
             check(name, ok, detail)
+    # Fullscreen checks run LAST of all: the showFullScreen/showNormal
+    # round-trip perturbs window activation, which flakes the API thread's
+    # snapshot JS if it is still in flight.
+    from PySide6.QtWebEngineCore import QWebEngineSettings
+
+    win = app.windows[0]
+    check(
+        "fullscreen API enabled",
+        win.profile.settings().testAttribute(
+            QWebEngineSettings.WebAttribute.FullScreenSupportEnabled
+        ),
+    )
+    win._enter_video_fullscreen()
+    check(
+        "video fullscreen hides chrome",
+        win.isFullScreen()
+        and not win.nav_bar.isVisible()
+        and not win.menuBar().isVisible()
+        and not win.tabs.tabBar().isVisible(),
+    )
+    win._exit_video_fullscreen()
+    check(
+        "video fullscreen restores chrome",
+        not win.isFullScreen() and win.nav_bar.isVisible() and win.menuBar().isVisible(),
+    )
     failed = [r for r in RESULTS if not r[1]]
     print(f"\n{len(RESULTS) - len(failed)}/{len(RESULTS)} checks passed")
     app.qapp.exit(1 if failed else 0)

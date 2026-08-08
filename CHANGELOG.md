@@ -5,6 +5,48 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.0] - 2026-08-08
+
+### Fixed
+- **Fullscreen video was completely dead** — Qt WebEngine ships with the
+  HTML5 Fullscreen API opt-in and OFF, so every player's fullscreen button
+  threw "Fullscreen is not supported". Both profiles now enable
+  `FullScreenSupportEnabled`, and the window honors the request properly:
+  **all chrome (menu, tabs, omnibox, bookmarks, status bar, docks) hides**
+  so the video gets the whole screen, then restores exactly on exit
+  (including the maximized state). F11 during a video exits through the page
+  so state stays consistent.
+- **YouTube Shorts stalled/glitched** — the ad-blocker's `ctier` URL pattern
+  matched YouTube's content-tier parameter on ordinary `videoplayback`
+  fetches, so Shorts' video data was blocked outright. Pattern removed, with
+  regression tests proving real stream URLs pass while ad URLs stay blocked.
+- **YouTube ads playing again (server-side insertion)** — ads now ride in on
+  googlevideo.com like content, invisible to domain blocking, and were
+  scheduled by `/youtubei/v1/player` API calls nobody scrubbed. The userscript
+  now runs at document-start and hooks fetch + XHR, **stripping ad placements
+  from every player response before the player parses it** — ads never
+  schedule. Short-circuit skip, cosmetic removal, and popup dismissal remain
+  as fallback layers.
+- **Control API `/snapshot` flake** — its page JS could lose the race against
+  startup work (harness spawn, update check); the selftest now retries before
+  failing.
+
+### Added
+- **Second terminal agent ("Agent 2")** — the terminal tab's shell bar gains
+  an Agent 2 button next to Agent/PowerShell/CMD: it spawns the standalone
+  coding-agent checkout (the Desktop shortcut's `run.bat` project) as an
+  interactive REPL on its own ConPTY, booting in that project as its
+  workspace. New `terminal_cli2` setting + `LUCKYD_CLI2` env override
+  (accepts an exe, `main.py`, or `run.bat` via `cmd.exe /c`), plus a
+  Tools → Agent 2 Terminal menu item.
+
+### Changed
+- **Browser version bumped to 2.1.0**; installer/version info updated.
+- `browser/selftest.py` grew to 111 checks (fullscreen API enabled, chrome
+  hide/restore, snapshot retry, 2nd-agent terminal wiring).
+- Agent terminal overrides now boot in the override file's own folder, so a
+  custom `terminal_cli` script acts on its own project as workspace.
+
 ## [3.0.0] - 2026-08-08
 
 ### Fixed

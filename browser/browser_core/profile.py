@@ -4,13 +4,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtWebEngineCore import QWebEngineProfile
+from PySide6.QtWebEngineCore import QWebEngineProfile, QWebEngineSettings
 
 
 def default_profile() -> QWebEngineProfile:
     """The shared persistent profile (cookies, cache, logins survive restarts)."""
     profile = QWebEngineProfile.defaultProfile()
     _enable_spellcheck(profile)
+    _enable_fullscreen(profile)
     return profile
 
 
@@ -22,7 +23,18 @@ def incognito_profile(parent=None) -> QWebEngineProfile:
     """
     profile = QWebEngineProfile(parent)
     _enable_spellcheck(profile)
+    _enable_fullscreen(profile)
     return profile
+
+
+def _enable_fullscreen(profile: QWebEngineProfile) -> None:
+    """Turn on the HTML5 Fullscreen API — opt-in and OFF by default in Qt
+    WebEngine. Without it, requestFullscreen() throws "Fullscreen is not
+    supported" and every video player's fullscreen button is dead. The window
+    still has to honor fullScreenRequested (main_window hides the chrome)."""
+    profile.settings().setAttribute(
+        QWebEngineSettings.WebAttribute.FullScreenSupportEnabled, True
+    )
 
 
 def _enable_spellcheck(profile: QWebEngineProfile) -> None:

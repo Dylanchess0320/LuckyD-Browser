@@ -65,7 +65,9 @@ _YT_AD_PATTERNS: list[re.Pattern] = [
     re.compile(r"youtube\.com/s/player/.*ad"),
     # googlevideo.com ad-serving patterns
     re.compile(r"googlevideo\.com/.*\boad\b"),
-    re.compile(r"googlevideo\.com/.*\bctier\b"),
+    # NOTE: no \bctier\b pattern here — ctier is YouTube's content-TIER param
+    # on ordinary streams (Shorts especially), not an ad marker. Matching it
+    # blocked real videoplayback fetches: Shorts stalled at 0:00 / glitched.
     re.compile(r"googlevideo\.com/.*\bid\b.*\bad\b"),
     re.compile(r"googlevideo\.com/.*[?&]mime=.*/mp4.*[?&]ad"),
     re.compile(r"googlevideo\.com/videoplayback\?.*\bad\b"),

@@ -47,6 +47,9 @@ DEFAULTS = {
     # Embedded terminal: which LuckyD Code CLI to spawn. Empty = auto-detect
     # (Desktop exe → repo exe → live source). Set a full path to force one.
     "terminal_cli": "",
+    # 2nd agent: standalone coding-agent CLI (exe, main.py, or run.bat).
+    # Empty = auto-detect the coding-agent checkout on the Desktop.
+    "terminal_cli2": "",
     # Port of the WebSocket↔PTY bridge the /terminal tab connects to.
     "terminal_port": 9881,
     # Auto-update: silently check for a newer release shortly after launch.

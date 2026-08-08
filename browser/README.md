@@ -71,14 +71,14 @@ rights, Windows 10/11 x64 only**:
 powershell -NoProfile -ExecutionPolicy Bypass -File browser\installer\build_installer.ps1
 ```
 
-Output: `browser\installer\output\LuckyDBrowserSetup-2.0.0.exe`
+Output: `browser\installer\output\LuckyDBrowserSetup-2.1.0.exe`
 
 - Installs per-user to `%LOCALAPPDATA%\Programs\LuckyDBrowser`
 - Start Menu shortcut, optional desktop icon, Settings > Apps uninstall entry
 - Includes everything (Qt WebEngine runtime **and** the `luckyd-code.exe`
   backend) — the target machine needs nothing else
 - Only the *build* machine needs Inno Setup 6: https://jrsoftware.org/isdl.php
-- Silent install for scripting: `LuckyDBrowserSetup-2.0.0.exe /VERYSILENT /NORESTART`
+- Silent install for scripting: `LuckyDBrowserSetup-2.1.0.exe /VERYSILENT /NORESTART`
 - The raw script is `browser\installer\LuckyDBrowser.iss` if you want to tweak
   it (then recompile with `iscc browser\installer\LuckyDBrowser.iss`)
 
@@ -156,7 +156,7 @@ browser/
 ├── main.py                   ← entry point
 ├── browser_app.py            ← QApplication + shared services + windows
 ├── selftest.py               ← automated functional smoke test (30 checks)
-├── __init__.py               ← package marker (version = "1.2.0")
+├── __init__.py               ← package marker (version = "2.1.0")
 │
 ├── browser_core/             ← backend services
 │   ├── __init__.py

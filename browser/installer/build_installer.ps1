@@ -4,7 +4,7 @@
 #
 # Steps:
 #   1. PyInstaller  -> browser\dist\LuckyDBrowser\  (the app itself)
-#   2. Inno Setup   -> browser\installer\output\LuckyDBrowserSetup-2.0.0.exe
+#   2. Inno Setup   -> browser\installer\output\LuckyDBrowserSetup-2.1.0.exe
 #                      (the shareable installer anyone can run)
 #
 # Requires: Python 3.10-3.12 with PyInstaller, and Inno Setup 6

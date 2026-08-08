@@ -3,16 +3,21 @@
 // @match       *://www.youtube.com/*
 // @match       *://m.youtube.com/*
 // @match       *://music.youtube.com/*
-// @run-at      document-end
+// @run-at      document-start
 // ==/UserScript==
 //
 // LuckyD built-in YouTube ad blocker (rewritten 2026 - short-circuit method).
-//   1. SHORT-CIRCUIT - jump currentTime to the end of a playing ad (finishes
+//   1. RESPONSE SCRUB - strip ad placements from /youtubei/v1/player fetch &
+//      XHR responses BEFORE the player parses them. With server-side ad
+//      insertion the ad media rides in on googlevideo.com like content, so
+//      the only reliable kill is deleting the ad schedule data itself. Runs
+//      at document-start so the hooks predate YouTube's first request.
+//   2. SHORT-CIRCUIT - jump currentTime to the end of a playing ad (finishes
 //      unskippable ads instantly; works even with no skip button).
-//   2. DATA - strip ad slots from ytInitialPlayerResponse so ads never schedule.
-//   3. NETWORK - block dedicated ad hosts (IMA SDK, DoubleClick). The C++
+//   3. DATA - strip ad slots from the ytInitialPlayerResponse global.
+//   4. NETWORK - block dedicated ad hosts (IMA SDK, DoubleClick). The C++
 //      interceptor also handles these; this is the same-origin fallback.
-//   4. COSMETIC - remove ad DOM + dismiss the "ad blockers violate ToS" popup.
+//   5. COSMETIC - remove ad DOM + dismiss the "ad blockers violate ToS" popup.
 // NOTE: never delete the `params` field from player requests - that broke video
 // loading in the previous version.
 (()=>{
@@ -23,10 +28,10 @@ const TAG='[LuckyD] YouTube Ad-Block';
 let adShortCircuits=0;
 
 // ---------------- 1. player-response data strip ----------------
+const ADKEYS=['adPlacements','playerAds','adBreakHeartbeatParams','adSlots'];
 function stripAdSlots(node){
 if(!node||typeof node!=='object')return;
 if(Array.isArray(node)){for(const it of node)stripAdSlots(it);return;}
-const ADKEYS=['adPlacements','playerAds','adBreakHeartbeatParams','adSlots'];
 for(const k of ADKEYS){if(k in node){try{delete node[k];}catch(_){node[k]=undefined;}}}
 for(const k in node){const v=node[k];if(v&&typeof v==='object')stripAdSlots(v);}
 }
@@ -45,7 +50,7 @@ set(v){stripAdSlots(v);cache=v;}
 }catch(_){/* non-configurable on some builds - periodic rescrub covers it */}
 }
 
-// ---------------- 2. fetch/XHR hard-blocking ----------------
+// ---------------- 2. fetch/XHR: block ad hosts, scrub player responses ----
 function isAdHost(u){
 return u.includes('imasdk.googleapis.com')||
 u.includes('doubleclick.net')||
@@ -56,13 +61,33 @@ u.includes('youtube.com/ptracking')||
 u.includes('youtube.com/api/stats/ads')||
 u.includes('adservice.google.com')||
 u.includes('fundingchoicesmessages.google.com');}
+function isPlayerApi(u){
+return u.includes('youtubei/v1/player');}
+// Rebuild a fetch Response with scrubbed JSON. Content-encoding/length MUST
+// be dropped: text() already decoded the body, and our JSON differs in size.
+function scrubbedFetchResponse(resp,text){
+try{
+const json=JSON.parse(text);
+stripAdSlots(json);
+const h=new Headers(resp.headers);
+h.delete('content-encoding');h.delete('content-length');
+return new Response(JSON.stringify(json),{status:resp.status,statusText:resp.statusText,headers:h});
+}catch(_){return new Response(text,{status:resp.status,statusText:resp.statusText});}
+}
 
 const _F=window.fetch;
 if(_F){window.fetch=function(i,o){
 let u='';
 try{u=('object'==typeof i&&i&&i.url?i.url:String(i)).toLowerCase();}catch(_){}
 if(u&&isAdHost(u)){return Promise.resolve(new Response('',{status:204,statusText:'No Content'}));}
-return _F.apply(this,arguments);};}
+const p=_F.apply(this,arguments);
+if(u&&isPlayerApi(u)){
+return p.then(resp=>{
+if(!resp||!resp.ok)return resp;
+return resp.clone().text().then(text=>scrubbedFetchResponse(resp,text)).catch(()=>resp);
+});
+}
+return p;};}
 
 const _O=XMLHttpRequest.prototype.open;
 const _S=XMLHttpRequest.prototype.send;
@@ -70,6 +95,22 @@ XMLHttpRequest.prototype.open=function(m,u){this.__ldu=String(u||'');return _O.a
 XMLHttpRequest.prototype.send=function(){
 const u=(this.__ldu||'').toLowerCase();
 if(u&&isAdHost(u)){try{this.abort();}catch(_){}return;}
+if(u&&isPlayerApi(u)){
+this.addEventListener('readystatechange',()=>{
+if(this.readyState!==4)return;
+try{
+const text=this.responseText;
+const json=JSON.parse(text);
+stripAdSlots(json);
+if(this.responseType==='json'){
+Object.defineProperty(this,'response',{get:()=>json});
+}else{
+const out=JSON.stringify(json);
+Object.defineProperty(this,'responseText',{get:()=>out});
+Object.defineProperty(this,'response',{get:()=>out});
+}
+}catch(_){/* not JSON or already read - leave it alone */}});
+}
 return _S.apply(this,arguments);};
 
 
@@ -79,7 +120,7 @@ function playerEl(){return document.querySelector('.html5-video-player')||docume
 function isAdPlaying(p){
 if(!p)return false;
 if(p.classList.contains('ad-showing')||p.classList.contains('ad-interrupting'))return true;
-return !!document.querySelector('.ytp-ad-player-overlay,.ytp-ad-player-overlay-instream-info,.ytp-ad-text-overlay,.ytp-ad-image-overlay');}
+return !!document.querySelector('.ytp-ad-player-overlay,.ytp-ad-player-overlay-instream-info,.ytp-ad-text-overlay,.ytp-ad-message-overlay');}
 // Content-position guard: ads share the <video> element with the content, so
 // a short-circuit (or a skip click) leaves the position polluted — pre-rolls
 // then start mid-video instead of at 0. Capture the content position when an
@@ -144,12 +185,15 @@ if(btn)btn.click();else dlg.remove();}
 for(const e of document.querySelectorAll('ytd-enforcement-message-view-model')){try{e.remove();}catch(_){}}}
 
 // ---------------- observers + timers ----------------
+// (observing `document`, not documentElement: at document-start the root
+// element may not exist yet)
 scrubAdsFromPlayerResponse();
 removeAdDom();
 new MutationObserver(()=>{removeAdDom();dismissBlockPopup();})
-.observe(document.documentElement,{childList:true,subtree:true});
+.observe(document,{childList:true,subtree:true});
 setInterval(()=>{trackAdBoundary();finishAd();dismissBlockPopup();},150);
 setInterval(()=>{scrubAdsFromPlayerResponse();removeAdDom();},1500);
 window.__ldYtStats=()=>({shortCircuits:adShortCircuits});
-console.info(TAG+' active (short-circuit method)');
+console.info(TAG+' active (response-scrub + short-circuit method)');
 })();
+

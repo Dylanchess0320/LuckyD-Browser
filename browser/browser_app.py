@@ -178,7 +178,8 @@ class BrowserApp:
 
             port = int(self.settings.get("terminal_port", 9881))
             cli = str(self.settings.get("terminal_cli", "") or "")
-            server = TerminalServer(port=port, cli_path=cli)
+            cli2 = str(self.settings.get("terminal_cli2", "") or "")
+            server = TerminalServer(port=port, cli_path=cli, cli2_path=cli2)
             if not server.start():
                 print("[browser] terminal bridge not started (pywinpty/websockets?)")
                 self.terminal_server = None

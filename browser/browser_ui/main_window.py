@@ -81,6 +81,11 @@ class MainWindow(QMainWindow):
         self.resize(1280, 800)
         self._dev_window = None
         self._dev_view = None
+        # Element fullscreen (a page's video player asked for the screen):
+        # tracks the state plus the chrome we hid, so exit restores exactly.
+        self._video_fs = False
+        self._fs_hidden: list = []
+        self._fs_was_maximized = False
 
         self.tabs = BrowserTabWidget(self)
         self.setCentralWidget(self.tabs)
@@ -477,6 +482,7 @@ class MainWindow(QMainWindow):
         tools_menu = mbar.addMenu("&Tools")
         self._add(tools_menu, "Coding Agent", self.open_hq, "Ctrl+Shift+H")
         self._add(tools_menu, "Agent Terminal", lambda: self.open_terminal("agent"), "Ctrl+`")
+        self._add(tools_menu, "Agent 2 Terminal", lambda: self.open_terminal("agent2"))
         self._add(
             tools_menu,
             "PowerShell Terminal",
@@ -893,9 +899,49 @@ class MainWindow(QMainWindow):
     def on_fullscreen_requested(self, request) -> None:
         request.accept()
         if request.toggleOn():
-            self.showFullScreen()
+            self._enter_video_fullscreen()
+        else:
+            self._exit_video_fullscreen()
+
+    def _fullscreen_chrome(self) -> list:
+        """Every chrome surface that must vanish for element fullscreen."""
+        widgets = [
+            self.menuBar(),
+            self.nav_bar,
+            self.bookmark_bar,
+            self.find_bar,
+            self.statusBar(),
+            self.tabs.tabBar(),
+            self.vtabs,
+            self.ai_sidebar,
+            self.downloads,
+        ]
+        return [w for w in widgets if w is not None]
+
+    def _enter_video_fullscreen(self) -> None:
+        """Hide ALL chrome, then go fullscreen — the video gets the whole
+        screen, not just the window area left over after the toolbars."""
+        if self._video_fs:
+            return
+        self._video_fs = True
+        self._fs_was_maximized = self.isMaximized()
+        self._fs_hidden = [w for w in self._fullscreen_chrome() if w.isVisible()]
+        for w in self._fs_hidden:
+            w.hide()
+        self.showFullScreen()
+
+    def _exit_video_fullscreen(self) -> None:
+        if not self._video_fs:
+            self.showNormal()
+            return
+        self._video_fs = False
+        if self._fs_was_maximized:
+            self.showMaximized()
         else:
             self.showNormal()
+        for w in self._fs_hidden:
+            w.show()
+        self._fs_hidden = []
 
     def _update_title(self, title: str = "") -> None:
         suffix = " — Incognito" if self.incognito else ""
@@ -1127,6 +1173,14 @@ class MainWindow(QMainWindow):
         self._dev_window.raise_()
 
     def toggle_fullscreen(self) -> None:
+        # During element fullscreen, F11 must exit THROUGH the page so the
+        # engine emits the toggle-off request that restores the chrome — a
+        # bare showNormal() would strand the video in fullscreen mode.
+        if self._video_fs:
+            view = self.tabs.current_view()
+            if view is not None:
+                view.page().triggerAction(QWebEnginePage.WebAction.ExitFullScreen)
+            return
         if self.isFullScreen():
             self.showNormal()
         else:

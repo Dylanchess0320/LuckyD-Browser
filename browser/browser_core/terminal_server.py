@@ -130,19 +130,127 @@ def _cli_command(cli_path: str = "") -> list[str]:
     )
 
 
+def _agent2_dir() -> Path | None:
+    """Locate the standalone ``coding-agent`` checkout (the 2nd agent).
+
+    Looks for a ``coding-agent`` folder on the user's real Desktop (Known
+    Folder API, so OneDrive-redirected Desktops work), then the common
+    plain/OneDrive fallbacks. This is the project the Desktop shortcut
+    ``LuckyD Code.lnk`` launches via ``run.bat``.
+    """
+    candidates: list[Path] = []
+    try:  # canonical Desktop path, redirection-aware
+        import ctypes
+
+        buf = ctypes.create_unicode_buffer(260)
+        # SHGetFolderPathW(hwnd, csidl=0x0010 DESKTOPDIRECTORY, token, flags, path)
+        if ctypes.windll.shell32.SHGetFolderPathW(None, 0x0010, None, 0, buf) == 0 and buf.value:
+            candidates.append(Path(buf.value) / "coding-agent")
+    except Exception:
+        pass
+    home = Path.home()
+    one_drive = os.environ.get("ONEDRIVE", "").strip()  # Windows env names are case-insensitive
+    candidates += [
+        home / "OneDrive" / "Desktop" / "coding-agent",
+        home / "Desktop" / "coding-agent",
+    ]
+    if one_drive:
+        candidates.append(Path(one_drive) / "Desktop" / "coding-agent")
+    for cand in candidates:
+        if cand.is_dir():
+            return cand
+    return None
+
+
+def _agent_cwd(cli_path: str = "") -> Path:
+    """Working dir for 1st-agent sessions.
+
+    An explicit override (``terminal_cli`` setting / ``LUCKYD_CLI`` env var)
+    boots in the file's own folder — that is the agent's project workspace.
+    Auto-detected CLIs keep the historical repo-root default.
+    """
+    override = cli_path.strip() or os.environ.get("LUCKYD_CLI", "").strip()
+    if override:
+        return _expand(override).parent
+    return _REPO_ROOT
+
+
+def _agent2_cwd(cli2_path: str = "") -> Path:
+    """Working dir for 2nd-agent sessions — its own checkout (its workspace)."""
+    override = cli2_path.strip() or os.environ.get("LUCKYD_CLI2", "").strip()
+    if override:
+        return _expand(override).parent
+    return _agent2_dir() or Path.home()
+
+
+def _agent2_command(cli2_path: str = "") -> list[str]:
+    """How to launch the 2nd agent — the standalone coding-agent CLI.
+
+    Resolution order (first existing wins):
+      1. ``cli2_path`` argument — the browser's ``terminal_cli2`` setting.
+      2. ``LUCKYD_CLI2`` env var (a ``.py`` runs under a real interpreter).
+      3. Live source: ``python main.py`` from the Desktop ``coding-agent``
+         checkout — the same interactive REPL the ``LuckyD Code.lnk``
+         shortcut starts via ``run.bat``.
+
+    The checkout's ``luckyd-code.exe`` is deliberately NOT auto-used: it is
+    the Harness HQ backend server (built from ``web_server.py``, with the
+    rich/prompt_toolkit CLI front-end excluded) — it prints a server banner
+    and has no prompt to type into. Point ``terminal_cli2`` at it explicitly
+    only if a server in the tab is really what you want.
+
+    ``.bat``/``.cmd`` overrides run via ``cmd.exe /c`` (a batch file is not a
+    spawnable executable), so pointing the setting straight at the shortcut's
+    ``run.bat`` works exactly like double-clicking it.
+
+    Raises ``FileNotFoundError`` with remediation guidance when nothing is
+    found — the bridge prints it in the terminal instead of spawning a
+    garbage process on the PTY.
+    """
+    override = cli2_path.strip() or os.environ.get("LUCKYD_CLI2", "").strip()
+    if override:
+        p = _expand(override)
+        if p.suffix.lower() == ".py":
+            interp = _python_for_scripts()
+            if interp is None:
+                raise FileNotFoundError(
+                    f"terminal_cli2 points to a .py ({p}) but no Python "
+                    "interpreter was found on PATH"
+                )
+            return [interp, str(p)]
+        if p.suffix.lower() in (".bat", ".cmd"):
+            return ["cmd.exe", "/c", str(p)]
+        return [str(p)]
+    root = _agent2_dir()
+    if root is not None:
+        live = root / "main.py"
+        if live.exists():
+            interp = _python_for_scripts()
+            if interp is not None:
+                return [interp, str(live)]
+    raise FileNotFoundError(
+        "no 2nd agent found — expected main.py in the coding-agent checkout "
+        "on the Desktop; set the browser's terminal_cli2 setting (or the "
+        "LUCKYD_CLI2 env var) to its main.py or run.bat"
+    )
+
+
 # Shells the terminal tab can spawn. "agent" is the LuckyD Code CLI (the
-# classic terminal); "powershell"/"cmd" are plain system shells — the
-# "second terminal" for everyday commands, side by side with the agent.
-SHELLS = ("agent", "powershell", "cmd")
+# classic terminal); "agent2" is the standalone coding-agent checkout on the
+# Desktop (the second agent, launched by the LuckyD Code shortcut);
+# "powershell"/"cmd" are plain system shells for everyday commands.
+SHELLS = ("agent", "agent2", "powershell", "cmd")
 
 
-def _shell_command(shell: str, cli_path: str = "") -> list[str]:
+def _shell_command(shell: str, cli_path: str = "", cli2_path: str = "") -> list[str]:
     """Resolve a shell name to its spawn command (allowlisted — never raw input)."""
     shell = (shell or "agent").strip().lower()
     if shell == "powershell":
         return ["powershell.exe", "-NoLogo", "-NoExit"]
     if shell == "cmd":
         return ["cmd.exe"]
+    if shell == "agent2":
+        return _agent2_command(cli2_path)
     return _cli_command(cli_path)
 
 
@@ -169,17 +277,28 @@ def _client_options(ws) -> tuple[int, int, str]:
     return max(20, min(cols, 500)), max(5, min(rows, 200)), shell
 
 
-def _spawn_pty(cli_path: str = "", shell: str = "agent", cols: int = _COLS, rows: int = _ROWS):
+def _spawn_pty(
+    cli_path: str = "",
+    shell: str = "agent",
+    cols: int = _COLS,
+    rows: int = _ROWS,
+    cli2_path: str = "",
+):
     """Spawn the chosen shell on a ConPTY. Returns a pywinpty PTY handle."""
     from winpty import PTY  # lazy import so the module loads without pywinpty
 
     pty = PTY(cols, rows)
-    cmd = _shell_command(shell, cli_path)
+    cmd = _shell_command(shell, cli_path, cli2_path)
     appname, rest = cmd[0], cmd[1:]
     cmdline = subprocess.list2cmdline(rest) if rest else None
-    # Agent sessions boot in the repo (their workspace); system shells open
-    # in the user's home directory like a freshly launched console would.
-    cwd = str(_REPO_ROOT) if shell == "agent" else str(Path.home())
+    # Agent sessions boot in their own project (their workspace); system
+    # shells open in the user's home directory like a fresh console would.
+    if shell == "agent":
+        cwd = str(_agent_cwd(cli_path))
+    elif shell == "agent2":
+        cwd = str(_agent2_cwd(cli2_path))
+    else:
+        cwd = str(Path.home())
     pty.spawn(appname, cmdline=cmdline, cwd=cwd, env=None)
     return pty
 
@@ -187,10 +306,17 @@ def _spawn_pty(cli_path: str = "", shell: str = "agent", cols: int = _COLS, rows
 class TerminalServer:
     """Owns the WebSocket server thread. One PTY per connected client."""
 
-    def __init__(self, host: str = DEFAULT_HOST, port: int = DEFAULT_PORT, cli_path: str = ""):
+    def __init__(
+        self,
+        host: str = DEFAULT_HOST,
+        port: int = DEFAULT_PORT,
+        cli_path: str = "",
+        cli2_path: str = "",
+    ):
         self.host = host
         self.port = int(port)
         self.cli_path = cli_path  # explicit CLI override (browser `terminal_cli` setting)
+        self.cli2_path = cli2_path  # 2nd-agent override (browser `terminal_cli2` setting)
         self._server = None
         self._thread: threading.Thread | None = None
         self._clients: set = set()
@@ -204,7 +330,9 @@ class TerminalServer:
         """Bridge one WebSocket connection to one fresh PTY."""
         try:
             cols, rows, shell = _client_options(ws)
-            pty = _spawn_pty(self.cli_path, shell=shell, cols=cols, rows=rows)
+            pty = _spawn_pty(
+                self.cli_path, shell=shell, cols=cols, rows=rows, cli2_path=self.cli2_path
+            )
         except Exception as exc:  # pywinpty missing or spawn failed
             with contextlib.suppress(Exception):
                 ws.send(f"\r\n\x1b[31m[terminal failed to start: {exc}]\x1b[0m\r\n")
