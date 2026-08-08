@@ -82,6 +82,9 @@ _CSS = r"""  .search { display: flex; background: var(--card); border: 1px solid
   .tile:hover { transform: translateY(-2px); border-color: rgba(120,170,255,.5); background: rgba(255,255,255,.09); }
   .tile .ico { font-size: 22px; }
   .tile img { width: 26px; height: 26px; border-radius: 6px; }
+  .tile .fav { width: 26px; height: 26px; border-radius: 7px; display: inline-flex;
+    align-items: center; justify-content: center; color: #fff; font-size: 14px;
+    font-weight: 700; text-shadow: 0 1px 2px rgba(0,0,0,.35); }
   .tile .del { position: absolute; top: 3px; right: 6px; color: var(--muted); font-size: 13px; opacity: 0; cursor: pointer; }
   .tile:hover .del { opacity: 1; }
   .tile.add { color: var(--muted); font-size: 24px; justify-content: center; cursor: pointer; }
@@ -138,6 +141,9 @@ const ENGINES = { google: 'https://www.google.com/search?q=', bing: 'https://www
 const APPS = [
   ['⚡', 'Coding Agent', '/hq'],
   ['🤖', 'AI Assistant', 'luckyd://assistant'],
+  ['🖥️', 'Terminal', '/terminal'],
+  ['🎬', 'Workflows', '/workflows'],
+  ['📡', 'Network', '/network'],
   ['🔖', 'Bookmarks', 'luckyd://bookmarks'],
   ['🕘', 'History', 'luckyd://history'],
   ['⬇️', 'Downloads', 'luckyd://downloads'],
@@ -240,16 +246,30 @@ _JS2 = r"""function renderApps() {
     g.appendChild(a);
   });
 }
+// Letter-tile favicons — minted locally from the hostname (same hue hash as
+// the app's icons.py). No favicon service ever sees your shortcuts.
+function tileFor(url) {
+  let host = '';
+  try { host = new URL(url).hostname.replace(/^www\./, ''); } catch (e) {}
+  const letter = host ? host[0].toUpperCase() : '•';
+  let hue = 0;
+  for (let i = 0; i < host.length; i++) hue = (hue + (i + 1) * host.charCodeAt(i)) % 360;
+  const tile = document.createElement('span');
+  tile.className = 'fav';
+  tile.textContent = letter;
+  tile.style.background = 'linear-gradient(135deg, hsl(' + hue + ',53%,59%), hsl(' +
+    ((hue + 48) % 360) + ',58%,47%))';
+  return tile;
+}
 function render() {
   const grid = document.getElementById('grid');
   grid.innerHTML = '';
   shortcuts.forEach(([name, url], idx) => {
     const a = document.createElement('a');
     a.className = 'tile'; a.href = url;
-    let host = ''; try { host = new URL(url).hostname; } catch (e) {}
-    a.innerHTML = '<img src="https://www.google.com/s2/favicons?domain=' + host +
-      '&sz=64" onerror="this.style.visibility=\'hidden\'"><span></span>' +
-      '<span class="del" title="Remove">&#10005;</span>';
+    a.appendChild(tileFor(url));
+    a.insertAdjacentHTML('beforeend', '<span></span>' +
+      '<span class="del" title="Remove">&#10005;</span>');
     a.querySelector('span').textContent = name;
     a.querySelector('.del').addEventListener('click', ev => {
       ev.preventDefault(); ev.stopPropagation();

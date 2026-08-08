@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QUrl
@@ -61,7 +62,8 @@ class DownloadsDock(QDockWidget):
         self.list.customContextMenuRequested.connect(self._context_menu)
         self._paths: dict[int, Path] = {}
         self._downloads: dict[int, QWebEngineDownloadRequest] = {}
-        self._cancel_btns: dict[int, QPushButton] = {}
+        self._cancel_btns: dict[int, QWidget] = {}
+        self._marks: dict[int, tuple[int, float]] = {}  # did → (bytes, monotonic) for rate
 
     # ── entry point (called by profile.downloadRequested) ────────────
 
@@ -72,13 +74,28 @@ class DownloadsDock(QDockWidget):
 
         did = download.id()
         self._downloads[did] = download
+        self._marks[did] = (0, time.monotonic())
 
         item = QListWidgetItem(f"⬇ {download.suggestedFileName()} — starting…")
         item.setData(Qt.ItemDataRole.UserRole, did)
         self.list.insertItem(0, item)
 
-        # Cancel button
-        cancel_btn = QPushButton("✕")
+        # Per-item controls: pause/resume + cancel.
+        controls = QWidget(self.list)
+        row = QHBoxLayout(controls)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(2)
+        pause_btn = QPushButton("⏸", controls)
+        pause_btn.setFixedSize(22, 22)
+        pause_btn.setToolTip("Pause / resume")
+        pause_btn.setStyleSheet(
+            "QPushButton { background: transparent; border: none; "
+            "color: #8b93a7; font-size: 12px; padding: 0; }"
+            "QPushButton:hover { color: #e8ecf5; }"
+        )
+        pause_btn.clicked.connect(lambda _=False, d=download, b=pause_btn: self._toggle_pause(d, b))
+        row.addWidget(pause_btn)
+        cancel_btn = QPushButton("✕", controls)
         cancel_btn.setFixedSize(22, 22)
         cancel_btn.setToolTip("Cancel download")
         cancel_btn.setStyleSheet(
@@ -87,9 +104,9 @@ class DownloadsDock(QDockWidget):
             "QPushButton:hover { color: #ff7b8e; }"
         )
         cancel_btn.clicked.connect(lambda _=False, d=download: d.cancel())
-        self._cancel_btns[did] = cancel_btn
-        # Store the cancel button reference via shared data on the item
-        self.list.setItemWidget(item, cancel_btn)
+        row.addWidget(cancel_btn)
+        self._cancel_btns[did] = controls
+        self.list.setItemWidget(item, controls)
 
         self._paths[did] = Path(target_dir) / download.downloadFileName()
 
@@ -99,30 +116,50 @@ class DownloadsDock(QDockWidget):
         self.show()
         self.raise_()
 
+    def _toggle_pause(self, download, button) -> None:
+        """Pause/resume a live download (Qt WebEngine supports both)."""
+        if download.isPaused():
+            download.resume()
+            button.setText("⏸")
+        else:
+            download.pause()
+            button.setText("▶")
+
     # ── progress / state ─────────────────────────────────────────────
 
     def _on_progress(self, download, item) -> None:
         received = download.receivedBytes()
         total = download.totalBytes()
+        did = download.id()
+        now = time.monotonic()
+        prev = self._marks.get(did)
+        self._marks[did] = (received, now)
+        rate = (received - prev[0]) / max(now - prev[1], 0.05) if prev else 0.0
+        speed = f" · {_fmt_size(rate)}/s" if rate > 1 else ""
         if total > 0:
             pct = int(received * 100 / total)
+            eta = ""
+            if rate > 1 and received < total:
+                left = int((total - received) / rate)
+                eta = f" · {left // 60}m{left % 60:02d}s" if left >= 60 else f" · {left}s"
             item.setText(
                 f"⬇ {download.downloadFileName()} — {pct}% "
-                f"({_fmt_size(received)} / {_fmt_size(total)})"
+                f"({_fmt_size(received)} / {_fmt_size(total)}){speed}{eta}"
             )
         else:
-            item.setText(f"⬇ {download.downloadFileName()} — {_fmt_size(received)}")
+            item.setText(f"⬇ {download.downloadFileName()} — {_fmt_size(received)}{speed}")
 
     def _on_state(self, download, item, state) -> None:
         states = QWebEngineDownloadRequest.DownloadState
         did = download.id()
-        # Remove cancel button when done
+        # Remove controls when done
         if state in (
             states.DownloadCompleted,
             states.DownloadCancelled,
             states.DownloadInterrupted,
         ):
             self._cancel_btns.pop(did, None)
+            self._marks.pop(did, None)
             self.list.setItemWidget(item, None)
 
         if state == states.DownloadCompleted:
@@ -146,6 +183,7 @@ class DownloadsDock(QDockWidget):
             if dl is not None and dl.state() in finished:
                 self._downloads.pop(did, None)
                 self._paths.pop(did, None)
+                self._marks.pop(did, None)
                 self.list.takeItem(i)
 
     def _context_menu(self, pos) -> None:
@@ -164,6 +202,7 @@ class DownloadsDock(QDockWidget):
         self._downloads.pop(did, None)
         self._paths.pop(did, None)
         self._cancel_btns.pop(did, None)
+        self._marks.pop(did, None)
         self.list.takeItem(self.list.row(item))
 
     # ── helpers ──────────────────────────────────────────────────────

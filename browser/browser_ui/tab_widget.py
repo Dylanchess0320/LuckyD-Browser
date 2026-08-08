@@ -430,9 +430,28 @@ class BrowserTabWidget(QTabWidget):
         menu.addSeparator()
         menu.addAction("Close Other Tabs", lambda: self._close_others(index))
         menu.addAction("Close Tabs to the Right", lambda: self._close_right(index))
+        menu.addAction("Close Duplicate Tabs", self.close_duplicates)
         reopen = menu.addAction("Reopen Closed Tab", self.reopen_last_closed)
         reopen.setEnabled(bool(self._closed_stack))
         menu.exec(global_pos)
+
+    def close_duplicates(self) -> int:
+        """Close tabs whose URL already has an open sibling (keeps the first)."""
+        seen: set[str] = set()
+        closed = 0
+        for i in range(self.count() - 1, -1, -1):
+            if self.is_pinned(i):
+                continue
+            view = self.widget(i)
+            url = view.url().toString() if view else ""
+            if url and url in seen:
+                self.close_tab(i)
+                closed += 1
+            elif url:
+                seen.add(url)
+        if hasattr(self._mw, "toast"):
+            self._mw.toast(f"Closed {closed} duplicate{'s' if closed != 1 else ''}")
+        return closed
 
     def _group_new_from(self, index: int) -> None:
         name, ok = QInputDialog.getText(self, "New Tab Group", "Group name:")

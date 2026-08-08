@@ -1,7 +1,7 @@
 """Automated functional smoke test for LuckyD Browser (dev tool, not shipped).
 
 Launches the real app, drives it with timers, prints PASS/FAIL per check,
-and exits non-zero if any check fails. Currently runs 91 checks.
+and exits non-zero if any check fails. Currently runs 95 checks.
 
 Run:  python browser/selftest.py
 """
@@ -123,7 +123,7 @@ check("md escapes html", "<script>" not in _md_lite("<script>alert(1)</script>")
 # package metadata (mojibake regression guard)
 import browser as _browser_pkg
 
-check("version 1.7.0", _browser_pkg.__version__ == "1.7.0", _browser_pkg.__version__)
+check("version 1.8.0", _browser_pkg.__version__ == "1.8.0", _browser_pkg.__version__)
 check("docstring has no mojibake", "�" not in (_browser_pkg.__doc__ or ""))
 
 # v1.4.0 — session restore, per-site zoom memory, screenshot naming (pure logic)
@@ -245,6 +245,17 @@ check(
     and DASHBOARD_HTML.rstrip().endswith("</html>")
     and 'id="apps"' in DASHBOARD_HTML
     and "ask-box" not in DASHBOARD_HTML,
+)
+# v1.8.0 — dashboard: local letter tiles, no favicon-service leak, new tiles
+check(
+    "dashboard local tiles (no favicon service)",
+    "s2/favicons" not in DASHBOARD_HTML and "tileFor" in DASHBOARD_HTML,
+)
+check(
+    "dashboard platform tiles",
+    "'/workflows'" in DASHBOARD_HTML
+    and "'/network'" in DASHBOARD_HTML
+    and "'/terminal'" in DASHBOARD_HTML,
 )
 check(
     "hq splash states",
@@ -582,6 +593,21 @@ def step2() -> None:
     win.close_current_tab()
     check("tab closes", win.tabs.count() == 1)
     # The API checks read the ACTIVE tab — make sure it's example.com again.
+    win.tabs.setCurrentIndex(0)
+
+    # v1.8.0 — side pane + duplicate tab closing (runs with a clean single tab)
+    win.open_in_side_pane(QUrl("https://example.com"))
+    check(
+        "side pane opens",
+        win._side_pane is not None
+        and win._side_pane.isVisible()
+        and "example.com" in win._side_view.url().toString(),
+    )
+    win._side_pane.close()
+    win.open_in_new_tab(QUrl("https://example.com/"))  # duplicate of tab 0
+    check("duplicate opened", win.tabs.count() == 2)
+    closed = win.tabs.close_duplicates()
+    check("close duplicate tabs", closed == 1 and win.tabs.count() == 1)
     win.tabs.setCurrentIndex(0)
 
     port = int(app.settings.get("browser_api_port", 9777))

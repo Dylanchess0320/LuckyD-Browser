@@ -226,6 +226,10 @@ class WebView(QWebEngineView):
                 lambda: self._mw.open_in_new_tab(link_url),
             )
             menu.addAction(
+                "Open Link in Side Pane",
+                lambda: self._mw.open_in_side_pane(link_url),
+            )
+            menu.addAction(
                 "Open Link in New Window",
                 lambda: self._mw._app.new_window(url=link_url),
             )

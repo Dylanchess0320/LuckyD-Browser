@@ -387,6 +387,10 @@ class MainWindow(QMainWindow):
             self.vtabs.show()
             self.tabs.tabBar().hide()
 
+        # Side pane: a second, docked web view for link previews/reference —
+        # shares the profile (cookies, adblock) but owns no tabs.
+        self._side_pane = None
+
         self.ai_sidebar = AiSidebar(self)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.ai_sidebar)
         # "Remember my setup": reopen the assistant on launch so the AI is
@@ -647,6 +651,39 @@ class MainWindow(QMainWindow):
                 "Network Monitor needs the Browser Control API (Tools → Browser Control API)",
                 kind="error",
             )
+
+    # ── side pane (second docked web view) ────────────────────────────
+
+    def open_in_side_pane(self, url: QUrl) -> None:
+        """Open a link in the docked side pane instead of a tab."""
+        from PySide6.QtWidgets import QDockWidget
+
+        if self._side_pane is None:
+            dock = QDockWidget("Side Pane", self)
+            dock.setObjectName("side_pane")
+            dock.setAllowedAreas(
+                Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea
+            )
+            view = QWebEngineView(self.profile, dock)
+            view.setUrl(url)
+            dock.setWidget(view)
+            self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
+            dock.show()  # docks default to visible on add — be explicit
+            dock.visibilityChanged.connect(self._side_pane_visibility)
+            self._side_pane = dock
+            self._side_view = view
+        else:
+            self._side_view.setUrl(url)
+            self._side_pane.show()
+        # A sensible split: about a third of the window for the pane.
+        self.resizeDocks(
+            [self._side_pane], [max(360, self.width() // 3)], Qt.Orientation.Horizontal
+        )
+
+    def _side_pane_visibility(self, visible: bool) -> None:
+        if not visible:
+            with contextlib.suppress(Exception):
+                self._side_view.stop()
 
     # ── AI tab organizer ─────────────────────────────────────────────
 
@@ -1337,11 +1374,14 @@ class MainWindow(QMainWindow):
         <tr><td><span class='kbd'>Ctrl+Shift+O</span></td><td>Bookmarks manager</td></tr>
         <tr><td><span class='kbd'>Ctrl+Shift+B</span></td><td>Toggle bookmarks bar</td></tr>
         <tr><td><span class='kbd'>Ctrl+Shift+S</span></td><td>Save screenshot</td></tr>
+        <tr><td><span class='kbd'>Ctrl+Alt+R</span></td><td>Reader mode</td></tr>
+        <tr><td><span class='kbd'>Ctrl+Shift+F</span></td><td>Focus mode (hide all chrome)</td></tr>
         <tr><td><span class='kbd'>Ctrl+Shift+A</span></td><td>AI assistant</td></tr>
         <tr><td><span class='kbd'>Ctrl+Shift+H</span></td><td>Coding agent</td></tr>
         <tr><td><span class='kbd'>Ctrl+`</span></td><td>Agent terminal</td></tr>
         <tr><td><span class='kbd'>Ctrl+Shift+`</span></td><td>PowerShell terminal</td></tr>
         <tr><td><span class='kbd'>Ctrl+K</span></td><td>Command palette</td></tr>
+        <tr><td><span class='kbd'>?</span></td><td>Omnibox prefix — ask the AI</td></tr>
         <tr><td><span class='kbd'>Ctrl+,</span></td><td>Settings</td></tr>
         <tr><td><span class='kbd'>Ctrl+P</span></td><td>Print</td></tr>
         <tr><td><span class='kbd'>Ctrl+S</span></td><td>Save page as</td></tr>

@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.0] - 2026-08-08
+
+### Added
+- **Side Pane** — right-click any link → "Open in Side Pane": a docked
+  second web view (shares the profile — cookies, adblock) sized to a third
+  of the window for reference reading without spending a tab.
+- **Dashboard letter-tile favicons** — speed-dial tiles are now minted
+  locally from the hostname (same hue hash as the app's `icons.py`):
+  **the Google favicon service call is gone**, so your shortcuts never
+  leave the machine. New one-tap tiles for Terminal, Workflows, Network.
+- **Downloads: live speed + ETA + pause/resume** — per-download controls
+  gained a pause/resume button, and in-progress rows show throughput and
+  time remaining.
+- **Close Duplicate Tabs** (tab context menu) — one click closes every
+  URL that already has an open sibling (pinned tabs are never touched).
+
+### Changed
+- Browser version bumped to 1.8.0; installer/version info updated.
+- The shortcuts reference (`Ctrl+/`) now lists Reader Mode, Focus Mode,
+  the terminals, the `?` omnibox prefix, and everything since 1.4.
+- `browser/selftest.py` grew to 95 checks (dashboard tiles, side pane,
+  duplicate closing).
+
 ## [2.6.0] - 2026-08-08
 
 ### Added
