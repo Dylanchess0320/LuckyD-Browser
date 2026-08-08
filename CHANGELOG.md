@@ -75,6 +75,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Selftest GUI deadlock** — `finish()` joined the API thread on the GUI
   thread while API calls still needed the event loop; it now polls with
   QTimer, making the API check section deterministic.
+- **Frozen build on Python 3.10.0** — `pygame`/`werkzeug`/`flask` pulled in
+  transitively crashed modulegraph's bytecode scan (`dis` tuple-index bug),
+  failing the PyInstaller build; excluded like PIL before them. Packaged
+  builds also gained a `crash.log` excepthook (windowed apps have no console,
+  so startup tracebacks used to vanish into a bare error dialog).
 
 ### Changed
 - Browser version bumped to 1.5.0; installer/version info updated.

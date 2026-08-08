@@ -24,6 +24,28 @@ for path in (BASE.parent, BASE):
 # Playwright/browser-use control of the live tabs (see browser/README.md).
 os.environ.setdefault("QTWEBENGINE_REMOTE_DEBUGGING", "127.0.0.1:9222")
 
+if getattr(sys, "frozen", False):
+    # Packaged builds have no console — without this hook a startup exception
+    # dies in a bare "Unhandled exception in script" dialog. Land it in a file
+    # next to the data dir instead, so bug reports carry a real traceback.
+    import traceback as _traceback
+    from datetime import datetime as _datetime
+
+    def _crash_log(exc_type, exc, tb) -> None:
+        try:
+            log_dir = (
+                Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "LuckyDBrowser"
+            )
+            log_dir.mkdir(parents=True, exist_ok=True)
+            stamp = _datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            with (log_dir / "crash.log").open("a", encoding="utf-8") as fh:
+                fh.write(f"\n=== {stamp} ===\n")
+                _traceback.print_exception(exc_type, exc, tb, file=fh)
+        except Exception:
+            pass
+
+    sys.excepthook = _crash_log
+
 # QtWebEngineWidgets must be imported before QApplication is created so Qt
 # WebEngine initializes its shared OpenGL context correctly.
 from browser_app import BrowserApp

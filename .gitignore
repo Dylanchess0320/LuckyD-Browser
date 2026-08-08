@@ -99,6 +99,9 @@ browser/version_info.txt
 browser/_dbg_src.js
 browser/test_*.py
 *.spec
+# …but the browser's PyInstaller recipe IS source — it carries the curated
+# exclude list (py3.10.0 dis-bug workarounds) and bundle layout.
+!browser/LuckyDBrowser.spec
 browser/LuckyD-Launch/*.exe
 browser/installer/output/*.exe
 browser/installer/output/
