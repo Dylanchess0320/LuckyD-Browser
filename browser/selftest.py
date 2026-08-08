@@ -1,7 +1,7 @@
 """Automated functional smoke test for LuckyD Browser (dev tool, not shipped).
 
 Launches the real app, drives it with timers, prints PASS/FAIL per check,
-and exits non-zero if any check fails. Currently runs 95 checks.
+and exits non-zero if any check fails. Currently runs 100 checks.
 
 Run:  python browser/selftest.py
 """
@@ -123,7 +123,7 @@ check("md escapes html", "<script>" not in _md_lite("<script>alert(1)</script>")
 # package metadata (mojibake regression guard)
 import browser as _browser_pkg
 
-check("version 1.8.0", _browser_pkg.__version__ == "1.8.0", _browser_pkg.__version__)
+check("version 1.9.0", _browser_pkg.__version__ == "1.9.0", _browser_pkg.__version__)
 check("docstring has no mojibake", "�" not in (_browser_pkg.__doc__ or ""))
 
 # v1.4.0 — session restore, per-site zoom memory, screenshot naming (pure logic)
@@ -257,6 +257,13 @@ check(
     and "'/network'" in DASHBOARD_HTML
     and "'/terminal'" in DASHBOARD_HTML,
 )
+
+# v1.9.0 — schedules UI in workflows page + full-page capture entry point
+from browser_core.screenshot import capture_full_b64
+
+_wf_page2 = workflows_html()
+check("workflows page schedules UI", "/schedules" in _wf_page2 and "sched" in _wf_page2)
+check("full-page screenshot entry point", callable(capture_full_b64))
 check(
     "hq splash states",
     "Starting your coding agent" in hq_splash_html("u", "starting")
@@ -435,6 +442,25 @@ def _api_checks(port: int) -> None:
         post("/network/stop", {})
     except Exception as exc:
         API_RESULTS.append(("netmon lifecycle", False, str(exc)))
+
+    # v1.9.0 — schedules API: set 60m → listed → off
+    try:
+        r = post("/schedule", {"name": "selftest-demo", "every_min": 60})
+        API_RESULTS.append(("schedule set", r.get("every_min") == 60, str(r)))
+        lst = get("/schedules")
+        API_RESULTS.append(
+            (
+                "schedule listed",
+                any(
+                    s.get("name") == "selftest-demo" and s.get("every_min") == 60
+                    for s in lst.get("schedules", [])
+                ),
+                "",
+            )
+        )
+        post("/schedule", {"name": "selftest-demo", "every_min": 0})
+    except Exception as exc:
+        API_RESULTS.append(("schedule API", False, str(exc)))
 
 
 app = BrowserApp(sys.argv)

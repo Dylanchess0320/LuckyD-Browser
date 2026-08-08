@@ -106,6 +106,7 @@ _BODY = r"""<body>
     <span class="pill" id="pill-harness"><span class="dot"></span><span>coding agent…</span></span>
     <span class="pill ok" id="pill-api"><span class="dot"></span><span>browser API</span></span>
     <span class="pill" id="pill-ai"><span class="dot"></span><span>AI…</span></span>
+    <span class="pill" id="pill-ads"><span class="dot"></span><span>shield…</span></span>
   </div>
   <div id="clock"><div class="time" id="time"></div><div class="date" id="date"></div>
     <div id="hello-line"><b id="hello"></b> <span id="tagline"></span></div></div>
@@ -230,6 +231,9 @@ async function refreshStatus() {
     const prov = (s.ai_providers || []);
     setPill('pill-ai', prov.length ? 'ok' : 'warn',
       prov.length ? 'AI: ' + prov.slice(0, 3).join(', ') + (prov.length > 3 ? '…' : '') : 'AI not set up');
+    const blocked = Number(s.ads_blocked || 0);
+    setPill('pill-ads', blocked ? 'ok' : '',
+      '🛡 ' + blocked.toLocaleString() + ' blocked');
   } catch (e) {
     setPill('pill-harness', 'err', 'status unavailable');
   }
@@ -490,6 +494,10 @@ _WORKFLOWS_HTML = r"""<!DOCTYPE html>
   .wf .name { font-weight: 600; }
   .wf .meta { color: #64748b; font-size: 12px; }
   .wf .sp { flex: 1; }
+  .wf .last { color: #475569; font-size: 11px; width: 100%; padding-left: 2px; }
+  select.sched { background: #1a2132; border: 1px solid #232c42; border-radius: 8px;
+    color: #cbd5e1; padding: 6px 8px; font: 600 12px system-ui; }
+  select.sched.on { color: #fbbf24; border-color: #92400e; }
   #log { font: 12px/1.6 ui-monospace, "Cascadia Mono", Consolas, monospace;
       white-space: pre-wrap; color: #94a3b8; max-height: 260px; overflow: auto; }
   #log .ok { color: #34d399; } #log .bad { color: #f87171; }
@@ -544,6 +552,10 @@ function paintRecorder(st) {
 async function refresh() {
   try {
     const data = await api('/workflows/list');
+    let schedData = {schedules: [], intervals: {0: 'Off'}};
+    try { schedData = await api('/schedules'); } catch (e) {}
+    const byName = {};
+    for (const s of schedData.schedules || []) byName[s.name] = s;
     paintRecorder(data.recording);
     const rows = data.workflows || [];
     $('list').innerHTML = rows.length ? '' :
@@ -559,6 +571,21 @@ async function refresh() {
       const play = document.createElement('button');
       play.className = 'play'; play.textContent = '▶ Replay';
       play.onclick = () => replay(wf.name, play);
+      const sel = document.createElement('select');
+      sel.className = 'sched';
+      sel.title = 'Auto-replay this workflow on a schedule';
+      const cur = byName[wf.name];
+      for (const [mins, label] of Object.entries(schedData.intervals || {0: 'Off'})) {
+        const opt = document.createElement('option');
+        opt.value = mins; opt.textContent = label;
+        if (cur && Number(mins) === cur.every_min) opt.selected = true;
+        sel.appendChild(opt);
+      }
+      if (cur && cur.every_min > 0) sel.classList.add('on');
+      sel.onchange = async () => {
+        await api('/schedule', {name: wf.name, every_min: Number(sel.value)});
+        refresh();
+      };
       const del = document.createElement('button');
       del.className = 'del'; del.textContent = '🗑';
       del.title = 'Delete workflow';
@@ -567,7 +594,14 @@ async function refresh() {
           await api('/workflow/delete', {name: wf.name}); refresh();
         }
       };
-      div.append(play, del);
+      div.append(play, sel, del);
+      if (cur && cur.last_result) {
+        const last = document.createElement('span');
+        last.className = 'last';
+        const ago = cur.last_run ? new Date(cur.last_run * 1000).toLocaleTimeString() : '';
+        last.textContent = `⏰ last: ${cur.last_result}${ago ? ' · ' + ago : ''}`;
+        div.appendChild(last);
+      }
       $('list').appendChild(div);
     }
   } catch (e) { /* control API hiccup — retry on next tick */ }

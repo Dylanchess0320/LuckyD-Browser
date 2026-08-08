@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.0] - 2026-08-08
+
+### Added
+- **Scheduled workflows (autopilot)** — every saved workflow gets an
+  interval picker on the Workflows page (Off / 15m / 30m / hourly / 6h /
+  daily). A 30-second app tick replays whatever is due via the Control API
+  backend, toasts the result, and records it (`last: 2/2 steps · 09:41`)
+  in the row. Routes: `GET /schedules`, `POST /schedule`.
+- **Full-page screenshots** (File → Save Full-Page Screenshot…) — CDP
+  `Page.getLayoutMetrics` + `captureBeyondViewport` captures the entire
+  scrollable document, not just the viewport (capped at 16384px).
+- **Ad-blocker stats** — the dashboard gained a 🛡 pill showing live
+  blocked-request counts, fed by `ads_blocked` in `GET /status`.
+- **"What's New" toast** — the first launch after an update greets you
+  with the release highlights (`browser.WHATS_NEW`), closing the
+  auto-update loop.
+
+### Changed
+- Browser version bumped to 1.9.0; installer/version info updated.
+- `browser/selftest.py` hit **100 checks** (schedules API round-trip,
+  schedules UI, full-page capture entry point).
+- `browser/test_browser_core.py` grew to 55 headless checks (schedule
+  math, due detection, store round-trips).
+
 ## [2.7.0] - 2026-08-08
 
 ### Added

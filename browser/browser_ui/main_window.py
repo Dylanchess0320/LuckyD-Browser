@@ -430,6 +430,7 @@ class MainWindow(QMainWindow):
         self._add(file_menu, "Print…", self.print_page, "Ctrl+P")
         self._add(file_menu, "Save Page As…", self.save_page, "Ctrl+S")
         self._add(file_menu, "Save Screenshot…", self.save_screenshot, "Ctrl+Shift+S")
+        self._add(file_menu, "Save Full-Page Screenshot…", self.save_full_screenshot)
         self._add(file_menu, "Reopen Previous Session", self.reopen_previous_session)
         file_menu.addSeparator()
         self._add(file_menu, "Close Tab", self.close_current_tab, "Ctrl+W")
@@ -1204,6 +1205,39 @@ class MainWindow(QMainWindow):
             self.toasts.show(f"Screenshot saved to {name}", kind="ok")
         except Exception as exc:
             self.toasts.show(f"Screenshot failed: {exc}", kind="error")
+
+    def save_full_screenshot(self) -> None:
+        """Capture the ENTIRE scrollable page (CDP captureBeyondViewport)."""
+        view = self.tabs.current_view()
+        if view is None:
+            return
+        url = view.url().toString()
+        if not url.startswith(("http://", "https://")):
+            self.toasts.show("Screenshots need a loaded web page", kind="info")
+            return
+        from browser_core.screenshot import capture_full_b64, suggested_name
+
+        folder = str(self.settings.get("download_dir", "") or "") or str(Path.home() / "Downloads")
+        suggested = suggested_name(url).replace(".jpg", "-full.jpg")
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save Full-Page Screenshot",
+            str(Path(folder) / suggested),
+            "JPEG Image (*.jpg);;PNG Image (*.png)",
+        )
+        if not path:
+            return
+        self.toasts.show("Capturing full page…", kind="info")
+
+        def _work() -> None:
+            try:
+                payload = base64.b64decode(asyncio.run(capture_full_b64(url, jpeg_quality=85)))
+            except Exception as exc:
+                self._shot_failed.emit(f"Screenshot failed: {exc}")
+                return
+            self._shot_saved.emit(payload, path)
+
+        threading.Thread(target=_work, name="screenshot-full", daemon=True).start()
 
     # ── session restore ("continue where you left off") ──────────────
 

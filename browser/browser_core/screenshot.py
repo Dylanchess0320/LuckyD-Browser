@@ -88,3 +88,53 @@ async def capture_b64(url: str, *, jpeg_quality: int = 60, timeout: float = 10.0
             return result["data"]
 
     return await asyncio.wait_for(_run(), timeout=timeout)
+
+
+# Chromium canvases cap at 16384px — taller pages get clipped there.
+_MAX_FULLPAGE_PX = 16384
+
+
+async def capture_full_b64(url: str, *, jpeg_quality: int = 60, timeout: float = 20.0) -> str:
+    """Base64 JPEG of the WHOLE scrollable page (not just the viewport).
+
+    Uses Page.getLayoutMetrics for the content size and captureBeyondViewport
+    so off-screen sections render into the shot.
+    """
+    try:
+        from websockets import connect
+    except ImportError as exc:
+        raise RuntimeError("websockets is required: pip install websockets") from exc
+    try:
+        resp = httpx.get(CDP_HTTP + "/json", timeout=3.0)
+        targets = resp.json()
+    except Exception as exc:
+        raise RuntimeError(f"CDP endpoint unreachable: {exc}") from exc
+    target = _find_target(targets, url)
+    if target is None:
+        pages = [t for t in targets if t.get("type") == "page"]
+        if not pages:
+            raise RuntimeError("no page targets found over CDP")
+        target = pages[0]
+
+    async def _run() -> str:
+        async with connect(target["webSocketDebuggerUrl"], open_timeout=timeout) as ws:
+            await _cmd(ws, 1, "Page.enable")
+            await asyncio.sleep(0.5)
+            metrics = await _cmd(ws, 2, "Page.getLayoutMetrics")
+            size = metrics.get("cssContentSize") or metrics.get("contentSize") or {}
+            width = max(1, min(int(size.get("width", 1280) or 1280), _MAX_FULLPAGE_PX))
+            height = max(1, min(int(size.get("height", 800) or 800), _MAX_FULLPAGE_PX))
+            result = await _cmd(
+                ws,
+                3,
+                "Page.captureScreenshot",
+                {
+                    "format": "jpeg",
+                    "quality": jpeg_quality,
+                    "captureBeyondViewport": True,
+                    "clip": {"x": 0, "y": 0, "width": width, "height": height, "scale": 1},
+                },
+            )
+            return result["data"]
+
+    return await asyncio.wait_for(_run(), timeout=timeout)

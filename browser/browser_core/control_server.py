@@ -43,6 +43,7 @@ from browser_core.dashboard import (
 )
 from browser_core.extract import build_messages, parse_json_loose
 from browser_core.netmon import NetMonitor, to_har
+from browser_core.scheduler import INTERVALS, ScheduleStore
 from browser_core.terminal_page import STATIC_DIR, terminal_html
 from browser_core.workflows import (
     INDEXED_ACTIONS,
@@ -105,6 +106,8 @@ _ROUTES = (
     ("POST /network/start", '{"url": "…" (optional — defaults to the active tab)}'),
     ("POST /network/stop", "stop capturing"),
     ("POST /network/clear", "clear captured rows"),
+    ("GET  /schedules", "workflow schedules with last-run results"),
+    ("POST /schedule", '{"name": "…", "every_min": 0|15|30|60|360|1440} — auto-replay a workflow'),
 )
 
 
@@ -314,6 +317,8 @@ def make_handler(backend, token: str = "", harness=None, settings=None):
                     return self._send_html(workflows_html())
                 if path == "/workflows/list":
                     return self._ok(**backend.list_workflows())
+                if path == "/schedules":
+                    return self._ok(**backend.schedule_list())
                 if path == "/network":
                     return self._send_html(netmon_html())
                 if path == "/network/events":
@@ -381,6 +386,15 @@ def make_handler(backend, token: str = "", harness=None, settings=None):
                     if not name:
                         return self._send(400, {"ok": False, "error": "name required"})
                     return self._ok(deleted=backend.delete_workflow(name))
+                if path == "/schedule":
+                    name = str(body.get("name", "")).strip()
+                    if not name:
+                        return self._send(400, {"ok": False, "error": "name required"})
+                    try:
+                        every = int(body.get("every_min", 0) or 0)
+                    except (TypeError, ValueError):
+                        every = 0
+                    return self._ok(**backend.schedule_set(name, every))
                 if path == "/extract":
                     instruction = str(body.get("instruction", "")).strip()
                     if not instruction:
@@ -538,6 +552,7 @@ class QtBrowserBackend:
         self._wf_store = WorkflowStore()
         self._replaying = False  # replayed steps must not re-record
         self._netmon: NetMonitor | None = None  # lazy network capture
+        self._schedules: ScheduleStore | None = None  # lazy schedule store
 
     # ── GUI-thread helpers ────────────────────────────────────────────
     def _window(self):
@@ -599,6 +614,8 @@ class QtBrowserBackend:
 
         info = self._invoker.run(_do)
         info.update(name=API_NAME, version=API_VERSION, cdp="127.0.0.1:9222")
+        with contextlib.suppress(Exception):
+            info["ads_blocked"] = int(self._app.adblock.blocked_count)
         try:  # harness reachability — network stays off the GUI thread
             import httpx
 
@@ -986,3 +1003,17 @@ class QtBrowserBackend:
         if self._netmon is None:
             return to_har([])
         return to_har(self._netmon.rows(0)["rows"], self._netmon.target)
+
+    # ── workflow schedules ────────────────────────────────────────────
+
+    def schedule_list(self) -> dict:
+        if self._schedules is None:
+            self._schedules = ScheduleStore()
+        return {"schedules": self._schedules.list(), "intervals": INTERVALS}
+
+    def schedule_set(self, name: str, every_min: int) -> dict:
+        if self._schedules is None:
+            self._schedules = ScheduleStore()
+        entry = self._schedules.set(name, every_min)
+        every = int(entry.get("every_min", 0) or 0)
+        return {"name": name, "every_min": every, "label": INTERVALS.get(every, "Off")}

@@ -71,14 +71,14 @@ rights, Windows 10/11 x64 only**:
 powershell -NoProfile -ExecutionPolicy Bypass -File browser\installer\build_installer.ps1
 ```
 
-Output: `browser\installer\output\LuckyDBrowserSetup-1.8.0.exe`
+Output: `browser\installer\output\LuckyDBrowserSetup-1.9.0.exe`
 
 - Installs per-user to `%LOCALAPPDATA%\Programs\LuckyDBrowser`
 - Start Menu shortcut, optional desktop icon, Settings > Apps uninstall entry
 - Includes everything (Qt WebEngine runtime **and** the `luckyd-code.exe`
   backend) — the target machine needs nothing else
 - Only the *build* machine needs Inno Setup 6: https://jrsoftware.org/isdl.php
-- Silent install for scripting: `LuckyDBrowserSetup-1.8.0.exe /VERYSILENT /NORESTART`
+- Silent install for scripting: `LuckyDBrowserSetup-1.9.0.exe /VERYSILENT /NORESTART`
 - The raw script is `browser\installer\LuckyDBrowser.iss` if you want to tweak
   it (then recompile with `iscc browser\installer\LuckyDBrowser.iss`)
 
@@ -102,9 +102,9 @@ Output: `browser\installer\output\LuckyDBrowserSetup-1.8.0.exe`
 | View | Zoom (Ctrl +/-/0, **Ctrl+Scroll**, **zoom percentage indicator**), **per-site zoom memory + configurable default zoom**, F11 fullscreen, Ctrl+U view-source, F12 DevTools, **🔒 HTTPS lock icon** in status bar |
 | Privacy | Built-in ad/tracker blocklist (Tools menu), clear cache/cookies in Settings |
 | Reliability | Transient network errors auto-retry up to 3× behind a friendly "Connecting…" page |
-| Print/Save | **Ctrl+P print**, **Ctrl+S save page as HTML**, **Ctrl+Shift+S save page screenshot (GPU-safe CDP capture)**, Ctrl+O open local file |
+| Print/Save | **Ctrl+P print**, **Ctrl+S save page as HTML**, **Ctrl+Shift+S save page screenshot (GPU-safe CDP capture)**, **full-page screenshots** (entire scrollable document), Ctrl+O open local file |
 | Terminal | **Multi-terminal tabs**: every terminal tab is its own ConPTY session — **agent CLI** (Ctrl+\`), **PowerShell** (Ctrl+Shift+\`), or **CMD**, switchable live in the tab's shell bar |
-| Automation | **Workflow recorder/replayer** (Tools → Workflows…): records Control-API actions into named JSON workflows, replays them with **self-healing element re-resolution** (fingerprint scoring when indices drift), manager page with per-step replay log. **POST /extract**: schema-guided AI extraction of structured JSON from the active page |
+| Automation | **Workflow recorder/replayer** (Tools → Workflows…): records Control-API actions into named JSON workflows, replays them with **self-healing element re-resolution** (fingerprint scoring when indices drift), manager page with per-step replay log. **Scheduled workflows** auto-replay every 15m–daily. **POST /extract**: schema-guided AI extraction of structured JSON from the active page |
 | Help | **Ctrl+/ keyboard shortcuts reference**, About dialog |
 | AI | Sidebar (Ctrl+Shift+A): **Markdown chat bubbles**, live **harness status line**, chat with page context, FMHY tool search, autonomous agent that drives your **real visible tab** — watch every step live: orange highlight ring + 🤖 badge on the element it's about to click, step narration in the sidebar, Stop button always available. Popup windows open as normal tabs the agent can read, and JavaScript alert/confirm/prompt dialogs are auto-dismissed mid-task. **Ultra-fast + smart mode:** plan-first reasoning, stuck detection, no API key needed. **Vision steps are AUTO** — screenshots stream to the model every step when the selected model accepts images (gpt-4o, gemini, claude-sonnet, gemma3…), auto-disabled for text-only models, and image payloads now work on Gemini and Anthropic endpoints too |
 | Themes | 4 futuristic themes (Neon Night, Cyber Grove, Solar Dusk, Arctic Light) + a **secret Synthwave Sunset** (Konami code on the new-tab page) — live switch in Settings or `POST /theme`, **themed tab bar + toolbar**, glass toasts, command palette (Ctrl+K) |

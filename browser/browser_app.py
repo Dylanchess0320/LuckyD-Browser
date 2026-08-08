@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import contextlib
 import threading
 from pathlib import Path
 
 from browser_core.adblock import AdBlockInterceptor
 from browser_core.harness_bridge import HarnessSupervisor
 from browser_core.profile import default_profile
+from browser_core.scheduler import ScheduleStore
 from browser_core.scripts import ScriptEngine
 from browser_core.session import SessionStore
 from browser_core.settings import SettingsStore
@@ -24,6 +26,7 @@ class _AppBus(QObject):
     """Thread-safe signal bus — worker threads emit, the GUI thread receives."""
 
     harness_booted = Signal(bool, str)  # (ok, error_message)
+    schedule_done = Signal(str, bool, str)  # (workflow, ok, detail)
 
 
 class BrowserApp:
@@ -59,6 +62,7 @@ class BrowserApp:
 
         self.bus = _AppBus()
         self.bus.harness_booted.connect(self._on_harness_boot)
+        self.bus.schedule_done.connect(self._on_schedule_done)
 
         # Browser Control API — localhost HTTP control of the live browser
         # (the luckyd-code.exe harness and local scripts drive tabs with it).
@@ -75,9 +79,20 @@ class BrowserApp:
         self.qapp.aboutToQuit.connect(self.stop_control_server)
         self.qapp.aboutToQuit.connect(self.stop_terminal_server)
 
+        # Workflow schedules: a 30s tick replays whatever is due (in a worker
+        # thread — replays drive the GUI through the backend's invoker).
+        self.schedule_store = ScheduleStore()
+        self.control_backend = None
+        self._schedule_running = False
+        self._schedule_timer = QTimer(self.qapp)
+        self._schedule_timer.setInterval(30_000)
+        self._schedule_timer.timeout.connect(self._run_due_schedules)
+        self._schedule_timer.start(30_000)
+
         self.windows: list[MainWindow] = []
         first_window = self.new_window()
         self._restore_previous_session(first_window)
+        self._announce_whats_new(first_window)
 
         # Auto-start the coding-agent backend (luckyd-code.exe) in the
         # background — the one-window platform: browser + assistant + agent.
@@ -123,8 +138,9 @@ class BrowserApp:
         try:
             port = int(self.settings.get("browser_api_port", 9777))
             token = str(self.settings.get("browser_api_token", "") or "")
+            self.control_backend = QtBrowserBackend(self)
             server = BrowserControlServer(
-                QtBrowserBackend(self),
+                self.control_backend,
                 port=port,
                 token=token,
                 harness=self.harness,
@@ -249,6 +265,52 @@ class BrowserApp:
                 self.new_window().restore_session(extra)
         except Exception as exc:  # a bad session file must never block startup
             print(f"[browser] session restore skipped: {exc}")
+
+    def _announce_whats_new(self, window: MainWindow) -> None:
+        """One toast on the first launch after an update."""
+        try:
+            from browser import WHATS_NEW, __version__
+
+            if str(self.settings.get("last_seen_version", "")) == __version__:
+                return
+            self.settings.set("last_seen_version", __version__)
+            QTimer.singleShot(2500, lambda: window.toast(WHATS_NEW, "ok"))
+        except Exception:
+            pass
+
+    # ── Workflow schedules (autopilot) ─────────────────────────────────
+
+    def _run_due_schedules(self) -> None:
+        backend = self.control_backend
+        if backend is None or self._schedule_running:
+            return
+        due = self.schedule_store.due()
+        if not due:
+            return
+        self._schedule_running = True
+
+        def _work() -> None:
+            try:
+                for name in due:
+                    try:
+                        result = backend.replay_workflow(name)
+                        ok = result.get("succeeded") == result.get("total")
+                        detail = f"{result.get('succeeded')}/{result.get('total')} steps"
+                    except Exception as exc:
+                        ok, detail = False, str(exc)[:120]
+                    self.schedule_store.mark_run(name, detail)
+                    self.bus.schedule_done.emit(name, ok, detail)
+            finally:
+                self._schedule_running = False
+
+        threading.Thread(target=_work, name="workflow-scheduler", daemon=True).start()
+
+    def _on_schedule_done(self, name: str, ok: bool, detail: str) -> None:
+        kind = "ok" if ok else "warn"
+        msg = f"⏰ Scheduled workflow “{name}” {'finished' if ok else 'had issues'} — {detail}"
+        for win in list(self.windows):
+            with contextlib.suppress(Exception):
+                win.toast(msg, kind)
 
     def run(self) -> int:
         return self.qapp.exec()
