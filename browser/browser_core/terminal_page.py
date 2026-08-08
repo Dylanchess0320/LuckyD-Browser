@@ -30,9 +30,7 @@ def terminal_html(settings=None, shell: str = "agent") -> str:
     shell = (shell or "agent").strip().lower()
     if shell not in _SHELL_LABELS:
         shell = "agent"
-    return _HTML.replace("__WS_URL__", f"ws://{_WS_HOST}:{port}").replace(
-        "__SHELL__", shell
-    )
+    return _HTML.replace("__WS_URL__", f"ws://{_WS_HOST}:{port}").replace("__SHELL__", shell)
 
 
 _HTML = """<!doctype html>

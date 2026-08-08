@@ -25,7 +25,9 @@ Rules:
 - Prefer arrays of flat objects for lists of things."""
 
 
-def build_messages(instruction: str, schema: dict | None, page_text: str, page_meta: str) -> list[dict]:
+def build_messages(
+    instruction: str, schema: dict | None, page_text: str, page_meta: str
+) -> list[dict]:
     """Chat messages for one extraction request."""
     parts = [f"Page: {page_meta}" if page_meta else "", "Page text:", page_text[:9000]]
     user = "\n\n".join(p for p in parts if p)
@@ -68,7 +70,7 @@ def parse_json_loose(text: str):
 
 
 def _try_parse(candidate: str):
-    if not candidate or candidate[0] not in "{[\"-0123456789tfn":
+    if not candidate or candidate[0] not in '{["-0123456789tfn':
         return None
     try:
         return json.loads(candidate)

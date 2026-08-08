@@ -939,9 +939,7 @@ class MainWindow(QMainWindow):
             return
         from browser_core.screenshot import capture_b64, suggested_name
 
-        folder = str(self.settings.get("download_dir", "") or "") or str(
-            Path.home() / "Downloads"
-        )
+        folder = str(self.settings.get("download_dir", "") or "") or str(Path.home() / "Downloads")
         path, _ = QFileDialog.getSaveFileName(
             self,
             "Save Screenshot",

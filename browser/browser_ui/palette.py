@@ -103,7 +103,9 @@ class CommandPalette(QWidget):
                 ("bookmark", t or u, letter_tile(u), lambda uu=u: self._mw.open_in_new_tab(uu))
             )
         for u, t, *_ in self._mw.storage.recent(100):
-            self._items.append(("history", t or u, letter_tile(u), lambda uu=u: self._mw.open_in_new_tab(uu)))
+            self._items.append(
+                ("history", t or u, letter_tile(u), lambda uu=u: self._mw.open_in_new_tab(uu))
+            )
         for label, action in [
             ("New Tab", self._mw.new_tab),
             ("AI Assistant", self._mw.show_assistant),

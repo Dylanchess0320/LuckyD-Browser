@@ -210,7 +210,7 @@ class SettingsDialog(QDialog):
         self.startup_box.addItem("Continue where you left off", "restore")
         self.startup_box.addItem("Open the New Tab page", "newtab")
         self.startup_box.setToolTip(
-            "\"Continue where you left off\" reopens the tabs (and windows) you had\n"
+            '"Continue where you left off" reopens the tabs (and windows) you had\n'
             "open when you last closed the browser. Incognito is never restored."
         )
         mode = str(settings.get("startup_mode", "restore"))
@@ -269,7 +269,9 @@ class SettingsDialog(QDialog):
             current_zoom = float(settings.get("zoom_factor", 1.0) or 1.0)
         except (TypeError, ValueError):
             current_zoom = 1.0
-        nearest = min(range(len(self._zoom_values)), key=lambda i: abs(self._zoom_values[i] - current_zoom))
+        nearest = min(
+            range(len(self._zoom_values)), key=lambda i: abs(self._zoom_values[i] - current_zoom)
+        )
         self.zoom_box.setCurrentIndex(nearest)
         form.addRow("Default zoom", self.zoom_box)
 

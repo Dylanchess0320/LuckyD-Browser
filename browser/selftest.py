@@ -26,7 +26,9 @@ for path in (BASE.parent, BASE):
 
 # Isolate session persistence: the app under test must always start with a
 # single fresh tab, never restore tabs left over from a dev session.
-os.environ["LUCKYD_SESSION_PATH"] = str(Path(tempfile.mkdtemp(prefix="ld-selftest-")) / "session.json")
+os.environ["LUCKYD_SESSION_PATH"] = str(
+    Path(tempfile.mkdtemp(prefix="ld-selftest-")) / "session.json"
+)
 
 from browser_app import BrowserApp
 from PySide6 import QtWebEngineWidgets  # noqa: F401  (before QApplication)
@@ -133,8 +135,7 @@ _win = window_record([tab_record("https://example.com", "Example", pinned=True)]
 check("session window record", _win is not None and _win["tabs"][0]["pinned"])
 check(
     "session store round-trip",
-    _store.save([_win])
-    and _store.load()["windows"][0]["tabs"][0]["url"] == "https://example.com",
+    _store.save([_win]) and _store.load()["windows"][0]["tabs"][0]["url"] == "https://example.com",
 )
 check(
     "session skips internal tabs",
@@ -149,7 +150,10 @@ check(
     "zoom origin keeps non-default port",
     origin_key("http://127.0.0.1:9777/dashboard") == "http://127.0.0.1:9777",
 )
-check("zoom origin drops default port", origin_key("https://example.com:443/") == "https://example.com")
+check(
+    "zoom origin drops default port",
+    origin_key("https://example.com:443/") == "https://example.com",
+)
 check(
     "zoom origin rejects non-http",
     origin_key("file:///C:/x.html") == "" and origin_key("about:blank") == "",

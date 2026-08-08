@@ -33,9 +33,7 @@ if getattr(sys, "frozen", False):
 
     def _crash_log(exc_type, exc, tb) -> None:
         try:
-            log_dir = (
-                Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "LuckyDBrowser"
-            )
+            log_dir = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "LuckyDBrowser"
             log_dir.mkdir(parents=True, exist_ok=True)
             stamp = _datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             with (log_dir / "crash.log").open("a", encoding="utf-8") as fh:
