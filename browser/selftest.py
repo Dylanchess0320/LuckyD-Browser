@@ -1,7 +1,7 @@
 """Automated functional smoke test for LuckyD Browser (dev tool, not shipped).
 
 Launches the real app, drives it with timers, prints PASS/FAIL per check,
-and exits non-zero if any check fails. Currently runs 100 checks.
+and exits non-zero if any check fails. Currently runs 103 checks.
 
 Run:  python browser/selftest.py
 """
@@ -29,6 +29,9 @@ for path in (BASE.parent, BASE):
 os.environ["LUCKYD_SESSION_PATH"] = str(
     Path(tempfile.mkdtemp(prefix="ld-selftest-")) / "session.json"
 )
+# And never collide with a real running browser on the default API/CDP ports.
+os.environ["LUCKYD_API_PORT"] = "19877"
+os.environ["QTWEBENGINE_REMOTE_DEBUGGING"] = "127.0.0.1:19222"
 
 from browser_app import BrowserApp
 from PySide6 import QtWebEngineWidgets  # noqa: F401  (before QApplication)
@@ -123,7 +126,7 @@ check("md escapes html", "<script>" not in _md_lite("<script>alert(1)</script>")
 # package metadata (mojibake regression guard)
 import browser as _browser_pkg
 
-check("version 1.9.0", _browser_pkg.__version__ == "1.9.0", _browser_pkg.__version__)
+check("version 2.0.0", _browser_pkg.__version__ == "2.0.0", _browser_pkg.__version__)
 check("docstring has no mojibake", "�" not in (_browser_pkg.__doc__ or ""))
 
 # v1.4.0 — session restore, per-site zoom memory, screenshot naming (pure logic)
@@ -264,6 +267,13 @@ from browser_core.screenshot import capture_full_b64
 _wf_page2 = workflows_html()
 check("workflows page schedules UI", "/schedules" in _wf_page2 and "sched" in _wf_page2)
 check("full-page screenshot entry point", callable(capture_full_b64))
+
+# v2.0.0 — youtube ad resume fix present in the shipped userscript
+_yt = (BASE / "assets" / "userscripts" / "youtube-adblock.user.js").read_text(encoding="utf-8")
+check(
+    "youtube ad resume-at-position fix",
+    "trackAdBoundary" in _yt and "preAdTime" in _yt and "preAdMuted" in _yt,
+)
 check(
     "hq splash states",
     "Starting your coding agent" in hq_splash_html("u", "starting")
@@ -636,7 +646,25 @@ def step2() -> None:
     check("close duplicate tabs", closed == 1 and win.tabs.count() == 1)
     win.tabs.setCurrentIndex(0)
 
-    port = int(app.settings.get("browser_api_port", 9777))
+    # v2.0.0 — read later queue + spellcheck profile
+    win.save_read_later()
+    check(
+        "read later saved",
+        any(r[0] == url and r[2] == "readlater" for r in app.storage.bookmarks()),
+    )
+    check(
+        "read later stays off the bar",
+        not any(a.data() == url for a in win.bookmark_bar.actions()),
+    )
+    app.storage.remove_bookmark(url)  # cleanup the test entry
+    # Spellcheck self-enables only when a hunspell .bdic dictionary exists
+    # (assets/qtwebengine_dictionaries) — either state is a valid setup.
+    check(
+        "spellcheck wiring safe",
+        win.profile.isSpellCheckEnabled() in (True, False),
+    )
+
+    port = int(os.environ.get("LUCKYD_API_PORT", "0") or app.settings.get("browser_api_port", 9777))
     global _ORIG_THEME
     _ORIG_THEME = str(app.settings.get("theme", "neon"))
     api_thread = threading.Thread(target=_api_checks, args=(port,), daemon=True)

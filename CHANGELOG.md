@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0] - 2026-08-08
+
+### Fixed
+- **YouTube videos resuming mid-content after a blocked ad** — ads share the
+  `<video>` element with the content, so the short-circuit skip polluted the
+  playback position. The userscript now captures the content position when an
+  ad starts (via the player's content-time API with the element as fallback)
+  and restores it when the ad ends: **0s for pre-rolls, the resume point for
+  mid-rolls** — and it restores your pre-ad mute state too.
+
+### Added
+- **Spell check everywhere** — both profiles now enable the OS spellchecker
+  (en-US default), and the right-click menu shows top-4 suggestions that
+  replace the misspelling in place.
+- **Translate Page…** — right-click any page to open it in Google Translate
+  (auto → English) in a new tab.
+- **Read Later queue** (`Ctrl+Alt+S` or Bookmarks menu) — parks the page in
+  a dedicated `readlater` list with its own 📖 submenu; kept out of the
+  bookmarks bar and the main bookmark list.
+
+### Changed
+- **Browser version bumped to 2.0.0**; installer/version info updated.
+- `browser/selftest.py` grew to 103 checks (read-later queue separation,
+  spellcheck profile flag, YouTube fix shipped in the userscript).
+
 ## [2.8.0] - 2026-08-08
 
 ### Added

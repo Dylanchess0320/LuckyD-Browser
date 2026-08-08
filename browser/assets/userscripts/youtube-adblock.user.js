@@ -80,6 +80,34 @@ function isAdPlaying(p){
 if(!p)return false;
 if(p.classList.contains('ad-showing')||p.classList.contains('ad-interrupting'))return true;
 return !!document.querySelector('.ytp-ad-player-overlay,.ytp-ad-player-overlay-instream-info,.ytp-ad-text-overlay,.ytp-ad-image-overlay');}
+// Content-position guard: ads share the <video> element with the content, so
+// a short-circuit (or a skip click) leaves the position polluted — pre-rolls
+// then start mid-video instead of at 0. Capture the content position when an
+// ad starts; restore it when the ad ends (0 for pre-rolls, the resume point
+// for mid-rolls). Also restores the pre-ad mute state.
+let preAdTime=null,preAdMuted=null,preAdUrl='';
+function trackAdBoundary(){
+const v=videoEl();const p=playerEl();
+if(!v)return;
+const adNow=isAdPlaying(p);
+if(adNow){
+if(preAdTime===null){
+preAdUrl=location.href;
+preAdMuted=v.muted;
+let t=NaN;
+try{if(p&&typeof p.getCurrentTime==='function')t=p.getCurrentTime();}catch(_){}
+preAdTime=(isFinite(t)&&t>=0)?t:(v.currentTime||0);
+}
+return;
+}
+if(preAdTime!==null&&location.href===preAdUrl){
+try{
+if(isFinite(v.duration)&&v.duration>0&&Math.abs(v.currentTime-preAdTime)>1){
+v.currentTime=Math.max(0,preAdTime);
+}
+if(preAdMuted!==null&&v.muted!==preAdMuted)v.muted=preAdMuted;
+}catch(_){}
+preAdTime=null;preAdMuted=null;}}
 function finishAd(){
 const v=videoEl();const p=playerEl();
 if(!v)return;
@@ -120,7 +148,7 @@ scrubAdsFromPlayerResponse();
 removeAdDom();
 new MutationObserver(()=>{removeAdDom();dismissBlockPopup();})
 .observe(document.documentElement,{childList:true,subtree:true});
-setInterval(()=>{finishAd();dismissBlockPopup();},150);
+setInterval(()=>{trackAdBoundary();finishAd();dismissBlockPopup();},150);
 setInterval(()=>{scrubAdsFromPlayerResponse();removeAdDom();},1500);
 window.__ldYtStats=()=>({shortCircuits:adShortCircuits});
 console.info(TAG+' active (short-circuit method)');

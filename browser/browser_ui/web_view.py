@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 from urllib.parse import quote
 
@@ -220,6 +221,17 @@ class WebView(QWebEngineView):
         selected = (request.selectedText() or "").strip() if request else ""
         media_url = request.mediaUrl() if request else QUrl()
 
+        # Spell-check suggestions sit on top, like every pro browser.
+        if request is not None:
+            with contextlib.suppress(Exception):
+                if request.misspelledWord():
+                    for suggestion in request.spellCheckerSuggestions()[:4]:
+                        menu.addAction(
+                            f"✓ {suggestion}",
+                            lambda s=suggestion: page.replaceMisspelledWord(s),
+                        )
+                    menu.addSeparator()
+
         if link_url.isValid() and not link_url.isEmpty():
             menu.addAction(
                 "Open Link in New Tab",
@@ -286,6 +298,19 @@ class WebView(QWebEngineView):
             menu.addAction(
                 "Save Media As…",
                 lambda: page.triggerAction(QWebEnginePage.WebAction.DownloadImageToDisk),
+            )
+            menu.addSeparator()
+
+        page_url = page.url().toString()
+        if page_url.startswith(("http://", "https://")):
+            menu.addAction(
+                "Translate Page…",
+                lambda: self._mw.open_in_new_tab(
+                    QUrl(
+                        "https://translate.google.com/translate?sl=auto&tl=en&u="
+                        + quote(page_url, safe="")
+                    )
+                ),
             )
             menu.addSeparator()
 

@@ -136,7 +136,14 @@ class BrowserApp:
         )
 
         try:
-            port = int(self.settings.get("browser_api_port", 9777))
+            # LUCKYD_API_PORT overrides the setting (tests run side-by-side
+            # with a real browser instance, which already owns 9777).
+            import os
+
+            port = int(
+                os.environ.get("LUCKYD_API_PORT")
+                or int(self.settings.get("browser_api_port", 9777))
+            )
             token = str(self.settings.get("browser_api_token", "") or "")
             self.control_backend = QtBrowserBackend(self)
             server = BrowserControlServer(

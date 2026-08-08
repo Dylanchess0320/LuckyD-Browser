@@ -252,7 +252,8 @@ class MainWindow(QMainWindow):
         """Rebuild the bookmark strip from storage (add/remove/import)."""
         bar = self.bookmark_bar
         bar.clear()
-        rows = self.storage.bookmarks()
+        # Read Later items stay in their menu — the bar is for real bookmarks.
+        rows = [r for r in self.storage.bookmarks() if r[2] != "readlater"]
         if not rows:
             hint = QAction("☆ No bookmarks yet — press Ctrl+D to add one", bar)
             hint.setEnabled(False)
@@ -515,15 +516,25 @@ class MainWindow(QMainWindow):
     def _rebuild_bookmarks_menu(self) -> None:
         self.bookmarks_menu.clear()
         self._add(self.bookmarks_menu, "Bookmark This Page", self.toggle_bookmark, "Ctrl+D")
+        self._add(self.bookmarks_menu, "Read This Page Later", self.save_read_later, "Ctrl+Alt+S")
         self._add(
             self.bookmarks_menu,
             "Show All Bookmarks",
             self.open_bookmarks,
             "Ctrl+Shift+O",
         )
+        # Read Later lives in its own submenu — a reading queue, not bookmarks.
+        later = [b for b in self.storage.bookmarks() if b[2] == "readlater"]
+        if later:
+            sub = self.bookmarks_menu.addMenu(f"📖 Read Later ({len(later)})")
+            for url, title, _f, _c in later[:15]:
+                sub.addAction(
+                    (title or url)[:60],
+                    lambda checked=False, u=url: self.open_in_new_tab(QUrl(u)),
+                )
         self.bookmarks_menu.addSeparator()
-        bookmarks = self.storage.bookmarks()[:25]
-        if not bookmarks:
+        bookmarks = [b for b in self.storage.bookmarks() if b[2] != "readlater"][:25]
+        if not bookmarks and not later:
             empty = QAction("(no bookmarks yet)", self)
             empty.setEnabled(False)
             self.bookmarks_menu.addAction(empty)
@@ -535,8 +546,24 @@ class MainWindow(QMainWindow):
                 lambda checked=False, u=url: self.open_in_new_tab(QUrl(u)),
             )
 
+    def save_read_later(self) -> None:
+        """Ctrl+Alt+S: park the current page in the Read Later queue."""
+        view = self.tabs.current_view()
+        if view is None:
+            return
+        url = view.url().toString()
+        if not url.startswith(("http://", "https://")):
+            self.toast("Read Later needs a web page", "info")
+            return
+        if any(b[0] == url and b[2] == "readlater" for b in self.storage.bookmarks()):
+            self.toast("Already in Read Later", "info")
+            return
+        self.storage.add_bookmark(url, view.title(), folder="readlater")
+        self.toast("Added to Read Later 📖", "ok")
+
     def _build_shortcuts(self) -> None:
         QShortcut(QKeySequence("Ctrl+L"), self, activated=self.focus_omnibox)
+        QShortcut(QKeySequence("Ctrl+Alt+S"), self, activated=self.save_read_later)
         QShortcut(QKeySequence("Alt+Left"), self, activated=lambda: self._nav("back"))
         QShortcut(QKeySequence("Alt+Right"), self, activated=lambda: self._nav("forward"))
         QShortcut(QKeySequence("F5"), self, activated=lambda: self._nav("reload"))

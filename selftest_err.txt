@@ -1,0 +1,4 @@
+Added {--remote-allow-origins=*} to command-line arguments to avoid web socket connection errors during remote debugging.
+
+DevTools listening on ws://127.0.0.1:19222/devtools/browser/cdc3ee7b-f765-4c33-ba65-1dd13adf49f9
+Remote debugging server started successfully. Try pointing a Chromium-based browser to http://127.0.0.1:19222
