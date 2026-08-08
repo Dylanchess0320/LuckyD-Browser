@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.0] - 2026-08-08
+
+### Added
+- **Vertical tabs** (`browser_ui/vertical_tabs.py`) — an Arc-style left dock
+  with readable rows: site tiles, group-color text, click to switch,
+  middle-click to close, drag to reorder, the full tab context menu. Toggle
+  in View → Vertical Tabs (persisted); the top bar hides while it's on.
+- **Network monitor** (`browser_core/netmon.py`, Tools → Network Monitor) —
+  a live request log of the active tab over raw CDP (Network domain):
+  method/status/type/size/time rows streaming into a themed page at
+  `127.0.0.1:9777/network`, with a text filter, in-place row updates, and
+  one-click **HAR 1.2 export** (`GET /network/har`). Control API routes:
+  `GET /network`, `GET /network/events?since=N`, `POST /network/start|stop|clear`.
+- **Focus mode** (`Ctrl+Shift+F`) — one key strips every chrome surface
+  (menu bar, nav bar, bookmark bar, status bar, docks) for pure content;
+  pressing it again restores exactly what was open.
+- **Omnibox AI ask** — start a query with `?` in the address bar to send it
+  straight to the AI sidebar (`? explain quantum computing`).
+
+### Changed
+- Browser version bumped to 1.7.0; Control API bumped to 1.4.0.
+- `browser/selftest.py` grew to 91 checks (netmon page + capture lifecycle +
+  HAR export, vertical-tabs toggle, focus mode hide/restore, sidebar ask).
+- `browser/test_browser_core.py` grew to 52 headless checks (netmon reducer,
+  row cap, HAR builder).
+
 ## [2.5.0] - 2026-08-08
 
 ### Added

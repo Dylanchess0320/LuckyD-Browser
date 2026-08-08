@@ -1,7 +1,7 @@
 """Automated functional smoke test for LuckyD Browser (dev tool, not shipped).
 
 Launches the real app, drives it with timers, prints PASS/FAIL per check,
-and exits non-zero if any check fails. Currently runs 83 checks.
+and exits non-zero if any check fails. Currently runs 91 checks.
 
 Run:  python browser/selftest.py
 """
@@ -123,7 +123,7 @@ check("md escapes html", "<script>" not in _md_lite("<script>alert(1)</script>")
 # package metadata (mojibake regression guard)
 import browser as _browser_pkg
 
-check("version 1.6.0", _browser_pkg.__version__ == "1.6.0", _browser_pkg.__version__)
+check("version 1.7.0", _browser_pkg.__version__ == "1.7.0", _browser_pkg.__version__)
 check("docstring has no mojibake", "�" not in (_browser_pkg.__doc__ or ""))
 
 # v1.4.0 — session restore, per-site zoom memory, screenshot naming (pure logic)
@@ -225,6 +225,15 @@ check(
     is_newer("9.9.9", _browser_pkg.__version__)
     and not is_newer(_browser_pkg.__version__, _browser_pkg.__version__)
     and parse_version("v1.5") == (1, 5),
+)
+
+# v1.7.0 — network monitor page
+from browser_core.dashboard import netmon_html
+
+_nm_page = netmon_html()
+check(
+    "netmon page well-formed",
+    _nm_page.startswith("<!DOCTYPE html>") and "/network/events" in _nm_page,
 )
 
 # dashboard module served by the Control API
@@ -390,6 +399,32 @@ def _api_checks(port: int) -> None:
     except Exception as exc:
         API_RESULTS.append(("workflow lifecycle", False, str(exc)))
 
+    # v1.7.0 — network monitor lifecycle: start → events → HAR → stop
+    try:
+        post("/network/start", {})
+        time.sleep(1.0)  # let the CDP hook attach
+        events = get("/network/events")
+        API_RESULTS.append(
+            (
+                "netmon capture starts",
+                bool(events.get("running")) and not events.get("error"),
+                str(events.get("error", "")),
+            )
+        )
+        har = get("/network/har")
+        API_RESULTS.append(
+            (
+                "netmon HAR export",
+                isinstance(har, dict)
+                and har.get("log", {}).get("version") == "1.2"
+                and "entries" in har["log"],
+                "",
+            )
+        )
+        post("/network/stop", {})
+    except Exception as exc:
+        API_RESULTS.append(("netmon lifecycle", False, str(exc)))
+
 
 app = BrowserApp(sys.argv)
 win = app.windows[0]
@@ -516,6 +551,26 @@ def step2() -> None:
     win.tabs.set_tab_group(0, None)
     win.tabs.set_tab_group(1, None)
     check("groups dissolve when empty", win.tabs._groups == {})
+
+    # v1.7.0 — vertical tabs + focus mode + omnibox ask wiring
+    win.vtabs_act.setChecked(True)
+    check(
+        "vertical tabs on",
+        win.vtabs.isVisible() and not win.tabs.tabBar().isVisible(),
+    )
+    win.vtabs_act.setChecked(False)
+    check(
+        "vertical tabs off",
+        not win.vtabs.isVisible() and win.tabs.tabBar().isVisible(),
+    )
+    win.toggle_focus_mode()
+    check(
+        "focus mode hides chrome",
+        not win.nav_bar.isVisible() and not win.statusBar().isVisible(),
+    )
+    win.toggle_focus_mode()
+    check("focus mode restores chrome", win.nav_bar.isVisible())
+    check("sidebar programmatic ask", callable(getattr(win.ai_sidebar, "ask", None)))
     # Collapsing hid the scratch tab, which moved the current index to 0 —
     # point back at the scratch tab before closing it.
     win.tabs.setCurrentIndex(1)

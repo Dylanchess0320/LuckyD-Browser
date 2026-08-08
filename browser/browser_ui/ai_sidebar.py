@@ -688,6 +688,12 @@ class AiSidebar(QDockWidget):
         self.status.setText("Conversation cleared")
         self._greet()
 
+    def ask(self, question: str) -> None:
+        """Programmatic question (e.g. omnibox "?…" prefix) — into the chat."""
+        self.show()
+        self.input.setText(question)
+        self._send()
+
     def ask_about(self, instruction: str, selected_text: str) -> None:
         """Context-menu entry: run an instruction over the selected text."""
         if self._chat_worker is not None:

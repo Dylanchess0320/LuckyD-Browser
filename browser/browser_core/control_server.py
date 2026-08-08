@@ -34,8 +34,15 @@ from browser_core.agent import (
     _SNAPSHOT_JS,
     _TYPE_JS,
 )
-from browser_core.dashboard import dashboard_html, hq_shell_html, hq_splash_html, workflows_html
+from browser_core.dashboard import (
+    dashboard_html,
+    hq_shell_html,
+    hq_splash_html,
+    netmon_html,
+    workflows_html,
+)
 from browser_core.extract import build_messages, parse_json_loose
+from browser_core.netmon import NetMonitor, to_har
 from browser_core.terminal_page import STATIC_DIR, terminal_html
 from browser_core.workflows import (
     INDEXED_ACTIONS,
@@ -48,7 +55,7 @@ from browser_core.workflows import (
 )
 
 API_NAME = "Browser Control API"
-API_VERSION = "1.3.0"
+API_VERSION = "1.4.0"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 9777
 
@@ -92,6 +99,12 @@ _ROUTES = (
         " — structured JSON data from the page (AI)",
     ),
     ("POST /theme", '{"name": "neon|cyber|solar|arctic|synthwave"} — live theme switch'),
+    ("GET  /network", "network monitor page (live request log of the active tab)"),
+    ("GET  /network/events?since=N", "incremental request rows (JSON)"),
+    ("GET  /network/har", "download the capture as HAR 1.2"),
+    ("POST /network/start", '{"url": "…" (optional — defaults to the active tab)}'),
+    ("POST /network/stop", "stop capturing"),
+    ("POST /network/clear", "clear captured rows"),
 )
 
 
@@ -163,6 +176,19 @@ def make_handler(backend, token: str = "", harness=None, settings=None):
                 self.send_header("Content-Type", mime)
                 self.send_header("Content-Length", str(len(body)))
                 self.send_header("Cache-Control", "no-cache")
+                self.end_headers()
+                self.wfile.write(body)
+            except (ConnectionError, OSError):
+                pass
+
+        def _send_download(self, text: str, filename: str, mime: str) -> None:
+            """Send a file download (Content-Disposition attachment)."""
+            body = text.encode("utf-8")
+            try:
+                self.send_response(200)
+                self.send_header("Content-Type", mime)
+                self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+                self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
                 self.wfile.write(body)
             except (ConnectionError, OSError):
@@ -288,6 +314,17 @@ def make_handler(backend, token: str = "", harness=None, settings=None):
                     return self._send_html(workflows_html())
                 if path == "/workflows/list":
                     return self._ok(**backend.list_workflows())
+                if path == "/network":
+                    return self._send_html(netmon_html())
+                if path == "/network/events":
+                    try:
+                        since = int((query.get("since") or ["0"])[0] or 0)
+                    except ValueError:
+                        since = 0
+                    return self._ok(**backend.netmon_events(since))
+                if path == "/network/har":
+                    har = json.dumps(backend.netmon_har(), indent=1)
+                    return self._send_download(har, "luckyd-capture.har", "application/json")
                 return self._send(404, {"ok": False, "error": f"unknown route {path}"})
             except Exception as exc:
                 return self._fail(500, exc)
@@ -356,6 +393,12 @@ def make_handler(backend, token: str = "", harness=None, settings=None):
                     if not name:
                         return self._send(400, {"ok": False, "error": "name required"})
                     return self._ok(theme=backend.set_theme(name))
+                if path == "/network/start":
+                    return self._ok(**backend.netmon_start(str(body.get("url", "") or "")))
+                if path == "/network/stop":
+                    return self._ok(**backend.netmon_stop())
+                if path == "/network/clear":
+                    return self._ok(**backend.netmon_clear())
                 return self._send(404, {"ok": False, "error": f"unknown route {path}"})
             except Exception as exc:
                 return self._fail(500, exc)
@@ -494,6 +537,7 @@ class QtBrowserBackend:
         self._recorder = WorkflowRecorder()
         self._wf_store = WorkflowStore()
         self._replaying = False  # replayed steps must not re-record
+        self._netmon: NetMonitor | None = None  # lazy network capture
 
     # ── GUI-thread helpers ────────────────────────────────────────────
     def _window(self):
@@ -906,3 +950,39 @@ class QtBrowserBackend:
 
         self._invoker.run(_do)
         return name
+
+    # ── network monitor ──────────────────────────────────────────────
+
+    def netmon_start(self, url_substr: str = "") -> dict:
+        """Start capturing the active tab's network traffic (CDP Network domain)."""
+        if not url_substr:
+
+            def _do():
+                return self._view().url().toString()
+
+            with contextlib.suppress(Exception):
+                url_substr = self._invoker.run(_do)
+        if self._netmon is None:
+            self._netmon = NetMonitor()
+        self._netmon.start(url_substr)
+        return {"started": True, "target": url_substr}
+
+    def netmon_events(self, since: int = 0) -> dict:
+        if self._netmon is None:
+            return {"running": False, "target": "", "error": "", "seq": 0, "rows": []}
+        return self._netmon.rows(since)
+
+    def netmon_stop(self) -> dict:
+        if self._netmon is not None:
+            self._netmon.stop()
+        return {"stopped": True}
+
+    def netmon_clear(self) -> dict:
+        if self._netmon is not None:
+            self._netmon.clear()
+        return {"cleared": True}
+
+    def netmon_har(self) -> dict:
+        if self._netmon is None:
+            return to_har([])
+        return to_har(self._netmon.rows(0)["rows"], self._netmon.target)

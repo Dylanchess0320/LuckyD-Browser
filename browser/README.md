@@ -71,14 +71,14 @@ rights, Windows 10/11 x64 only**:
 powershell -NoProfile -ExecutionPolicy Bypass -File browser\installer\build_installer.ps1
 ```
 
-Output: `browser\installer\output\LuckyDBrowserSetup-1.6.0.exe`
+Output: `browser\installer\output\LuckyDBrowserSetup-1.7.0.exe`
 
 - Installs per-user to `%LOCALAPPDATA%\Programs\LuckyDBrowser`
 - Start Menu shortcut, optional desktop icon, Settings > Apps uninstall entry
 - Includes everything (Qt WebEngine runtime **and** the `luckyd-code.exe`
   backend) — the target machine needs nothing else
 - Only the *build* machine needs Inno Setup 6: https://jrsoftware.org/isdl.php
-- Silent install for scripting: `LuckyDBrowserSetup-1.6.0.exe /VERYSILENT /NORESTART`
+- Silent install for scripting: `LuckyDBrowserSetup-1.7.0.exe /VERYSILENT /NORESTART`
 - The raw script is `browser\installer\LuckyDBrowser.iss` if you want to tweak
   it (then recompile with `iscc browser\installer\LuckyDBrowser.iss`)
 
@@ -89,6 +89,8 @@ Output: `browser\installer\output\LuckyDBrowserSetup-1.6.0.exe`
 | Platform | **Live dashboard** new-tab page, **Coding Agent HQ in a tab** (⚡ / Ctrl+Shift+H), harness **auto-start on launch**, shared harness status everywhere |
 | Tabs | New/close/pin-style reorder (drag), Ctrl+T / Ctrl+W / Ctrl+Tab / Ctrl+1-9, `+` button, popups open as tabs, middle-click to close, hover preview cards, wheel cycling, recently-closed stack (Ctrl+Shift+T), **session restore — "continue where you left off"** (Settings → On startup), **tab groups with colors + collapse** (right-click → Tab Group), **AI tab organizer** (Tools) |
 | Reader | **Reader Mode** (Ctrl+Alt+R): text-density extraction into a themed serif view; **Copy Link to Highlighted Text** (`#:~:text=` fragment links) |
+| Layout | **Vertical tabs** (View menu) with group colors; **Focus Mode** (Ctrl+Shift+F) strips all chrome |
+| DevTools+ | **Network Monitor** (Tools): live request table over CDP with filter + **HAR export** (`/network`); Omnibox **`?` prefix asks the AI** |
 | Omnibox | URLs and searches in one bar, history-based completions, configurable search engine, Ctrl+L to focus |
 | Bookmarks | Ctrl+D star toggle with toast feedback, **bookmarks bar (Ctrl+Shift+B, right-click to manage)**, Bookmarks menu + manager, **import from Chrome/Edge HTML export**, **export to HTML**, per-bookmark delete |
 | History | Ctrl+H, searchable, clear-all, **delete individual entries** (right-click), auto-recorded to SQLite |

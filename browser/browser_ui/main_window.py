@@ -48,6 +48,7 @@ from .palette import CommandPalette
 from .tab_widget import BrowserTabWidget
 from .theme import apply_to_app
 from .toasts import ToastManager
+from .vertical_tabs import VerticalTabsDock
 
 ASSETS_DIR = Path(__file__).resolve().parent.parent / "assets"
 NEWTAB_PATH = ASSETS_DIR / "newtab.html"
@@ -192,6 +193,7 @@ class MainWindow(QMainWindow):
         bar.addAction(home_act)
 
         self.omnibox = Omnibox(self.settings, self.storage, self)
+        self.omnibox.ask.connect(self._omnibox_ask)
         self.omnibox.navigate.connect(self.load_in_current_tab)
         bar.addWidget(self.omnibox)
 
@@ -288,6 +290,48 @@ class MainWindow(QMainWindow):
         self.bookmark_bar.setVisible(bool(visible))
         self.settings.set("bookmark_bar_visible", bool(visible))
 
+    def toggle_vertical_tabs(self, visible: bool) -> None:
+        self.settings.set("vertical_tabs", bool(visible))
+        self.vtabs.setVisible(bool(visible))
+        self.tabs.tabBar().setVisible(not visible)
+        if visible:
+            self.vtabs.refresh()
+
+    def _omnibox_ask(self, question: str) -> None:
+        """The omnibox "?…" prefix: straight into the AI sidebar chat."""
+        if not question:
+            return
+        self.show_assistant()
+        self.ai_sidebar.ask(question)
+
+    def toggle_focus_mode(self) -> None:
+        """Immersive mode: strip every chrome surface, keep only the page."""
+        on = not getattr(self, "_focus", False)
+        self._focus = on
+        self.menuBar().setVisible(not on)
+        self.nav_bar.setVisible(not on)
+        if on:
+            self._focus_bm_was = self.bookmark_bar.isVisible()
+            self._focus_sb_was = self.ai_sidebar.isVisible()
+            self._focus_dl_was = self.downloads.isVisible()
+            self._focus_vt_was = self.vtabs.isVisible()
+            self.bookmark_bar.hide()
+            self.ai_sidebar.hide()
+            self.downloads.hide()
+            self.vtabs.hide()
+            self.statusBar().hide()
+            self.toast("Focus mode — Ctrl+Shift+F brings the chrome back")
+        else:
+            self.statusBar().show()
+            if self._focus_bm_was:
+                self.bookmark_bar.show()
+            if self._focus_sb_was:
+                self.ai_sidebar.show()
+            if self._focus_dl_was:
+                self.downloads.show()
+            if self._focus_vt_was:
+                self.vtabs.show()
+
     def _build_statusbar(self) -> None:
         self.progress = QProgressBar(self)
         self.progress.setMaximumWidth(160)
@@ -335,6 +379,13 @@ class MainWindow(QMainWindow):
         self.downloads = DownloadsDock(self.settings, self)
         self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.downloads)
         self.downloads.hide()
+
+        self.vtabs = VerticalTabsDock(self)
+        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.vtabs)
+        self.vtabs.hide()
+        if bool(self.settings.get("vertical_tabs", False)):
+            self.vtabs.show()
+            self.tabs.tabBar().hide()
 
         self.ai_sidebar = AiSidebar(self)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.ai_sidebar)
@@ -406,6 +457,12 @@ class MainWindow(QMainWindow):
         self.bm_bar_act.setStatusTip("Show/hide the bookmarks bar")
         self.bm_bar_act.toggled.connect(self.toggle_bookmark_bar)
         view_menu.addAction(self.bm_bar_act)
+        self.vtabs_act = QAction("Vertical Tabs", self, checkable=True)
+        self.vtabs_act.setChecked(bool(self.settings.get("vertical_tabs", False)))
+        self.vtabs_act.setStatusTip("Show tabs as a sidebar strip instead of the top bar")
+        self.vtabs_act.toggled.connect(self.toggle_vertical_tabs)
+        view_menu.addAction(self.vtabs_act)
+        self._add(view_menu, "Focus Mode", self.toggle_focus_mode, "Ctrl+Shift+F")
         ai_toggle = self.ai_sidebar.toggleViewAction()
         ai_toggle.setText("AI Assistant")
         ai_toggle.setShortcut(QKeySequence("Ctrl+Shift+A"))
@@ -421,6 +478,7 @@ class MainWindow(QMainWindow):
             "Ctrl+Shift+`",
         )
         self._add(tools_menu, "Workflows…", self.open_workflows)
+        self._add(tools_menu, "Network Monitor", self.open_network_monitor)
         self._add(tools_menu, "Organize Tabs with AI", self.organize_tabs_with_ai)
         tools_menu.addSeparator()
         self.adblock_act = QAction("Ad-Block Enabled", self, checkable=True)
@@ -576,6 +634,17 @@ class MainWindow(QMainWindow):
         else:
             self.toasts.show(
                 "Workflows need the Browser Control API (Tools → Browser Control API)",
+                kind="error",
+            )
+
+    def open_network_monitor(self) -> None:
+        """Open the live network monitor tab (CDP Network domain)."""
+        server = getattr(self._app, "control_server", None)
+        if server is not None and server.running:
+            self.open_in_new_tab(QUrl(server.base_url + "/network"))
+        else:
+            self.toasts.show(
+                "Network Monitor needs the Browser Control API (Tools → Browser Control API)",
                 kind="error",
             )
 
@@ -1107,6 +1176,9 @@ class MainWindow(QMainWindow):
         scheduler = getattr(app, "schedule_session_save", None)
         if callable(scheduler) and not self.incognito:
             scheduler()
+        vtabs = getattr(self, "vtabs", None)
+        if vtabs is not None and vtabs.isVisible():
+            vtabs.refresh()
 
     def _session_snapshot(self) -> dict | None:
         """This window's restorable state, or None (incognito / nothing worth saving)."""

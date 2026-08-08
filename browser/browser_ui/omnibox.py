@@ -17,12 +17,13 @@ class Omnibox(QLineEdit):
     """Single input for both URLs and web searches (like Chrome's omnibox)."""
 
     navigate = Signal(QUrl)
+    ask = Signal(str)  # "? question" prefix → AI assistant
 
     def __init__(self, settings, storage, parent=None):
         super().__init__(parent)
         self._settings = settings
         self._storage = storage
-        self.setPlaceholderText("Search or enter address")
+        self.setPlaceholderText("Search or enter address — ? asks the AI")
         self.setClearButtonEnabled(True)
 
         self._model = QStringListModel(self)
@@ -34,7 +35,11 @@ class Omnibox(QLineEdit):
         self.returnPressed.connect(self._submit)
 
     def _submit(self) -> None:
-        url = self.to_url(self.text())
+        text = self.text().strip()
+        if text.startswith("?") and len(text) > 1:
+            self.ask.emit(text[1:].strip())
+            return
+        url = self.to_url(text)
         if url is not None and url.isValid():
             self.navigate.emit(url)
 

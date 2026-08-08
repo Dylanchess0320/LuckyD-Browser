@@ -621,3 +621,142 @@ def workflows_html() -> str:
     no auth juggling, no external assets.
     """
     return _WORKFLOWS_HTML
+
+
+_NETMON_HTML = r"""<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Network Monitor</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #0b0f16; color: #e2e8f0;
+         font: 13px/1.45 system-ui, "Segoe UI", sans-serif; }
+  header { display: flex; gap: 10px; align-items: center; padding: 12px 16px;
+      background: #0f1622; border-bottom: 1px solid #1e293b; flex-wrap: wrap; }
+  h1 { font-size: 16px; margin: 0; }
+  .target { color: #64748b; font-size: 12px; overflow: hidden;
+      text-overflow: ellipsis; white-space: nowrap; max-width: 40ch; }
+  .sp { flex: 1; }
+  button { border: 1px solid #1e293b; background: #1a2132; color: #cbd5e1;
+      border-radius: 8px; padding: 7px 12px; font: 600 12px system-ui; cursor: pointer; }
+  button:hover { border-color: #334155; }
+  button.on { color: #f87171; border-color: #7f1d1d; }
+  input { background: #1a2132; border: 1px solid #232c42; border-radius: 8px;
+      padding: 7px 10px; color: #e2e8f0; font: inherit; width: 170px; }
+  table { width: 100%; border-collapse: collapse; }
+  th { position: sticky; top: 0; background: #0f1622; text-align: left;
+      padding: 8px 10px; font-size: 11px; letter-spacing: 1px; color: #64748b;
+      text-transform: uppercase; border-bottom: 1px solid #1e293b; }
+  td { padding: 5px 10px; border-bottom: 1px solid #131a26; font-size: 12px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 0; }
+  tr:hover td { background: #101827; }
+  td.u { width: 100%; }
+  .m { font-weight: 700; color: #7dd3fc; }
+  .s2 { color: #34d399; } .s3 { color: #7dd3fc; } .s4 { color: #fbbf24; }
+  .s5, .serr { color: #f87171; } .s0 { color: #64748b; }
+  .empty { text-align: center; color: #475569; padding: 40px 0; }
+</style></head><body>
+<header>
+  <h1>📡 Network</h1>
+  <span class="target" id="target">not capturing</span>
+  <span class="sp"></span>
+  <input id="filter" placeholder="filter (host, .js, 404…)">
+  <button id="toggle">⏺ Start</button>
+  <button id="clear">Clear</button>
+  <button id="har">⬇ Export HAR</button>
+</header>
+<table><thead><tr>
+  <th style="width:60px">Method</th><th style="width:56px">Status</th>
+  <th>URL</th><th style="width:76px">Type</th>
+  <th style="width:76px">Size</th><th style="width:64px">Time</th>
+</tr></thead><tbody id="rows"></tbody></table>
+<div class="empty" id="empty">Start capture, then browse — requests appear live.</div>
+<script>
+const $ = id => document.getElementById(id);
+let since = 0, capturing = false;
+const seen = new Map();  // seq -> <tr> for in-place updates
+
+function fmtSize(b) {
+  if (!b) return '—';
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+  return (b / 1048576).toFixed(1) + ' MB';
+}
+function statusClass(s) {
+  if (s < 0) return 'serr';
+  if (s < 200) return 's0';
+  if (s < 300) return 's2';
+  if (s < 400) return 's3';
+  if (s < 500) return 's4';
+  return 's5';
+}
+function hostOf(u) { try { return new URL(u).hostname; } catch (e) { return u; } }
+function matches(row, f) {
+  if (!f) return true;
+  return row.url.toLowerCase().includes(f) || String(row.status).includes(f) ||
+    (row.type || '').toLowerCase().includes(f) || row.method.toLowerCase().includes(f);
+}
+"""
+
+_NETMON_HTML2 = r"""function paint(row) {
+  const f = $('filter').value.trim().toLowerCase();
+  let tr = seen.get(row.seq);
+  if (!tr) {
+    tr = document.createElement('tr');
+    tr.innerHTML = '<td class="m"></td><td class="st"></td><td class="u"></td>' +
+      '<td class="ty"></td><td class="sz"></td><td class="ms"></td>';
+    tr.title = row.url;
+    seen.set(row.seq, tr);
+    $('rows').prepend(tr);
+  }
+  tr.children[0].textContent = row.method;
+  tr.children[1].textContent = row.status < 0 ? '✗' : (row.status || '…');
+  tr.children[1].className = statusClass(row.status);
+  tr.children[2].textContent = row.url;
+  tr.children[3].textContent = row.type || '—';
+  tr.children[4].textContent = fmtSize(row.size);
+  tr.children[5].textContent = row.ms ? row.ms + ' ms' : '—';
+  tr.style.display = matches(row, f) ? '' : 'none';
+  $('empty').style.display = seen.size ? 'none' : '';
+}
+async function poll() {
+  try {
+    const r = await fetch('/network/events?since=' + since);
+    const data = await r.json();
+    since = data.seq;
+    capturing = !!data.running;
+    $('target').textContent = data.target ? 'watching: ' + hostOf(data.target) : 'not capturing';
+    $('toggle').textContent = capturing ? '⏹ Stop' : '⏺ Start';
+    $('toggle').className = capturing ? 'on' : '';
+    for (const row of data.rows || []) paint(row);
+  } catch (e) { /* retry next tick */ }
+}
+$('toggle').onclick = async () => {
+  await fetch('/network/' + (capturing ? 'stop' : 'start'),
+    {method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'});
+  poll();
+};
+$('clear').onclick = async () => {
+  await fetch('/network/clear', {method: 'POST', body: '{}'});
+  seen.forEach(tr => tr.remove()); seen.clear();
+  $('empty').style.display = '';
+  poll();
+};
+$('har').onclick = () => { location.href = '/network/har'; };
+$('filter').addEventListener('input', () => { since = since; poll(); });
+fetch('/network/start', {method: 'POST', body: '{}'}).then(poll);  // auto-start
+setInterval(poll, 1000);
+</script>
+</body></html>
+"""
+
+
+def netmon_html() -> str:
+    """The network monitor page — live request table for the active tab.
+
+    Polls /network/events with a since-cursor (new rows only), repaints rows
+    in place as status/size land, and exports HAR straight from the server.
+    """
+    return _NETMON_HTML + _NETMON_HTML2
