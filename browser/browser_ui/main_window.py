@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import contextlib
+import json
 import subprocess
 import sys
 import tempfile
@@ -57,6 +58,9 @@ class MainWindow(QMainWindow):
     # Screenshot worker → GUI thread delivery (bytes payload + target path).
     _shot_saved = Signal(bytes, str)
     _shot_failed = Signal(str)
+    # AI tab organizer worker → GUI thread delivery.
+    _groups_done = Signal(list)
+    _groups_failed = Signal(str)
 
     def __init__(self, app, incognito: bool = False):
         super().__init__()
@@ -90,6 +94,8 @@ class MainWindow(QMainWindow):
 
         self._shot_saved.connect(self._write_screenshot)
         self._shot_failed.connect(lambda msg: self.toast(msg, "error"))
+        self._groups_done.connect(self._apply_ai_groups)
+        self._groups_failed.connect(lambda msg: self.toast(f"AI organizer: {msg}", "error"))
 
         self.new_tab()
         self._update_title()
@@ -369,6 +375,7 @@ class MainWindow(QMainWindow):
         self._add(file_menu, "Print…", self.print_page, "Ctrl+P")
         self._add(file_menu, "Save Page As…", self.save_page, "Ctrl+S")
         self._add(file_menu, "Save Screenshot…", self.save_screenshot, "Ctrl+Shift+S")
+        self._add(file_menu, "Reopen Previous Session", self.reopen_previous_session)
         file_menu.addSeparator()
         self._add(file_menu, "Close Tab", self.close_current_tab, "Ctrl+W")
         self._add(file_menu, "Quit", self.close, "Ctrl+Q")
@@ -384,6 +391,7 @@ class MainWindow(QMainWindow):
         self._add(view_menu, "Zoom In", self.zoom_in, "Ctrl+=")
         self._add(view_menu, "Zoom Out", self.zoom_out, "Ctrl+-")
         self._add(view_menu, "Actual Size", self.zoom_reset, "Ctrl+0")
+        self._add(view_menu, "Reader Mode", self.toggle_reader_mode, "Ctrl+Alt+R")
         view_menu.addSeparator()
         self._add(view_menu, "Find in Page…", self.show_find_bar, "Ctrl+F")
         self._add(view_menu, "View Page Source", self.view_source, "Ctrl+U")
@@ -413,6 +421,7 @@ class MainWindow(QMainWindow):
             "Ctrl+Shift+`",
         )
         self._add(tools_menu, "Workflows…", self.open_workflows)
+        self._add(tools_menu, "Organize Tabs with AI", self.organize_tabs_with_ai)
         tools_menu.addSeparator()
         self.adblock_act = QAction("Ad-Block Enabled", self, checkable=True)
         self.adblock_act.setChecked(bool(self.settings.get("adblock_enabled", True)))
@@ -569,6 +578,81 @@ class MainWindow(QMainWindow):
                 "Workflows need the Browser Control API (Tools → Browser Control API)",
                 kind="error",
             )
+
+    # ── AI tab organizer ─────────────────────────────────────────────
+
+    def organize_tabs_with_ai(self) -> None:
+        """Cluster the window's tabs into named groups via the AI provider."""
+        entries = []
+        for i in range(self.tabs.count()):
+            if self.tabs.is_pinned(i):
+                continue
+            view = self.tabs.widget(i)
+            if view is None:
+                continue
+            host = ""
+            with contextlib.suppress(Exception):
+                from urllib.parse import urlsplit
+
+                host = urlsplit(view.url().toString()).hostname or ""
+            entries.append({"i": i, "title": (view.title() or "")[:80], "host": host})
+        if len(entries) < 3:
+            self.toast("Open at least 3 unpinned tabs to organize", "info")
+            return
+        self.toast("AI is grouping your tabs…")
+
+        def _work() -> None:
+            try:
+                from browser_core.ai_bridge import AIBridge
+                from browser_core.extract import parse_json_loose
+
+                bridge = AIBridge()
+                system = (
+                    "You organize browser tabs into topical groups. Reply with ONLY "
+                    'JSON: {"groups": [{"name": "1-3 word label", "tabs": [<index>, ...]}]}. '
+                    "At most 6 groups; every tab index exactly once; skip nothing."
+                )
+                user = "Tabs:\n" + "\n".join(
+                    f'{t["i"]}: {t["title"]} ({t["host"]})' for t in entries
+                )
+                text, _used = asyncio.run(
+                    bridge.chat(
+                        [
+                            {"role": "system", "content": system},
+                            {"role": "user", "content": user},
+                        ]
+                    )
+                )
+                data = parse_json_loose(text)
+                groups = data.get("groups") if isinstance(data, dict) else None
+                if not groups:
+                    raise RuntimeError("the model returned no groups")
+                self._groups_done.emit(groups)
+            except Exception as exc:
+                self._groups_failed.emit(str(exc))
+
+        threading.Thread(target=_work, name="tab-organizer", daemon=True).start()
+
+    def _apply_ai_groups(self, groups: list) -> None:
+        applied = 0
+        for group in groups[:6]:
+            name = str(group.get("name", "")).strip()[:24]
+            indices = []
+            for raw in group.get("tabs", []):
+                with contextlib.suppress(TypeError, ValueError):
+                    idx = int(raw)
+                    if 0 <= idx < self.tabs.count():
+                        indices.append(idx)
+            if not name or not indices:
+                continue
+            gid = self.tabs.create_group(name)
+            for idx in indices:
+                self.tabs.set_tab_group(idx, gid)
+                applied += 1
+        if applied:
+            self.toast(f"Sorted {applied} tabs into groups", "ok")
+        else:
+            self.toast("AI organizer produced nothing usable", "warn")
 
     def create_popup_view(self):
         """Called by WebView.createWindow for target=_blank / window.open."""
@@ -786,6 +870,48 @@ class MainWindow(QMainWindow):
             self._update_zoom_label(view)
             self._remember_zoom(view)
 
+    # ── reader mode ──────────────────────────────────────────────────
+
+    def toggle_reader_mode(self) -> None:
+        """Distill the page into a clean article view (Ctrl+Alt+R to exit)."""
+        view = self.tabs.current_view()
+        if view is None:
+            return
+        original = getattr(view, "_reader_original", "")
+        if original:  # already in reader mode → back to the live page
+            view._reader_original = ""
+            view.setUrl(QUrl(original))
+            return
+        url = view.url().toString()
+        if not url.startswith(("http://", "https://")):
+            self.toast("Reader mode needs a web page", "info")
+            return
+        from browser_core.reader import EXTRACT_JS
+
+        view._reader_candidate = url  # guard against mid-extract navigation
+        view.page().runJavaScript(EXTRACT_JS, lambda raw: self._reader_apply(view, raw))
+
+    def _reader_apply(self, view, raw) -> None:
+        data = None
+        with contextlib.suppress(Exception):
+            data = json.loads(raw) if raw else None
+        if not data or not data.get("html"):
+            self.toast("Nothing readable on this page", "info")
+            return
+        if getattr(view, "_reader_candidate", "") != view.url().toString():
+            return  # user navigated while we were extracting
+        from browser_core.reader import reader_html
+
+        from .theme import palette as theme_palette
+
+        url = view.url().toString()
+        view._reader_original = url
+        view.setHtml(
+            reader_html(data.get("title", ""), data["html"], url, theme_palette(self.settings)),
+            QUrl(url),
+        )
+        self.toast("Reader mode on — Ctrl+Alt+R or F5 exits", "info")
+
     def _apply_zoom(self, view) -> None:
         """Per-site zoom memory first, global default as the fallback."""
         url = view.url().toString()
@@ -993,12 +1119,21 @@ class MainWindow(QMainWindow):
             view = self.tabs.widget(i)
             if view is None:
                 continue
-            rec = tab_record(view.url().toString(), view.title(), self.tabs.is_pinned(i))
+            rec = tab_record(
+                view.url().toString(),
+                view.title(),
+                self.tabs.is_pinned(i),
+                group=self.tabs.group_of(i) or "",
+            )
             if rec is not None:
                 if i == current_index:
                     current = len(records)
                 records.append(rec)
-        return window_record(records, current)
+        groups = {
+            gid: {"name": info["name"], "color": info["color"], "collapsed": info["collapsed"]}
+            for gid, info in self.tabs._groups.items()
+        }
+        return window_record(records, current, groups=groups or None)
 
     def restore_session(self, window_data: dict) -> None:
         """Reopen a saved window's tabs (pinned state + active index too)."""
@@ -1022,6 +1157,17 @@ class MainWindow(QMainWindow):
             view = self.tabs.new_tab(QUrl(rec["url"]), make_current=False)
             if rec.get("pinned"):
                 self.tabs.toggle_pin(self.tabs.indexOf(view))
+        # Recreate tab groups (ids are remapped — they only need uniqueness).
+        gid_map: dict[str, str] = {}
+        for old_gid, info in (window_data.get("groups") or {}).items():
+            gid_map[old_gid] = self.tabs.create_group(info.get("name", ""), info.get("color"))
+        for i, rec in enumerate(urls):
+            old_gid = rec.get("group")
+            if old_gid and old_gid in gid_map and i < self.tabs.count():
+                self.tabs.set_tab_group(i, gid_map[old_gid])
+        for old_gid, info in (window_data.get("groups") or {}).items():
+            if info.get("collapsed") and old_gid in gid_map:
+                self.tabs.toggle_group_collapsed(gid_map[old_gid])
         current = int(window_data.get("current", 0) or 0)
         if 0 <= current < self.tabs.count():
             self.tabs.setCurrentIndex(current)
@@ -1036,6 +1182,20 @@ class MainWindow(QMainWindow):
         if callable(saver) and not self.incognito:
             saver()
         super().closeEvent(event)
+
+    def reopen_previous_session(self) -> None:
+        """Restore the previous session generation (session.prev.json)."""
+        app = getattr(self, "_app", None)
+        store = getattr(app, "session_store", None)
+        if store is None:
+            return
+        windows = store.load_previous().get("windows") or []
+        if not windows:
+            self.toast("No previous session saved yet", "info")
+            return
+        self.restore_session(windows[0])
+        for extra in windows[1:]:
+            app.new_window().restore_session(extra)
 
     # ── settings / about ─────────────────────────────────────────────
 

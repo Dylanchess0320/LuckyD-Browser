@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0] - 2026-08-08
+
+### Added
+- **Tab groups** — right-click any tab → Tab Group: create named, colored
+  groups (6-color rotation, color strip under grouped tabs, group tooltips).
+  Groups **collapse** to a single chip tab (`▸ name · n`) that keeps its
+  pages alive, and they're **persisted through session restore** (names,
+  colors, collapsed state all survive a restart).
+- **AI Tab Organizer** (Tools → Organize Tabs with AI) — the configured AI
+  provider clusters your open tabs by topic and builds the groups for you,
+  with JSON-loose parsing of the model's reply and full bounds-checking.
+- **Reader Mode** (`Ctrl+Alt+R`, View menu) — a readability-lite extractor
+  (text-density scoring, link-density penalty) distills articles into a
+  clean serif view tinted with the active theme; F5 or the shortcut exits.
+- **Copy Link to Highlighted Text** — right-click a selection to copy a
+  `#:~:text=` fragment link that deep-scrolls to the quote in Chromium.
+- **Reopen Previous Session** (File menu) — the session store now rotates
+  one backup generation (`session.prev.json`) on every save.
+
+### Changed
+- Browser version bumped to 1.6.0; installer/version info updated.
+- `browser/selftest.py` grew to 83 checks (tab-group lifecycle: assign,
+  collapse chip, session round-trip, AI-group application, empty dissolve).
+- `browser/test_browser_core.py` grew to 48 headless checks (session group
+  fields, prev rotation, reader template).
+
 ## [2.4.0] - 2026-08-07
 
 ### Added

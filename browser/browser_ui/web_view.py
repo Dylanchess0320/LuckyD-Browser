@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from urllib.parse import quote
 
 from browser_core import agent as _agent
 from PySide6.QtCore import Qt, QTimer, QUrl
@@ -255,6 +256,12 @@ class WebView(QWebEngineView):
             menu.addAction("Copy", lambda: page.triggerAction(QWebEnginePage.WebAction.Copy))
             label = selected if len(selected) <= 24 else selected[:24] + "…"
             menu.addAction(f'Search for "{label}"', lambda: self._mw.search_for(selected))
+            menu.addAction(
+                "Copy Link to Highlighted Text",
+                lambda: QGuiApplication.clipboard().setText(
+                    page.url().toString() + "#:~:text=" + quote(selected[:300], safe="")
+                ),
+            )
             ai_menu = menu.addMenu("AI")
             for action_label, instruction in (
                 ("Explain this", "Explain this clearly:"),

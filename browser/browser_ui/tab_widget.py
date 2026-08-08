@@ -19,6 +19,7 @@ from PySide6.QtCore import QPoint, QRect, Qt, QTimer
 from PySide6.QtGui import QColor, QGuiApplication, QIcon, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QMenu,
     QTabBar,
@@ -173,8 +174,31 @@ class BrowserTabBar(QTabBar):
         if index >= 0:
             self._tabs.show_tab_menu(index, self.mapToGlobal(event.pos()))
 
+    def paintEvent(self, event):  # noqa: N802
+        super().paintEvent(event)
+        tabs = self._tabs
+        if not tabs._groups:
+            return
+        # A 3px color strip along the bottom marks group membership.
+        painter = QPainter(self)
+        for i in range(self.count()):
+            gid = tabs.group_of(i)
+            info = tabs.group_info(gid) if gid else None
+            if info is None:
+                continue
+            rect = self.tabRect(i)
+            if rect.isNull():
+                continue
+            painter.fillRect(
+                rect.left() + 6, rect.bottom() - 2, rect.width() - 12, 3, QColor(info["color"])
+            )
+        painter.end()
+
 
 class BrowserTabWidget(QTabWidget):
+    # Tab-group accent colors, assigned round-robin to new groups.
+    GROUP_COLORS = ("#5b9dff", "#34d399", "#fbbf24", "#f87171", "#b46bff", "#22d3ee")
+
     def __init__(self, main_window):
         super().__init__(main_window)
         self._mw = main_window
@@ -188,6 +212,10 @@ class BrowserTabWidget(QTabWidget):
         self._loading: set[int] = set()  # indexes currently loading
         self._muted: set[int] = set()
         self._spin_angle = 0
+        # Tab groups: gid -> {"name", "color", "collapsed"}; view id -> gid.
+        self._groups: dict[str, dict] = {}
+        self._tab_group: dict[int, str] = {}
+        self._group_seq = 0
 
         # Fall back to the stock tab bar on failure (loses preview/wheel extras).
         with contextlib.suppress(Exception):
@@ -230,9 +258,13 @@ class BrowserTabWidget(QTabWidget):
                 self._closed_stack = self._closed_stack[-25:]
             self._pinned.discard(id(view))
             self._muted.discard(id(view))
+            self._tab_group.pop(id(view), None)
         self._loading.discard(index)
         self.removeTab(index)
         self._loading = {i for i in self._loading if i < self.count()}
+        # Groups with no members left dissolve.
+        for dead in [g for g in self._groups if g not in self._tab_group.values()]:
+            del self._groups[dead]
         if view is not None:
             view.deleteLater()
         self._mw.on_tabs_changed()
@@ -305,6 +337,62 @@ class BrowserTabWidget(QTabWidget):
                     urls.append(url)
         return urls
 
+    # ── tab groups ────────────────────────────────────────────────────
+
+    def create_group(self, name: str = "", color: str | None = None) -> str:
+        """Register a group; returns its id."""
+        self._group_seq += 1
+        gid = f"g{self._group_seq}"
+        if color is None:
+            color = self.GROUP_COLORS[(self._group_seq - 1) % len(self.GROUP_COLORS)]
+        self._groups[gid] = {
+            "name": (name or "").strip() or f"Group {self._group_seq}",
+            "color": color,
+            "collapsed": False,
+        }
+        return gid
+
+    def group_of(self, index: int) -> str | None:
+        view = self.widget(index)
+        return self._tab_group.get(id(view)) if view is not None else None
+
+    def group_info(self, gid: str) -> dict | None:
+        return self._groups.get(gid)
+
+    def group_indexes(self, gid: str) -> list[int]:
+        return [i for i in range(self.count()) if self.group_of(i) == gid]
+
+    def set_tab_group(self, index: int, gid: str | None) -> None:
+        """Assign (or clear, gid=None) the tab's group; refreshes chrome."""
+        view = self.widget(index)
+        if view is None:
+            return
+        vid = id(view)
+        if gid and gid in self._groups:
+            self._tab_group[vid] = gid
+        else:
+            self._tab_group.pop(vid, None)
+        # Drop groups that no tab uses anymore.
+        for dead in [g for g in self._groups if g not in self._tab_group.values()]:
+            del self._groups[dead]
+        self._retitle(view, view.title())
+        self.tabBar().update()  # repaint the color strips
+        self._mw.on_tabs_changed()
+
+    def toggle_group_collapsed(self, gid: str) -> None:
+        """Collapse = hide every member tab except the first (the chip tab)."""
+        group = self._groups.get(gid)
+        if group is None:
+            return
+        group["collapsed"] = not group["collapsed"]
+        members = self.group_indexes(gid)
+        for pos, index in enumerate(members):
+            self.tabBar().setTabVisible(index, not group["collapsed"] or pos == 0)
+        if group["collapsed"] and members:
+            self._retitle(self.widget(members[0]), self.widget(members[0]).title())
+        self.tabBar().update()
+        self._mw.on_tabs_changed()
+
     # ── tab context menu ─────────────────────────────────────────────
     def show_tab_menu(self, index: int, global_pos: QPoint) -> None:
         view = self.widget(index)
@@ -317,6 +405,22 @@ class BrowserTabWidget(QTabWidget):
         menu.addAction("Unpin Tab" if pinned else "Pin Tab", lambda: self.toggle_pin(index))
         muted = id(view) in self._muted
         menu.addAction("Unmute Tab" if muted else "Mute Tab", lambda: self.toggle_mute(index))
+
+        # ── tab groups ──
+        gid = self.group_of(index)
+        group_menu = menu.addMenu("Tab Group")
+        group_menu.addAction("New Group from Tab…", lambda: self._group_new_from(index))
+        for g, info in self._groups.items():
+            if g != gid:
+                group_menu.addAction(
+                    f"Add to “{info['name']}”", lambda g=g: self.set_tab_group(index, g)
+                )
+        if gid:
+            info = self._groups[gid]
+            group_menu.addSeparator()
+            group_menu.addAction("Remove from Group", lambda: self.set_tab_group(index, None))
+            label = "Expand Group" if info.get("collapsed") else "Collapse Group"
+            group_menu.addAction(label, lambda g=gid: self.toggle_group_collapsed(g))
         menu.addSeparator()
         menu.addAction("Reload Tab", view.reload)
         menu.addAction(
@@ -329,6 +433,12 @@ class BrowserTabWidget(QTabWidget):
         reopen = menu.addAction("Reopen Closed Tab", self.reopen_last_closed)
         reopen.setEnabled(bool(self._closed_stack))
         menu.exec(global_pos)
+
+    def _group_new_from(self, index: int) -> None:
+        name, ok = QInputDialog.getText(self, "New Tab Group", "Group name:")
+        if not ok:
+            return
+        self.set_tab_group(index, self.create_group(name))
 
     def _close_others(self, keep: int) -> None:
         for i in range(self.count() - 1, -1, -1):
@@ -407,7 +517,13 @@ class BrowserTabWidget(QTabWidget):
     def _retitle(self, view: WebView, title: str) -> None:
         index = self.indexOf(view)
         if index >= 0:
-            if id(view) in self._pinned:
+            gid = self._tab_group.get(id(view))
+            group = self._groups.get(gid) if gid else None
+            members = self.group_indexes(gid) if group else []
+            if group and group.get("collapsed") and members and members[0] == index:
+                # The visible chip for a collapsed group: "▸ name · n tabs".
+                self.setTabText(index, f"▸ {group['name']} · {len(members)}")
+            elif id(view) in self._pinned:
                 self.setTabText(index, "")
             else:
                 short = (title or "").strip() or "New Tab"
@@ -418,7 +534,10 @@ class BrowserTabWidget(QTabWidget):
                 except AttributeError:
                     pass
                 self.setTabText(index, prefix + short[:40])
-            self.setTabToolTip(index, title or "")
+            tip = title or ""
+            if group:
+                tip = f"[{group['name']}] {tip}"
+            self.setTabToolTip(index, tip)
         if view is self.currentWidget():
             self._mw.on_title_changed(title or "")
 

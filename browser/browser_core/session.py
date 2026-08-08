@@ -50,19 +50,25 @@ def is_restorable(url: str) -> bool:
     return url.startswith(_RESTORABLE_PREFIXES)
 
 
-def tab_record(url: str, title: str = "", pinned: bool = False) -> dict | None:
+def tab_record(url: str, title: str = "", pinned: bool = False, group: str = "") -> dict | None:
     """One tab's serializable state, or None when not restorable."""
     if not is_restorable(url):
         return None
-    return {"url": url, "title": (title or "")[:200], "pinned": bool(pinned)}
+    rec = {"url": url, "title": (title or "")[:200], "pinned": bool(pinned)}
+    if group:
+        rec["group"] = str(group)
+    return rec
 
 
-def window_record(tabs: list[dict], current: int = 0) -> dict | None:
+def window_record(tabs: list[dict], current: int = 0, groups: dict | None = None) -> dict | None:
     """One window's serializable state, or None when it has no restorable tabs."""
     tabs = [t for t in tabs if t is not None][:MAX_TABS_PER_WINDOW]
     if not tabs:
         return None
-    return {"tabs": tabs, "current": max(0, min(int(current), len(tabs) - 1))}
+    record = {"tabs": tabs, "current": max(0, min(int(current), len(tabs) - 1))}
+    if groups:
+        record["groups"] = groups
+    return record
 
 
 class SessionStore:
@@ -99,12 +105,30 @@ class SessionStore:
         }
         try:
             self._path.parent.mkdir(parents=True, exist_ok=True)
+            # Rotate: the previous save survives as session.prev.json so
+            # "Reopen Previous Session" always has one generation of backup.
+            if self._path.exists():
+                with contextlib.suppress(Exception):
+                    self._path.replace(self._prev_path())
             tmp = self._path.with_name(self._path.name + ".tmp")
             tmp.write_text(json.dumps(payload, indent=1), encoding="utf-8")
             tmp.replace(self._path)
         except Exception:
             return False
         return True
+
+    def _prev_path(self) -> Path:
+        return self._path.with_name(self._path.stem + ".prev" + self._path.suffix)
+
+    def load_previous(self) -> dict:
+        """The previous session generation ({} when none)."""
+        try:
+            data = json.loads(self._prev_path().read_text(encoding="utf-8-sig"))
+        except Exception:
+            return {}
+        if not isinstance(data, dict) or data.get("version") != SESSION_VERSION:
+            return {}
+        return data if isinstance(data.get("windows"), list) else {}
 
     def clear(self) -> None:
         """Forget the saved session (e.g. after a clean shutdown with no tabs)."""

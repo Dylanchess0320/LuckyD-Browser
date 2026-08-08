@@ -55,13 +55,13 @@ Prefer a cloud model instead? The sidebar supports 9 more providers — see
 
 ## 📦 Download & install
 
-**[⬇ Download the latest installer](https://github.com/Dylanchess0320/LuckyD-Browser/releases)** (`LuckyDBrowserSetup-1.5.0.exe`)
+**[⬇ Download the latest installer](https://github.com/Dylanchess0320/LuckyD-Browser/releases)** (`LuckyDBrowserSetup-1.6.0.exe`)
 
 - Windows 10/11 x64 · per-user install · **no admin rights needed**
 - Installs to `%LOCALAPPDATA%\Programs\LuckyDBrowser`
 - Start Menu shortcut, optional desktop icon, **Settings > Apps** uninstall entry
 - Everything is bundled (Chromium runtime + coding-agent backend) — nothing else required
-- Silent install for scripting: `LuckyDBrowserSetup-1.5.0.exe /VERYSILENT /NORESTART`
+- Silent install for scripting: `LuckyDBrowserSetup-1.6.0.exe /VERYSILENT /NORESTART`
 
 ---
 
@@ -87,8 +87,9 @@ your **live, visible tabs** through the Control API — exe brain, browser hands
 
 ## 🌐 It's also just a really good browser
 
-**Session restore** (continue where you left off — windows, tabs, pinned state) · tabs (pin, drag,
-hover previews, recently-closed) · omnibox with history completion · bookmarks (import/export
+**Session restore** (continue where you left off — windows, tabs, pinned state) · **tab groups**
+(colors, collapse, restored with your session) with an **AI organizer** that sorts them for you ·
+**Reader Mode** · tabs (pin, drag, hover previews, recently-closed) · omnibox with history completion · bookmarks (import/export
 Chrome/Edge HTML) with a **toggleable bookmarks bar** (`Ctrl+Shift+B`) · searchable history ·
 downloads dock with cancel · **incognito (🕶 badge, nothing touches disk)** · in-page find ·
 built-in **ad/tracker blocker** · **per-site zoom memory** with Ctrl+scroll zoom · **one-key

@@ -1,7 +1,7 @@
 """Automated functional smoke test for LuckyD Browser (dev tool, not shipped).
 
 Launches the real app, drives it with timers, prints PASS/FAIL per check,
-and exits non-zero if any check fails. Currently runs 78 checks.
+and exits non-zero if any check fails. Currently runs 83 checks.
 
 Run:  python browser/selftest.py
 """
@@ -123,7 +123,7 @@ check("md escapes html", "<script>" not in _md_lite("<script>alert(1)</script>")
 # package metadata (mojibake regression guard)
 import browser as _browser_pkg
 
-check("version 1.5.0", _browser_pkg.__version__ == "1.5.0", _browser_pkg.__version__)
+check("version 1.6.0", _browser_pkg.__version__ == "1.6.0", _browser_pkg.__version__)
 check("docstring has no mojibake", "�" not in (_browser_pkg.__doc__ or ""))
 
 # v1.4.0 — session restore, per-site zoom memory, screenshot naming (pure logic)
@@ -494,10 +494,40 @@ def step2() -> None:
         win.ai_sidebar.vision_box.isChecked() == _expect,
         f"{_dp} -> vision={_expect}",
     )
+    # v1.6.0 — tab groups (assign, collapse chip, session persistence, AI apply)
+    win.new_tab()
+    gid = win.tabs.create_group("Work")
+    win.tabs.set_tab_group(0, gid)
+    win.tabs.set_tab_group(1, gid)
+    check(
+        "tab group assign",
+        win.tabs.group_of(0) == gid and win.tabs.group_of(1) == gid,
+    )
+    win.tabs.toggle_group_collapsed(gid)
+    check("group collapse chip", win.tabs.tabText(0).startswith("▸ Work"))
+    win.tabs.toggle_group_collapsed(gid)
+    snap = win._session_snapshot()
+    check("session carries groups", bool(snap and snap.get("groups")), str(snap))
+    win._apply_ai_groups([{"name": "AI Stuff", "tabs": [0]}])
+    check(
+        "ai group apply",
+        win.tabs.group_info(win.tabs.group_of(0)).get("name") == "AI Stuff",
+    )
+    win.tabs.set_tab_group(0, None)
+    win.tabs.set_tab_group(1, None)
+    check("groups dissolve when empty", win.tabs._groups == {})
+    # Collapsing hid the scratch tab, which moved the current index to 0 —
+    # point back at the scratch tab before closing it.
+    win.tabs.setCurrentIndex(1)
+    win.close_current_tab()
+    check("group tab closed back to one", win.tabs.count() == 1)
+
     win.new_tab()
     check("second tab opens", win.tabs.count() == 2)
     win.close_current_tab()
     check("tab closes", win.tabs.count() == 1)
+    # The API checks read the ACTIVE tab — make sure it's example.com again.
+    win.tabs.setCurrentIndex(0)
 
     port = int(app.settings.get("browser_api_port", 9777))
     global _ORIG_THEME
