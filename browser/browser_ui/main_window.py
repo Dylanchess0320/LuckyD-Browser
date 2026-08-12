@@ -1699,7 +1699,19 @@ class MainWindow(QMainWindow):
     def _start_update_download(self, info: dict) -> None:
         url = str(info.get("installer_url") or "")
         if not url:
-            self.toast("Update asset missing download URL", "error")
+            # No direct installer asset attached to the release (e.g. the
+            # build/upload step was skipped). Fall back to opening the
+            # human-readable release page so the user can grab it manually,
+            # instead of dead-ending on an error toast.
+            release_page = str(info.get("url") or "")
+            if release_page:
+                self.toast(
+                    "No installer attached — opening the release page instead",
+                    "info",
+                )
+                self.open_in_new_tab(QUrl(release_page))
+            else:
+                self.toast("Update asset missing download URL", "error")
             return
 
         from PySide6.QtWidgets import QProgressDialog
