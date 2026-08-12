@@ -5,7 +5,9 @@ Guards against destructive operations — the heart of principle #3.
 
 import platform
 import re
+import shutil
 import subprocess
+import time
 from pathlib import Path
 from typing import NamedTuple
 
@@ -190,7 +192,6 @@ def execute_batch(commands: list[str], cwd: str | None = None) -> list[CommandRe
 
 # ── E2B-style Isolated Execution ───────────────────────────────────────
 
-import shutil
 import tempfile
 from contextlib import contextmanager
 

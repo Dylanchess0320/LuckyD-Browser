@@ -38,13 +38,13 @@ from __future__ import annotations
 import json
 import os
 import sys
-import time
+from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import Any, AsyncIterator
+from typing import Any
 
+import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, StreamingResponse
-import httpx
 
 # --------------------------------------------------------------------------
 # Token source: reuse the existing cline_session helper from the source tree.
@@ -55,7 +55,7 @@ for _cand in (_HERE / "browser" / "browser_core", _HERE):
         sys.path.insert(0, str(_cand))
         break
 
-import cline_session  # noqa: E402
+import cline_session
 
 UPSTREAM_BASE = os.environ.get("CLINE_BRIDGE_UPSTREAM", "https://api.cline.bot/api/v1")
 DEFAULT_MODEL = os.environ.get("CLINE_BRIDGE_MODEL", "cline-pass/kimi-k3")

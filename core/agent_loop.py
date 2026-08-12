@@ -548,10 +548,7 @@ class CodingAgent:
                 return True
 
         # Ends with a colon / connector (a lead-in to something that never came)
-        if tail.endswith((":", "—", "-", ",", ";")):
-            return True
-
-        return False
+        return bool(tail.endswith((":", "—", "-", ",", ";")))
 
     async def run(self, user_message: str, max_turns: int | None = None) -> str:
         """Run the full agent loop with hooks, events, checkpointing, and memory extraction.

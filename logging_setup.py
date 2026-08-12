@@ -51,18 +51,18 @@ def _enable_windows_ansi() -> bool:
     try:
         import ctypes
 
-        ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004
-        STD_OUTPUT_HANDLE = -11
-        STD_ERROR_HANDLE = -12
+        enable_virtual_terminal_processing = 0x0004
+        std_output_handle = -11
+        std_error_handle = -12
         kernel32 = ctypes.windll.kernel32
         ok = True
-        for std_handle in (STD_OUTPUT_HANDLE, STD_ERROR_HANDLE):
+        for std_handle in (std_output_handle, std_error_handle):
             handle = kernel32.GetStdHandle(std_handle)
             mode = ctypes.c_uint32()
             if not kernel32.GetConsoleMode(handle, ctypes.byref(mode)):
                 ok = False
                 continue
-            if not kernel32.SetConsoleMode(handle, mode.value | ENABLE_VIRTUAL_TERMINAL_PROCESSING):
+            if not kernel32.SetConsoleMode(handle, mode.value | enable_virtual_terminal_processing):
                 ok = False
         return ok
     except Exception:

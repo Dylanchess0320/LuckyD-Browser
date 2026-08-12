@@ -49,7 +49,6 @@ try:
     from rich.console import Console
     from rich.live import Live
     from rich.markdown import Markdown
-    from rich.panel import Panel
     from rich.spinner import Spinner  # noqa: F401  (used to register custom spinners)
     from rich.table import Table
     from rich.text import Text
@@ -402,10 +401,9 @@ class TerminalUI:
         self.stop_spinner()
         if self._thinking:
             self.end_thinking()
-        if not self._stream_buffer:
+        if not self._stream_buffer and not self.rich:
             # First answer token — switch the stream to clean white.
-            if not self.rich:
-                sys.stdout.write(ANSI["bright_white"])
+            sys.stdout.write(ANSI["bright_white"])
         self._stream_buffer += token
         sys.stdout.write(token)
         sys.stdout.flush()

@@ -8,10 +8,11 @@ import sys
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtCore import Qt, QUrl, qVersion, __version__ as PYSIDE_VERSION
+from PySide6.QtCore import Qt, QUrl, qVersion
+from PySide6.QtCore import __version__ as pyside_version
 from PySide6.QtGui import QGuiApplication
-from PySide6.QtWidgets import QApplication
 from PySide6.QtWebEngineWidgets import QWebEngineView
+from PySide6.QtWidgets import QApplication
 
 QGuiApplication.setAttribute(Qt.AA_ShareOpenGLContexts)
 app = QApplication(sys.argv)
@@ -45,7 +46,7 @@ def on_load(ok):
 def on_js(result):
     import json
 
-    print(f"PySide {PYSIDE_VERSION} / Qt runtime {qVersion()}")
+    print(f"PySide {pyside_version} / Qt runtime {qVersion()}")
     print(f"Chromium UA: {view.page().profile().httpUserAgent()}")
     print("-" * 60)
     for k, val in json.loads(result).items():
