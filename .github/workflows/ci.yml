@@ -189,7 +189,18 @@ jobs:
           name: dist
           path: dist/
 
+      - name: Check PyPI credentials
+        id: pypi-creds
+        run: |
+          if [ -n "${{ secrets.PYPI_API_TOKEN }}" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::PYPI_API_TOKEN secret not set - skipping PyPI publish."
+          fi
+
       - name: Publish to PyPI
+        if: steps.pypi-creds.outputs.available == 'true'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}
