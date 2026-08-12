@@ -1,4 +1,4 @@
-"""Tests for LuckyD Code 2.1.0 competitive features — providers, sessions, rules."""
+"""Tests for LuckyD Code 2.2.0 competitive features — providers, sessions, rules."""
 
 from __future__ import annotations
 
@@ -48,6 +48,12 @@ class TestProviders:
 
         assert "zai" in VALID_PROVIDERS
         assert "openrouter" in VALID_PROVIDERS
+
+    def test_clinepass_env_override(self, monkeypatch):
+        from llm.providers.clinepass import ClinePassProvider
+
+        monkeypatch.setenv("CLINEPASS_API_KEY", "pk-test-clinepass")
+        assert ClinePassProvider.get_cline_token() == "pk-test-clinepass"
 
     def test_zai_uses_openai_client(self):
         from llm import LLMClient, LLMConfig

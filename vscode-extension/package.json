@@ -2,7 +2,7 @@
   "name": "luckyd-code",
   "displayName": "LuckyD Code Agent",
   "description": "AI coding agent powered by DeepSeek — multi-agent swarms, LSP analysis, and autonomous coding",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "publisher": "luckyd",
   "license": "Apache-2.0",
   "icon": "media/icon.png",

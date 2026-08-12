@@ -224,7 +224,7 @@ async def serve(
 
     app = FastAPI(
         title="LuckyD Code Web GUI",
-        version="2.1.0",
+        version="2.2.0",
         docs_url=None,
         redoc_url=None,
         openapi_url=None,

@@ -244,7 +244,7 @@ class TerminalUI:
             self._console.print()
             title = Text()
             title.append("  LuckyD Code", style=f"bold {BRAND['primary']}")
-            title.append("  v2.1.0", style=BRAND["muted"])
+            title.append("  v2.2.0", style=BRAND["muted"])
             self._console.print(title)
             if header:
                 self._console.print(f"  {self._dim(header)}")
@@ -253,7 +253,7 @@ class TerminalUI:
             self._console.print()
         else:
             print(
-                f"\n  {ANSI['bold']}{ANSI['cyan']}LuckyD Code{ANSI['reset']} {ANSI['dim']}v2.1.0{ANSI['reset']}"
+                f"\n  {ANSI['bold']}{ANSI['cyan']}LuckyD Code{ANSI['reset']} {ANSI['dim']}v2.2.0{ANSI['reset']}"
             )
             if header:
                 print(f"  {ANSI['dim']}{header}{ANSI['reset']}")

@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.0] - 2026-08-12
+
+### Added
+- **ClinePass provider** — sign in with Cline as the agent's AI provider. The
+  token resolves from the live Cline CLI session (`~/.cline`) and refreshes via
+  WorkOS on expiry, so it never goes stale; `CLINEPASS_API_KEY` overrides.
+- **Skills system** — `skills/*.md` with YAML frontmatter (name, description,
+  version, author, tags) are auto-discovered; ships with `top-picks`,
+  `ai-news-brief`, and `movie-picker`. `LUCKYD.md` defines intent patterns that
+  auto-trigger the matching skill.
+- **Project rules loader** — `LUCKYD.md` (plus AGENTS.md, .clinerules,
+  .goosehints, et al.) is injected into the system prompt with per-file and
+  total size caps.
+- **Cline bridge + launcher** — `cline_bridge.py` and `Start-LuckyD-Cline.bat`
+  wire the Cline CLI straight into the agent.
+- **Codec self-check utility** — `tests/codec_check.py` reports which media
+  codecs the QtWebEngine build supports (offscreen, no window).
+
+### Changed
+- **Browser version bumped to 2.2.0**; installer/version info updated.
+- Browser Control API, dashboard, profile, and settings polish; terminal bridge
+  and second-agent plumbing refined.
+- Agent loop, background-process tool, file tools, logging setup, sandbox, CLI
+  (`ui.py`), and web server improvements.
+
+### Fixed
+- **CI pipeline green and hardened** — secret scanning (gitleaks), dependency
+  auditing, and SAST are now blocking gates (no `continue-on-error`); Safety
+  replaced with pip-audit (Safety 3.x requires an interactive login that can
+  never succeed in CI); all bandit medium+ findings remediated; black + ruff
+  clean; the rules-loader test no longer picks up the repo's own `LUCKYD.md`.
+
 ## [3.1.0] - 2026-08-08
 
 ### Fixed

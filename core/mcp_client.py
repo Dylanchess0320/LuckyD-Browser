@@ -173,7 +173,7 @@ class MCPStdioTransport:
             "initialize",
             {
                 "protocolVersion": "2024-11-05",
-                "clientInfo": {"name": "luckyd-code", "version": "2.1.0"},
+                "clientInfo": {"name": "luckyd-code", "version": "2.2.0"},
                 "capabilities": {},
             },
         )

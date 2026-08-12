@@ -550,7 +550,7 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
             ui.warn("MCP not configured or no servers connected")
 
     elif cmd == "version":
-        ui.info("LuckyD Code 2.1.0")
+        ui.info("LuckyD Code 2.2.0")
 
     elif cmd == "":
         pass  # Empty command
@@ -848,12 +848,12 @@ def main():
             resume_session_id = args[i + 1]
             i += 2
         elif args[i] in ("-v", "--version"):
-            print("LuckyD Code 2.1.0")
+            print("LuckyD Code 2.2.0")
             sys.exit(0)
         elif args[i] == "--help":
             print(
                 """
-LuckyD Code — AI Coding Agent  v2.1.0
+LuckyD Code — AI Coding Agent  v2.2.0
 
 Usage:
   lucky-code                       Interactive REPL
