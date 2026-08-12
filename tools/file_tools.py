@@ -15,10 +15,28 @@ from .registry import register_tool
 # Credential / system paths the agent should never read or write, even though
 # these tools are intentionally unconfined to any single project directory.
 _SENSITIVE_PATH_MARKERS = {
-    ".env", ".ssh", ".aws", ".netrc", ".npmrc", ".docker", ".gnupg",
-    "id_rsa", "id_ed25519", "id_ecdsa", "authorized_keys", "known_hosts",
-    ".bash_history", ".zsh_history", ".python_history", ".bashrc", ".zshrc",
-    ".bash_profile", ".profile", "shadow", "sam", "credentials",
+    ".env",
+    ".ssh",
+    ".aws",
+    ".netrc",
+    ".npmrc",
+    ".docker",
+    ".gnupg",
+    "id_rsa",
+    "id_ed25519",
+    "id_ecdsa",
+    "authorized_keys",
+    "known_hosts",
+    ".bash_history",
+    ".zsh_history",
+    ".python_history",
+    ".bashrc",
+    ".zshrc",
+    ".bash_profile",
+    ".profile",
+    "shadow",
+    "sam",
+    "credentials",
 }
 
 

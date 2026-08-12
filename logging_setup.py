@@ -62,9 +62,7 @@ def _enable_windows_ansi() -> bool:
             if not kernel32.GetConsoleMode(handle, ctypes.byref(mode)):
                 ok = False
                 continue
-            if not kernel32.SetConsoleMode(
-                handle, mode.value | ENABLE_VIRTUAL_TERMINAL_PROCESSING
-            ):
+            if not kernel32.SetConsoleMode(handle, mode.value | ENABLE_VIRTUAL_TERMINAL_PROCESSING):
                 ok = False
         return ok
     except Exception:

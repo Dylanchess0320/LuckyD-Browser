@@ -2,6 +2,7 @@
 
 Run:  python tests/codec_check.py
 """
+
 import os
 import sys
 

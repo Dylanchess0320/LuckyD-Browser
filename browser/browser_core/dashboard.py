@@ -336,7 +336,8 @@ def dashboard_html(settings=None, token: str = "") -> str:
     else:
         html = "<style>" + css_vars(settings) + "</style>" + DASHBOARD_HTML
     return html.replace(
-        "<script>\nconst ENGINES", f"<script>\nconst DASH_TOKEN = {json.dumps(token)};\nconst ENGINES"
+        "<script>\nconst ENGINES",
+        f"<script>\nconst DASH_TOKEN = {json.dumps(token)};\nconst ENGINES",
     )
 
 

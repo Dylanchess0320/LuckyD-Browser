@@ -32,9 +32,7 @@ def _enable_fullscreen(profile: QWebEngineProfile) -> None:
     WebEngine. Without it, requestFullscreen() throws "Fullscreen is not
     supported" and every video player's fullscreen button is dead. The window
     still has to honor fullScreenRequested (main_window hides the chrome)."""
-    profile.settings().setAttribute(
-        QWebEngineSettings.WebAttribute.FullScreenSupportEnabled, True
-    )
+    profile.settings().setAttribute(QWebEngineSettings.WebAttribute.FullScreenSupportEnabled, True)
 
 
 def _enable_spellcheck(profile: QWebEngineProfile) -> None:

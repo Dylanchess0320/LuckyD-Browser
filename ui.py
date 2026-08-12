@@ -72,9 +72,7 @@ try:
     if SPINNERS is not None and "processing_wheel" not in SPINNERS:
         SPINNERS["processing_wheel"] = {
             "interval": 80,
-            "frames": list(
-                "⠁⠁⠉⠙⠚⠒⠂⠂⠒⠲⠴⠤⠄⠄⠤⠠⠠⠤⠦⠖⠒⠐⠐⠒⠓⠋⠉⠈⠈⠉"
-            ),
+            "frames": list("⠁⠁⠉⠙⠚⠒⠂⠂⠒⠲⠴⠤⠄⠄⠤⠠⠠⠤⠦⠖⠒⠐⠐⠒⠓⠋⠉⠈⠈⠉"),
         }
 
     _RICH_AVAILABLE = True

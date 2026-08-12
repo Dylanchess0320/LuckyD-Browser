@@ -211,6 +211,7 @@ class CodingAgent:
         def _resolve() -> str | None:
             try:
                 from llm.providers.clinepass import ClinePassProvider
+
                 return ClinePassProvider.get_cline_token()
             except Exception:
                 return None
