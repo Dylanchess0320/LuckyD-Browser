@@ -41,6 +41,7 @@ Thumbs.db
 *.cert
 credentials.json
 service-account.json
+cred_in.txt
 
 # ── LuckyD Code Specific ──────────────────────────────────────────────
 .luckyd_history
