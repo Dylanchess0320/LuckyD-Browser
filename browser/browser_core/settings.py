@@ -43,7 +43,11 @@ DEFAULTS = {
     # lets the luckyd-code.exe harness drive tabs; see browser/README.md).
     "browser_api_enabled": True,
     "browser_api_port": 9777,
-    "browser_api_token": "",  # empty = trust localhost; set to require Bearer
+    # Auto-generated on first run if empty (see BrowserApp._ensure_token in
+    # browser_app.py) — binding to 127.0.0.1 does NOT make this safe to leave
+    # unauthenticated, since any page open in the browser itself can still
+    # reach it with a normal cross-origin fetch(). Do not hand-set to "".
+    "browser_api_token": "",
     # Embedded terminal: which LuckyD Code CLI to spawn. Empty = auto-detect
     # (Desktop exe → repo exe → live source). Set a full path to force one.
     "terminal_cli": "",
@@ -52,6 +56,10 @@ DEFAULTS = {
     "terminal_cli2": "",
     # Port of the WebSocket↔PTY bridge the /terminal tab connects to.
     "terminal_port": 9881,
+    # Auto-generated on first run if empty, same rationale as browser_api_token
+    # — required as a ?token= query param since the browser WebSocket API
+    # can't set an Authorization header.
+    "terminal_token": "",
     # Auto-update: silently check for a newer release shortly after launch.
     "update_auto_check": True,
     # A version tag the user chose to skip (don't prompt for it again).

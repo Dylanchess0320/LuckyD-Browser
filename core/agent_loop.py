@@ -93,7 +93,7 @@ class CodingAgent:
 
         # Track consecutive turns with no tool calls to detect premature stopping
         self._no_tool_call_turns: int = 0
-        self._max_no_tool_call_turns: int = 2  # Allow 1 retry before giving up
+        self._max_no_tool_call_turns: int = 5  # Auto-continue retries before giving up
 
         # Cost tracking (for /cost, goodbye)
         self._cost_tracker = CostTracker()
@@ -129,6 +129,7 @@ class CodingAgent:
             timeout_sec=self.timeout_sec,
             max_retries=self.max_retries,
             base_delay=self.base_delay,
+            token_resolver=self._make_token_resolver(),
         )
         self.message_builder = MessageBuilder()
         self.hooks = get_hooks()
@@ -190,6 +191,32 @@ class CodingAgent:
         }
         return names.get(self._provider_config.provider, self._provider_config.provider)
 
+    def _make_token_resolver(self):
+        """Return a callable that re-reads the Cline CLI auth token on each
+        request, or None for non-ClinePass providers.
+
+        The gateway forwards our bearer token to Cline's API, which expects
+        the live WorkOS session token from `cline auth`. That token expires
+        (401) and Cline CLI silently rotates it, so a key captured at startup
+        goes stale mid-session. Re-reading the file each request makes token
+        refreshes (and even `cline auth` re-logins) take effect without
+        restarting LuckyD.
+        """
+        try:
+            if (self._provider_config.provider or "").lower() != "clinepass":
+                return None
+        except Exception:
+            return None
+
+        def _resolve() -> str | None:
+            try:
+                from llm.providers.clinepass import ClinePassProvider
+                return ClinePassProvider.get_cline_token()
+            except Exception:
+                return None
+
+        return _resolve
+
     def switch_provider(self, config: LLMConfig) -> None:
         """Switch the active LLM provider/model at runtime.
 
@@ -213,6 +240,7 @@ class CodingAgent:
             timeout_sec=self.timeout_sec,
             max_retries=self.max_retries,
             base_delay=self.base_delay,
+            token_resolver=self._make_token_resolver(),
         )
 
     def _emit_event(self, event_type: AgentEventType, payload: dict | None = None) -> None:
@@ -429,9 +457,12 @@ class CodingAgent:
     def _should_continue(self, assistant_msg: dict) -> str | None:
         """Return a continuation prompt if the agent stopped prematurely, else None.
 
-        Detects two premature-stop cases:
+        Detects premature-stop cases:
         1. finish_reason == "length" (output truncated by max_tokens)
         2. Content ends with a continuation phrase ("Continuing", "Let me continue", etc.)
+        3. Content looks incomplete: an unclosed code block, or a trailing
+           sentence that signals more work was about to happen ("Now I'll...",
+           "Next, ...", ends mid-word, ends with ':' etc.)
         """
         # Case 1: truncated by token limit
         finish_reason = assistant_msg.get("_finish_reason", "") or assistant_msg.get(
@@ -443,26 +474,83 @@ class CodingAgent:
                 "Please continue from where you left off."
             )
 
-        # Case 2: ends with a continuation phrase
         content = (assistant_msg.get("content") or "").strip()
-        if content:
-            lower = content.lower()
-            continuation_phrases = [
-                "continuing",
-                "let me continue",
-                "i'll continue",
-                "to be continued",
-                "continuing from where",
-                "let me keep going",
-                "moving on to",
-            ]
-            for phrase in continuation_phrases:
-                # Check if the phrase appears in the last 80 chars
-                tail = lower[-80:]
-                if phrase in tail:
-                    return "Please continue from where you left off."
+        if not content:
+            return None
+
+        lower = content.lower()
+
+        # Case 2: ends with a continuation phrase
+        continuation_phrases = [
+            "continuing",
+            "let me continue",
+            "i'll continue",
+            "to be continued",
+            "continuing from where",
+            "let me keep going",
+            "moving on to",
+        ]
+        tail = lower[-80:]
+        for phrase in continuation_phrases:
+            if phrase in tail:
+                return "Please continue from where you left off."
+
+        # Case 3: structurally incomplete output
+        if self._looks_incomplete(content, lower):
+            return (
+                "Your response appears incomplete — you stopped before the task "
+                "was finished. Please continue from where you left off and complete "
+                "the remaining steps."
+            )
 
         return None
+
+    @staticmethod
+    def _looks_incomplete(content: str, lower: str) -> bool:
+        """Heuristics for output that stopped mid-task.
+
+        Returns True when the text shows structural signs of being cut short:
+        - An odd number of ``` fences (an unclosed code block)
+        - A trailing phrase announcing an imminent action that never happened
+        - Ending with ':' or a connector suggesting a follow-up
+        """
+        # Unclosed fenced code block
+        if content.count("```") % 2 == 1:
+            return True
+
+        tail = lower[-120:].rstrip()
+
+        # Trailing "I'm about to do X" signals
+        imminent_action = [
+            "now i'll",
+            "now i will",
+            "now let me",
+            "next, i'll",
+            "next i'll",
+            "next, let me",
+            "i'll now",
+            "i will now",
+            "let me now",
+            "i'm going to",
+            "i am going to",
+            "let's now",
+            "first, i'll",
+            "then i'll",
+            "then i will",
+            "next step",
+            "the next",
+            "let me",
+            "i'll",
+        ]
+        for phrase in imminent_action:
+            if tail.endswith(phrase):
+                return True
+
+        # Ends with a colon / connector (a lead-in to something that never came)
+        if tail.endswith((":", "—", "-", ",", ";")):
+            return True
+
+        return False
 
     async def run(self, user_message: str, max_turns: int | None = None) -> str:
         """Run the full agent loop with hooks, events, checkpointing, and memory extraction.

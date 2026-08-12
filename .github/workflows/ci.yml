@@ -81,15 +81,13 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        continue-on-error: true
+        # Not continue-on-error: this repo has already leaked a live API key once.
 
       - name: Dependency Scanning (Safety)
-        run: safety scan -r requirements.txt --disable-telemetry || true
-        continue-on-error: true
+        run: safety scan -r requirements.txt --disable-telemetry
 
       - name: SAST (Bandit)
-        run: bandit -r tools llm memory project features core browser --severity medium --quiet || true
-        continue-on-error: true
+        run: bandit -r tools llm memory project features core browser --severity medium --quiet
 
   # ── Tests ───────────────────────────────────────────────────────────
   test:
@@ -147,6 +145,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: [test, security]
+    # security is a hard gate now (no more continue-on-error) - this if-clause
+    # only controls *when* build runs, needs.security still blocks it on failure.
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v'))
 
     steps:
@@ -246,6 +246,10 @@ jobs:
         run: |
           if [[ "${{ needs.test.result }}" == "failure" ]]; then
             echo "::error::Tests failed"
+            exit 1
+          fi
+          if [[ "${{ needs.security.result }}" == "failure" ]]; then
+            echo "::error::Security scan failed"
             exit 1
           fi
           echo "CI pipeline completed"

@@ -133,9 +133,30 @@ def make_handler(backend, token: str = "", harness=None, settings=None):
 
         # ── helpers ───────────────────────────────────────────────────
         def _authorized(self) -> bool:
+            # token is now always non-empty by the time it reaches here (see
+            # BrowserControlServer.__init__ / browser_app.py) — this endpoint
+            # can navigate tabs, run arbitrary JS via /eval, and read whatever
+            # page is open, including logged-in sessions. An empty token used
+            # to mean "trust localhost", but binding to 127.0.0.1 doesn't
+            # protect this: any page loaded in the browser itself can reach
+            # 127.0.0.1:9777 with a normal cross-origin fetch().
             if not token:
-                return True
+                return True  # only true if a caller explicitly disabled it
             return self.headers.get("Authorization", "") == f"Bearer {token}"
+
+        def _origin_ok(self) -> bool:
+            """Reject cross-origin browser fetches outright (defense in depth).
+
+            A page loaded from any website can still fire the request even
+            though 9777 is loopback-only — the browser itself is the client.
+            Requests without an Origin header (scripts, curl, the harness)
+            pass through to the token check above.
+            """
+            origin = self.headers.get("Origin")
+            if not origin:
+                return True
+            host = self.headers.get("Host", "")
+            return origin in (f"http://{host}", f"https://{host}")
 
         def _send(self, code: int, obj) -> None:
             body = json.dumps(obj, ensure_ascii=False, default=str).encode("utf-8")
@@ -285,11 +306,22 @@ def make_handler(backend, token: str = "", harness=None, settings=None):
                     info.update(ai_info())
             return info
 
+        # Routes reachable by direct browser navigation (new-tab URL, iframe
+        # src, <script>/<link> tags) can never carry an Authorization header
+        # — only same-origin fetch() calls from a page's own JS can. These stay
+        # gated by _origin_ok() (direct navigation never sends a mismatched
+        # Origin) and get the token injected into their own JS instead, the
+        # same pattern web_server.py uses for its landing page.
+        _NAV_PATHS = ("/", "/help", "/dashboard", "/hq", "/terminal")
+
         def do_GET(self):
-            if not self._authorized():
-                return self._send(401, {"ok": False, "error": "unauthorized"})
+            if not self._origin_ok():
+                return self._send(403, {"ok": False, "error": "forbidden origin"})
             parsed = urlparse(self.path)
             path, query = parsed.path, parse_qs(parsed.query)
+            is_nav = path in self._NAV_PATHS or path.startswith("/static/terminal/")
+            if not is_nav and not self._authorized():
+                return self._send(401, {"ok": False, "error": "unauthorized"})
             try:
                 if path in ("/", "/help"):
                     return self._ok(
@@ -298,7 +330,7 @@ def make_handler(backend, token: str = "", harness=None, settings=None):
                         routes=[{"route": r, "about": a} for r, a in _ROUTES],
                     )
                 if path == "/dashboard":
-                    return self._send_html(dashboard_html(settings))
+                    return self._send_html(dashboard_html(settings, token))
                 if path == "/hq":
                     return self._hq(query)
                 if path == "/terminal":
@@ -335,6 +367,8 @@ def make_handler(backend, token: str = "", harness=None, settings=None):
                 return self._fail(500, exc)
 
         def do_POST(self):
+            if not self._origin_ok():
+                return self._send(403, {"ok": False, "error": "forbidden origin"})
             if not self._authorized():
                 return self._send(401, {"ok": False, "error": "unauthorized"})
             path = urlparse(self.path).path

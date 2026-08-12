@@ -15,6 +15,8 @@ Everything is one self-contained HTML string (no build step, no assets).
 
 from __future__ import annotations
 
+import json
+
 _HEAD = r"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -219,7 +221,8 @@ function setPill(id, cls, text) {
 }
 async function refreshStatus() {
   try {
-    const r = await fetch('/status'); const s = await r.json();
+    const r = await fetch('/status', { headers: DASH_TOKEN ? { 'Authorization': 'Bearer ' + DASH_TOKEN } : {} });
+    const s = await r.json();
     if (s.harness) {
       setPill('pill-harness', 'ok', 'coding agent online');
     } else if (s.harness_starting) {
@@ -317,15 +320,24 @@ renderApps(); render();
 DASHBOARD_HTML = _HEAD + _CSS + _BODY + _JS + _JS2
 
 
-def dashboard_html(settings=None) -> str:
+def dashboard_html(settings=None, token: str = "") -> str:
     """The dashboard with the active theme's design tokens injected, so the
-    new-tab hub matches the Qt chrome, sidebar and HQ splash exactly."""
+    new-tab hub matches the Qt chrome, sidebar and HQ splash exactly.
+
+    ``token`` (the Control API's auth token) is injected as a JS constant so
+    the dashboard's own same-origin fetch('/status') call can authenticate —
+    /status is otherwise gated behind the same token as every other route.
+    """
     from browser_core.brand import css_vars
 
     block = "  " + css_vars(settings) + "\n"
     if "/* __BRAND_VARS__ */" in DASHBOARD_HTML:
-        return DASHBOARD_HTML.replace("  /* __BRAND_VARS__ */\n", block, 1)
-    return "<style>" + css_vars(settings) + "</style>" + DASHBOARD_HTML
+        html = DASHBOARD_HTML.replace("  /* __BRAND_VARS__ */\n", block, 1)
+    else:
+        html = "<style>" + css_vars(settings) + "</style>" + DASHBOARD_HTML
+    return html.replace(
+        "<script>\nconst ENGINES", f"<script>\nconst DASH_TOKEN = {json.dumps(token)};\nconst ENGINES"
+    )
 
 
 def hq_splash_html(harness_url: str, state: str, detail: str = "", settings=None) -> str:

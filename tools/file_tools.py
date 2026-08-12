@@ -12,6 +12,26 @@ from pathlib import Path
 from .base import ToolBase, ToolOutput
 from .registry import register_tool
 
+# Credential / system paths the agent should never read or write, even though
+# these tools are intentionally unconfined to any single project directory.
+_SENSITIVE_PATH_MARKERS = {
+    ".env", ".ssh", ".aws", ".netrc", ".npmrc", ".docker", ".gnupg",
+    "id_rsa", "id_ed25519", "id_ecdsa", "authorized_keys", "known_hosts",
+    ".bash_history", ".zsh_history", ".python_history", ".bashrc", ".zshrc",
+    ".bash_profile", ".profile", "shadow", "sam", "credentials",
+}
+
+
+def _is_sensitive_path(path: Path) -> bool:
+    """Block reads/writes to credential stores and shell/system config,
+    regardless of which project directory the agent is currently working in.
+    Catches both the exact filename and any ancestor directory (e.g. ~/.ssh/config).
+    """
+    name_lower = path.name.lower()
+    if name_lower in _SENSITIVE_PATH_MARKERS:
+        return True
+    return any(part.lower() in _SENSITIVE_PATH_MARKERS for part in path.parts)
+
 
 class ReadTool(ToolBase):
     name = "Read"
@@ -30,6 +50,11 @@ class ReadTool(ToolBase):
     ) -> ToolOutput:
         try:
             path = Path(file_path).expanduser().resolve()
+            if _is_sensitive_path(path):
+                return ToolOutput(
+                    text=f"Error: Refusing to read credential/system path: {file_path}",
+                    error=True,
+                )
             if not path.exists():
                 return ToolOutput(text=f"Error: File not found: {file_path}", error=True)
             if path.is_dir():
@@ -71,6 +96,11 @@ class WriteTool(ToolBase):
     async def execute(self, file_path: str, content: str) -> ToolOutput:
         try:
             path = Path(file_path).expanduser().resolve()
+            if _is_sensitive_path(path):
+                return ToolOutput(
+                    text=f"Error: Refusing to write to credential/system path: {file_path}",
+                    error=True,
+                )
             # Snapshot before for checkpoint
             old_content = None
             if path.exists():
@@ -120,6 +150,11 @@ class EditTool(ToolBase):
     ) -> ToolOutput:
         try:
             path = Path(file_path).expanduser().resolve()
+            if _is_sensitive_path(path):
+                return ToolOutput(
+                    text=f"Error: Refusing to edit credential/system path: {file_path}",
+                    error=True,
+                )
             if not path.exists():
                 return ToolOutput(text=f"Error: File not found: {file_path}", error=True)
 

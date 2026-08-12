@@ -35,6 +35,44 @@ from typing import Any
 PROJECT_DIR = Path(__file__).parent.resolve()
 LOG_DIR = PROJECT_DIR / "logs"
 
+
+def _enable_windows_ansi() -> bool:
+    """Turn on ANSI/VT100 escape processing for the Windows console.
+
+    Modern Windows (10+) consoles - Windows Terminal, PowerShell 7, VS Code's
+    terminal, and even plain cmd.exe - support ANSI colors, but the console
+    mode flag has to be set first. Without this, color codes print as raw
+    garbage (or get silently swallowed), which is why colors used to just be
+    disabled outright on win32. Returns True if VT processing is active
+    (either enabled here, or was already on).
+    """
+    if sys.platform != "win32":
+        return True
+    try:
+        import ctypes
+
+        ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004
+        STD_OUTPUT_HANDLE = -11
+        STD_ERROR_HANDLE = -12
+        kernel32 = ctypes.windll.kernel32
+        ok = True
+        for std_handle in (STD_OUTPUT_HANDLE, STD_ERROR_HANDLE):
+            handle = kernel32.GetStdHandle(std_handle)
+            mode = ctypes.c_uint32()
+            if not kernel32.GetConsoleMode(handle, ctypes.byref(mode)):
+                ok = False
+                continue
+            if not kernel32.SetConsoleMode(
+                handle, mode.value | ENABLE_VIRTUAL_TERMINAL_PROCESSING
+            ):
+                ok = False
+        return ok
+    except Exception:
+        return False
+
+
+_WINDOWS_ANSI_OK = _enable_windows_ansi()
+
 # ── Sensitive data patterns ──────────────────────────────────────────
 SENSITIVE_PATTERNS = [
     (r'(api_key["\']?\s*[:=]\s*["\'])([^"\']+)(["\'])', r"\1***REDACTED***\3"),
@@ -95,7 +133,18 @@ class ReadableFormatter(logging.Formatter):
     def __init__(self, redact: bool = True, use_colors: bool = True):
         super().__init__()
         self.redact = redact
-        self.use_colors = use_colors and sys.platform != "win32"
+        self.use_colors = use_colors and _WINDOWS_ANSI_OK
+
+    def format(self, record: logging.LogRecord) -> str:
+        message = record.getMessage()
+        if self.redact:
+            message = redact_sensitive(message)
+        timestamp = datetime.fromtimestamp(record.created).strftime("%H:%M:%S.%f")[:-3]
+        level = record.levelname
+        if self.use_colors:
+            color = self.COLORS.get(level, "")
+            return f"{color}{timestamp} {level:<8} {record.name:<20}{self.RESET} {message}"
+        return f"{timestamp} {level:<8} {record.name:<20} {message}"
 
 
 # ── Correlation ID Filter ────────────────────────────────────────────────
@@ -290,17 +339,6 @@ def configure(
     global _initialized
     _initialized = False
     get_logger("root")
-
-    def format(self, record: logging.LogRecord) -> str:
-        message = record.getMessage()
-        if self.redact:
-            message = redact_sensitive(message)
-        timestamp = datetime.fromtimestamp(record.created).strftime("%H:%M:%S.%f")[:-3]
-        level = record.levelname
-        if self.use_colors:
-            color = self.COLORS.get(level, "")
-            return f"{color}{timestamp} {level:<8} {record.name:<20}{self.RESET} {message}"
-        return f"{timestamp} {level:<8} {record.name:<20} {message}"
 
 
 def redact_sensitive(text: str) -> str:

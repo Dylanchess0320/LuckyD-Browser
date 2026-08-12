@@ -32,6 +32,7 @@ class LLMClient:
         max_retries: int = 3,
         base_delay: float = 1.0,
         context_manager: ContextManager | None = None,
+        token_resolver: Callable[[], str | None] | None = None,
     ):
         self.api_key = api_key
         self.base_url = base_url
@@ -43,6 +44,22 @@ class LLMClient:
         self.base_delay = base_delay
         self.retryable_codes = {429, 500, 502, 503, 504}
         self.context_manager = context_manager or ContextManager()
+        # Optional callable that returns a fresh bearer token before each
+        # request. Wired in for providers whose auth is backed by a live
+        # session (e.g. ClinePass -> Cline CLI WorkOS token) so that a token
+        # refreshed since startup actually gets used instead of the stale one.
+        self.token_resolver = token_resolver
+
+    def _auth_token(self) -> str:
+        """Resolve the bearer token to use for this request."""
+        if self.token_resolver is not None:
+            try:
+                fresh = (self.token_resolver() or "").strip()
+                if fresh:
+                    self.api_key = fresh
+            except Exception:
+                pass  # fall back to whatever key we already have
+        return (self.api_key or "").strip()
 
     def _retry_delay(self, resp, attempt: int) -> float:
         """Seconds to wait before retrying a retryable HTTP error.
@@ -84,7 +101,7 @@ class LLMClient:
         """Streaming LLM call. Returns the assembled assistant message."""
         url = f"{self.base_url}/chat/completions"
         headers = {"Content-Type": "application/json"}
-        _k = (self.api_key or "").strip()
+        _k = self._auth_token()
         if _k:
             headers["Authorization"] = f"Bearer {_k}"
 
@@ -344,7 +361,7 @@ class LLMClient:
         """Non-streaming fallback"""
         url = f"{self.base_url}/chat/completions"
         headers = {"Content-Type": "application/json"}
-        _k = (self.api_key or "").strip()
+        _k = self._auth_token()
         if _k:
             headers["Authorization"] = f"Bearer {_k}"
         messages = await self.context_manager.compact(messages)

@@ -13,6 +13,11 @@ from config import COMMAND_TIMEOUT_SEC, MAX_OUTPUT_CHARS, PROJECT_DIR
 
 # ── Safety: Blocklist ──────────────────────────────────────────────────
 # Any command containing these patterns is blocked (case-insensitive)
+# NOTE: kept in sync with tools/bash_tool.py's BLOCKED_PATTERNS — these are
+# two independent implementations (one gates the Bash tool the agent calls,
+# this one gates the sandbox module directly), so a pattern added to one
+# without the other reopens exactly the kind of gap that let bash-only
+# patterns miss every PowerShell-native destructive cmdlet.
 BLOCKLIST = [
     # Destructive filesystem ops
     r"rm\s+-rf\s+/",
@@ -20,6 +25,14 @@ BLOCKLIST = [
     r"format\s",
     r"del\s+/f\s+/s",
     r"deltree",
+    # PowerShell-native destructive cmdlets
+    r"remove-item\s+.*-recurse\s+.*-force",
+    r"remove-item\s+.*-force\s+.*-recurse",
+    r"clear-disk",
+    r"clear-recyclebin\s+.*-force",
+    r"initialize-disk",
+    r"format-volume",
+    r"remove-partition",
     # Dangerous system ops
     r"shutdown",
     r"restart-computer",
@@ -397,6 +410,3 @@ SANDBOX_PRESETS = {
 def get_sandbox_preset(name: str = "standard") -> ResourceLimits:
     """Get a pre-configured sandbox preset."""
     return SANDBOX_PRESETS.get(name, SANDBOX_PRESETS["standard"])
-
-
-import time

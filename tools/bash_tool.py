@@ -14,17 +14,52 @@ from .base import ToolBase, ToolOutput
 from .registry import register_tool
 from .session_tools import record_shell_command
 
-# Blocked patterns for safety
+# Blocked patterns for safety.
+# Merged with sandbox.py's blocklist (which had a larger pattern set — registry
+# deletion, privilege escalation) so the two independent checks stop diverging,
+# and extended with PowerShell-native destructive cmdlets: the previous list
+# was written for bash syntax (rm -rf, dd if=) but the shell actually being
+# driven on Windows is PowerShell, where the equivalent destructive commands
+# (Remove-Item -Recurse -Force, Clear-Disk, etc.) used different names
+# entirely and weren't covered by either blocklist.
 BLOCKED_PATTERNS = [
+    # Destructive filesystem ops
     r"rm\s+-rf\s+/",
+    r"rd\s+/s\s+/q\s+c:\\",
+    r"format\s+[c-zC-Z]:",
+    r"del\s+/[fsq].*\\Windows",
+    r"deltree",
     r"mkfs\.",
     r"dd\s+if=",
     r">\s*/dev/",
-    r"format\s+[c-zC-Z]:",
-    r"del\s+/[fsq].*\\Windows",
+    # PowerShell-native destructive cmdlets (bash-style patterns above don't
+    # match these at all)
+    r"remove-item\s+.*-recurse\s+.*-force",
+    r"remove-item\s+.*-force\s+.*-recurse",
+    r"clear-disk",
+    r"clear-recyclebin\s+.*-force",
+    r"initialize-disk",
+    r"format-volume",
+    r"remove-partition",
+    # Dangerous system ops
     r"shutdown",
     r"reboot",
+    r"restart-computer",
+    r"stop-computer",
+    r"bcdedit",
+    # Fork bombs / resource exhaustion
     r":\(\)\s*\{\s*:\|:&\s*\};:",  # fork bomb
+    r"%0\|%0",
+    # Privilege escalation
+    r"sudo\s",
+    r"runas\s+/user:",
+    # Network havoc
+    r"netsh\s+.*delete",
+    r"ipconfig\s+/release",
+    r"wmic\s+.*delete",
+    # Registry destruction
+    r"reg\s+delete\s+hklm",
+    r"reg\s+delete\s+/f",
 ]
 
 # Allowlist for common dev commands
@@ -154,21 +189,29 @@ class BashTool(ToolBase):
             if re.search(pattern, cmd, re.IGNORECASE):
                 return False, f"Blocked dangerous pattern: {pattern}"
 
-        # Check allowlist
-        first_word = cmd.strip().split()[0] if cmd.strip().split() else ""
-        first_word_lower = first_word.lower()
-
-        if first_word_lower in [p.lower() for p in ALLOWED_PREFIXES]:
-            return True, ""
-
-        # Allow full paths
-        if first_word.startswith("/") or (IS_WINDOWS and first_word[1:2] == ":\\"):
-            return True, ""
-
-        return (
-            False,
-            f"Command prefix '{first_word}' not in allowlist. Wrap unsafe commands in a script file.",
-        )
+        # Check allowlist — the first-word check alone only validated the
+        # FIRST command in a chain. `<allowed> && rm -rf /` passed because
+        # only "rm" (not the whole chain) is checked against the allowlist;
+        # the blocklist regex above still scans the full string so the most
+        # obvious bypasses were already caught, but any chained command
+        # whose second half wasn't itself in BLOCKED_PATTERNS sailed through
+        # unchecked. Split on chain/pipe operators and validate every segment.
+        segments = re.split(r"&&|\|\||;|\|(?!\|)", cmd)
+        for segment in segments:
+            segment = segment.strip()
+            if not segment:
+                continue
+            first_word = segment.split()[0] if segment.split() else ""
+            first_word_lower = first_word.lower()
+            if first_word_lower in [p.lower() for p in ALLOWED_PREFIXES]:
+                continue
+            if first_word.startswith("/") or (IS_WINDOWS and first_word[1:2] == ":\\"):
+                continue
+            return (
+                False,
+                f"Command prefix '{first_word}' not in allowlist. Wrap unsafe commands in a script file.",
+            )
+        return True, ""
 
     async def execute(
         self, command: str, description: str = "", timeout: int = 120000, cwd: str = ""

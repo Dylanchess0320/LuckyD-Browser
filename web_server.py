@@ -22,17 +22,49 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import secrets
 import threading
 import time
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from config import PROJECT_DIR, get_config, load_env
+from core.approval_hook import ApprovalHook
+from core.hooks import register_plugin
 from memory.store import get_memory
 from tools.registry import registry
 
 load_env()  # load .env before any agent/LLM construction
+
+# ── Auth token (default-on) ──────────────────────────────────────────────
+# Anyone who can reach this port and knows the token can run the full agent
+# (Bash/PowerShell/Write/Git). Previously this server had NO auth at all and
+# sent Access-Control-Allow-Origin: * on every response, so any webpage open
+# in any browser on the machine could drive it. A random per-install token is
+# generated once and persisted under .luckyd-code/ (already gitignored).
+_TOKEN_PATH = PROJECT_DIR / ".luckyd-code" / "hq_token"
+
+
+def _load_or_create_token() -> str:
+    try:
+        if _TOKEN_PATH.exists():
+            tok = _TOKEN_PATH.read_text(encoding="utf-8").strip()
+            if tok:
+                return tok
+        _TOKEN_PATH.parent.mkdir(parents=True, exist_ok=True)
+        tok = secrets.token_urlsafe(32)
+        _TOKEN_PATH.write_text(tok, encoding="utf-8")
+        return tok
+    except OSError:
+        # Can't persist (read-only fs, etc.) — fall back to a per-run token.
+        # Sessions won't survive a restart, but the server is never unauthenticated.
+        return secrets.token_urlsafe(32)
+
+
+_TOKEN = _load_or_create_token()
+_ALLOWED_ORIGINS = None  # set once the bound port is known, in main()
 
 # Dedicated event loop in its own thread for all async agent/tool work.
 _LOOP = asyncio.new_event_loop()
@@ -100,7 +132,10 @@ class HQHandler(BaseHTTPRequestHandler):
             self.send_response(code)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body)))
-            self.send_header("Access-Control-Allow-Origin", "*")
+            # No Access-Control-Allow-Origin here on purpose: this server runs
+            # the full agent (Bash/Write/Git). Wildcard CORS let any webpage
+            # open in any browser on the machine call it. Same-origin fetches
+            # from the HQ page itself don't need CORS headers at all.
             self.end_headers()
             self.wfile.write(body)
         except (ConnectionError, OSError):
@@ -116,6 +151,51 @@ class HQHandler(BaseHTTPRequestHandler):
             self.wfile.write(body)
         except (ConnectionError, OSError):
             pass
+
+    def _authorized(self) -> bool:
+        """Require the per-install bearer token on every API call.
+
+        The inline HQ page (served from '/') gets the token injected into its
+        own JS so its same-origin fetches keep working without prompting the
+        user for anything.
+        """
+        auth = self.headers.get("Authorization", "")
+        return auth == f"Bearer {_TOKEN}"
+
+    _DENY_NAMES = {".env", ".git"}
+
+    def _path_denied(self, target: Path) -> str:
+        """Return a denial reason, or "" if the path is allowed.
+
+        Uses Path.is_relative_to instead of a plain string-prefix check —
+        str(target).startswith(str(PROJECT_DIR)) also matches a sibling
+        directory like PROJECT_DIR + "-anything". Also blocks .env/.git
+        outright regardless of where they sit under the project root.
+        """
+        try:
+            if not target.is_relative_to(PROJECT_DIR):
+                return "path outside project"
+        except (OSError, ValueError):
+            return "invalid path"
+        for part in target.parts:
+            if part in self._DENY_NAMES:
+                return f"access to '{part}' is not allowed"
+        return ""
+
+    def _origin_ok(self) -> bool:
+        """Reject requests carrying a cross-origin Origin header outright.
+
+        A same-origin page fetching '/api/...' from this same server won't
+        send a mismatched Origin. A page loaded from any other site making a
+        cross-origin fetch() will — and normal browsers cannot forge this
+        header, so this blocks the "any open tab can reach 127.0.0.1:8000"
+        class of attack even before the token check runs.
+        """
+        origin = self.headers.get("Origin")
+        if not origin:
+            return True  # no Origin header: not a cross-origin browser fetch
+        host = self.headers.get("Host", "")
+        return origin in (f"http://{host}", f"https://{host}")
 
     def _body(self) -> dict:
         try:
@@ -137,11 +217,18 @@ class HQHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path.rstrip("/") or "/"
         q = parse_qs(parsed.query)
+        if not self._origin_ok():
+            return self._send_json({"error": "forbidden origin"}, code=403)
         try:
             if path == "/health":
                 return self._send_json({"status": "healthy"})
             if path in ("/", "/index.html"):
-                return self._send_html(_HQ_HTML)
+                # The landing page itself doesn't need the token (it's just
+                # static HTML+JS); its own fetch() calls carry the token so
+                # they pass the check below like any other client.
+                return self._send_html(_HQ_HTML.replace("__HQ_TOKEN__", _TOKEN))
+            if not self._authorized():
+                return self._send_json({"error": "unauthorized"}, code=401)
             if path == "/api/tools":
                 return self._send_json(
                     {"tools": registry.list_with_descriptions(), "count": registry.count}
@@ -215,6 +302,10 @@ class HQHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
         path = parsed.path.rstrip("/") or "/"
+        if not self._origin_ok():
+            return self._send_json({"error": "forbidden origin"}, code=403)
+        if not self._authorized():
+            return self._send_json({"error": "unauthorized"}, code=401)
         body = self._body()
         try:
             if path in ("/api/chat", "/chat", "/api/orchestrate"):
@@ -252,16 +343,18 @@ class HQHandler(BaseHTTPRequestHandler):
             if path == "/api/read-file":
                 rel = body.get("path", "")
                 target = (PROJECT_DIR / rel).resolve()
-                if not str(target).startswith(str(PROJECT_DIR)):
-                    return self._send_json({"error": "path outside project"}, code=403)
+                denied = self._path_denied(target)
+                if denied:
+                    return self._send_json({"error": denied}, code=403)
                 return self._send_json(
                     {"content": target.read_text(encoding="utf-8", errors="replace")}
                 )
             if path == "/api/write-file":
                 rel = body.get("path", "")
                 target = (PROJECT_DIR / rel).resolve()
-                if not str(target).startswith(str(PROJECT_DIR)):
-                    return self._send_json({"error": "path outside project"}, code=403)
+                denied = self._path_denied(target)
+                if denied:
+                    return self._send_json({"error": denied}, code=403)
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_text(body.get("content", ""), encoding="utf-8")
                 return self._send_json({"ok": True, "path": rel})
@@ -291,6 +384,7 @@ background:#0e2417;color:#3fb950;border:1px solid #1d3a26}
 .msg{max-width:80%;padding:10px 14px;border-radius:12px;white-space:pre-wrap;word-wrap:break-word}
 .user{align-self:flex-end;background:var(--acc);color:#fff;border-bottom-right-radius:4px}
 .agent{align-self:flex-start;background:var(--panel);border:1px solid var(--border);border-bottom-left-radius:4px}
+.agent.thinking{color:#6CB6FF;font-style:italic}
 #bar{display:flex;gap:10px;padding:14px;background:var(--panel);border-top:1px solid var(--border)}
 #in{flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);
 border-radius:8px;padding:11px 13px;font:inherit;resize:none}
@@ -309,13 +403,14 @@ const chat=document.getElementById('chat'),inp=document.getElementById('in'),
 btn=document.getElementById('send');
 function add(cls,text){const d=document.createElement('div');d.className='msg '+cls;
 d.textContent=text;chat.appendChild(d);chat.scrollTop=chat.scrollHeight;return d;}
+const HQ_TOKEN='__HQ_TOKEN__';
 document.getElementById('bar').addEventListener('submit',async e=>{e.preventDefault();
 const t=inp.value.trim();if(!t)return;inp.value='';add('user',t);btn.disabled=true;
-const thinking=add('agent','\\u2026');
+const thinking=add('agent','\\u2026');thinking.classList.add('thinking');
 try{const r=await fetch('/api/chat',{method:'POST',
-headers:{'Content-Type':'application/json'},body:JSON.stringify({task:t})});
-const d=await r.json();thinking.textContent=d.result||d.response||d.error||'(no reply)';}
-catch(err){thinking.textContent='Error: '+err.message;}finally{btn.disabled=false;inp.focus();}});
+headers:{'Content-Type':'application/json','Authorization':'Bearer '+HQ_TOKEN},body:JSON.stringify({task:t})});
+const d=await r.json();thinking.classList.remove('thinking');thinking.textContent=d.result||d.response||d.error||'(no reply)';}
+catch(err){thinking.classList.remove('thinking');thinking.textContent='Error: '+err.message;}finally{btn.disabled=false;inp.focus();}});
 </script></body></html>"""
 
 
@@ -325,6 +420,17 @@ def main() -> None:
     ap.add_argument("--port", type=int, default=8000)
     ap.add_argument("--host", default="127.0.0.1")
     args, _ = ap.parse_known_args()
+
+    # Wire the same tiered approval system the CLI uses (core/approval_hook.py)
+    # so this entry point isn't the one path that bypasses it. Previously
+    # nothing ever called register_plugin() here, so ApprovalHook never even
+    # loaded for this server — Bash/Write/Git ran with zero gating. Mirrors
+    # main.py's default (auto_approve_all=True): the token+Origin checks above
+    # are what actually gates access to this server; this keeps the hook
+    # consistently wired so it's live if that default is ever changed.
+    hook = ApprovalHook(session_id="web-hq")
+    hook.auto_approve_all = True
+    register_plugin(hook)
 
     # Eagerly import agent so all ~98 tools register before the first request.
     try:
@@ -336,6 +442,8 @@ def main() -> None:
     server.daemon_threads = True
     print(f"LuckyD Code HQ (live source) on http://{args.host}:{args.port}")
     print(f"  tools registered: {registry.count}")
+    print(f"  auth token: {_TOKEN_PATH}")
+    print("  (open the URL above in a browser — the token is injected into the page for you)")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

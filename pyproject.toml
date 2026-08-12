@@ -214,7 +214,9 @@ exclude_lines = [
 # ── Bandit: Security linter ──────────────────────────────────────────
 [tool.bandit]
 exclude_dirs = ["tests", "venv", ".venv", "__pycache__", "node_modules"]
-skips = ["B101", "B311", "B403", "B404", "B603", "B607"]
+# B603/B607 (subprocess w/ untrusted input, partial executable path) are NOT skipped:
+# bash_tool.py/PowerShellTool are exactly what these checks exist to catch.
+skips = ["B101", "B311", "B403", "B404"]
 
 # ── Vulture: Dead code finder ────────────────────────────────────────
 [tool.vulture]

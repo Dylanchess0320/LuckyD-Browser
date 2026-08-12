@@ -11,6 +11,15 @@ import shutil
 import sys
 import time
 
+_IS_WINDOWS = platform.system() == "Windows"
+if _IS_WINDOWS:
+    try:
+        import msvcrt
+    except ImportError:
+        msvcrt = None
+else:
+    msvcrt = None
+
 # ── Windows ANSI/VT support ───────────────────────────────────────
 # On Windows, ANSI escape codes only work if Virtual Terminal Processing
 # is explicitly enabled on the console handle. Do this once at import time
@@ -41,9 +50,32 @@ try:
     from rich.live import Live
     from rich.markdown import Markdown
     from rich.panel import Panel
+    from rich.spinner import Spinner  # noqa: F401  (used to register custom spinners)
     from rich.table import Table
     from rich.text import Text
     from rich.theme import Theme
+
+    # Register a classic half-braille "processing wheel" spinner. Rich does not
+    # ship a braille spinner by default, so we add one ourselves.
+    #
+    # IMPORTANT: Rich's Spinner.__init__ does `spinner["frames"]` and
+    # `spinner["interval"]` on whatever SPINNERS[name] resolves to, so the
+    # value MUST be a dict with those two keys - frames as a list of
+    # single-character strings, interval in milliseconds. A tuple here (as
+    # this used to be) crashes with "tuple indices must be integers or
+    # slices, not str" the first time the spinner is actually used.
+    try:
+        from rich._spinners import SPINNERS  # internal registry
+    except ImportError:  # pragma: no cover - fallback if internals move
+        SPINNERS = None
+
+    if SPINNERS is not None and "processing_wheel" not in SPINNERS:
+        SPINNERS["processing_wheel"] = {
+            "interval": 80,
+            "frames": list(
+                "⠁⠁⠉⠙⠚⠒⠂⠂⠒⠲⠴⠤⠄⠄⠤⠠⠠⠤⠦⠖⠒⠐⠐⠒⠓⠋⠉⠈⠈⠉"
+            ),
+        }
 
     _RICH_AVAILABLE = True
 except ImportError:
@@ -143,6 +175,11 @@ class TerminalUI:
         self._project_name = ""
         self._provider_name = ""
         self._model_name = ""
+        # Spinner state — shows while the agent is working before the first
+        # token arrives, and again during tool-call pauses mid-stream.
+        self._spinner_status = None  # rich Status or None
+        self._spinner_label = ""
+        self._spinner_style = "processing_wheel"  # rich spinner name (dots, line, clock…)
 
     # ── Helpers ────────────────────────────────────────────────────
 
@@ -254,6 +291,61 @@ class TerminalUI:
         else:
             print(f"  {ANSI['dim']}{msg}{ANSI['reset']}")
 
+    # ── Spinner ────────────────────────────────────────────────────
+
+    def start_spinner(self, label: str = "working…") -> None:
+        """Show a small spinner while the agent works (pre-token or tool pauses).
+
+        Rich's Status/Spinner touches internals (SPINNERS registry, terminal
+        capability probing) that have broken before on this project - wrap it
+        so a spinner glitch degrades to the plain ANSI line instead of taking
+        down the whole REPL loop.
+        """
+        if self._spinner_status is not None:
+            return  # already spinning
+        self._spinner_label = label
+        if self.rich:
+            try:
+                from rich.status import Status
+
+                self._spinner_status = Status(
+                    f"  {label}",
+                    console=self._console,
+                    spinner=self._spinner_style,
+                    spinner_style=BRAND["think"],
+                )
+                self._spinner_status.start()
+                return
+            except Exception:
+                self._spinner_status = None
+                # fall through to the plain ANSI line below
+        sys.stdout.write(f"  {ANSI['gray']}… {label}{ANSI['reset']}\r")
+        sys.stdout.flush()
+
+    def stop_spinner(self) -> None:
+        """Stop the spinner if it is running."""
+        if self._spinner_status is None:
+            return
+        if self.rich:
+            with contextlib.suppress(Exception):
+                self._spinner_status.stop()
+            self._spinner_status = None
+        else:
+            # Clear the spinner line
+            sys.stdout.write("\r" + " " * (len(self._spinner_label) + 8) + "\r")
+            sys.stdout.flush()
+            self._spinner_status = None
+
+    def update_spinner(self, label: str) -> None:
+        """Change the spinner label without restarting it."""
+        self._spinner_label = label
+        if self._spinner_status is not None and self.rich:
+            with contextlib.suppress(Exception):
+                self._spinner_status.update(f"  {label}")
+        elif self._spinner_status is not None:
+            sys.stdout.write(f"\r  {ANSI['gray']}… {label}{ANSI['reset']}\r")
+            sys.stdout.flush()
+
     # ── Streaming ──────────────────────────────────────────────────
     @property
     def streamed_chars(self) -> int:
@@ -286,70 +378,36 @@ class TerminalUI:
             )
 
     def begin_thinking(self) -> None:
-        """Start the thinking section before reasoning tokens arrive."""
+        """Start the thinking phase.
+
+        The reasoning text stays hidden for a clean terminal, but a
+        spinner (processing wheel) shows while the agent is thinking.
+        """
         self._thinking = True
         self._think_buffer = ""
-        if self.rich:
-            if self._live:
-                self._live.stop()
-                self._live = None
-            self._live = Live(
-                Markdown(""),
-                console=self._console,
-                refresh_per_second=12,
-                transient=True,
-            )
-            self._live.start()
-            self._live.update(
-                Panel(
-                    Text("…", style=BRAND["think"]),
-                    title=Text("thinking", style=BRAND["think"]),
-                    border_style=BRAND["think"],
-                    title_align="left",
-                    padding=(0, 1),
-                )
-            )
-        else:
-            print(f"  {ANSI['bright_blue']}thinking…{ANSI['reset']}")
+        self.start_spinner("thinking")
 
     def stream_think_token(self, token: str) -> None:
-        """Push a reasoning token to the thinking display."""
+        """Consume a reasoning token while the thinking spinner spins."""
         if not self._thinking:
             self.begin_thinking()
         self._think_buffer += token
-        # Keep panel compact — show a short tail only
-        preview = self._think_buffer[-400:]
-        if self.rich and self._live:
-            with contextlib.suppress(Exception):
-                self._live.update(
-                    Panel(
-                        Text(preview, style=BRAND["think"]),
-                        title=Text("thinking", style=BRAND["think"]),
-                        border_style=BRAND["think"],
-                        title_align="left",
-                        padding=(0, 1),
-                    )
-                )
-        elif not self.rich:
-            sys.stdout.write(f"{ANSI['bright_blue']}{token}{ANSI['reset']}")
-            sys.stdout.flush()
 
     def end_thinking(self) -> None:
-        """Close the thinking section."""
+        """Close the thinking phase — stop the spinner, render nothing else."""
         self._thinking = False
-        if self.rich and self._live:
-            self._live.stop()
-            self._live = None
-        elif not self.rich:
-            print()
+        self._think_buffer = ""
+        self.stop_spinner()
 
     def stream_token(self, token: str) -> None:
         """Push a token directly to the terminal as plain, incremental text."""
+        self.stop_spinner()
         if self._thinking:
             self.end_thinking()
         if not self._stream_buffer:
             # First answer token — switch the stream to clean white.
-            sys.stdout.write(ANSI["bright_white"])
+            if not self.rich:
+                sys.stdout.write(ANSI["bright_white"])
         self._stream_buffer += token
         sys.stdout.write(token)
         sys.stdout.flush()
@@ -373,8 +431,9 @@ class TerminalUI:
             self._live.stop()
             self._live = None
         # Reset the white answer color started by the first streamed token.
-        sys.stdout.write(ANSI["reset"])
-        sys.stdout.flush()
+        if not self.rich:
+            sys.stdout.write(ANSI["reset"])
+            sys.stdout.flush()
         print()
         print()
 
@@ -589,18 +648,66 @@ class TerminalUI:
 
     # ── Input prompt ───────────────────────────────────────────────
 
+    @staticmethod
+    def _drain_pending_stdin(first_line: str) -> str:
+        """If text was just pasted, the remaining lines are already sitting in
+        the stdin buffer. Read them all and return the full multi-line text.
+
+        Uses ``select`` with a zero timeout to detect buffered input without
+        blocking. On Windows, ``select`` doesn't work on console handles, so
+        we use ``msvcrt`` to detect a pending paste and then read whole lines
+        from ``sys.stdin`` (which by then contains the pasted tail).
+        """
+        lines = [first_line]
+
+        if _IS_WINDOWS and msvcrt is not None:
+            # If kbhit() is True right after input() returned, the user pasted
+            # and the tail is waiting in the console buffer.
+            if not msvcrt.kbhit():
+                return first_line
+            # Give the console a tick to flush the full paste into stdin.
+            time.sleep(0.05)
+            # Read until the buffer is empty AND we've hit a line boundary.
+            while True:
+                line = sys.stdin.readline()
+                if not line:
+                    break
+                lines.append(line.rstrip("\r\n"))
+                # Small grace period: if more chars arrive immediately, keep
+                # reading. Otherwise we've consumed the whole paste.
+                time.sleep(0.01)
+                if not msvcrt.kbhit():
+                    break
+            return "\n".join(lines)
+
+        # POSIX path — select on stdin works.
+        try:
+            import select as _select
+
+            while _select.select([sys.stdin], [], [], 0.0)[0]:
+                line = sys.stdin.readline()
+                if not line:
+                    break
+                lines.append(line.rstrip("\r\n"))
+        except (OSError, ValueError, ImportError):
+            pass
+
+        return "\n".join(lines)
+
     def prompt(self) -> str:
         if self.rich:
             from rich.prompt import Prompt
 
-            return Prompt.ask(
+            first = Prompt.ask(
                 f"[{BRAND['primary']}]›[/{BRAND['primary']}]",
                 console=self._console,
             )
+            return self._drain_pending_stdin(first)
         try:
-            return input(f"{ANSI['bold']}{ANSI['cyan']}› {ANSI['reset']}")
+            first = input(f"{ANSI['bold']}{ANSI['cyan']}› {ANSI['reset']}")
         except (EOFError, KeyboardInterrupt):
             return ""
+        return self._drain_pending_stdin(first)
 
 
 # ── Web UI (browser front end over WebSocket) ────────────────────────────────

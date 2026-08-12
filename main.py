@@ -569,6 +569,7 @@ async def run_one_shot(agent: CodingAgent, message: str):
     agent.stream_callback = ui.stream_token
     agent.think_callback = ui.stream_think_token
     ui.start_streaming()
+    ui.start_spinner("working…")
     result = ""
     try:
         result = await agent.run(message)
@@ -576,9 +577,11 @@ async def run_one_shot(agent: CodingAgent, message: str):
         ui.error(f"Agent error: {e}")
         result = ""
     finally:
+        ui.stop_spinner()
         ui.end_streaming()
     if result and not ui.streamed_chars:
         ui.markdown(result)
+    ui.play_done_sound()
 
 
 async def run_one_shot_json(agent: CodingAgent, message: str):
@@ -661,6 +664,7 @@ async def run_repl(agent: CodingAgent):
         agent.stream_callback = ui.stream_token
         agent.think_callback = ui.stream_think_token
         ui.start_streaming()
+        ui.start_spinner("working…")
         result = ""
         try:
             result = await agent.run(user_input)
@@ -668,9 +672,11 @@ async def run_repl(agent: CodingAgent):
             ui.error(f"Agent error: {e}")
             result = ""
         finally:
+            ui.stop_spinner()
             ui.end_streaming()
         if result and not ui.streamed_chars:
             ui.markdown(result)
+        ui.play_done_sound()
 
 
 # ── "model" CLI subcommand ─────────────────────────────────────────────
