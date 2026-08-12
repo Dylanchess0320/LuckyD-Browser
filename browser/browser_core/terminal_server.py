@@ -331,7 +331,11 @@ class TerminalServer:
         try:
             cols, rows, shell = _client_options(ws)
             pty = _spawn_pty(
-                self.cli_path, shell=shell, cols=cols, rows=rows, cli2_path=self.cli2_path
+                self.cli_path,
+                shell=shell,  # nosec B604
+                cols=cols,
+                rows=rows,
+                cli2_path=self.cli2_path,
             )
         except Exception as exc:  # pywinpty missing or spawn failed
             with contextlib.suppress(Exception):

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import os
 
+import pytest
+
 
 class TestProviders:
     def test_zai_provider_resolution(self):
@@ -139,6 +141,13 @@ class TestSessionStore:
 
 
 class TestRulesLoader:
+    @pytest.fixture(autouse=True)
+    def _isolate_rules_dirs(self, tmp_path, monkeypatch):
+        """Keep these tests hermetic: load_project_rules() always scans the cwd and
+        config.PROJECT_DIR, and this repo's root ships a LUCKYD.md rules file."""
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr("config.PROJECT_DIR", tmp_path)
+
     def test_loads_agents_md(self, tmp_path):
         from core.rules_loader import load_project_rules
 

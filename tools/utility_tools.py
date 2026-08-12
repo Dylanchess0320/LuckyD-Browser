@@ -141,9 +141,10 @@ class ProcessTool(ToolBase):
             elif op == "start":
                 pid = str(uuid.uuid4())[:8]
                 work_dir = cwd or os.getcwd()
+                # shell=True is the point: run the background command exactly as typed.
                 proc = subprocess.Popen(
                     command,
-                    shell=True,
+                    shell=True,  # nosec B602
                     cwd=work_dir,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,

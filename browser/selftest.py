@@ -186,16 +186,16 @@ check(
 from browser_core.dashboard import workflows_html
 from browser_core.terminal_page import terminal_html
 
-_ps_page = terminal_html(None, shell="powershell")
+_ps_page = terminal_html(None, shell="powershell")  # nosec B604
 check(
     "terminal page shell injection",
     "&shell=" in _ps_page and 'let SHELL = "powershell"' in _ps_page,
 )
 check(
     "terminal page sanitizes shell",
-    'let SHELL = "agent"' in terminal_html(None, shell='bogus";alert(1)'),
+    'let SHELL = "agent"' in terminal_html(None, shell='bogus";alert(1)'),  # nosec B604
 )
-_agent2_page = terminal_html(None, shell="agent2")
+_agent2_page = terminal_html(None, shell="agent2")  # nosec B604
 check(
     "terminal page second agent",
     'let SHELL = "agent2"' in _agent2_page and 'data-sh="agent2"' in _agent2_page,
@@ -299,7 +299,7 @@ def _api_checks(port: int) -> None:
     base = f"http://127.0.0.1:{port}"
 
     def get(path):
-        with urllib.request.urlopen(base + path, timeout=10) as r:
+        with urllib.request.urlopen(base + path, timeout=10) as r:  # nosec B310
             return json.loads(r.read())
 
     def post(path, payload, timeout=15):
@@ -309,7 +309,7 @@ def _api_checks(port: int) -> None:
             headers={"Content-Type": "application/json"},
             method="POST",
         )
-        with urllib.request.urlopen(req, timeout=timeout) as r:
+        with urllib.request.urlopen(req, timeout=timeout) as r:  # nosec B310
             return json.loads(r.read())
 
     try:
@@ -354,7 +354,7 @@ def _api_checks(port: int) -> None:
     except Exception as exc:
         API_RESULTS.append(("control API /tabs", False, str(exc)))
     try:
-        with urllib.request.urlopen(base + "/dashboard", timeout=10) as r:
+        with urllib.request.urlopen(base + "/dashboard", timeout=10) as r:  # nosec B310
             dash = r.read().decode("utf-8", errors="replace")
         API_RESULTS.append(
             (
@@ -368,7 +368,7 @@ def _api_checks(port: int) -> None:
     try:
         # urllib follows the 302 to the exe UI when the harness is up;
         # otherwise the auto-start splash is served — both say "Coding Agent".
-        with urllib.request.urlopen(base + "/hq", timeout=15) as r:
+        with urllib.request.urlopen(base + "/hq", timeout=15) as r:  # nosec B310
             hq = r.read().decode("utf-8", errors="replace")
         API_RESULTS.append(("control API /hq gateway", "Coding Agent" in hq, ""))
     except Exception as exc:

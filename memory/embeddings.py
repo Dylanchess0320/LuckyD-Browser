@@ -63,7 +63,8 @@ def is_available() -> bool:
             _download_model()
 
         _session = ort.InferenceSession(str(MODEL_PATH))
-        _tokenizer = AutoTokenizer.from_pretrained(f"sentence-transformers/{MODEL_ID}")
+        model_ref = f"sentence-transformers/{MODEL_ID}"  # trusted constant
+        _tokenizer = AutoTokenizer.from_pretrained(model_ref)  # nosec B615
         _onnx_available = True
         return True
     except Exception:
@@ -78,7 +79,7 @@ def _download_model() -> None:
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
 
     print(f"  [EMBED] Downloading ONNX model '{MODEL_ID}' (~80 MB)...")
-    urllib.request.urlretrieve(MODEL_URL, MODEL_PATH)
+    urllib.request.urlretrieve(MODEL_URL, MODEL_PATH)  # nosec B310
     print(f"  [EMBED] Model saved to {MODEL_PATH}")
 
 

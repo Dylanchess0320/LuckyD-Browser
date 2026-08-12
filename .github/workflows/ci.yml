@@ -83,8 +83,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         # Not continue-on-error: this repo has already leaked a live API key once.
 
-      - name: Dependency Scanning (Safety)
-        run: safety scan -r requirements.txt --disable-telemetry
+      - name: Dependency Scanning (pip-audit)
+        # safety>=3.0 requires an interactive platform login, which can never
+        # succeed in CI; pip-audit (PyPA, OSV DB) needs no auth and stays a hard gate.
+        run: pip-audit -r requirements.txt
 
       - name: SAST (Bandit)
         run: bandit -r tools llm memory project features core browser --severity medium --quiet

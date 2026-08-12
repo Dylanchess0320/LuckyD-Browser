@@ -14,6 +14,13 @@ from .base import ToolBase, ToolOutput
 from .registry import register_tool
 
 
+def _require_http_scheme(url: str) -> None:
+    """Reject non-HTTP(S) URLs so urlopen can't reach file:/ or custom schemes."""
+    scheme = urllib.parse.urlparse(url).scheme.lower()
+    if scheme not in ("http", "https"):
+        raise ValueError(f"Unsupported URL scheme {scheme!r}: only http/https are allowed")
+
+
 class HttpTool(ToolBase):
     name = "Http"
     description = "Make an HTTP request to any URL. Supports GET, POST, PUT, PATCH, DELETE with JSON body and auth."
@@ -74,11 +81,12 @@ class HttpTool(ToolBase):
                 data = json.dumps(json_body).encode("utf-8")
                 req_headers.setdefault("Content-Type", "application/json")
 
+            _require_http_scheme(url)
             req = urllib.request.Request(url, data=data, method=method.upper())
             for k, v in req_headers.items():
                 req.add_header(k, v)
 
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:  # nosec B310
                 body = resp.read().decode("utf-8", errors="replace")
                 status = resp.status
 
@@ -133,8 +141,9 @@ class WebFetchTool(ToolBase):
     @staticmethod
     def _do_fetch(url: str) -> ToolOutput:
         try:
+            _require_http_scheme(url)
             req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 CodingAgent/2.0"})
-            with urllib.request.urlopen(req, timeout=30) as resp:
+            with urllib.request.urlopen(req, timeout=30) as resp:  # nosec B310
                 html = resp.read().decode("utf-8", errors="replace")
 
             # Simple HTML text extraction
@@ -237,7 +246,7 @@ class WebSearchTool(ToolBase):
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
                 },
             )
-            with urllib.request.urlopen(req, timeout=15) as resp:
+            with urllib.request.urlopen(req, timeout=15) as resp:  # nosec B310
                 html_text = resp.read().decode("utf-8", errors="replace")
 
             # Extract results via HTML scraping

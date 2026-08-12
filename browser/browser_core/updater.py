@@ -30,6 +30,7 @@ from __future__ import annotations
 import json
 import re
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
@@ -98,7 +99,7 @@ class GitHubReleasesSource:
                 "Accept": "application/vnd.github+json",
             },
         )
-        with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
+        with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:  # nosec B310
             data = json.loads(resp.read().decode("utf-8", "replace"))
 
         tag = data.get("tag_name") or data.get("name") or ""
@@ -195,11 +196,16 @@ class ReleaseDownloader(QThread):
 
     def run(self) -> None:
         try:
+            if urllib.parse.urlparse(self.url).scheme.lower() not in ("http", "https"):
+                raise ValueError(f"Unsupported download URL: {self.url!r}")
             req = urllib.request.Request(self.url, headers={"User-Agent": _USER_AGENT})
             self.dest.parent.mkdir(parents=True, exist_ok=True)
             tmp = self.dest.with_suffix(self.dest.suffix + ".part")
             received = 0
-            with urllib.request.urlopen(req, timeout=30) as resp, open(tmp, "wb") as fh:
+            with (
+                urllib.request.urlopen(req, timeout=30) as resp,  # nosec B310
+                open(tmp, "wb") as fh,
+            ):
                 total = int(resp.headers.get("Content-Length") or self.expected_size or 0)
                 while True:
                     chunk = resp.read(1 << 16)  # 64 KiB

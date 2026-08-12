@@ -58,7 +58,7 @@ dev = [
     "mkdocstrings>=0.24,<1.0",
     "pydocstyle>=6.3,<7.0",
     "bandit>=1.7,<2.0",
-    "safety>=3.0,<4.0",
+    "pip-audit>=2.6,<3.0",
     "vulture>=2.10,<3.0",
 ]
 onnx = [
@@ -213,7 +213,17 @@ exclude_lines = [
 
 # ── Bandit: Security linter ──────────────────────────────────────────
 [tool.bandit]
-exclude_dirs = ["tests", "venv", ".venv", "__pycache__", "node_modules"]
+exclude_dirs = [
+    "tests",
+    "venv",
+    ".venv",
+    "__pycache__",
+    "node_modules",
+    "dist",
+    "build",
+    "browser/dist",
+    "browser/build",
+]
 # B603/B607 (subprocess w/ untrusted input, partial executable path) are NOT skipped:
 # bash_tool.py/PowerShellTool are exactly what these checks exist to catch.
 skips = ["B101", "B311", "B403", "B404"]

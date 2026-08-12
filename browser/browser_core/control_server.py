@@ -335,7 +335,8 @@ def make_handler(backend, token: str = "", harness=None, settings=None):
                     return self._hq(query)
                 if path == "/terminal":
                     shell = (query.get("shell") or ["agent"])[0]
-                    return self._send_html(terminal_html(settings, shell=shell))
+                    # B604 false positive: `shell` is an allowlisted terminal profile name.
+                    return self._send_html(terminal_html(settings, shell=shell))  # nosec B604
                 if path.startswith("/static/terminal/"):
                     return self._terminal_asset(path)
                 if path == "/status":
