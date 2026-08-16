@@ -1,0 +1,22 @@
+{
+  "name": "Nexus — AI Chat",
+  "short_name": "Nexus",
+  "description": "One app for every AI — GPT, Claude, Gemini, Grok, Llama & 300+ models with streaming, vision, voice and web search.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0d0d10",
+  "theme_color": "#0d0d10",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icon-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "New chat",
+      "url": "/?new=1",
+      "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    }
+  ]
+}
