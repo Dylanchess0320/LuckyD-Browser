@@ -22,6 +22,10 @@ venv/
 env/
 .venv_*/
 
+# ── Node / Web ─────────────────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+
 # ── IDE / Editor ──────────────────────────────────────────────────────
 .vscode/settings.json
 .vscode/launch.json
@@ -109,3 +113,19 @@ selftest_err.txt
 browser/LuckyD-Launch/*.exe
 browser/installer/output/*.exe
 browser/installer/output/
+
+# ── Nexus app (Capacitor/React) build artifacts ───────────────────────
+*.apk
+nexus-app-debug.apk
+nexus-screenshot.png
+nexus/android/
+nexus/crash-log.txt
+nexus/build-and-install-log*.txt
+nexus/gradle-build.log
+nexus/build-and-install.bat
+nexus/_removed/
+build-apk.bat
+build-apk.sh
+
+# ── Vendored third-party reference codebases ──────────────────────────
+external/
