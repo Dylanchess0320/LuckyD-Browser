@@ -35,6 +35,10 @@ a = Analysis(
            ('../memory', 'memory'),
            ('../tools', 'tools'),
            ('../skills', 'skills'),
+           # Ship browser_core (esp. cline_session.py) as a data folder so the
+           # bundled core/providers.py can locate it at browser/browser_core/
+           # relative to _internal (its __file__.parent.parent) in the frozen app.
+           ('browser_core', 'browser/browser_core'),
            ('../luckyd-code.exe', '.'),
            # Ship the clean template (never the dev .env — it holds real keys),
            # plus a ready-made _internal/.env so the bundled harness/terminal
