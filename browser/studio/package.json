@@ -4,6 +4,7 @@
   "private": true,
   "description": "LuckyD YouTube deck generator - Marp pipeline with real-browser overflow checking",
   "dependencies": {
+    "@marp-team/marp-cli": "^4.5.0",
     "puppeteer": "^23.0.0"
   },
   "allowScripts": {

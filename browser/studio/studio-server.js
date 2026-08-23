@@ -4,12 +4,16 @@
 // Deck Studio — the local HTTP service that lets LuckyD Browser use
 // the Marp pipeline as a platform tile (Phase 3 of the platform plan).
 //
-//   GET  /health                 -> {"ok":true}  (dashboard probe)
-//   GET  /api/decks              -> JSON list of decks/*.md
-//   POST /api/build  {deck:..}   -> runs build.js (paginate -> images ->
-//                                  filter -> video -> marp -> verify-fit
-//                                  repair loop), returns the export URL
-//   GET  /export/<file>          -> serves exported decks + images
+//   GET    /health                 -> {"ok":true}  (dashboard probe)
+//   GET    /api/decks              -> JSON list of decks/*.md
+//   GET    /api/deck/<name>        -> raw markdown of one deck
+//   POST   /api/decks              -> create/save a deck {"name","content"}
+//   DELETE /api/decks/<name>       -> delete a deck
+//   POST   /api/build  {deck:..}   -> runs build.js (paginate -> images ->
+//                                     filter -> video -> marp -> verify-fit
+//                                     repair loop), returns the export URL
+//   GET    /export/<file>          -> serves exported decks + images
+//                                     (?download=1 forces a download)
 //
 // Run:  node studio-server.js [port]        (default 8770)
 //
@@ -38,12 +42,36 @@ try {
   marpCliPath = cfg.marpCliPath || null;
 } catch (e) { /* no config file — fine */ }
 if (!marpCliPath) {
-  try { marpCliPath = require.resolve("@marp-team/marp-cli"); } catch (e) { /* npx fallback below */ }
+  // NOTE: the package *bin* is marp-cli.js at the root — lib/index.js is a
+  // library entry that no-ops when executed directly.
+  for (const cand of ["@marp-team/marp-cli/marp-cli.js", "@marp-team/marp-cli"]) {
+    try { marpCliPath = require.resolve(cand); break; } catch (e) { /* next */ }
+  }
 }
 
-function send(res, code, body, type = "application/json") {
-  res.writeHead(code, { "Content-Type": type, "Cache-Control": "no-store" });
-  res.end(typeof body === "string" ? body : JSON.stringify(body));
+function send(res, code, body, type = "application/json", extra = {}) {
+  res.writeHead(code, Object.assign({ "Content-Type": type, "Cache-Control": "no-store" }, extra));
+  res.end(typeof body === "string" || Buffer.isBuffer(body) ? body : JSON.stringify(body));
+}
+
+function readBody(req) {
+  return new Promise((resolve) => {
+    let body = "";
+    req.on("data", (c) => (body += c));
+    req.on("end", () => resolve(body));
+  });
+}
+
+async function readJsonBody(req) {
+  const body = await readBody(req);
+  try { return JSON.parse(body || "{}"); } catch (e) { return null; }
+}
+
+// Only plain filenames inside decks/. Rejects traversal and _-prefixed temps.
+function safeDeckName(name) {
+  const base = path.basename(String(name || "").trim());
+  if (!base || base.startsWith("_") || /[\\/:*?"<>|]/.test(base)) return null;
+  return base.toLowerCase().endsWith(".md") ? base : base + ".md";
 }
 
 function listDecks() {
@@ -52,8 +80,14 @@ function listDecks() {
       .filter((f) => f.toLowerCase().endsWith(".md") && !f.startsWith("_"))
       .map((f) => {
         const st = fs.statSync(path.join(DECKS_DIR, f));
-        return { deck: f, modified: st.mtime.toISOString() };
-      });
+        const html = path.join(EXPORT_DIR, f.replace(/\.md$/i, ".html"));
+        return {
+          deck: f,
+          modified: st.mtime.toISOString(),
+          built: fs.existsSync(html),
+        };
+      })
+      .sort((a, b) => b.modified.localeCompare(a.modified));
   } catch (e) { return []; }
 }
 
@@ -82,85 +116,222 @@ function buildDeck(deckName) {
 const MIME = { ".html": "text/html", ".png": "image/png", ".jpg": "image/jpeg",
   ".css": "text/css", ".md": "text/markdown" };
 
-const server = http.createServer((req, res) => {
+const NEW_DECK_TEMPLATE = [
+  "---",
+  "marp: true",
+  "theme: black-green",
+  "paginate: true",
+  "---",
+  "",
+  "# My new deck",
+  "",
+  "---",
+  "",
+  "## Slide 2",
+  "",
+  "- point one",
+  "- point two",
+  "",
+].join("\n");
+
+const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, `http://127.0.0.1:${PORT}`);
   try {
     if (u.pathname === "/health") return send(res, 200, { ok: true, service: "deck-studio",
       building, lastResult });
 
-    if (u.pathname === "/api/decks") return send(res, 200, { decks: listDecks() });
+    // ── deck CRUD ────────────────────────────────────────────────────
+    if (u.pathname === "/api/decks" && req.method === "GET") {
+      return send(res, 200, { decks: listDecks() });
+    }
 
+    if (u.pathname === "/api/decks" && req.method === "POST") {
+      const data = await readJsonBody(req);
+      if (!data) return send(res, 400, { error: "invalid JSON body" });
+      const name = safeDeckName(data.name);
+      if (!name) return send(res, 400, { error: "invalid deck name" });
+      if (typeof data.content !== "string" || !data.content.trim())
+        return send(res, 400, { error: "content must be a non-empty string" });
+      fs.mkdirSync(DECKS_DIR, { recursive: true });
+      fs.writeFileSync(path.join(DECKS_DIR, name), data.content, "utf8");
+      return send(res, 200, { ok: true, deck: name, saved: true });
+    }
+
+    let m;
+    if ((m = u.pathname.match(/^\/api\/deck\/(.+)$/)) && req.method === "GET") {
+      const name = safeDeckName(decodeURIComponent(m[1]));
+      const p = name && path.join(DECKS_DIR, name);
+      if (!p || !fs.existsSync(p)) return send(res, 404, { error: "deck not found" });
+      return send(res, 200, { name, content: fs.readFileSync(p, "utf8") });
+    }
+
+    if ((m = u.pathname.match(/^\/api\/decks\/(.+)$/)) && req.method === "DELETE") {
+      const name = safeDeckName(decodeURIComponent(m[1]));
+      const p = name && path.join(DECKS_DIR, name);
+      if (!p || !fs.existsSync(p)) return send(res, 404, { error: "deck not found" });
+      fs.unlinkSync(p);
+      return send(res, 200, { ok: true, deleted: name });
+    }
+
+    // ── build ────────────────────────────────────────────────────────
     if (u.pathname === "/api/build") {
       if (req.method !== "POST") return send(res, 405, { error: "use POST" });
-      let body = "";
-      req.on("data", (c) => (body += c));
-      req.on("end", () => {
-        if (building) return send(res, 409, { error: "a build is already running" });
-        let deck;
-        try { deck = JSON.parse(body || "{}").deck; } catch (e) {}
-        if (!deck) return send(res, 400, { error: 'body must be {"deck": "name.md"}' });
-        building = true;
-        // Build off the request thread so the health endpoint stays live.
-        setImmediate(() => {
-          try { lastResult = buildDeck(deck); send(res, 200, lastResult); }
-          catch (e) {
-            lastResult = { ok: false, error: String(e.message || e).slice(0, 500) };
-            send(res, 500, lastResult);
-          } finally { building = false; }
-        });
+      const data = await readJsonBody(req);
+      if (building) return send(res, 409, { error: "a build is already running" });
+      const deck = data && data.deck;
+      if (!deck) return send(res, 400, { error: 'body must be {"deck": "name.md"}' });
+      building = true;
+      // Build off the request thread so the health endpoint stays live.
+      setImmediate(() => {
+        try { lastResult = buildDeck(deck); send(res, 200, lastResult); }
+        catch (e) {
+          lastResult = { ok: false, error: String(e.message || e).slice(0, 500) };
+          send(res, 500, lastResult);
+        } finally { building = false; }
       });
       return;
     }
 
+    // ── exports ──────────────────────────────────────────────────────
     if (u.pathname.startsWith("/export/")) {
       const rel = decodeURIComponent(u.pathname.slice("/export/".length));
       const file = path.normalize(path.join(EXPORT_DIR, rel));
       if (!file.startsWith(EXPORT_DIR)) return send(res, 403, { error: "forbidden" });
       if (!fs.existsSync(file) || !fs.statSync(file).isFile())
         return send(res, 404, { error: "not found" });
+      const extra = {};
+      if (u.searchParams.get("download"))
+        extra["Content-Disposition"] =
+          `attachment; filename="${path.basename(file)}"`;
       return send(res, 200, fs.readFileSync(file),
-        MIME[path.extname(file).toLowerCase()] || "application/octet-stream");
+        MIME[path.extname(file).toLowerCase()] || "application/octet-stream", extra);
     }
 
     if (u.pathname === "/" || u.pathname === "/index.html") {
       const decks = listDecks();
-      const rows = decks.map(d =>
-        `<div class="row"><b>${d.deck}</b><span class="sp"></span>` +
-        `<button onclick="build('${encodeURIComponent(d.deck)}',this)">Build</button>` +
-        `<a class="view" href="/export/${encodeURIComponent(d.deck.replace(/\.md$/i, ".html"))}" target="_blank">view</a></div>`
-      ).join("") || '<div class="empty">No .md decks found in decks\\</div>';
+      const rows = decks.map((d) => {
+        const htmlName = d.deck.replace(/\.md$/i, ".html");
+        const enc = encodeURIComponent(d.deck);
+        const built = d.built
+          ? '<span class="badge ok">built</span>'
+          : '<span class="badge">not built</span>';
+        return `<div class="row"><b>${d.deck}</b>${built}<span class="sp"></span>` +
+          `<button onclick="build('${enc}',this)">Build</button>` +
+          `<button class="ghost" onclick="editDeck('${enc}')">Edit</button>` +
+          (d.built
+            ? `<a class="view" href="/export/${encodeURIComponent(htmlName)}" target="_blank">Open ↗</a>` +
+              `<a class="btn ghost" href="/export/${encodeURIComponent(htmlName)}?download=1">⬇ Download</a>`
+            : "") +
+          `<button class="ghost danger" onclick="delDeck('${enc}')">🗑</button></div>`;
+      }).join("") ||
+        '<div class="empty">No decks yet — click "＋ New deck" or upload a .md file.</div>';
       return send(res, 200, `<!DOCTYPE html><html><head><meta charset="utf-8">
-<title>Deck Studio</title><style>
-body{font:600 15px 'Segoe UI Variable','Segoe UI',system-ui,sans-serif;color:#e8eaf2;
-background:linear-gradient(135deg,#0b1020,#101a30 45%,#1a1030);min-height:100vh;margin:0;padding:40px}
-h1{margin:0 0 4px}.sub{color:#9aa1b5;font-size:13px;margin-bottom:24px}
-.row{display:flex;gap:10px;align-items:center;background:rgba(255,255,255,.06);
-border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:12px 16px;margin-bottom:10px}
-button{background:linear-gradient(90deg,#5b9dff,#b46bff);border:none;color:#fff;
-font-weight:600;padding:8px 18px;border-radius:9px;cursor:pointer}
-button:disabled{opacity:.5}.empty{color:#9aa1b5}.sp{flex:1}
-a.view{color:#5b9dff}#log{white-space:pre-wrap;font:12px Consolas,monospace;
-color:#94a3b8;margin-top:18px;max-height:300px;overflow:auto}</style></head><body>
+<title>Deck Studio</title><link rel="stylesheet" href="/app.css"></head><body>
 <h1>🎬 Deck Studio</h1>
-<div class="sub">Marp pipeline: paginate → AI images → word filter → video embed → render → verified-fit repair loop.</div>
+<div class="sub">Add Markdown → Build → View &amp; download the finished presentation. Pipeline: paginate → AI images → word filter → video embed → Marp render → verified-fit repair loop.</div>
+<div class="bar">
+  <button onclick="newDeck()">＋ New deck</button>
+  <button class="ghost" onclick="document.getElementById('up').click()">⬆ Upload .md</button>
+  <input type="file" id="up" multiple accept=".md,text/markdown" style="display:none">
+  <span class="sp"></span>
+  <span class="sub" style="margin:0">${decks.length} deck(s)</span>
+</div>
 ${rows}<div id="log"></div>
-<script>
+<dialog id="ed">
+  <h2 style="margin:8px 0">✏️ Deck editor</h2>
+  <input type="text" id="edname" placeholder="my-deck.md">
+  <textarea id="edtext" spellcheck="false"></textarea>
+  <div class="dlgbar">
+    <button onclick="saveDeck(this)">💾 Save</button>
+    <button class="ghost" onclick="document.getElementById('ed').close()">Close</button>
+    <span class="sp"></span><span class="sub" style="margin:0">Markdown (Marp) — separate slides with ---</span>
+  </div>
+</dialog>
+<script src="/app.js"></script></body></html>`, "text/html");
+    }
+
+    if (u.pathname === "/app.css") {
+      const css = `body{font:600 15px 'Segoe UI Variable','Segoe UI',system-ui,sans-serif;color:#e8eaf2;
+background:linear-gradient(135deg,#0b1020,#101a30 45%,#1a1030);min-height:100vh;margin:0;padding:40px}
+h1{margin:0 0 4px}.sub{color:#9aa1b5;font-size:13px;margin-bottom:20px}
+.bar{display:flex;gap:10px;margin-bottom:22px;align-items:center}
+.row{display:flex;gap:10px;align-items:center;background:rgba(255,255,255,.06);
+border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:12px 16px;margin-bottom:10px;flex-wrap:wrap}
+button,.btn{background:linear-gradient(90deg,#5b9dff,#b46bff);border:none;color:#fff;
+font-weight:600;padding:8px 18px;border-radius:9px;cursor:pointer;text-decoration:none;display:inline-block;font-size:13px}
+button.ghost,.btn.ghost{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2)}
+button.danger{background:rgba(255,80,80,.25)}
+button:disabled{opacity:.5}.empty{color:#9aa1b5}.sp{flex:1}
+.badge{font-size:11px;color:#9aa1b5;border:1px solid rgba(255,255,255,.15);border-radius:99px;padding:2px 10px;margin-left:10px}
+.badge.ok{color:#34d399;border-color:rgba(52,211,153,.4)}
+a.view{color:#5b9dff;text-decoration:none}a.view:hover{text-decoration:underline}
+#log{white-space:pre-wrap;font:12px Consolas,monospace;color:#94a3b8;margin-top:18px;max-height:300px;overflow:auto}
+dialog{background:#141c30;color:#e8eaf2;border:1px solid rgba(255,255,255,.15);border-radius:14px;width:min(860px,92vw)}
+dialog::backdrop{background:rgba(0,0,0,.55)}
+textarea{width:100%;box-sizing:border-box;height:52vh;background:#0d1424;color:#dfe6f5;
+border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:12px;font:13px Consolas,monospace;resize:vertical}
+.dlgbar{display:flex;gap:10px;margin-top:12px;align-items:center}
+input[type=text]{flex:1;background:#0d1424;color:#e8eaf2;border:1px solid rgba(255,255,255,.15);border-radius:9px;padding:9px 12px;font-weight:600}`;
+      return send(res, 200, css, "text/css");
+    }
+
+    if (u.pathname === "/app.js") {
+      const js = `const NEW = ['---','marp: true','theme: black-green','paginate: true','---','','# Title','','Your first slide.',''].join('\\n');
+function log(t){ document.getElementById('log').textContent += t + '\\n'; }
 async function build(name, btn) {
-  btn.disabled = true; const log = document.getElementById('log');
-  log.textContent = 'building ' + decodeURIComponent(name) + ' …';
+  btn.disabled = true; log('building ' + decodeURIComponent(name) + ' …');
   try {
     const r = await fetch('/api/build', {method:'POST', body: JSON.stringify({deck: decodeURIComponent(name)})});
     const j = await r.json();
-    log.textContent = j.ok ? ('done in ' + j.seconds + 's') : ('FAILED: ' + (j.error||''));
-    if (j.ok) window.open(j.url, '_blank');
-  } catch (e) { log.textContent = 'error: ' + e; }
+    if (j.ok) { log('done in ' + j.seconds + 's'); window.open(j.url, '_blank'); setTimeout(()=>location.reload(), 800); }
+    else log('FAILED: ' + (j.error||''));
+  } catch (e) { log('error: ' + e); }
   btn.disabled = false;
 }
-</script></body></html>`, "text/html");
+async function editDeck(name) {
+  const n = decodeURIComponent(name);
+  const r = await fetch('/api/deck/' + encodeURIComponent(n)); const j = await r.json();
+  document.getElementById('edname').value = j.name || n;
+  document.getElementById('edname').disabled = true;
+  document.getElementById('edtext').value = j.content || '';
+  document.getElementById('ed').showModal();
+}
+function newDeck() {
+  document.getElementById('edname').value = '';
+  document.getElementById('edname').disabled = false;
+  document.getElementById('edtext').value = NEW;
+  document.getElementById('ed').showModal();
+  document.getElementById('edname').focus();
+}
+async function saveDeck(btn) {
+  btn.disabled = true;
+  const r = await fetch('/api/decks', {method:'POST',
+    body: JSON.stringify({name: document.getElementById('edname').value,
+                          content: document.getElementById('edtext').value})});
+  const j = await r.json(); btn.disabled = false;
+  if (r.ok) { document.getElementById('ed').close(); log('saved ' + j.deck); setTimeout(()=>location.reload(), 500); }
+  else log('save FAILED: ' + (j.error||''));
+}
+async function delDeck(name) {
+  const n = decodeURIComponent(name);
+  if (!confirm('Delete deck ' + n + '?')) return;
+  const r = await fetch('/api/decks/' + encodeURIComponent(n), {method:'DELETE'});
+  if (r.ok) { log('deleted ' + n); setTimeout(()=>location.reload(), 400); } else log('delete FAILED');
+}
+document.getElementById('up').addEventListener('change', async (ev) => {
+  let uploaded = 0;
+  for (const file of ev.target.files) {
+    const text = await file.text();
+    const r = await fetch('/api/decks', {method:'POST',
+      body: JSON.stringify({name: file.name, content: text})});
+    if (r.ok) { uploaded++; log('uploaded ' + file.name); }
+    else log('upload FAILED ' + file.name);
+  }
+  ev.target.value = '';
+  if (uploaded) setTimeout(()=>location.reload(), 500);
+});`;
+      return send(res, 200, js, "application/javascript");
     }
-
-    send(res, 200, { service: "LuckyD Deck Studio",
-      endpoints: ["/health", "/api/decks", "POST /api/build {deck}", "/export/<file>"] });
   } catch (e) {
     send(res, 500, { error: String(e.message || e).slice(0, 300) });
   }
@@ -168,3 +339,4 @@ async function build(name, btn) {
 
 server.listen(PORT, "127.0.0.1", () =>
   console.log(`[deck-studio] listening on http://127.0.0.1:${PORT} (marp: ${marpCliPath || "npx fallback"})`));
+
