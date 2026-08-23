@@ -179,14 +179,34 @@ function cacheInfoFor(spec, imagesDir) {
     return { fileName, filePath: path.join(imagesDir, fileName) };
 }
 
-// Generates (or reuses a cached) image for one [gen: ...] tag match.
+// Cache filenames claimed during THIS run. Two slides must never share an
+// image, so if two tags hash to the same file (identical prompts), later
+// ones get a variant suffix that changes both the cache key AND the
+// generated picture (the salt flows into the Pollinations URL too).
+const claimedFiles = new Set();
+let variantCounter = 0;
+
+function uniqueCacheInfoFor(spec, imagesDir) {
+    let info = cacheInfoFor(spec, imagesDir);
+    while (claimedFiles.has(info.fileName)) {
+        spec = {
+            ...spec,
+            prompt: `${spec.prompt}, variation ${++variantCounter}`,
+        };
+        info = cacheInfoFor(spec, imagesDir);
+    }
+    claimedFiles.add(info.fileName);
+    return { spec, ...info };
+}
+
+// Generates a guaranteed-unique image for one [gen: ...] tag match.
 // maxAttempts is overridable so the final cooldown retry pass can use a
 // smaller attempt count (it's already had its full share of retries).
 async function generateOne(match, imagesDir, maxAttempts = MAX_ATTEMPTS) {
-    const spec = parseTag(match[1]);
-    if (!spec) return { match, ok: false, skip: true };
+    const parsed = parseTag(match[1]);
+    if (!parsed) return { match, ok: false, skip: true };
 
-    const { fileName, filePath } = cacheInfoFor(spec, imagesDir);
+    const { spec, fileName, filePath } = uniqueCacheInfoFor(parsed, imagesDir);
 
     try {
         if (!fs.existsSync(filePath)) {
@@ -252,19 +272,31 @@ async function main() {
         }
     }
 
-    let out = src;
+    // Rebuild the output POSITIONALLY from the match offsets. String.replace
+    // only swaps the first occurrence, so two identical tags used to collapse
+    // onto the first slide's image — duplicates are exactly what we never
+    // want. Positional splicing keeps every tag independent.
+    let out = "";
+    let last = 0;
     let ok = 0;
     const stillFailed = [];
-    for (const r of results) {
-        if (!r || r.skip) continue;
+    results.forEach((r, i) => {
+        const m = found[i];
+        out += src.slice(last, m.index);
+        last = m.index + m[0].length;
+        if (!r || r.skip) {
+            out += m[0];
+            return;
+        }
         if (r.ok) {
-            out = out.replace(r.match[0], `![](images/${r.fileName})`);
+            out += `![](images/${r.fileName})`;
             ok++;
         } else {
-            out = out.replace(r.match[0], `> ⚠️ image generation failed: ${r.spec.prompt}`);
+            out += `> ⚠️ image generation failed: ${r.spec.prompt}`;
             stillFailed.push(r.spec.prompt);
         }
-    }
+    });
+    out += src.slice(last);
 
     fs.writeFileSync(output, out, "utf8");
     console.log(`==> Done: ${ok}/${found.length} images ready in ${imagesDir}`);

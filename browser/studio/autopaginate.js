@@ -528,9 +528,8 @@ function slideTextForPrompt(slide) {
 }
 
 // A rotating set of comedic angles so slides don't all get the same
-// flavor of joke - picked deterministically from the slide's own text
-// (not random) so re-running the generator on the same content still
-// hits the same cached image instead of burning a fresh generation.
+// flavor of joke. Rotation is by SCENE NUMBER in buildGenPrompt (not a
+// text hash), so every slide in the deck gets its own distinct look.
 const COMEDIC_STYLES = [
   'absurd visual punchline, exaggerated comedic facial expressions',
   'slapstick energy, over-the-top comedic timing, silly sight gag',
@@ -540,16 +539,14 @@ const COMEDIC_STYLES = [
   'literal/on-the-nose visual pun, taken way too far for a laugh',
 ];
 
-function pickComedicStyle(text) {
-  let hash = 0;
-  for (let i = 0; i < text.length; i++) hash = (hash * 31 + text.charCodeAt(i)) >>> 0;
-  return COMEDIC_STYLES[hash % COMEDIC_STYLES.length];
-}
-
-function buildGenPrompt(slide) {
+function buildGenPrompt(slide, sceneNo) {
   const text = slideTextForPrompt(slide).slice(0, 160);
-  const style = pickComedicStyle(text);
-  return `${text}, hilarious ${style}, vivid concrete comedic illustration, cinematic lighting, dark background with neon green accents`;
+  // Style rotates by SCENE NUMBER (not text hash) so adjacent slides never
+  // share a look, and "unique scene N" guarantees the prompt itself is
+  // distinct per slide — which keeps the genimage cache from ever handing
+  // two slides the same picture.
+  const style = COMEDIC_STYLES[(sceneNo - 1) % COMEDIC_STYLES.length];
+  return `${text}, hilarious ${style}, vivid concrete comedic illustration, cinematic lighting, dark background with neon green accents, unique scene ${sceneNo}`;
 }
 
 function getAvailableImages(imagesDir) {
@@ -571,28 +568,20 @@ function countContentBlocks(text) {
   return trimmed.split(/\r?\n\s*\r?\n/).filter(b => b.trim()).length;
 }
 
-function pickImage(slideText, images, usageCounts) {
+function matchImageByName(slideText, images) {
   const lower = slideText.toLowerCase();
   for (const img of images) {
     const base = path.basename(img, path.extname(img)).toLowerCase();
-    if (base.length >= 3 && lower.includes(base)) {
-      usageCounts[img] = (usageCounts[img] || 0) + 1;
-      return img;
-    }
+    if (base.length >= 3 && lower.includes(base)) return img;
   }
-  let best = images[0];
-  let bestCount = usageCounts[best] || 0;
-  for (const img of images) {
-    const c = usageCounts[img] || 0;
-    if (c < bestCount) { best = img; bestCount = c; }
-  }
-  usageCounts[best] = (usageCounts[best] || 0) + 1;
-  return best;
+  return null;
 }
 
 function insertImagesIntoSlides(text, images) {
   const parts = text.split(/\r?\n[ \t]*---[ \t]*\r?\n/);
-  const usageCounts = {};
+  // Local images already claimed by an earlier slide in THIS deck. Each
+  // image is used at most once — repeats are exactly what we're avoiding.
+  const usedLocal = new Set();
   let sideToggle = 0;
   let insertedCount = 0;
 
@@ -629,7 +618,7 @@ function insertImagesIntoSlides(text, images) {
     return slide.replace(/[ \t]*<!--\s*_class:\s*(.*?)\s*-->[ \t]*\n?/, '');
   }
 
-  const outParts = parts.map((slide) => {
+  const outParts = parts.map((slide, slideIdx) => {
     if (!slide.trim()) return slide;
     if (/!\[[^\]]*\]\([^)]+\)/.test(slide)) return slide; // already has a real image
     if (/!\[gen:/.test(slide)) return slide; // already has a pending AI-image tag
@@ -642,9 +631,25 @@ function insertImagesIntoSlides(text, images) {
     const blocks = countContentBlocks(withoutHeading);
     const weight = weighOf(withoutHeading.split(/\r?\n/));
 
-    const imgLine = images.length
-      ? `![](images/${pickImage(slide, images, usageCounts)})`
-      : `![gen: ${buildGenPrompt(slide)} | flux | 1280x720]`;
+    // UNIQUE IMAGES POLICY: a local image is used at most once per deck.
+    // Name-matched images win first; otherwise the slide takes a fresh,
+    // never-yet-used local image if one remains. When the folder runs dry,
+    // the slide gets its own AI-generated image (scene-numbered prompt)
+    // instead of repeating one another deck's picture.
+    let imgLine;
+    const matched = matchImageByName(slide, images);
+    if (matched) {
+      imgLine = `![](images/${matched})`;
+      usedLocal.add(matched);
+    } else {
+      const fresh = images.find((img) => !usedLocal.has(img));
+      if (fresh) {
+        imgLine = `![](images/${fresh})`;
+        usedLocal.add(fresh);
+      } else {
+        imgLine = `![gen: ${buildGenPrompt(slide, slideIdx + 1)} | flux | 1280x720]`;
+      }
+    }
 
     // Fits comfortably beside the text at half-width - proper side-by-
     // side layout, alternating left/right for visual rhythm. Any
