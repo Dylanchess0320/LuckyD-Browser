@@ -22,12 +22,57 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 import urllib.request
 
-CONFIG_PATH = Path(__file__).with_name("platform_tiles.json")
+
+def _debug_log(msg: str) -> None:
+    """Best-effort trace of registry decisions (temp dir), so silent
+    failures inside frozen builds can be diagnosed from disk."""
+    try:
+        import tempfile
+
+        with open(
+            os.path.join(tempfile.gettempdir(), "luckyd_tiles.log"),
+            "a",
+            encoding="utf-8",
+        ) as f:
+            f.write(f"{time.strftime('%H:%M:%S')} {msg}\n")
+    except Exception:
+        pass
+
+
+def _resolve_config_path() -> Path:
+    """Locate platform_tiles.json in both dev and frozen (PyInstaller) layouts.
+
+    Dev:  the JSON sits next to this file.
+    Frozen: this module lives in the PYZ archive, so __file__ points at a
+    virtual location — the real config ships as data under
+    <_MEIPASS>/browser/browser_core/.
+    """
+    here = Path(__file__).with_name("platform_tiles.json")
+    if here.exists():
+        return here
+    meipass = getattr(sys, "_MEIPASS", None)
+    if meipass:
+        cand = Path(meipass) / "browser" / "browser_core" / "platform_tiles.json"
+        if cand.exists():
+            return cand
+        cand2 = Path(meipass) / "browser_core" / "platform_tiles.json"
+        if cand2.exists():
+            return cand2
+    return here
+
+
+CONFIG_PATH = _resolve_config_path()
+_debug_log(
+    f"tile_registry import: CONFIG_PATH={CONFIG_PATH} "
+    f"exists={CONFIG_PATH.exists()} meipass={getattr(sys, '_MEIPASS', None)!r} "
+    f"file={__file__!r}"
+)
 PROBE_TIMEOUT_SEC = 1.5
 AUTOSTART_RETRY_SEC = 60.0
 
@@ -47,7 +92,17 @@ class Tile:
 
 
 def _expand(p: str) -> str:
-    return os.path.expandvars(os.path.expanduser(p or ""))
+    out = os.path.expandvars(os.path.expanduser(p or ""))
+    # %APPDIR% = folder containing the running exe (frozen) or the browser
+    # package root (dev) — lets tiles reference files bundled with the app.
+    if "%APPDIR%" in out or "{app}" in out.lower():
+        if getattr(sys, "frozen", False):
+            appdir = str(Path(sys.executable).resolve().parent)
+        else:
+            appdir = str(Path(__file__).resolve().parent.parent)
+        out = out.replace("%APPDIR%", appdir)
+        out = out.replace("{app}", appdir)
+    return out
 
 
 def load_tiles(config_path: Path | None = None) -> list[Tile]:
@@ -58,7 +113,8 @@ def load_tiles(config_path: Path | None = None) -> list[Tile]:
     try:
         raw = json.loads(path.read_text(encoding="utf-8-sig"))
         entries = raw.get("tiles", [])
-    except Exception:
+    except Exception as exc:  # noqa: BLE001 — degrade to empty tile list
+        _debug_log(f"load_tiles FAILED path={path!r}: {exc!r}")
         return []
     tiles = []
     for e in entries:
@@ -124,8 +180,10 @@ def ensure_autostart(tiles: list[Tile] | None = None) -> None:
     every 5s); internally rate-limited so each tile gets at most one launch
     attempt per AUTOSTART_RETRY_SEC. Never raises.
     """
+    tiles = tiles if tiles is not None else load_tiles()
+    _debug_log(f"ensure_autostart: {len(tiles)} tile(s) {[t.id for t in tiles]}")
     now = time.monotonic()
-    for t in (tiles if tiles is not None else load_tiles()):
+    for t in tiles:
         if not (t.autostart and t.command):
             continue
         if now - _last_attempt.get(t.id, 0.0) < AUTOSTART_RETRY_SEC:
@@ -143,8 +201,9 @@ def ensure_autostart(tiles: list[Tile] | None = None) -> None:
             _launched[t.id] = subprocess.Popen(  # nosec B603 — config-owned argv
                 list(t.command), **kwargs
             )
-        except Exception:
-            pass
+            _debug_log(f"launched {t.id}: cmd={list(t.command)} cwd={t.cwd!r}")
+        except Exception as exc:  # noqa: BLE001 — logged below
+            _debug_log(f"launch FAILED {t.id}: {exc!r}")
 
 
 def tile_anchor(tile: Tile, status: dict | None = None) -> str:

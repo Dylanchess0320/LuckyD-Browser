@@ -21,10 +21,32 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+import os
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
+
+
+def _export_env_to_os() -> None:
+    """Push .env keys into os.environ so spawned tile services inherit them.
+
+    The AI bridge loads .env into its own dict; child processes launched by
+    the TileRegistry (e.g. Deck Studio's node pipeline, which needs
+    GOOGLE_API_KEY for image generation) only see real environment variables.
+    Never overrides anything already set.
+    """
+    try:
+        from browser_core.ai_bridge import _load_env
+
+        for key, value in _load_env().items():
+            if key.endswith(("_KEY", "_MODEL", "_HOST", "_PROVIDER", "_BASE_URL")):
+                os.environ.setdefault(key, value)
+    except Exception:
+        pass  # env export is best-effort — never block server startup
+
+
+_export_env_to_os()
 
 from browser_core.agent import (
     _CLICK_JS,

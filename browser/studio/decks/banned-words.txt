@@ -1,0 +1,23 @@
+# decks/banned-words.txt
+# One word or phrase per line. Lines starting with # are comments/ignored.
+# Anything listed here gets starred out (first letter kept, rest -> *)
+# in the exported deck by filter-check.js. Your original .md is never touched.
+#
+# Starter list: the same AI-buzzword filler ai.js already tells the
+# model to avoid when generating a deck from scratch. Add your own
+# words/phrases below (swears, brand names, whatever you don't want
+# slipping into an exported video).
+
+delve
+leverage
+unlock
+unleash
+game-changer
+revolutionary
+revolutionize
+landscape
+realm
+tapestry
+testament
+moreover
+furthermore

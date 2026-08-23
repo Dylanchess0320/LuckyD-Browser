@@ -44,7 +44,11 @@ a = Analysis(
            # plus a ready-made _internal/.env so the bundled harness/terminal
            # exes default to free local Ollama on end-user machines.
            ('../.env.example', '.env.example'),
-           ('installer/env/.env', '.')] + wp_datas,
+           ('installer/env/.env', '.'),
+           # Bundled Deck Studio (Marp pipeline UI + decks + themes). The
+           # TileRegistry autostarts it from %APPDIR%\studio; ai.js falls back
+           # to the app-injected GOOGLE_API_KEY, so no secret ships in here.
+           ('studio', 'studio')] + wp_datas,
     # websockets + winpty are imported lazily (CDP driver / screenshots /
     # terminal bridge) - pin them. assets/ ships recursively, including
     # assets/terminal/ (the vendored xterm.js page the /terminal tab needs).

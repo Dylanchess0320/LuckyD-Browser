@@ -7,7 +7,7 @@
       "icon": "⚡",
       "url": "http://127.0.0.1:8000/hq",
       "health_url": "http://127.0.0.1:8000/health",
-      "autostart": true,
+      "autostart": false,
       "enabled": true,
       "extra_class": "hq"
     },
@@ -20,7 +20,7 @@
       "autostart": true,
       "enabled": true,
       "command": ["node", "studio-server.js", "8770"],
-      "cwd": "%USERPROFILE%\\OneDrive\\Desktop\\LuckyD\\LuckyD Generator"
+      "cwd": "%APPDIR%\\studio"
     },
     {
       "id": "luckyd-chat",
