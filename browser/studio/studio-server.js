@@ -26,6 +26,7 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
+const zlib = require("zlib");
 const { execFileSync } = require("child_process");
 
 const PORT = Number(process.argv[2]) || 8770;
@@ -116,6 +117,89 @@ function buildDeck(deckName) {
 const MIME = { ".html": "text/html", ".png": "image/png", ".jpg": "image/jpeg",
   ".css": "text/css", ".md": "text/markdown" };
 
+// ── self-contained download: ZIP the wrapped HTML + its images ────────
+// A bare .html download loses the relative images/ references when opened
+// locally. A zip that bundles the html and every image it uses travels
+// anywhere and renders exactly like the live export.
+function makeZip(entries) {
+  const parts = [];
+  const central = [];
+  let offset = 0;
+  let count = 0;
+  for (const { name, data } of entries) {
+    const nameBuf = Buffer.from(name, "utf8");
+    const crc = zlib.crc32(data) >>> 0;
+    const size = data.length;
+    const lfh = Buffer.alloc(30);
+    lfh.writeUInt32LE(0x04034b50, 0);
+    lfh.writeUInt16LE(20, 4);        // version needed
+    lfh.writeUInt16LE(0x0800, 6);    // UTF-8 name flag
+    lfh.writeUInt16LE(0, 8);         // stored (no compression)
+    lfh.writeUInt16LE(0, 10);
+    lfh.writeUInt16LE(0, 12);
+    lfh.writeUInt32LE(crc, 14);
+    lfh.writeUInt32LE(size, 18);
+    lfh.writeUInt32LE(size, 22);
+    lfh.writeUInt16LE(nameBuf.length, 26);
+    lfh.writeUInt16LE(0, 28);
+    parts.push(Buffer.concat([lfh, nameBuf, data]));
+    const cf = Buffer.alloc(46);
+    cf.writeUInt32LE(0x02014b50, 0);
+    cf.writeUInt16LE(20, 4);         // version made by
+    cf.writeUInt16LE(20, 6);         // version needed
+    cf.writeUInt16LE(0x0800, 8);
+    cf.writeUInt16LE(0, 10);
+    cf.writeUInt16LE(0, 12);
+    cf.writeUInt16LE(0, 14);
+    cf.writeUInt32LE(crc, 16);
+    cf.writeUInt32LE(size, 20);
+    cf.writeUInt32LE(size, 24);
+    cf.writeUInt16LE(nameBuf.length, 28);
+    cf.writeUInt16LE(0, 30);
+    cf.writeUInt16LE(0, 32);
+    cf.writeUInt16LE(0, 34);
+    cf.writeUInt16LE(0, 36);
+    cf.writeUInt32LE(0, 38);
+    cf.writeUInt32LE(offset, 42);
+    central.push(Buffer.concat([cf, nameBuf]));
+    offset += lfh.length + nameBuf.length + size;
+    count++;
+  }
+  const cdBuf = Buffer.concat(central);
+  const eocd = Buffer.alloc(22);
+  eocd.writeUInt32LE(0x06054b50, 0);
+  eocd.writeUInt16LE(0, 4);
+  eocd.writeUInt16LE(0, 6);
+  eocd.writeUInt16LE(count, 8);
+  eocd.writeUInt16LE(count, 10);
+  eocd.writeUInt32LE(cdBuf.length, 12);
+  eocd.writeUInt32LE(offset, 16);
+  eocd.writeUInt16LE(0, 20);
+  return Buffer.concat([...parts, cdBuf, eocd]);
+}
+
+function buildDeckZip(deckName) {
+  const safe = path.basename(deckName);
+  fs.mkdirSync(EXPORT_DIR, { recursive: true });
+  const base = path.basename(safe, ".md");
+  const htmlPath = path.join(EXPORT_DIR, `${base}.html`);
+  if (!fs.existsSync(htmlPath)) throw new Error(`deck not built yet: ${safe}`);
+  const html = fs.readFileSync(htmlPath);
+  const entries = [{ name: `${base}.html`, data: html }];
+  // Bundle exactly the images this deck references, kept in images/.
+  const seen = new Set();
+  for (const m of html.toString("utf8").matchAll(/images\/[^"')\]>\s]+/g)) {
+    const rel = m[0];
+    if (seen.has(rel)) continue;
+    seen.add(rel);
+    const p = path.normalize(path.join(EXPORT_DIR, rel));
+    if (p.startsWith(EXPORT_DIR) && fs.existsSync(p) && fs.statSync(p).isFile()) {
+      entries.push({ name: rel, data: fs.readFileSync(p) });
+    }
+  }
+  return { dir: EXPORT_DIR, buffer: makeZip(entries), name: `${base}.zip` };
+}
+
 const NEW_DECK_TEMPLATE = [
   "---",
   "marp: true",
@@ -200,11 +284,25 @@ const server = http.createServer(async (req, res) => {
       if (!fs.existsSync(file) || !fs.statSync(file).isFile())
         return send(res, 404, { error: "not found" });
       const extra = {};
-      if (u.searchParams.get("download"))
+      if (u.searchParams.get("download")) {
+        const asciiName = path.basename(file).replace(/[^\x20-\x7e]/g, "_");
         extra["Content-Disposition"] =
-          `attachment; filename="${path.basename(file)}"`;
+          `attachment; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(path.basename(file))}`;
+      }
       return send(res, 200, fs.readFileSync(file),
         MIME[path.extname(file).toLowerCase()] || "application/octet-stream", extra);
+    }
+
+    // ── self-contained download (HTML + images) ───────────────────────
+    if ((m = u.pathname.match(/^\/api\/download\/(.+)$/))) {
+      const name = safeDeckName(decodeURIComponent(m[1]));
+      try {
+        const { buffer, name: zipName } = buildDeckZip(name);
+        return send(res, 200, buffer, "application/zip",
+          { "Content-Disposition": `attachment; filename="${zipName}"` });
+      } catch (e) {
+        return send(res, 404, { error: String(e.message || e).slice(0, 200) });
+      }
     }
 
     if (u.pathname === "/" || u.pathname === "/index.html") {
@@ -220,8 +318,8 @@ const server = http.createServer(async (req, res) => {
           `<button class="ghost" onclick="editDeck('${enc}')">Edit</button>` +
           (d.built
             ? `<a class="view" href="/export/${encodeURIComponent(htmlName)}" target="_blank">Open ↗</a>` +
-              `<a class="btn ghost" href="/export/${encodeURIComponent(htmlName)}?download=1">⬇ Download</a>`
-            : "") +
+              `<a class="btn ghost" href="/api/download/${enc}">⬇ Download (with images)</a>`
+            : `<span class="sub" style="margin:0">build first to download</span>`) +
           `<button class="ghost danger" onclick="delDeck('${enc}')">🗑</button></div>`;
       }).join("") ||
         '<div class="empty">No decks yet — click "＋ New deck" or upload a .md file.</div>';

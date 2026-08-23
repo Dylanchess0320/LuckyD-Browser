@@ -9,7 +9,6 @@ best-practice recommendations. Stdlib only.
 from __future__ import annotations
 
 import ast
-import configparser
 import json
 import os
 import re
@@ -21,58 +20,138 @@ from typing import Any
 # ── Constants ──────────────────────────────────────────────────────────
 
 _SKIP_DIRS = {
-    ".git", ".hg", ".svn", "node_modules", "__pycache__", ".venv", "venv",
-    "env", ".tox", ".mypy_cache", ".pytest_cache", ".ruff_cache", "dist",
-    "build", ".idea", ".vscode", "target", "bin", "obj", ".next", ".nuxt",
-    "coverage", ".cargo", "vendor",
+    ".git",
+    ".hg",
+    ".svn",
+    "node_modules",
+    "__pycache__",
+    ".venv",
+    "venv",
+    "env",
+    ".tox",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    "dist",
+    "build",
+    ".idea",
+    ".vscode",
+    "target",
+    "bin",
+    "obj",
+    ".next",
+    ".nuxt",
+    "coverage",
+    ".cargo",
+    "vendor",
 }
 
 _LANG_BY_EXT = {
-    ".py": "Python", ".js": "JavaScript", ".mjs": "JavaScript",
-    ".cjs": "JavaScript", ".ts": "TypeScript", ".tsx": "TypeScript",
-    ".jsx": "JavaScript", ".go": "Go", ".rs": "Rust", ".rb": "Ruby",
-    ".php": "PHP", ".cs": "C#", ".java": "Java", ".kt": "Kotlin",
-    ".c": "C", ".h": "C/C++", ".cpp": "C++", ".hpp": "C++",
-    ".swift": "Swift", ".lua": "Lua", ".sh": "Shell", ".ps1": "PowerShell",
-    ".html": "HTML", ".css": "CSS", ".scss": "SCSS", ".sql": "SQL",
-    ".vue": "Vue", ".svelte": "Svelte",
+    ".py": "Python",
+    ".js": "JavaScript",
+    ".mjs": "JavaScript",
+    ".cjs": "JavaScript",
+    ".ts": "TypeScript",
+    ".tsx": "TypeScript",
+    ".jsx": "JavaScript",
+    ".go": "Go",
+    ".rs": "Rust",
+    ".rb": "Ruby",
+    ".php": "PHP",
+    ".cs": "C#",
+    ".java": "Java",
+    ".kt": "Kotlin",
+    ".c": "C",
+    ".h": "C/C++",
+    ".cpp": "C++",
+    ".hpp": "C++",
+    ".swift": "Swift",
+    ".lua": "Lua",
+    ".sh": "Shell",
+    ".ps1": "PowerShell",
+    ".html": "HTML",
+    ".css": "CSS",
+    ".scss": "SCSS",
+    ".sql": "SQL",
+    ".vue": "Vue",
+    ".svelte": "Svelte",
 }
 
 # framework name -> (manifest file, json key path or regex, confidence)
 _JS_FRAMEWORK_HINTS = {
-    "react": "React", "react-dom": "React", "next": "Next.js",
-    "vue": "Vue", "nuxt": "Nuxt", "@angular/core": "Angular",
-    "svelte": "Svelte", "express": "Express", "fastify": "Fastify",
-    "nest": "NestJS", "@nestjs/core": "NestJS", "gatsby": "Gatsby",
-    "electron": "Electron", "tailwindcss": "Tailwind CSS",
+    "react": "React",
+    "react-dom": "React",
+    "next": "Next.js",
+    "vue": "Vue",
+    "nuxt": "Nuxt",
+    "@angular/core": "Angular",
+    "svelte": "Svelte",
+    "express": "Express",
+    "fastify": "Fastify",
+    "nest": "NestJS",
+    "@nestjs/core": "NestJS",
+    "gatsby": "Gatsby",
+    "electron": "Electron",
+    "tailwindcss": "Tailwind CSS",
 }
 
 _PY_FRAMEWORK_HINTS = {
-    "django": "Django", "flask": "Flask", "fastapi": "FastAPI",
-    "starlette": "Starlette", "tornado": "Tornado", "sqlalchemy": "SQLAlchemy",
-    "pytest": "pytest", "celery": "Celery", "pydantic": "Pydantic",
-    "numpy": "NumPy", "pandas": "pandas", "torch": "PyTorch",
-    "tensorflow": "TensorFlow", "click": "Click", "rich": "Rich",
-    "httpx": "httpx", "requests": "requests", "aiohttp": "aiohttp",
+    "django": "Django",
+    "flask": "Flask",
+    "fastapi": "FastAPI",
+    "starlette": "Starlette",
+    "tornado": "Tornado",
+    "sqlalchemy": "SQLAlchemy",
+    "pytest": "pytest",
+    "celery": "Celery",
+    "pydantic": "Pydantic",
+    "numpy": "NumPy",
+    "pandas": "pandas",
+    "torch": "PyTorch",
+    "tensorflow": "TensorFlow",
+    "click": "Click",
+    "rich": "Rich",
+    "httpx": "httpx",
+    "requests": "requests",
+    "aiohttp": "aiohttp",
 }
 
-_RUBY_FRAMEWORK_HINTS = {"rails": "Ruby on Rails", "sinatra": "Sinatra",
-                         "rspec": "RSpec", "sidekiq": "Sidekiq"}
+_RUBY_FRAMEWORK_HINTS = {
+    "rails": "Ruby on Rails",
+    "sinatra": "Sinatra",
+    "rspec": "RSpec",
+    "sidekiq": "Sidekiq",
+}
 
-_PHP_FRAMEWORK_HINTS = {"laravel/framework": "Laravel",
-                        "symfony/framework-bundle": "Symfony",
-                        "phpunit/phpunit": "PHPUnit", "slim/slim": "Slim"}
+_PHP_FRAMEWORK_HINTS = {
+    "laravel/framework": "Laravel",
+    "symfony/framework-bundle": "Symfony",
+    "phpunit/phpunit": "PHPUnit",
+    "slim/slim": "Slim",
+}
 
-_GO_FRAMEWORK_HINTS = {"github.com/gin-gonic/gin": "Gin",
-                       "github.com/gorilla/mux": "Gorilla Mux",
-                       "github.com/labstack/echo": "Echo"}
+_GO_FRAMEWORK_HINTS = {
+    "github.com/gin-gonic/gin": "Gin",
+    "github.com/gorilla/mux": "Gorilla Mux",
+    "github.com/labstack/echo": "Echo",
+}
 
-_RUST_FRAMEWORK_HINTS = {"actix-web": "Actix Web", "rocket": "Rocket",
-                         "tokio": "Tokio", "axum": "Axum", "serde": "Serde"}
+_RUST_FRAMEWORK_HINTS = {
+    "actix-web": "Actix Web",
+    "rocket": "Rocket",
+    "tokio": "Tokio",
+    "axum": "Axum",
+    "serde": "Serde",
+}
 
 _CI_FILES = [
-    ".github/workflows", ".gitlab-ci.yml", "azure-pipelines.yml",
-    ".circleci/config.yml", "Jenkinsfile", ".travis.yml", "appveyor.yml",
+    ".github/workflows",
+    ".gitlab-ci.yml",
+    "azure-pipelines.yml",
+    ".circleci/config.yml",
+    "Jenkinsfile",
+    ".travis.yml",
+    "appveyor.yml",
 ]
 
 _GIANT_FILE_LINES = 1000
@@ -80,12 +159,52 @@ _DEEP_NESTING_DEPTH = 8
 
 # Extensions we treat as text for LOC counting; binaries are skipped.
 _BINARY_EXTS = {
-    ".exe", ".dll", ".so", ".dylib", ".bin", ".dat", ".db", ".sqlite",
-    ".zip", ".gz", ".tar", ".7z", ".rar", ".whl", ".jar", ".war",
-    ".png", ".jpg", ".jpeg", ".gif", ".ico", ".svg", ".webp", ".bmp",
-    ".mp3", ".mp4", ".wav", ".avi", ".mov", ".mkv", ".pdf", ".woff",
-    ".woff2", ".ttf", ".otf", ".eot", ".pyc", ".pyo", ".class", ".o",
-    ".a", ".lib", ".msi", ".dmg", ".iso", ".snap",
+    ".exe",
+    ".dll",
+    ".so",
+    ".dylib",
+    ".bin",
+    ".dat",
+    ".db",
+    ".sqlite",
+    ".zip",
+    ".gz",
+    ".tar",
+    ".7z",
+    ".rar",
+    ".whl",
+    ".jar",
+    ".war",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".ico",
+    ".svg",
+    ".webp",
+    ".bmp",
+    ".mp3",
+    ".mp4",
+    ".wav",
+    ".avi",
+    ".mov",
+    ".mkv",
+    ".pdf",
+    ".woff",
+    ".woff2",
+    ".ttf",
+    ".otf",
+    ".eot",
+    ".pyc",
+    ".pyo",
+    ".class",
+    ".o",
+    ".a",
+    ".lib",
+    ".msi",
+    ".dmg",
+    ".iso",
+    ".snap",
 }
 
 _REQ_LINE_RE = re.compile(r"^\s*([A-Za-z0-9_.\-]+)\s*(?:==|>=|<=|~=|!=|>|<)?")
@@ -94,16 +213,21 @@ _IMPORT_FROM_RE = re.compile(r"^\s*(?:from|import)\s+([A-Za-z0-9_]+)", re.M)
 
 # ── Result dataclasses ────────────────────────────────────────────────
 
+
 @dataclass
 class FrameworkHit:
     name: str
     confidence: float  # 0.0 - 1.0
-    source: str        # manifest file where detected
-    ecosystem: str     # python, javascript, dotnet, go, rust, ruby, php
+    source: str  # manifest file where detected
+    ecosystem: str  # python, javascript, dotnet, go, rust, ruby, php
 
     def to_dict(self) -> dict[str, Any]:
-        return {"name": self.name, "confidence": round(self.confidence, 2),
-                "source": self.source, "ecosystem": self.ecosystem}
+        return {
+            "name": self.name,
+            "confidence": round(self.confidence, 2),
+            "source": self.source,
+            "ecosystem": self.ecosystem,
+        }
 
 
 @dataclass
@@ -114,9 +238,12 @@ class DependencyInfo:
     manifest_files: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
-        return {"declared": self.declared, "unused": self.unused,
-                "possibly_outdated": self.possibly_outdated,
-                "manifest_files": self.manifest_files}
+        return {
+            "declared": self.declared,
+            "unused": self.unused,
+            "possibly_outdated": self.possibly_outdated,
+            "manifest_files": self.manifest_files,
+        }
 
 
 @dataclass
@@ -127,8 +254,12 @@ class PatternHit:
     detail: str
 
     def to_dict(self) -> dict[str, Any]:
-        return {"pattern": self.pattern, "file": self.file,
-                "line": self.line, "detail": self.detail}
+        return {
+            "pattern": self.pattern,
+            "file": self.file,
+            "line": self.line,
+            "detail": self.detail,
+        }
 
 
 @dataclass
@@ -143,10 +274,11 @@ class StructureStats:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "file_count": self.file_count, "total_loc": self.total_loc,
-            "files_by_ext": self.files_by_ext, "loc_by_lang": self.loc_by_lang,
-            "largest_files": [{"file": f, "lines": n}
-                              for f, n in self.largest_files],
+            "file_count": self.file_count,
+            "total_loc": self.total_loc,
+            "files_by_ext": self.files_by_ext,
+            "loc_by_lang": self.loc_by_lang,
+            "largest_files": [{"file": f, "lines": n} for f, n in self.largest_files],
             "dir_classification": self.dir_classification,
             "max_depth": self.max_depth,
         }
@@ -175,14 +307,11 @@ class ProjectReport:
 
     def to_markdown(self) -> str:
         """Render a human-readable markdown report."""
-        lines: list[str] = [f"# Project Intelligence Report",
-                            f"",
-                            f"**Root:** `{self.root}`", ""]
+        lines: list[str] = ["# Project Intelligence Report", "", f"**Root:** `{self.root}`", ""]
         # Tech stack
         lines.append("## Tech Stack")
         total = sum(self.tech_stack.values()) or 1
-        for lang, count in sorted(self.tech_stack.items(),
-                                  key=lambda kv: -kv[1])[:10]:
+        for lang, count in sorted(self.tech_stack.items(), key=lambda kv: -kv[1])[:10]:
             pct = count / total * 100
             lines.append(f"- **{lang}**: {count} files ({pct:.0f}%)")
         lines.append("")
@@ -190,8 +319,10 @@ class ProjectReport:
         lines.append("## Detected Frameworks")
         if self.frameworks:
             for fw in sorted(self.frameworks, key=lambda f: -f.confidence):
-                lines.append(f"- **{fw.name}** ({fw.ecosystem}) — "
-                             f"confidence {fw.confidence:.0%}, via `{fw.source}`")
+                lines.append(
+                    f"- **{fw.name}** ({fw.ecosystem}) — "
+                    f"confidence {fw.confidence:.0%}, via `{fw.source}`"
+                )
         else:
             lines.append("- None detected")
         lines.append("")
@@ -217,8 +348,9 @@ class ProjectReport:
         if d.unused:
             lines.append(f"- Possibly unused: {', '.join(d.unused[:15])}")
         if d.possibly_outdated:
-            lines.append(f"- Possibly outdated (unpinned): "
-                         f"{', '.join(d.possibly_outdated[:15])}")
+            lines.append(
+                f"- Possibly outdated (unpinned): " f"{', '.join(d.possibly_outdated[:15])}"
+            )
         lines.append("")
         # Patterns
         lines.append("## Code Patterns")
@@ -243,6 +375,7 @@ class ProjectReport:
 
 
 # ── Main analyzer ─────────────────────────────────────────────────────
+
 
 class ProjectIntelligence:
     """Static analyzer producing a ProjectReport for a project tree."""
@@ -334,11 +467,11 @@ class ProjectIntelligence:
             info.manifest_files.append("pyproject.toml")
             text = pyproject.read_text(encoding="utf-8", errors="replace")
             for block in re.findall(
-                r"(?:^|\n)\s*(?:dependencies|optional-dependencies(?:\.\w+)?)"
-                r"\s*=\s*\[(.*?)\]", text, re.S,
+                r"(?:^|\n)\s*(?:dependencies|optional-dependencies(?:\.\w+)?)" r"\s*=\s*\[(.*?)\]",
+                text,
+                re.S,
             ):
-                for m in re.finditer(r'"([A-Za-z0-9_.\-]+)(?:\s*[><=!~]=?[^"]*)?"',
-                                     block):
+                for m in re.finditer(r'"([A-Za-z0-9_.\-]+)(?:\s*[><=!~]=?[^"]*)?"', block):
                     pkg = m.group(1)
                     if pkg.lower() not in {p.lower() for p in declared_py}:
                         declared_py.append(pkg)
@@ -364,9 +497,21 @@ class ProjectIntelligence:
             norm = pkg.lower().replace("-", "_")
             if norm not in imported and pkg.lower() not in imported:
                 # Ignore common meta/dev packages that aren't imported
-                if norm in {"pip", "setuptools", "wheel", "build", "twine",
-                            "black", "ruff", "mypy", "isort", "flake8",
-                            "pre_commit", "pytest_cov", "pytest_asyncio"}:
+                if norm in {
+                    "pip",
+                    "setuptools",
+                    "wheel",
+                    "build",
+                    "twine",
+                    "black",
+                    "ruff",
+                    "mypy",
+                    "isort",
+                    "flake8",
+                    "pre_commit",
+                    "pytest_cov",
+                    "pytest_asyncio",
+                }:
                     continue
                 unused.append(pkg)
         info.unused = unused
@@ -386,8 +531,9 @@ class ProjectIntelligence:
             hits.extend(self._regex_patterns(source, rel))
         return hits[:200]  # cap to keep report sane
 
-    def get_recommendations(self, root: str | Path,
-                            report: ProjectReport | None = None) -> list[str]:
+    def get_recommendations(
+        self, root: str | Path, report: ProjectReport | None = None
+    ) -> list[str]:
         """Best-practice recommendations based on project layout."""
         root = Path(root)
         recs: list[str] = []
@@ -401,22 +547,23 @@ class ProjectIntelligence:
         if ".gitignore" not in lower_names:
             recs.append("Add a .gitignore — none found at project root.")
         if not any((root / ci).exists() for ci in _CI_FILES):
-            recs.append("Add CI configuration (e.g. .github/workflows) — "
-                        "no CI config detected.")
+            recs.append("Add CI configuration (e.g. .github/workflows) — " "no CI config detected.")
         if "license" not in lower_names and "license.md" not in lower_names:
             recs.append("Add a LICENSE file — none found.")
 
         if report is not None:
             for f, n in report.structure.largest_files:
                 if n > _GIANT_FILE_LINES:
-                    recs.append(f"Consider splitting `{f}` — {n:,} lines "
-                                f"(giant file).")
+                    recs.append(f"Consider splitting `{f}` — {n:,} lines " f"(giant file).")
             if report.structure.max_depth > _DEEP_NESTING_DEPTH:
-                recs.append(f"Directory nesting is {report.structure.max_depth} "
-                            f"levels deep — consider flattening.")
+                recs.append(
+                    f"Directory nesting is {report.structure.max_depth} "
+                    f"levels deep — consider flattening."
+                )
             if report.dependencies.unused:
-                recs.append(f"Review {len(report.dependencies.unused)} possibly "
-                            f"unused dependencies.")
+                recs.append(
+                    f"Review {len(report.dependencies.unused)} possibly " f"unused dependencies."
+                )
         return recs
 
     # ── framework parsers ─────────────────────────────────────────────
@@ -532,53 +679,71 @@ class ProjectIntelligence:
         for node in ast.walk(tree):
             if isinstance(node, ast.ClassDef):
                 bases = [self._name_of(b) for b in node.bases]
-                methods = {n.name for n in node.body
-                           if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
+                methods = {
+                    n.name
+                    for n in node.body
+                    if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+                }
                 # Singleton: __new__ overridden or _instance class attr
                 if "__new__" in methods or any(
                     isinstance(n, ast.Assign)
-                    and any(isinstance(t, ast.Name) and t.id == "_instance"
-                            for t in n.targets)
+                    and any(isinstance(t, ast.Name) and t.id == "_instance" for t in n.targets)
                     for n in node.body
                 ):
-                    hits.append(PatternHit("Singleton", rel_path, node.lineno,
-                                           f"class {node.name}"))
+                    hits.append(
+                        PatternHit("Singleton", rel_path, node.lineno, f"class {node.name}")
+                    )
                 # Factory: method named create*/make*/build*
                 if any(re.match(r"(create|make|build)_", m) for m in methods):
-                    hits.append(PatternHit("Factory", rel_path, node.lineno,
-                                           f"class {node.name}"))
+                    hits.append(PatternHit("Factory", rel_path, node.lineno, f"class {node.name}"))
                 # MVC hints
                 if node.name.lower().endswith("controller"):
-                    hits.append(PatternHit("MVC", rel_path, node.lineno,
-                                           f"Controller class {node.name}"))
+                    hits.append(
+                        PatternHit("MVC", rel_path, node.lineno, f"Controller class {node.name}")
+                    )
                 elif node.name.lower().endswith("view") and "ABC" not in bases:
-                    hits.append(PatternHit("MVC", rel_path, node.lineno,
-                                           f"View class {node.name}"))
+                    hits.append(PatternHit("MVC", rel_path, node.lineno, f"View class {node.name}"))
                 # Observer: subscribe/notify/emit methods
-                if methods & {"subscribe", "unsubscribe", "notify", "emit",
-                              "add_listener", "on_event"}:
-                    hits.append(PatternHit("Observer", rel_path, node.lineno,
-                                           f"class {node.name}"))
+                if methods & {
+                    "subscribe",
+                    "unsubscribe",
+                    "notify",
+                    "emit",
+                    "add_listener",
+                    "on_event",
+                }:
+                    hits.append(PatternHit("Observer", rel_path, node.lineno, f"class {node.name}"))
         return hits
 
     def _regex_patterns(self, source: str, rel_path: str) -> list[PatternHit]:
         hits: list[PatternHit] = []
         # Module-level singleton via decorator or global instance
-        for m in re.finditer(r"^(\w+)\s*=\s*\1?\(?\)?\s*#\s*singleton", source,
-                             re.M | re.I):
-            hits.append(PatternHit("Singleton", rel_path,
-                                   source[:m.start()].count("\n") + 1,
-                                   "global instance"))
+        for m in re.finditer(r"^(\w+)\s*=\s*\1?\(?\)?\s*#\s*singleton", source, re.M | re.I):
+            hits.append(
+                PatternHit(
+                    "Singleton", rel_path, source[: m.start()].count("\n") + 1, "global instance"
+                )
+            )
         # Observer via common event registration call
         for m in re.finditer(r"\.(on|subscribe|addEventListener)\(", source):
-            hits.append(PatternHit("Observer", rel_path,
-                                   source[:m.start()].count("\n") + 1,
-                                   f".{m.group(1)}() call"))
+            hits.append(
+                PatternHit(
+                    "Observer",
+                    rel_path,
+                    source[: m.start()].count("\n") + 1,
+                    f".{m.group(1)}() call",
+                )
+            )
         # Factory function
         for m in re.finditer(r"^def\s+(create|make|build)_\w+\(", source, re.M):
-            hits.append(PatternHit("Factory", rel_path,
-                                   source[:m.start()].count("\n") + 1,
-                                   f"function {m.group(0)[4:-1]}"))
+            hits.append(
+                PatternHit(
+                    "Factory",
+                    rel_path,
+                    source[: m.start()].count("\n") + 1,
+                    f"function {m.group(0)[4:-1]}",
+                )
+            )
         return hits
 
     @staticmethod
@@ -612,7 +777,7 @@ class ProjectIntelligence:
                 ext_counts[ext] += 1
                 lang = _LANG_BY_EXT.get(ext)
                 try:
-                    with open(fpath, "r", encoding="utf-8", errors="replace") as fh:
+                    with open(fpath, encoding="utf-8", errors="replace") as fh:
                         loc = sum(1 for _ in fh)
                 except Exception:
                     loc = 0
@@ -698,8 +863,10 @@ if __name__ == "__main__":
     # Also verify JSON round-trip
     data = report.to_dict()
     print(f"\n[to_dict] keys: {sorted(data.keys())}")
-    print(f"[summary] {len(report.frameworks)} frameworks, "
-          f"{len(report.patterns)} pattern hits, "
-          f"{report.structure.file_count} files, "
-          f"{report.structure.total_loc:,} LOC, "
-          f"{len(report.recommendations)} recommendations")
+    print(
+        f"[summary] {len(report.frameworks)} frameworks, "
+        f"{len(report.patterns)} pattern hits, "
+        f"{report.structure.file_count} files, "
+        f"{report.structure.total_loc:,} LOC, "
+        f"{len(report.recommendations)} recommendations"
+    )
