@@ -54,7 +54,11 @@ from browser_core.fmhy import parse_markdown
 
 bridge = AIBridge()
 providers = bridge.providers()
-check("bridge detects deepseekkey", "deepseek" in providers, str(providers))
+# Detection-logic check: inject a placeholder key so the test is deterministic
+# regardless of which real API keys exist in the user's .env.
+os.environ.setdefault("DEEPSEEK_API_KEY", "selftest-placeholder-key")
+check("bridge detects deepseekkey", "deepseek" in AIBridge().providers(), str(providers))
+os.environ.pop("DEEPSEEK_API_KEY", None)
 
 from browser_core import control_server
 from browser_core.harness_bridge import HarnessBridge, _find_exe
@@ -126,7 +130,7 @@ check("md escapes html", "<script>" not in _md_lite("<script>alert(1)</script>")
 # package metadata (mojibake regression guard)
 import browser as _browser_pkg
 
-check("version 2.2.0", _browser_pkg.__version__ == "2.2.0", _browser_pkg.__version__)
+check("version 2.3.0", _browser_pkg.__version__ == "2.3.0", _browser_pkg.__version__)
 check("docstring has no mojibake", "�" not in (_browser_pkg.__doc__ or ""))
 
 # v1.4.0 — session restore, per-site zoom memory, screenshot naming (pure logic)

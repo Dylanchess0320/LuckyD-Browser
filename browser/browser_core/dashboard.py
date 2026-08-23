@@ -243,9 +243,11 @@ async function refreshStatus() {
 }
 refreshStatus(); setInterval(refreshStatus, 5000);
 """
-_JS2 = r"""function renderApps() {
+_JS2 = r"""// Platform tiles from browser_core/platform_tiles.json (TileRegistry).
+const PLATFORM_TILES = __PLATFORM_TILES__;
+function renderApps() {
   const g = document.getElementById('apps');
-  APPS.forEach(([ico, name, href], i) => {
+  APPS.concat(PLATFORM_TILES).forEach(([ico, name, href], i) => {
     const a = document.createElement('a');
     a.className = 'tile' + (i === 0 ? ' hq' : ''); a.href = href;
     a.innerHTML = '<span class="ico">' + ico + '</span><span></span>';
@@ -335,6 +337,14 @@ def dashboard_html(settings=None, token: str = "") -> str:
         html = DASHBOARD_HTML.replace("  /* __BRAND_VARS__ */\n", block, 1)
     else:
         html = "<style>" + css_vars(settings) + "</style>" + DASHBOARD_HTML
+    # Platform tiles: registry-driven extras appended to the built-in Apps.
+    try:
+        from browser_core.tile_registry import load_tiles
+
+        extra = [[t.icon, t.name, t.url] for t in load_tiles()]
+    except Exception:
+        extra = []  # a broken config must never take the dashboard down
+    html = html.replace("__PLATFORM_TILES__", json.dumps(extra))
     return html.replace(
         "<script>\nconst ENGINES",
         f"<script>\nconst DASH_TOKEN = {json.dumps(token)};\nconst ENGINES",

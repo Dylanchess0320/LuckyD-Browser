@@ -340,6 +340,11 @@ def make_handler(backend, token: str = "", harness=None, settings=None):
                 if path.startswith("/static/terminal/"):
                     return self._terminal_asset(path)
                 if path == "/status":
+                    # Platform heartbeat: also revive any enabled+autostart
+                    # tile services (rate-limited inside the registry).
+                    from browser_core import tile_registry
+
+                    tile_registry.ensure_autostart()
                     return self._ok(**self._status())
                 if path == "/tabs":
                     return self._ok(tabs=backend.tabs())

@@ -1,0 +1,35 @@
+{
+  "_comment": "LuckyD Platform tile registry. Add a tool = add an entry. enabled:false hides it without deleting the config. extra_class 'hq' gets the accent style.",
+  "tiles": [
+    {
+      "id": "hq",
+      "name": "Agent HQ",
+      "icon": "⚡",
+      "url": "http://127.0.0.1:8000/hq",
+      "health_url": "http://127.0.0.1:8000/health",
+      "autostart": true,
+      "enabled": true,
+      "extra_class": "hq"
+    },
+    {
+      "id": "deck-studio",
+      "name": "Deck Studio",
+      "icon": "🎬",
+      "url": "http://127.0.0.1:8770/",
+      "health_url": "http://127.0.0.1:8770/health",
+      "autostart": true,
+      "enabled": true,
+      "command": ["node", "studio-server.js", "8770"],
+      "cwd": "%USERPROFILE%\\OneDrive\\Desktop\\LuckyD\\LuckyD Generator"
+    },
+    {
+      "id": "luckyd-chat",
+      "name": "LuckyD Chat",
+      "icon": "💬",
+      "url": "http://127.0.0.1:8771/",
+      "health_url": "http://127.0.0.1:8771/health",
+      "autostart": false,
+      "enabled": false
+    }
+  ]
+}
