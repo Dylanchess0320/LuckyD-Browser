@@ -35,7 +35,7 @@ VersionInfoVersion=2.3.0.0
 VersionInfoCompany={#AppPublisher}
 VersionInfoDescription={#AppName} Setup
 VersionInfoProductName={#AppName}
-VersionInfoProductVersion=2.2.0.0
+VersionInfoProductVersion=2.3.0.0
 ; Per-user install ??? no admin rights required (admin users may opt into all-users).
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
@@ -46,7 +46,7 @@ MinVersion=10.0
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir=output
-OutputBaseFilename=LuckyDBrowserSetup-2.2.0
+OutputBaseFilename=LuckyDBrowserSetup-2.3.0
 SetupIconFile=..\assets\icon.ico
 UninstallDisplayName={#AppName}
 UninstallDisplayIcon={app}\{#AppExeName}
