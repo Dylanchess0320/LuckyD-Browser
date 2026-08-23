@@ -35,8 +35,8 @@ No accounts. No API keys. No subscriptions.
 ## Verify your download
 
 ```
-SHA256: d7f620e927f13a0d00938b29af4c7dd495f9b5b54b0e4b31fe12e6c3d4a36d28
-File:   LuckyDBrowserSetup-2.3.0.exe (157.7 MB)
+SHA256: da56da21e48452d6cbe9118092e26b46b68d7c2b7c8a2a4f863636ca20e258f6
+File:   LuckyDBrowserSetup-2.3.0.exe (168 MB)
 ```
 
 ## Everything since 1.3.0
