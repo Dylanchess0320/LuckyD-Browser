@@ -199,9 +199,7 @@ class CodeExecutionSandbox:
         tmpdir = tempfile.mkdtemp(prefix="luckyd_sandbox_")
         try:
             script_path = Path(tmpdir) / "_sandbox_main.py"
-            script_path.write_text(
-                self._build_runner(code), encoding="utf-8"
-            )
+            script_path.write_text(self._build_runner(code), encoding="utf-8")
 
             cmd = [self.python, "-I", str(script_path)]  # -I: isolated mode
             kwargs: dict[str, Any] = {
@@ -280,9 +278,7 @@ class CodeExecutionSandbox:
         try:
             code = p.read_text(encoding="utf-8", errors="replace")
         except OSError as exc:
-            return ExecutionResult(
-                success=False, stderr=str(exc), error_type="runtime"
-            )
+            return ExecutionResult(success=False, stderr=str(exc), error_type="runtime")
         return self.execute(code, timeout=timeout, capture_output=capture_output)
 
     # ── Static analysis ────────────────────────────────────────────────
@@ -322,8 +318,7 @@ class CodeExecutionSandbox:
         funcs = [
             n
             for n in tree.body
-            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
-            and not n.name.startswith("_")
+            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and not n.name.startswith("_")
         ]
         lines = [
             '"""Auto-generated test skeleton. Fill in the assertions."""',
@@ -340,12 +335,12 @@ class CodeExecutionSandbox:
                 "",
                 f"def test_{fn.name}():",
                 f'    """Test {fn.name}({args})."""',
-                f"    # Arrange",
-                f"    # ...",
-                f"    # Act",
+                "    # Arrange",
+                "    # ...",
+                "    # Act",
                 f"    result = {fn.name}({call_args})" if args else f"    result = {fn.name}()",
-                f"    # Assert",
-                f"    assert result is not None  # TODO: real assertion",
+                "    # Assert",
+                "    assert result is not None  # TODO: real assertion",
                 "",
             ]
         if not funcs:
@@ -369,7 +364,7 @@ class CodeExecutionSandbox:
         stream = io.StringIO()
         try:
             profiler.enable()
-            exec(compile(code, "<sandbox-profile>", "exec"), namespace)  # noqa: S102
+            exec(compile(code, "<sandbox-profile>", "exec"), namespace)
             profiler.disable()
         except Exception as exc:  # profiled code raised — still report stats
             profiler.disable()
@@ -547,14 +542,29 @@ class CodeExecutionSandbox:
         return issues
 
     def _lint_shadowed_builtins(self, tree: ast.AST) -> list[LintIssue]:
-        common = {"id", "type", "list", "dict", "set", "str", "int", "input", "len", "min", "max", "sum", "filter", "map", "open", "format"}
+        common = {
+            "id",
+            "type",
+            "list",
+            "dict",
+            "set",
+            "str",
+            "int",
+            "input",
+            "len",
+            "min",
+            "max",
+            "sum",
+            "filter",
+            "map",
+            "open",
+            "format",
+        }
         issues = []
         for node in ast.walk(tree):
             targets: list[str] = []
             if isinstance(node, ast.Assign):
-                targets = [
-                    t.id for t in node.targets if isinstance(t, ast.Name)
-                ]
+                targets = [t.id for t in node.targets if isinstance(t, ast.Name)]
             elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 targets = [node.name]
             for name in targets:
@@ -614,12 +624,11 @@ def _make_memory_limiter(limit_mb: int):
 
 def _remove_tree(path: str) -> None:
     """Best-effort recursive delete without shutil semantics surprises."""
+    import contextlib
     import shutil
 
-    try:
+    with contextlib.suppress(Exception):
         shutil.rmtree(path, ignore_errors=True)
-    except Exception:
-        pass
 
 
 # ── Smoke test ─────────────────────────────────────────────────────────

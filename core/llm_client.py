@@ -7,11 +7,29 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from collections.abc import Callable
 
 import httpx
 
 from .context_manager import ContextManager
+
+# Models whose thinking mode makes function-call thought signatures mandatory
+_GEMINI_THINKING_RE = re.compile(r"gemini-[3-9]|thinking", re.IGNORECASE)
+
+# Whitelist of JSON-schema keys Gemini function declarations accept
+_SCHEMA_KEYS = {
+    "type",
+    "description",
+    "enum",
+    "items",
+    "properties",
+    "required",
+    "format",
+    "nullable",
+    "minimum",
+    "maximum",
+}
 
 
 class LLMClient:
@@ -91,6 +109,323 @@ class LLMClient:
         backoff = self.base_delay * (2**attempt)
         return min(max(wait, backoff), 30.0)
 
+    # ── Native Gemini transport ────────────────────────────────────────
+    # The OpenAI-compat shim at /v1beta/openai drops function-call
+    # thoughtSignature fields when history is replayed, which Gemini 3+
+    # thinking models reject with HTTP 400. When the base URL points at the
+    # native generativelanguage API we speak its format directly and round-
+    # trip signatures via the "_gcalls" sidecar on assistant messages.
+
+    def _is_google(self) -> bool:
+        return "generativelanguage.googleapis.com" in (self.base_url or "")
+
+    @classmethod
+    def _clean_schema(cls, schema):
+        """Strip JSON-schema keys Gemini doesn't accept."""
+        if isinstance(schema, list):
+            return [cls._clean_schema(s) for s in schema]
+        if not isinstance(schema, dict):
+            return schema
+        out = {}
+        for k, v in schema.items():
+            if k not in _SCHEMA_KEYS:
+                continue
+            if k == "properties" and isinstance(v, dict):
+                out[k] = {pk: cls._clean_schema(pv) for pk, pv in v.items()}
+            elif k == "items":
+                out[k] = cls._clean_schema(v)
+            else:
+                out[k] = v
+        return out
+
+    def _google_body(self, messages: list[dict], tools: list[dict] | None = None) -> dict:
+        """Convert OpenAI-style message history to native Gemini contents."""
+        # Map tool_call_id -> function name so tool results can name their call
+        id_to_name: dict[str, str] = {}
+        for m in messages:
+            for i, tc in enumerate(m.get("tool_calls") or []):
+                f = tc.get("function", {})
+                id_to_name[tc.get("id") or f"call_{i}"] = f.get("name", "")
+
+        sys_texts: list[str] = []
+        contents: list[dict] = []
+        pending_responses: list[dict] = []
+
+        def flush():
+            nonlocal pending_responses
+            if pending_responses:
+                contents.append({"role": "user", "parts": pending_responses})
+                pending_responses = []
+
+        for m in messages:
+            role = m.get("role")
+            if role == "system":
+                sys_texts.append(m.get("content", ""))
+            elif role == "user":
+                flush()
+                contents.append({"role": "user", "parts": [{"text": m.get("content", "")}]})
+            elif role == "assistant":
+                flush()
+                content = m.get("content") or ""
+                gcalls = m.get("_gcalls")
+                tcs = m.get("tool_calls") or []
+                parts: list[dict] = []
+                if content:
+                    parts.append({"text": content})
+                if gcalls:
+                    for g in gcalls:
+                        part = {"functionCall": {"name": g["name"], "args": g["args"]}}
+                        if g.get("sig"):
+                            part["thoughtSignature"] = g["sig"]
+                        parts.append(part)
+                elif tcs:
+                    if _GEMINI_THINKING_RE.search(self.model or ""):
+                        # Legacy history without signatures: thinking models
+                        # reject bare functionCalls, so degrade to text.
+                        lines = [content] if content else []
+                        for tc in tcs:
+                            f = tc.get("function", {})
+                            lines.append(f"[Called tool {f.get('name')}({f.get('arguments', '')})]")
+                        parts = [{"text": "\n".join(lines)}]
+                    else:
+                        for tc in tcs:
+                            f = tc.get("function", {})
+                            try:
+                                args = json.loads(f.get("arguments") or "{}")
+                            except json.JSONDecodeError:
+                                args = {}
+                            parts.append(
+                                {"functionCall": {"name": f.get("name", ""), "args": args}}
+                            )
+                if parts:
+                    contents.append({"role": "model", "parts": parts})
+            elif role == "tool":
+                name = m.get("name") or id_to_name.get(m.get("tool_call_id"), "tool")
+                pending_responses.append(
+                    {
+                        "functionResponse": {
+                            "name": name,
+                            "response": {"result": m.get("content", "")},
+                        }
+                    }
+                )
+        flush()
+
+        body: dict = {
+            "contents": contents,
+            "generationConfig": {
+                "temperature": self.temperature,
+                "maxOutputTokens": self.max_tokens,
+            },
+        }
+        if _GEMINI_THINKING_RE.search(self.model or ""):
+            body["generationConfig"]["maxOutputTokens"] = max(self.max_tokens, 32768)
+        if sys_texts:
+            body["systemInstruction"] = {"parts": [{"text": "\n\n".join(sys_texts)}]}
+        if tools:
+            decls = []
+            for t in tools:
+                f = t.get("function", t)
+                params = f.get("parameters") or {"type": "object", "properties": {}}
+                decls.append(
+                    {
+                        "name": f.get("name", ""),
+                        "description": f.get("description", ""),
+                        "parameters": self._clean_schema(params),
+                    }
+                )
+            body["tools"] = [{"functionDeclarations": decls}]
+        return body
+
+    async def _google_chat(
+        self,
+        messages: list[dict],
+        tools: list[dict] | None,
+        stream_callback=None,
+        think_callback=None,
+        stream: bool = True,
+    ) -> dict | None:
+        key = self._auth_token()
+        base = (self.base_url or "").rstrip("/")
+        verb = "streamGenerateContent?alt=sse&key=" if stream else "generateContent?key="
+        url = f"{base}/models/{self.model}:{verb}{key}"
+        body = self._google_body(messages, tools)
+
+        for attempt in range(self.max_retries + 1):
+            try:
+                timeout = httpx.Timeout(connect=30.0, read=self.timeout_sec, write=30.0, pool=30.0)
+                text_chunks: list[str] = []
+                think_chunks: list[str] = []
+                calls: list[dict] = []
+                usage: dict = {}
+                finish = ""
+                async with httpx.AsyncClient(timeout=timeout) as client:
+                    if stream:
+                        async with client.stream("POST", url, json=body) as resp:
+                            if resp.status_code >= 400:
+                                await resp.aread()
+                            resp.raise_for_status()
+                            async for line in resp.aiter_lines():
+                                if not line.startswith("data: "):
+                                    continue
+                                try:
+                                    chunk = json.loads(line[6:])
+                                except json.JSONDecodeError:
+                                    continue
+                                (
+                                    text_chunks,
+                                    think_chunks,
+                                    calls,
+                                    usage,
+                                    finish,
+                                ) = self._google_ingest_chunk(
+                                    chunk,
+                                    text_chunks,
+                                    think_chunks,
+                                    calls,
+                                    usage,
+                                    finish,
+                                    stream_callback,
+                                    think_callback,
+                                )
+                    else:
+                        resp = await client.post(url, json=body)
+                        resp.raise_for_status()
+                        data = resp.json()
+                        um = data.get("usageMetadata") or {}
+                        usage = {
+                            "prompt_tokens": um.get("promptTokenCount", 0),
+                            "completion_tokens": um.get("candidatesTokenCount", 0),
+                        }
+                        cands = data.get("candidates") or []
+                        if cands:
+                            fr = cands[0].get("finishReason")
+                            if fr:
+                                finish = {"STOP": "stop", "MAX_TOKENS": "length"}.get(
+                                    fr, fr.lower()
+                                )
+                            for part in (cands[0].get("content") or {}).get("parts", []):
+                                fc = part.get("functionCall")
+                                if fc:
+                                    calls.append(
+                                        {
+                                            "name": fc.get("name", ""),
+                                            "args": fc.get("args") or {},
+                                            "sig": part.get("thoughtSignature", ""),
+                                        }
+                                    )
+                                    continue
+                                t = part.get("text") or ""
+                                if not t:
+                                    continue
+                                if part.get("thought"):
+                                    think_chunks.append(t)
+                                    if think_callback:
+                                        think_callback(t)
+                                else:
+                                    text_chunks.append(t)
+                                    if stream_callback:
+                                        stream_callback(t)
+
+                msg: dict = {"role": "assistant", "content": "".join(text_chunks)}
+                if think_chunks:
+                    msg["reasoning_content"] = "".join(think_chunks)
+                if calls:
+                    msg["_gcalls"] = calls
+                    msg["tool_calls"] = [
+                        {
+                            "id": f"call_{i}",
+                            "type": "function",
+                            "function": {
+                                "name": c["name"],
+                                "arguments": json.dumps(c["args"]),
+                            },
+                        }
+                        for i, c in enumerate(calls)
+                    ]
+                if usage:
+                    msg["_usage"] = usage
+                if finish:
+                    msg["_finish_reason"] = finish
+                return msg
+            except httpx.HTTPStatusError as e:
+                code = e.response.status_code
+                detail = self._extract_error_detail(e.response)
+                if code in self.retryable_codes and attempt < self.max_retries:
+                    delay = self._retry_delay(e.response, attempt)
+                    print(
+                        f"\n  [RETRY] HTTP {code} in {delay:.1f}s "
+                        f"({attempt + 2}/{self.max_retries + 1})"
+                    )
+                    await asyncio.sleep(delay)
+                    continue
+                print(f"\n  [ERR] API Error ({code}): {detail}")
+                return {
+                    "role": "assistant",
+                    "content": f"[API Error: {code}] {detail}",
+                }
+            except (
+                httpx.ReadError,
+                httpx.RemoteProtocolError,
+                httpx.ConnectError,
+                httpx.ReadTimeout,
+                httpx.ConnectTimeout,
+            ) as e:
+                if attempt < self.max_retries:
+                    delay = self._retry_delay(None, attempt)
+                    print(f"\n  [RETRY] {type(e).__name__}: {e} in {delay:.1f}s")
+                    await asyncio.sleep(delay)
+                    continue
+                if stream:
+                    print("\n  [WARN] Streaming failed — falling back to non-streaming")
+                    return await self._google_chat(
+                        messages, tools, None, think_callback, stream=False
+                    )
+                print(f"\n  [ERR] Non-streaming fallback also failed: {e}")
+                return None
+        return None
+
+    def _google_ingest_chunk(
+        self, chunk, text_chunks, think_chunks, calls, usage, finish, scb, tcb
+    ):
+        """Fold one SSE chunk into running buffers; returns the updated tuple."""
+        um = chunk.get("usageMetadata") or {}
+        if um:
+            usage = {
+                "prompt_tokens": um.get("promptTokenCount", 0),
+                "completion_tokens": um.get("candidatesTokenCount", 0),
+                "total_tokens": um.get("totalTokenCount", 0),
+            }
+        cands = chunk.get("candidates") or []
+        if not cands:
+            return (text_chunks, think_chunks, calls, usage, finish)
+        fr = cands[0].get("finishReason")
+        if fr:
+            finish = {"STOP": "stop", "MAX_TOKENS": "length"}.get(fr, fr.lower())
+        for part in (cands[0].get("content") or {}).get("parts", []):
+            fc = part.get("functionCall")
+            if fc:
+                calls.append(
+                    {
+                        "name": fc.get("name", ""),
+                        "args": fc.get("args") or {},
+                        "sig": part.get("thoughtSignature", ""),
+                    }
+                )
+                continue
+            t = part.get("text") or ""
+            if not t:
+                continue
+            if part.get("thought"):
+                think_chunks.append(t)
+                if tcb:
+                    tcb(t)
+            else:
+                text_chunks.append(t)
+                if scb:
+                    scb(t)
+        return (text_chunks, think_chunks, calls, usage, finish)
+
     async def chat_stream(
         self,
         messages: list[dict],
@@ -99,6 +434,8 @@ class LLMClient:
         think_callback: Callable[[str], None] | None = None,
     ) -> dict | None:
         """Streaming LLM call. Returns the assembled assistant message."""
+        if self._is_google():
+            return await self._google_chat(messages, tools, stream_callback, think_callback)
         url = f"{self.base_url}/chat/completions"
         headers = {"Content-Type": "application/json"}
         _k = self._auth_token()
@@ -359,6 +696,10 @@ class LLMClient:
         self, messages, tools=None, stream_callback=None, think_callback=None
     ) -> dict | None:
         """Non-streaming fallback"""
+        if self._is_google():
+            return await self._google_chat(
+                messages, tools, stream_callback, think_callback, stream=False
+            )
         url = f"{self.base_url}/chat/completions"
         headers = {"Content-Type": "application/json"}
         _k = self._auth_token()

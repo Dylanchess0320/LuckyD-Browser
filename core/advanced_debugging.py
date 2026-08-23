@@ -12,11 +12,9 @@ import ast
 import cProfile
 import io
 import json
-import os
 import pstats
 import re
 import time
-import traceback
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -71,7 +69,7 @@ class RootCauseReport:
     parsed: ParsedTraceback
     suspicious_frames: list[StackFrame]  # ranked, user code first
     local_var_hints: list[str]
-    confidence: float  # 0.0 – 1.0
+    confidence: float  # 0.0 - 1.0
 
 
 @dataclass
@@ -343,7 +341,12 @@ class _RiskyPatternVisitor(ast.NodeVisitor):
 
     def visit_ExceptHandler(self, node: ast.ExceptHandler) -> None:
         if node.type is None:
-            self._add(node, "bare_except", "Bare `except:` catches all exceptions, including SystemExit and KeyboardInterrupt.", "high")
+            self._add(
+                node,
+                "bare_except",
+                "Bare `except:` catches all exceptions, including SystemExit and KeyboardInterrupt.",
+                "high",
+            )
         self.generic_visit(node)
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
@@ -379,12 +382,25 @@ class _RiskyPatternVisitor(ast.NodeVisitor):
 
     def visit_Call(self, node: ast.Call) -> None:
         # Unclosed file:  open(...) without a `with` statement
-        if isinstance(node.func, ast.Name) and node.func.id == "open":
-            if not self._inside_with(node):
-                self._add(node, "unclosed_file", "`open()` called without a `with` statement. File may not be closed.", "medium")
+        if (
+            isinstance(node.func, ast.Name)
+            and node.func.id == "open"
+            and not self._inside_with(node)
+        ):
+            self._add(
+                node,
+                "unclosed_file",
+                "`open()` called without a `with` statement. File may not be closed.",
+                "medium",
+            )
         # eval / exec
         if isinstance(node.func, ast.Name) and node.func.id in ("eval", "exec"):
-            self._add(node, "eval_exec", f"Avoid `{node.func.id}` — security risk and hard to debug.", "high")
+            self._add(
+                node,
+                "eval_exec",
+                f"Avoid `{node.func.id}` — security risk and hard to debug.",
+                "high",
+            )
         self.generic_visit(node)
 
     def _inside_with(self, target: ast.AST) -> bool:
@@ -456,9 +472,7 @@ class AdvancedDebugging:
 
         # Frame extraction
         frames: list[StackFrame] = []
-        frame_re = re.compile(
-            r'^\s*File "(?P<file>.+?)", line (?P<line>\d+), in (?P<func>.+)$'
-        )
+        frame_re = re.compile(r'^\s*File "(?P<file>.+?)", line (?P<line>\d+), in (?P<func>.+)$')
         i = 0
         while i < len(lines):
             match = frame_re.match(lines[i])
@@ -509,19 +523,20 @@ class AdvancedDebugging:
 
         # Find the enclosing function/class and extract assignments
         for node in ast.walk(tree):
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                if node.lineno <= line_no <= (node.end_lineno or node.lineno):
-                    vars_: dict[str, str] = {}
-                    for child in ast.walk(node):
-                        if isinstance(child, ast.Assign):
-                            for target in child.targets:
-                                if isinstance(target, ast.Name):
-                                    try:
-                                        val = ast.literal_eval(child.value)
-                                        vars_[target.id] = repr(val)[:_MAX_LOCAL_VAR_REPR]
-                                    except Exception:
-                                        vars_[target.id] = "<dynamic>"
-                    return vars_
+            if isinstance(
+                node, (ast.FunctionDef, ast.AsyncFunctionDef)
+            ) and node.lineno <= line_no <= (node.end_lineno or node.lineno):
+                vars_: dict[str, str] = {}
+                for child in ast.walk(node):
+                    if isinstance(child, ast.Assign):
+                        for target in child.targets:
+                            if isinstance(target, ast.Name):
+                                try:
+                                    val = ast.literal_eval(child.value)
+                                    vars_[target.id] = repr(val)[:_MAX_LOCAL_VAR_REPR]
+                                except Exception:
+                                    vars_[target.id] = "<dynamic>"
+                return vars_
         return {}
 
     # ── 2. Root cause analysis ──────────────────────────────────────────────
@@ -532,6 +547,7 @@ class AdvancedDebugging:
         Rank frames by suspiciousness.
         User code (not in site-packages / dist-packages) is more suspicious.
         """
+
         def _score(frame: StackFrame) -> float:
             path = frame.file_path.replace("\\", "/").lower()
             if "site-packages" in path or "dist-packages" in path:
@@ -595,7 +611,7 @@ class AdvancedDebugging:
                 continue
             match = pattern.regex.search(error.exception_message)
             if match or not pattern.regex.groups:
-                for cause, fix in zip(pattern.likely_causes, pattern.fix_suggestions):
+                for cause, fix in zip(pattern.likely_causes, pattern.fix_suggestions, strict=False):
                     snippet = self._build_snippet(error, pattern, match)
                     suggestions.append(
                         FixSuggestion(
@@ -693,7 +709,7 @@ class AdvancedDebugging:
         start = time.perf_counter()
         try:
             profiler.enable()
-            exec(compile(code, "<string>", "exec"), namespace)  # noqa: S102
+            exec(compile(code, "<string>", "exec"), namespace)
         except Exception:
             pass  # we still want the profile even if the code raised
         finally:
@@ -896,7 +912,9 @@ KeyError: 'alice'
     report = debugger.analyze_traceback(sample_tb)
     print(f"Exception : {report.parsed.exception_type}: {report.parsed.exception_message}")
     print(f"Frames    : {len(report.parsed.frames)}")
-    print(f"Top frame : {report.suspicious_frames[0].file_path}:{report.suspicious_frames[0].line_number}")
+    print(
+        f"Top frame : {report.suspicious_frames[0].file_path}:{report.suspicious_frames[0].line_number}"
+    )
     print(f"Confidence: {report.confidence:.2f}\n")
 
     # 2. Fix suggestions

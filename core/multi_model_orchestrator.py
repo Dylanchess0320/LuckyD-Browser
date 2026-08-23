@@ -116,9 +116,7 @@ class ModelStats:
         """A model is healthy if it's not in a failure spiral."""
         if self.consecutive_failures >= 3:
             return False
-        if self.calls >= 5 and self.success_rate < 0.3:
-            return False
-        return True
+        return not (self.calls >= 5 and self.success_rate < 0.3)
 
 
 @dataclass
@@ -246,11 +244,7 @@ class MultiModelOrchestrator:
 
     def list_models(self, enabled_only: bool = True) -> list[str]:
         with self._lock:
-            return [
-                n
-                for n, c in self._models.items()
-                if (c.enabled or not enabled_only)
-            ]
+            return [n for n, c in self._models.items() if (c.enabled or not enabled_only)]
 
     def get_stats(self, name: str) -> ModelStats | None:
         return self._stats.get(name)
@@ -306,13 +300,13 @@ class MultiModelOrchestrator:
         weights: list[int] = []
         for n in names:
             sr = self._stats.get(n, ModelStats()).success_rate
-            weights.append(max(1, int(round(sr * 10))))
+            weights.append(max(1, round(sr * 10)))
 
         key = "|".join(names)
         idx = self._rr_counters.get(key, 0)
         # Build the expanded weighted sequence lazily.
         expanded: list[str] = []
-        for n, w in zip(names, weights):
+        for n, w in zip(names, weights, strict=False):
             expanded.extend([n] * w)
         pick = expanded[idx % len(expanded)]
         self._rr_counters[key] = idx + 1
@@ -382,10 +376,7 @@ class MultiModelOrchestrator:
         workers = max_workers or min(len(models), 8)
         results: dict[str, CallResult] = {}
         with ThreadPoolExecutor(max_workers=workers) as pool:
-            futures = {
-                pool.submit(self._call_one, name, messages, tools): name
-                for name in models
-            }
+            futures = {pool.submit(self._call_one, name, messages, tools): name for name in models}
             for fut in as_completed(futures):
                 name = futures[fut]
                 try:
@@ -450,7 +441,7 @@ class MultiModelOrchestrator:
                     cost_usd=cost,
                     attempts=attempts,
                 )
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 latency = time.monotonic() - started
                 last_err = f"{type(e).__name__}: {e}"
                 self._record_failure(name, latency, last_err)
@@ -545,7 +536,9 @@ class MultiModelOrchestrator:
             if not isinstance(raw, dict):
                 continue
             try:
-                self._stats[name] = ModelStats(**{k: v for k, v in raw.items() if k in ModelStats.__dataclass_fields__})
+                self._stats[name] = ModelStats(
+                    **{k: v for k, v in raw.items() if k in ModelStats.__dataclass_fields__}
+                )
             except TypeError:
                 continue
 
@@ -596,8 +589,13 @@ if __name__ == "__main__":
         provider="deepseek",
         model_id="deepseek-chat",
         capabilities=ModelCapabilities(
-            code=6, chat=7, reasoning=5, speed=9, cost=9,
-            price_input=0.27, price_output=1.10,
+            code=6,
+            chat=7,
+            reasoning=5,
+            speed=9,
+            cost=9,
+            price_input=0.27,
+            price_output=1.10,
         ),
     )
     orch.register_model(
@@ -605,8 +603,13 @@ if __name__ == "__main__":
         provider="anthropic",
         model_id="claude-sonnet-4",
         capabilities=ModelCapabilities(
-            code=9, chat=9, reasoning=9, speed=4, cost=2,
-            price_input=3.0, price_output=15.0,
+            code=9,
+            chat=9,
+            reasoning=9,
+            speed=4,
+            cost=2,
+            price_input=3.0,
+            price_output=15.0,
         ),
     )
     orch.register_model(
@@ -635,7 +638,9 @@ if __name__ == "__main__":
     print("== parallel_call ==")
     out = orch.parallel_call(messages, models=["fast-cheap", "smart-expensive", "broken-model"])
     for name, r in out.items():
-        print(f"  {name}: ok={r.ok} latency={r.latency:.3f}s cost=${r.cost_usd:.6f} err={r.error!r}")
+        print(
+            f"  {name}: ok={r.ok} latency={r.latency:.3f}s cost=${r.cost_usd:.6f} err={r.error!r}"
+        )
 
     print("== health_check ==")
     for name, healthy in orch.health_check().items():

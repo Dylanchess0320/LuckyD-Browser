@@ -24,9 +24,9 @@ import os
 import subprocess
 import sys
 import time
+import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
-import urllib.request
 
 
 def _debug_log(msg: str) -> None:
@@ -113,7 +113,7 @@ def load_tiles(config_path: Path | None = None) -> list[Tile]:
     try:
         raw = json.loads(path.read_text(encoding="utf-8-sig"))
         entries = raw.get("tiles", [])
-    except Exception as exc:  # noqa: BLE001 — degrade to empty tile list
+    except Exception as exc:
         _debug_log(f"load_tiles FAILED path={path!r}: {exc!r}")
         return []
     tiles = []
@@ -202,7 +202,7 @@ def ensure_autostart(tiles: list[Tile] | None = None) -> None:
                 list(t.command), **kwargs
             )
             _debug_log(f"launched {t.id}: cmd={list(t.command)} cwd={t.cwd!r}")
-        except Exception as exc:  # noqa: BLE001 — logged below
+        except Exception as exc:
             _debug_log(f"launch FAILED {t.id}: {exc!r}")
 
 

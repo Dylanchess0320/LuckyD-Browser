@@ -64,8 +64,23 @@ _DEFAULT_TYPE_WEIGHT = 0.30
 
 # Extensions treated as code for token estimation + comment stripping.
 _CODE_EXTS = {
-    ".py", ".js", ".ts", ".jsx", ".tsx", ".go", ".rs", ".java", ".c", ".h",
-    ".cpp", ".cs", ".rb", ".php", ".sh", ".ps1", ".sql",
+    ".py",
+    ".js",
+    ".ts",
+    ".jsx",
+    ".tsx",
+    ".go",
+    ".rs",
+    ".java",
+    ".c",
+    ".h",
+    ".cpp",
+    ".cs",
+    ".rb",
+    ".php",
+    ".sh",
+    ".ps1",
+    ".sql",
 }
 
 # Comment syntax per family — (line_comment_prefixes, block_comment_pairs).
@@ -99,9 +114,57 @@ _COMMENT_SYNTAX: dict[str, tuple[tuple[str, ...], tuple[tuple[str, str], ...]]] 
 
 # Stop words stripped from queries so they don't pollute keyword overlap.
 _STOP_WORDS = frozenset(
-    "a an and are as at be by for from has how i in is it of on or that the "
-    "this to was what when where which who why will with should would could "
-    "can do does did me my we you your our their its them they".split()
+    [
+        "a",
+        "an",
+        "and",
+        "are",
+        "as",
+        "at",
+        "be",
+        "by",
+        "for",
+        "from",
+        "has",
+        "how",
+        "i",
+        "in",
+        "is",
+        "it",
+        "of",
+        "on",
+        "or",
+        "that",
+        "the",
+        "this",
+        "to",
+        "was",
+        "what",
+        "when",
+        "where",
+        "which",
+        "who",
+        "why",
+        "will",
+        "with",
+        "should",
+        "would",
+        "could",
+        "can",
+        "do",
+        "does",
+        "did",
+        "me",
+        "my",
+        "we",
+        "you",
+        "your",
+        "our",
+        "their",
+        "its",
+        "them",
+        "they",
+    ]
 )
 
 # ── Data structures ───────────────────────────────────────────────────
@@ -162,7 +225,7 @@ class SmartContextEngine:
     # ── Public API ────────────────────────────────────────────────────
 
     def score_file(self, path: str, task_query: str) -> float:
-        """Score a single file's relevance to the task query (0.0–~1.5).
+        """Score a single file's relevance to the task query (0.0-~1.5).
 
         Results are cached with a TTL and invalidated when the file changes.
         """
@@ -185,7 +248,11 @@ class SmartContextEngine:
             fp = self._fingerprint(norm)
             key = (norm, task_query)
             entry = self._cache.get(key)
-            if entry and entry.fingerprint == fp and (time.time() - entry.created_at) < self.cache_ttl:
+            if (
+                entry
+                and entry.fingerprint == fp
+                and (time.time() - entry.created_at) < self.cache_ttl
+            ):
                 scores.append(entry.score)
                 continue
             score = self._compute_score(norm, task_query, fp)
@@ -223,7 +290,9 @@ class SmartContextEngine:
                 tokens = estimate_tokens(compressed, is_code=is_code)
                 if tokens <= 0 or tokens > budget_left:
                     continue
-            items.append(ContextItem(path=fs.path, content=compressed, score=fs.total, tokens=tokens))
+            items.append(
+                ContextItem(path=fs.path, content=compressed, score=fs.total, tokens=tokens)
+            )
             budget_left -= tokens
 
         return [(it.path, it.content, it.score) for it in items]
@@ -442,7 +511,7 @@ class SmartContextEngine:
         head = lines[: self.head_tail_lines]
         tail = lines[-self.head_tail_lines :]
         elided = len(lines) - len(head) - len(tail)
-        return "\n".join(head + [f"\n... ({elided} lines elided) ...\n"] + tail)
+        return "\n".join((*head, f"\n... ({elided} lines elided) ...\n", *tail))
 
     def _truncate_to_budget(self, path: str, content: str, token_budget: int) -> str:
         """Hard-truncate compressed content to fit a remaining token budget."""
@@ -454,16 +523,22 @@ class SmartContextEngine:
             return content
         half = char_budget // 2
         elided_chars = len(content) - char_budget
-        return (
-            content[:half]
-            + f"\n... ({elided_chars} chars elided) ...\n"
-            + content[-half:]
-        )
+        return content[:half] + f"\n... ({elided_chars} chars elided) ...\n" + content[-half:]
 
     # ── Filesystem helpers ────────────────────────────────────────────
 
     _IGNORE_DIRS = frozenset(
-        {".git", "__pycache__", "node_modules", ".venv", "venv", "dist", "build", ".idea", ".vscode"}
+        {
+            ".git",
+            "__pycache__",
+            "node_modules",
+            ".venv",
+            "venv",
+            "dist",
+            "build",
+            ".idea",
+            ".vscode",
+        }
     )
     _MAX_FILE_BYTES = 512 * 1024  # skip files > 512 KB
 
@@ -471,7 +546,9 @@ class SmartContextEngine:
         """Collect candidate files under root, skipping junk dirs and huge files."""
         results: list[str] = []
         for dirpath, dirnames, filenames in os.walk(self.root):
-            dirnames[:] = [d for d in dirnames if d not in self._IGNORE_DIRS and not d.startswith(".")]
+            dirnames[:] = [
+                d for d in dirnames if d not in self._IGNORE_DIRS and not d.startswith(".")
+            ]
             for name in filenames:
                 p = os.path.join(dirpath, name)
                 try:
@@ -559,9 +636,7 @@ if __name__ == "__main__":
             encoding="utf-8",
         )
         (pkg / "db.py").write_text(
-            "# database helpers\n\n\n"
-            "def get_user(name):\n"
-            "    return {'name': name}\n",
+            "# database helpers\n\n\n" "def get_user(name):\n" "    return {'name': name}\n",
             encoding="utf-8",
         )
         (Path(tmp) / "README.md").write_text(

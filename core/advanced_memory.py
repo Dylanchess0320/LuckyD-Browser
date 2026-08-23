@@ -27,10 +27,11 @@ import re
 import sqlite3
 import threading
 import uuid
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 try:  # Prefer project config, but stay importable standalone
     from config import MEMORY_DIR
@@ -51,9 +52,65 @@ EXPORT_VERSION = 1
 
 _TOKEN_RE = re.compile(r"[a-zA-Z0-9_]{2,}")
 _STOPWORDS = frozenset(
-    "the a an and or but of to in on for with at by from is are was were be been "
-    "it its this that these those as not no do does did have has had will would "
-    "can could should i you he she we they them his her their our your my me him us".split()
+    [
+        "the",
+        "a",
+        "an",
+        "and",
+        "or",
+        "but",
+        "of",
+        "to",
+        "in",
+        "on",
+        "for",
+        "with",
+        "at",
+        "by",
+        "from",
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "it",
+        "its",
+        "this",
+        "that",
+        "these",
+        "those",
+        "as",
+        "not",
+        "no",
+        "do",
+        "does",
+        "did",
+        "have",
+        "has",
+        "had",
+        "will",
+        "would",
+        "can",
+        "could",
+        "should",
+        "i",
+        "you",
+        "he",
+        "she",
+        "we",
+        "they",
+        "them",
+        "his",
+        "her",
+        "their",
+        "our",
+        "your",
+        "my",
+        "me",
+        "him",
+        "us",
+    ]
 )
 
 
@@ -85,9 +142,7 @@ def _hash_bucket(term: str, dims: int) -> int:
     return int(hashlib.md5(term.encode("utf-8")).hexdigest(), 16) % dims
 
 
-def _tfidf_vector(
-    tokens: list[str], dims: int = 256, sublinear: bool = True
-) -> dict[int, float]:
+def _tfidf_vector(tokens: list[str], dims: int = 256, sublinear: bool = True) -> dict[int, float]:
     """Sparse TF vector in a fixed-dim hash space, L2-normalized.
 
     IDF is applied at query time against corpus stats; stored vectors are
@@ -200,9 +255,7 @@ class AdvancedMemorySystem:
         self.compact_threshold = compact_threshold
         self.vector_dims = vector_dims
         self._lock = threading.RLock()
-        self._conn = sqlite3.connect(
-            str(self.db_path), check_same_thread=False, timeout=30.0
-        )
+        self._conn = sqlite3.connect(str(self.db_path), check_same_thread=False, timeout=30.0)
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA foreign_keys=ON")
@@ -303,9 +356,7 @@ class AdvancedMemorySystem:
     def get(self, memory_id: str) -> Memory | None:
         """Fetch by full or prefix ID (matches MemoryForget's partial lookup)."""
         with self._lock:
-            row = self._conn.execute(
-                "SELECT * FROM memories WHERE id = ?", (memory_id,)
-            ).fetchone()
+            row = self._conn.execute("SELECT * FROM memories WHERE id = ?", (memory_id,)).fetchone()
             if row is None:
                 row = self._conn.execute(
                     "SELECT * FROM memories WHERE id LIKE ? ORDER BY created_at LIMIT 1",
@@ -516,9 +567,7 @@ class AdvancedMemorySystem:
                         ",".join(sorted(sources)) or "compressed",
                     ),
                 )
-                self._conn.executemany(
-                    "DELETE FROM memories WHERE id = ?", [(i,) for i in ids]
-                )
+                self._conn.executemany("DELETE FROM memories WHERE id = ?", [(i,) for i in ids])
                 merged += len(ids)
         return merged
 
@@ -527,9 +576,7 @@ class AdvancedMemorySystem:
     def export(self, path: Path | str | None = None) -> str:
         """Export all memories to a JSON file. Returns the file path."""
         with self._lock:
-            rows = self._conn.execute(
-                "SELECT * FROM memories ORDER BY created_at"
-            ).fetchall()
+            rows = self._conn.execute("SELECT * FROM memories ORDER BY created_at").fetchall()
         payload = {
             "version": EXPORT_VERSION,
             "exported_at": _iso(_utcnow()),
@@ -747,9 +794,7 @@ if __name__ == "__main__":
                 category="scratch",
                 importance=0.1,
             )
-            mem._conn.execute(
-                "UPDATE memories SET last_accessed = ? WHERE id = ?", (stale, mid)
-            )
+            mem._conn.execute("UPDATE memories SET last_accessed = ? WHERE id = ?", (stale, mid))
     before = mem.stats()["total"]
     merged = mem.compress_old_memories(older_than_days=30, max_importance=0.3, keep_minimum=0)
     after = mem.stats()["total"]
