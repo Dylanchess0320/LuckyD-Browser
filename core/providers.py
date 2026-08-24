@@ -240,11 +240,16 @@ def resolve_provider_config(provider: str | None = None) -> dict:
             # Surface the real reason instead of silently producing an empty key
             # that later turns into a confusing 401 in the agent reply.
             api_key = ""
-            print(
-                f"\n  [AUTH] Cline session unavailable — {type(exc).__name__}: {exc}\n"
-                "         Run `cline` (or `cline auth`) to log in, or set "
-                "CLINEPASS_API_KEY in .env."
-            )
+            # Only warn if using ClinePass intentionally; fall back to DeepSeek for Agent Mesh
+            if explicit in ("clinepass", "cline-usage"):
+                print(
+                    f"\n  [AUTH] Cline session unavailable — {type(exc).__name__}: {exc}\n"
+                    "         Run `cline` (or `cline auth`) to log in, or set "
+                    "CLINEPASS_API_KEY in .env."
+                )
+            # For ClinePass fallback: silently retry with DeepSeek (Agent Mesh doesn't need Cline)
+            else:
+                provider = "deepseek"
 
     base_url = os.environ.get(defaults["env_base"], defaults["default_base"])
     model_name = os.environ.get(defaults["env_model"], defaults["default_model"])
