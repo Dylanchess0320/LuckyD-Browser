@@ -1,21 +1,64 @@
 <div align="center">
 
-# LuckyD Code
+# LuckyD Browser
 
-**AI-powered coding agent for Windows — work in your terminal or VS Code.**
+**A local-first AI browser for Windows — browse, chat, automate, and code from one window.**
 
 [![CI](https://github.com/Dylanchess0320/LuckyD-Browser/actions/workflows/ci.yml/badge.svg)](https://github.com/Dylanchess0320/LuckyD-Browser/actions/workflows/ci.yml)
 [![Python 3.10–3.12](https://img.shields.io/badge/python-3.10--3.12-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-<img src="docs/screenshots/hq.png" alt="LuckyD Code terminal UI" width="720">
+<img src="docs/screenshots/sidebar.png" alt="LuckyD Browser AI sidebar" width="720">
 
 </div>
 
 ---
 
-## Features
+## LuckyD Browser Features
+
+LuckyD Browser is a Chromium-based browser with a built-in AI assistant, coding-agent workspace, real Windows terminals, and browser automation. Use free local AI with Ollama or connect your preferred cloud provider.
+
+**[Download for Windows](https://github.com/Dylanchess0320/LuckyD-Browser/releases)** &middot; **[Full browser guide](README-LuckyD-Browser.md)** &middot; **[Changelog](CHANGELOG.md)**
+
+| Area | What's included |
+|---|---|
+| **Local-first AI** | Free offline Ollama, LM Studio, plus optional Gemini, Groq, Z.ai, OpenRouter, DeepSeek, OpenAI, Anthropic, Cline, and ClinePass. |
+| **Page-aware assistant** | Sidebar chat, model picker, visual questions, Explain/Summarize/Translate, and omnibox AI questions. |
+| **Automation** | Visible-tab agent, workflows, self-healing replay, schedules, JSON extraction, and a localhost-only Control API. |
+| **Browsing** | Tab groups, AI tab organizer, vertical tabs, side pane, session restore, Reader Mode, Focus Mode, Read Later, bookmarks, history, and command palette. |
+| **Developer tools** | Coding Agent HQ, multi-tab agent/PowerShell/CMD terminals, network monitor, HAR export, DevTools, source viewer, and dashboard service tiles. |
+
+### Browse better
+
+- Collapsible, session-persistent tab groups and an AI Tab Organizer
+- Vertical tabs, tab hover previews, pinning, drag reorder, recently closed tabs, and duplicate-tab cleanup
+- Reader Mode, Focus Mode, full-screen video, Side Pane, Read Later, bookmark import/export, and previous-session restore
+- Ad/tracker blocking, incognito, per-site zoom, in-page find, downloads with live speed/ETA and pause/resume
+- Full-page screenshots, print, Save Page, spell check, customizable themes, and a playable offline page
+
+### Automate and build
+
+- Record workflows, replay them against changed pages with resilient element matching, and schedule saved workflows
+- Give the AI a page question, a screenshot, or an extraction schema; it can return structured JSON
+- Use the Coding Agent HQ and independent ConPTY terminal tabs for the LuckyD agent, a second agent, PowerShell, or CMD
+- Inspect live requests and export HAR 1.2 files from the Network Monitor
+
+### Privacy by default
+
+With local Ollama, prompts and page context stay on your computer. Browser data lives in `%LOCALAPPDATA%\LuckyDBrowser`; the Control API, HQ, terminal, and CDP services bind to loopback by default.
+
+### Key shortcuts
+
+| Shortcut | Action |
+|---|---|
+| Ctrl+Shift+A | Toggle AI sidebar |
+| Ctrl+Shift+H | Open Coding Agent HQ |
+| Ctrl+K | Command palette |
+| Ctrl+Alt+R / Ctrl+Shift+F | Reader Mode / Focus Mode |
+| Ctrl+Alt+S / Ctrl+Shift+S | Read Later / full-page screenshot |
+
+## LuckyD Code Features
 
 - **Multi-provider LLM support** — DeepSeek, OpenAI, Anthropic, Google, Z.ai, OpenRouter, or local models via Ollama. Swap providers mid-session with `/model`.
 - **Full tool suite** — file editing, shell commands, git, web search/fetch, browser automation, LSP code intelligence, SQLite, and persistent memory.
