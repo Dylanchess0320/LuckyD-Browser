@@ -364,7 +364,7 @@ class CodeExecutionSandbox:
         stream = io.StringIO()
         try:
             profiler.enable()
-            exec(compile(code, "<sandbox-profile>", "exec"), namespace)
+            exec(compile(code, "<sandbox-profile>", "exec"), namespace)  # nosec B102
             profiler.disable()
         except Exception as exc:  # profiled code raised — still report stats
             profiler.disable()

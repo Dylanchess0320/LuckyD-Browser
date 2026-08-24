@@ -585,7 +585,7 @@ class SmartContextEngine:
         except OSError:
             return "missing"
         raw = f"{st.st_mtime_ns}:{st.st_size}"
-        return hashlib.md5(raw.encode()).hexdigest()
+        return hashlib.md5(raw.encode(), usedforsecurity=False).hexdigest()
 
     @staticmethod
     def _query_terms(query: str) -> set[str]:
