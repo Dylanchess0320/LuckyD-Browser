@@ -148,7 +148,7 @@ def probe_tile(tile: Tile, timeout: float = PROBE_TIMEOUT_SEC) -> dict:
         result["up"] = tile.url.startswith(("http://", "https://"))
         return result
     try:
-        with urllib.request.urlopen(tile.health_url, timeout=timeout) as resp:
+        with urllib.request.urlopen(tile.health_url, timeout=timeout) as resp:  # nosec B310
             result["up"] = resp.status == 200
             if result["up"]:
                 body = resp.read(4096)

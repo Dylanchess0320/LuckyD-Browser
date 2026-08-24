@@ -139,7 +139,7 @@ def _tokenize(text: str) -> list[str]:
 
 def _hash_bucket(term: str, dims: int) -> int:
     """Deterministic feature bucket via md5 (hashing trick — no vocab needed)."""
-    return int(hashlib.md5(term.encode("utf-8")).hexdigest(), 16) % dims
+    return int(hashlib.md5(term.encode("utf-8"), usedforsecurity=False).hexdigest(), 16) % dims
 
 
 def _tfidf_vector(tokens: list[str], dims: int = 256, sublinear: bool = True) -> dict[int, float]:

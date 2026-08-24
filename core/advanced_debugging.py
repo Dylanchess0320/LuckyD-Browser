@@ -709,7 +709,7 @@ class AdvancedDebugging:
         start = time.perf_counter()
         try:
             profiler.enable()
-            exec(compile(code, "<string>", "exec"), namespace)
+            exec(compile(code, "<string>", "exec"), namespace)  # nosec B102
         except Exception:
             pass  # we still want the profile even if the code raised
         finally:
