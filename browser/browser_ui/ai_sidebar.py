@@ -546,9 +546,11 @@ class AiSidebar(QDockWidget):
         self.model_box.setEnabled(True)
         self._sync_vision_default()
 
-    @staticmethod
-    def _provider_label(provider: str) -> str:
+    def _provider_label(self, provider: str) -> str:
         """Human-friendly provider name shown in the dropdown."""
+        endpoint_label = self.bridge.provider_label(provider)
+        if endpoint_label:
+            return endpoint_label
         labels = {
             "clinepass": "ClinePass",
             "cline-usage": "Cline Usage",

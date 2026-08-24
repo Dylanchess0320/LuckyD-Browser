@@ -24,6 +24,9 @@
 
 ## What is LuckyD Browser?
 
+- **Multiple Agents** — support for agent handoffs, team creation, and message passing between specialist agents (researcher, coder, reviewer, tester). Use `/agent list` to view active agents, `/agent handoff researcher` to research a topic, `/agent team create` to create a parallel agent team, and `/agent message` to send messages between agents.
+
+
 LuckyD Browser is a **Chromium-based browser + AI coding environment + multi-agent orchestration platform** for Windows. It merges everyday browsing, AI-powered automation, and professional development tools into one seamless experience.
 
 **Key idea:** Use free local AI (or your favorite cloud provider) to record workflows, drive the browser autonomously, extract data, and run multiple agents in parallel—all without leaving your browser tabs.

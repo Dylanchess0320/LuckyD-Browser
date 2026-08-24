@@ -18,6 +18,7 @@ VALID_PROVIDERS = {
     "deepseek",
     "zai",
     "openrouter",
+    "opencode",
     "clinepass",
     "cline-usage",
 }
@@ -30,6 +31,7 @@ PROVIDER_NAMES = {
     "ollama": "Ollama",
     "zai": "Z.ai (GLM)",
     "openrouter": "OpenRouter",
+    "opencode": "OpenCode Zen",
     "clinepass": "ClinePass",
     "cline-usage": "Cline (usage)",
 }
@@ -83,6 +85,15 @@ PROVIDER_DEFAULTS = {
         "env_model": "OPENROUTER_MODEL",
         "default_base": "https://openrouter.ai/api/v1",
         "default_model": "deepseek/deepseek-chat-v3.1",
+    },
+    # OpenCode Zen (opencode.ai gateway) — every model on it is $0/free.
+    # Catalog: opencode's open registry (models.dev), 2026-08.
+    "opencode": {
+        "env_key": "OPENCODE_API_KEY",
+        "env_base": "OPENCODE_BASE_URL",
+        "env_model": "OPENCODE_MODEL",
+        "default_base": "https://opencode.ai/zen/v1",
+        "default_model": "nemotron-3-ultra-free",
     },
     # ClinePass (Cline flat-subscription gateway) — OpenAI-compatible.
     # Key comes from CLINEPASS_API_KEY, else the logged-in Cline CLI session.
@@ -141,6 +152,7 @@ def detect_provider() -> str | None:
         ("anthropic", "ANTHROPIC_API_KEY"),
         ("google", "GOOGLE_API_KEY"),
         ("zai", "ZAI_API_KEY"),
+        ("opencode", "OPENCODE_API_KEY"),
         ("openrouter", "OPENROUTER_API_KEY"),
         ("ollama", "OLLAMA_MODEL"),
     ]
@@ -312,6 +324,7 @@ def detect_api_format(provider: str) -> str:
         "deepseek": "openai",  # DeepSeek uses OpenAI-compatible
         "zai": "openai",  # Z.ai GLM uses OpenAI-compatible endpoint
         "openrouter": "openai",  # OpenRouter uses OpenAI-compatible
+        "opencode": "openai",  # OpenCode Zen is OpenAI-compatible
         "clinepass": "openai",  # ClinePass gateway is OpenAI-compatible
         "cline-usage": "openai",  # same gateway, usage-billed model ids
     }

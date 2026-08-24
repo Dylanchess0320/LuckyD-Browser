@@ -1,11 +1,11 @@
 """LuckyD Browser — a full-featured Chromium-based web browser for Windows."""
 
-__version__ = "2.3.0"
+__version__ = "2.5.0"
 
 # Shown once after an update (first launch with a new version).
 WHATS_NEW = (
-    "Welcome to 2.3: the LuckyD Platform hub — a config-driven tile registry "
-    "(platform_tiles.json), Deck Studio built into your browser (AI Marp decks "
-    "with verified-fit rendering), auto-recovering platform services, and the "
-    "one-window home for every LuckyD tool"
+    "Welcome to 2.5: every free AI model from opencode's registry is now "
+    "wired in — OpenCode Zen shows only $0 models, OpenRouter sorts all "
+    ":free models to the top of the picker, a new 'opencode' provider for "
+    "the coding agent, smarter update checks, and honest About/version info"
 )

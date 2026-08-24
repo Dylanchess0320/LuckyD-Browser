@@ -105,6 +105,14 @@ _VISION_HINTS = (
     "phi-3-vision",
     "phi-3.5-vision",
     "phi-4-multimodal",
+    # OpenCode Zen / OpenRouter free models with image input (models.dev)
+    "gemma-4",
+    "gemma4",
+    "grok-code",
+    "kimi-k2.5",
+    "mimo-v2",
+    "qwen3.6",
+    "muse-spark",
 )
 # Substrings that veto a hint match (text-only variants of vision lines).
 _VISION_EXCLUDE = ("gemma3:1b", "gemma-3-1b")
@@ -130,6 +138,65 @@ _CLINEPASS_CATALOG = [
     "cline-pass/minimax-m3",
     "cline-pass/qwen3.7-max",
     "cline-pass/qwen3.7-plus",
+]
+
+# OpenCode Zen (opencode.ai) free catalog — every $0 model on the Zen
+# gateway, synced from opencode's open model registry (models.dev), 2026-08.
+# Used as the fetch_models() fallback for the zen endpoint and to keep the
+# sidebar picker complete when the live catalog request fails. All of these
+# are tool-capable unless noted; [V] marks vision-capable entries.
+_OPENCODE_ZEN_BASE = "https://opencode.ai/zen/v1"
+_OPENCODE_ZEN_DEFAULT = "nemotron-3-ultra-free"
+_OPENCODE_FREE_CATALOG = [
+    "big-pickle",
+    "deepseek-v4-flash-free",
+    "glm-4.7-free",
+    "glm-5-free",
+    "grok-code",  # [V]
+    "hy3-free",
+    "hy3-preview-free",
+    "kimi-k2.5-free",  # [V]
+    "laguna-s-2.1-free",
+    "ling-2.6-flash-free",
+    "ling-3.0-flash-free",
+    "ling-3.0-tiny-free",
+    "longcat-2.0-free",
+    "mimo-v2-flash-free",
+    "mimo-v2-omni-free",  # [V]
+    "mimo-v2-pro-free",  # [V]
+    "mimo-v2.5-free",  # [V]
+    "minimax-m2.1-free",
+    "minimax-m2.5-free",
+    "minimax-m3-free",
+    "muse-spark-1.2-contributor-free",  # [V]
+    "nemotron-3-super-free",
+    "nemotron-3-ultra-free",
+    "nemotron-3.5-lightning-free",
+    "north-mini-code-free",
+    "qwen3.6-plus-free",  # [V]
+    "ring-2.6-1t-free",
+    "trinity-large-preview-free",
+    "x-preview-f-free",  # [V]
+]
+
+# OpenRouter free fallback — the :free chat models plus the auto free-router,
+# used only when the live /models request fails. Kept roughly largest-first.
+_OPENROUTER_FREE_FALLBACK = [
+    "openrouter/free",  # meta-router: auto-picks any available free model
+    "nvidia/nemotron-3-ultra-550b-a55b:free",
+    "z-ai/glm-5.2:free",
+    "thinkingmachines/inkling:free",
+    "thinkingmachines/inkling-small:free",
+    "google/gemma-4-31b-it:free",
+    "google/gemma-4-26b-a4b-it:free",
+    "dots-studio/dots-3-note-preview:free",
+    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+    "nvidia/nemotron-3-super-120b-a12b:free",
+    "nvidia/nemotron-3.5-lightning:free",
+    "cohere/north-mini-code:free",
+    "liquid/lfm-2.5-2.6b:free",
+    "poolside/laguna-s-2.1:free",
+    "poolside/laguna-xs-2.1:free",
 ]
 
 # Cline Usage (credit-billed / free tier) — same gateway, usage-based billing.
@@ -186,9 +253,11 @@ class AIBridge:
             key = env.get(key_name, "").strip()
             if not key:
                 continue
-            # Per-provider model override, e.g. DEEPSEEK_MODEL=deepseek-v4-pro
+            # Per-provider overrides, e.g. DEEPSEEK_MODEL=deepseek-v4-pro or
+            # OPENAI_BASE_URL=https://opencode.ai/zen/v1
             prefix = key_name.removesuffix("_API_KEY")
             model = env.get(f"{prefix}_MODEL", "").strip() or model
+            base_url = env.get(f"{prefix}_BASE_URL", "").strip() or base_url
             self._configs[name] = (model, base_url, key, kind)
 
     def _detect_clinepass(self, env) -> None:
@@ -249,6 +318,17 @@ class AIBridge:
 
     def providers(self) -> list[str]:
         return list(self._configs)
+
+    def is_opencode_zen(self, provider: str) -> bool:
+        """True when the provider's endpoint is the OpenCode Zen gateway."""
+        info = self._configs.get(provider)
+        return bool(info) and "opencode.ai" in info[1]
+
+    def provider_label(self, provider: str) -> str | None:
+        """Endpoint-aware display name: 'OpenCode Zen' vs plain 'OpenAI'."""
+        if self.is_opencode_zen(provider):
+            return "OpenCode Zen"
+        return None
 
     def default_provider(self) -> str | None:
         """Return the highest-priority available provider.
@@ -338,16 +418,32 @@ class AIBridge:
                 ]
             except Exception:
                 models = []
+        if self.is_opencode_zen(provider) and models:
+            # Zen's live catalog mixes paid Claude/GPT/GLM tiers in with the
+            # free ones — keep only $0 models: everything in the synced
+            # catalog plus any future "-free" suffixed release.
+            models = [
+                m for m in models if m.endswith("-free") or m in _OPENCODE_FREE_CATALOG
+            ]
         if not models:
             if provider == "clinepass":
                 models = list(_CLINEPASS_CATALOG)
             elif provider == "cline-usage":
                 models = list(_CLINE_USAGE_CATALOG)
+            elif self.is_opencode_zen(provider):
+                # OpenCode Zen free gateway — full $0 catalog from models.dev.
+                models = list(_OPENCODE_FREE_CATALOG)
+            elif provider == "openrouter":
+                models = list(_OPENROUTER_FREE_FALLBACK)
             else:
                 models = [model]
         if model in models:
             models.remove(model)
         models.insert(0, model)  # current model first
+        if provider == "openrouter" and len(models) > 1:
+            # Free models first (stable): the paid catalog dwarfs :free, and
+            # nobody should have to scroll 300 rows to find a $0 option.
+            models = sorted(models, key=lambda m: not m.endswith(":free"))
         self._model_cache[provider] = models
         return models
 

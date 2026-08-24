@@ -130,7 +130,7 @@ check("md escapes html", "<script>" not in _md_lite("<script>alert(1)</script>")
 # package metadata (mojibake regression guard)
 import browser as _browser_pkg
 
-check("version 2.3.0", _browser_pkg.__version__ == "2.3.0", _browser_pkg.__version__)
+check("version 2.5.0", _browser_pkg.__version__ == "2.5.0", _browser_pkg.__version__)
 check("docstring has no mojibake", "�" not in (_browser_pkg.__doc__ or ""))
 
 # v1.4.0 — session restore, per-site zoom memory, screenshot naming (pure logic)

@@ -37,12 +37,70 @@ from pathlib import Path
 
 from PySide6.QtCore import QThread, Signal
 
+
+def _exe_file_version() -> str:
+    """Read FileVersion from the running exe's version resource (Windows).
+
+    Frozen-safe fallback for when the `browser` package isn't importable
+    (e.g. a repackaged build): keeps CURRENT_VERSION honest so the updater
+    never mistakes a fully up-to-date install for ancient "1.0.0" and nag
+    users into re-downloading the same release forever.
+    """
+    import ctypes
+    import ctypes.wintypes
+    import sys
+
+    try:
+        if sys.platform != "win32" or not getattr(sys, "frozen", False):
+            return ""
+        path = sys.executable
+        size = ctypes.windll.version.GetFileVersionInfoSizeW(path, None)
+        if not size:
+            return ""
+        data = ctypes.create_string_buffer(size)
+        if not ctypes.windll.version.GetFileVersionInfoW(path, 0, size, data):
+            return ""
+        val = ctypes.c_void_p()
+        vlen = ctypes.wintypes.UINT()
+        # \VarFileInfo\Translation -> primary language id
+        if not ctypes.windll.version.VerQueryValueW(
+            data, r"\VarFileInfo\Translation", ctypes.byref(val), ctypes.byref(vlen)
+        ):
+            return ""
+        lang = ctypes.cast(val, ctypes.POINTER(ctypes.c_uint16)).contents.value
+        codepage = (lang >> 16) or 1200
+        sub = f"\\StringFileInfo\\{lang & 0xFFFF:04x}{codepage:04x}\\FileVersion"
+        if not ctypes.windll.version.VerQueryValueW(
+            data, sub, ctypes.byref(val), ctypes.byref(vlen)
+        ):
+            return ""
+        return ctypes.wstring_at(val.value) or ""
+    except Exception:
+        return ""
+
+
 try:
     from browser import __version__
 
     CURRENT_VERSION = __version__
 except Exception:  # frozen build without package context
-    CURRENT_VERSION = "1.0.0"
+    CURRENT_VERSION = _exe_file_version() or "1.0.0"
+
+
+def current_version() -> str:
+    """Best-effort running version (package attr, then exe metadata)."""
+    global CURRENT_VERSION
+    if CURRENT_VERSION not in ("", "1.0.0"):
+        return CURRENT_VERSION
+    try:
+        from browser import __version__ as v
+
+        CURRENT_VERSION = v
+    except Exception:
+        exe = _exe_file_version()
+        if exe:
+            CURRENT_VERSION = exe
+    return CURRENT_VERSION
 
 # ── Configuration ────────────────────────────────────────────────────────────
 # The GitHub repository that hosts the browser's releases. This MUST be a public

@@ -1,0 +1,193 @@
+{
+  "_source": "Synced from opencode's open model registry (https://models.dev/api.json), 2026-08-24. 'free_models' = $0 cost per token.",
+  "ai_providers": {
+    "opencode": {
+      "name": "OpenCode Zen",
+      "base_url": "https://opencode.ai/zen/v1",
+      "env_key": "OPENCODE_API_KEY",
+      "free_models": [
+        "big-pickle",
+        "deepseek-v4-flash-free",
+        "glm-4.7-free",
+        "glm-5-free",
+        "grok-code",
+        "hy3-free",
+        "hy3-preview-free",
+        "kimi-k2.5-free",
+        "laguna-s-2.1-free",
+        "ling-2.6-flash-free",
+        "ling-3.0-flash-free",
+        "ling-3.0-tiny-free",
+        "longcat-2.0-free",
+        "mimo-v2-flash-free",
+        "mimo-v2-omni-free",
+        "mimo-v2-pro-free",
+        "mimo-v2.5-free",
+        "minimax-m2.1-free",
+        "minimax-m2.5-free",
+        "minimax-m3-free",
+        "muse-spark-1.2-contributor-free",
+        "nemotron-3-super-free",
+        "nemotron-3-ultra-free",
+        "nemotron-3.5-lightning-free",
+        "north-mini-code-free",
+        "qwen3.6-plus-free",
+        "ring-2.6-1t-free",
+        "trinity-large-preview-free",
+        "x-preview-f-free"
+      ],
+      "recommended": "nemotron-3-ultra-free",
+      "requires_key": true,
+      "free_tier": true
+    },
+    "openai": {
+      "name": "OpenAI-compatible / OpenCode Zen",
+      "base_url": "https://opencode.ai/zen/v1",
+      "env_key": "OPENAI_API_KEY",
+      "free_models": [
+        "big-pickle",
+        "deepseek-v4-flash-free",
+        "glm-4.7-free",
+        "glm-5-free",
+        "grok-code",
+        "hy3-free",
+        "hy3-preview-free",
+        "kimi-k2.5-free",
+        "laguna-s-2.1-free",
+        "ling-2.6-flash-free",
+        "ling-3.0-flash-free",
+        "ling-3.0-tiny-free",
+        "longcat-2.0-free",
+        "mimo-v2-flash-free",
+        "mimo-v2-omni-free",
+        "mimo-v2-pro-free",
+        "mimo-v2.5-free",
+        "minimax-m2.1-free",
+        "minimax-m2.5-free",
+        "minimax-m3-free",
+        "muse-spark-1.2-contributor-free",
+        "nemotron-3-super-free",
+        "nemotron-3-ultra-free",
+        "nemotron-3.5-lightning-free",
+        "north-mini-code-free",
+        "qwen3.6-plus-free",
+        "ring-2.6-1t-free",
+        "trinity-large-preview-free",
+        "x-preview-f-free"
+      ],
+      "recommended": "nemotron-3-ultra-free",
+      "requires_key": true,
+      "free_tier": true,
+      "note": "OPENAI_BASE_URL in .env points at the Zen gateway, so this provider serves Zen free models."
+    },
+    "openrouter": {
+      "name": "OpenRouter",
+      "base_url": "https://openrouter.ai/api/v1",
+      "env_key": "OPENROUTER_API_KEY",
+      "free_models": [
+        "openrouter/free",
+        "cohere/north-mini-code:free",
+        "dots-studio/dots-3-note-preview:free",
+        "google/gemma-4-26b-a4b-it:free",
+        "google/gemma-4-31b-it:free",
+        "liquid/lfm-2.5-2.6b:free",
+        "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+        "nvidia/nemotron-3-super-120b-a12b:free",
+        "nvidia/nemotron-3-ultra-550b-a55b:free",
+        "nvidia/nemotron-3.5-lightning:free",
+        "openrouter/auto",
+        "poolside/laguna-s-2.1:free",
+        "poolside/laguna-xs-2.1:free",
+        "stealth/ox-alpha",
+        "thinkingmachines/inkling-small:free",
+        "thinkingmachines/inkling:free",
+        "z-ai/glm-5.2:free"
+      ],
+      "recommended": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "requires_key": true,
+      "free_tier": true
+    },
+    "google": {
+      "name": "Google Gemini",
+      "base_url": "https://generativelanguage.googleapis.com/v1beta",
+      "env_key": "GOOGLE_API_KEY",
+      "free_models": [
+        "gemma-4-26b-a4b-it",
+        "gemma-4-31b-it"
+      ],
+      "recommended": "gemma-4-31b-it",
+      "requires_key": true,
+      "free_tier": true,
+      "note": "Gemini flash models are free-tier-quota (rate limited), not $0/token; gemma-4 entries are $0."
+    },
+    "groq": {
+      "name": "Groq",
+      "base_url": "https://api.groq.com/openai/v1",
+      "env_key": "GROQ_API_KEY",
+      "free_models": [
+        "allam-2-7b",
+        "groq/compound",
+        "groq/compound-mini"
+      ],
+      "recommended": "groq/compound-mini",
+      "requires_key": true,
+      "free_tier": true
+    },
+    "zai": {
+      "name": "Z.ai (GLM)",
+      "base_url": "https://api.z.ai/api/paas/v4",
+      "env_key": "ZAI_API_KEY",
+      "free_models": [
+        "glm-4.5-flash",
+        "glm-4.7-flash"
+      ],
+      "recommended": "glm-4.7-flash",
+      "requires_key": true,
+      "free_tier": true
+    },
+    "ollama": {
+      "name": "Ollama (Local)",
+      "base_url": "http://127.0.0.1:11434/v1",
+      "free_models": [
+        "llama3.2:3b",
+        "gemma3:4b",
+        "phi3:mini",
+        "mistral:7b",
+        "codellama:7b"
+      ],
+      "recommended": "llama3.2:3b",
+      "requires_key": false,
+      "free_tier": true,
+      "local": true
+    },
+    "deepseek": {
+      "name": "DeepSeek",
+      "base_url": "https://api.deepseek.com/v1",
+      "env_key": "DEEPSEEK_API_KEY",
+      "free_models": [
+        "deepseek-chat",
+        "deepseek-coder",
+        "deepseek-lite"
+      ],
+      "recommended": "deepseek-chat",
+      "requires_key": true,
+      "free_tier": true,
+      "note": "Free tier available, check current status"
+    }
+  },
+  "default_provider": "opencode",
+  "fallback_chain": [
+    "ollama",
+    "opencode",
+    "openrouter",
+    "google",
+    "zai",
+    "groq"
+  ],
+  "model_resolution": {
+    "auto_select": true,
+    "prefer_free": true,
+    "cache_duration_hours": 24,
+    "fallback_to_cached": true
+  }
+}

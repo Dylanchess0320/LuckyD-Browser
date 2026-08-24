@@ -1510,6 +1510,7 @@ class MainWindow(QMainWindow):
         QMessageBox.about(self, f"{APP_DISPLAY} — Shortcuts", shortcuts)
 
     def show_about(self) -> None:
+        from browser_core.updater import current_version
         from PySide6.QtWidgets import (
             QDialog,
             QDialogButtonBox,
@@ -1518,10 +1519,7 @@ class MainWindow(QMainWindow):
             QVBoxLayout,
         )
 
-        try:
-            from browser import __version__
-        except Exception:
-            __version__ = "1.0.0"  # frozen build without package context
+        __version__ = current_version()
 
         channel = "Standalone build" if getattr(sys, "frozen", False) else "Source (dev)"
         last_checked = str(self.settings.get("update_last_checked", "") or "").strip()
@@ -1565,12 +1563,9 @@ class MainWindow(QMainWindow):
     # ── self-updater ────────────────────────────────────────────────────
 
     def _current_version(self) -> str:
-        try:
-            from browser import __version__
+        from browser_core.updater import current_version
 
-            return __version__
-        except Exception:
-            return "1.0.0"
+        return current_version()
 
     def check_for_updates(self, silent: bool = False) -> None:
         """Check GitHub for a newer release; offer to download + install."""
