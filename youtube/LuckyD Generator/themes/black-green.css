@@ -1,0 +1,359 @@
+/* ============================================================
+   Marp Theme: black-green  (for YouTube channel decks)
+   Colors:      background #0a0a0a | accent #00ff66
+   ------------------------------------------------------------
+   To use: put this line at the TOP of your .md file:
+
+     ---
+     theme: black-green
+     ---
+
+   SLIDE CLASSES (put right after a slide's --- as a comment):
+     <!-- _class: lead -->        title screen
+     <!-- _class: big -->         one giant punchline
+     <!-- _class: split -->       two columns, side by side
+     <!-- _class: image-right --> heading+text left, photo right
+     <!-- _class: image-left -->  photo left, heading+text right
+     <!-- _class: quote -->       big centered quote (use markdown >)
+     <!-- _class: stat -->        giant number/stat callout
+     <!-- _class: compact -->     shrinks bullet text - use on
+                                  slides with a LOT of bullets
+     <!-- _class: cta -->         ending / subscribe screen
+
+   Want to change the channel name in the footer? Search for
+   "MY CHANNEL" near the bottom of this file.
+   ============================================================ */
+
+/* @theme black-green */
+
+/* ---- Global slide styling --------------------------------- */
+section {
+  /* central palette - tweak these two lines to reskin everything */
+  --accent: #00ff66;
+  --accent2: #b8ffce;
+  --bg: #0a0a0a;
+  --bg2: #0f0f0f;
+
+  position: relative;
+  box-sizing: border-box;
+  background-color: var(--bg);
+  /* subtle dot-grid texture for a bit of depth, not distracting */
+  background-image: radial-gradient(rgba(0, 255, 102, 0.07) 1.5px, transparent 1.5px);
+  background-size: 26px 26px;
+  color: #e8e8e8;
+  font-family: 'Segoe UI', 'Arial', sans-serif;
+  justify-content: center;      /* center content vertically */
+  padding: 50px 70px;
+}
+
+/* ---- ANTI-CUTOFF FIXES --------------------------------------
+   These are the important ones: long headings/bullets now wrap
+   and shrink instead of spilling past the edge of the slide. */
+section, section * {
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  box-sizing: border-box;
+}
+h1, h2, h3, p, li, blockquote {
+  hyphens: auto;
+}
+img {
+  max-width: 100%;
+  max-height: 480px;
+  object-fit: contain;
+}
+
+/* Thin accent stripe across the top of normal content slides */
+section:not(.lead):not(.big):not(.cta):not(.stat):not(.quote)::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 6px;
+  background: linear-gradient(90deg, var(--accent), transparent 75%);
+}
+
+/* Fallback styles for HTML export (kept outside @theme-safe) */
+section.black {
+  background: #050505;
+  color: #e8e8e8;
+}
+
+/* ---- Heading treatment (clamp() = auto-shrinks on long text) ---- */
+h1 {
+  color: var(--accent);
+  font-size: 58px;
+  line-height: 1.15;
+  text-shadow: 0 0 15px rgba(0, 255, 102, 0.45);
+  font-weight: 900;
+  letter-spacing: 0.5px;
+}
+
+h2 {
+  color: var(--accent);
+  font-size: 42px;
+  line-height: 1.2;
+  text-shadow: 0 0 10px rgba(0, 255, 102, 0.30);
+}
+
+h3 {
+  color: var(--accent2);
+  font-size: 30px;
+}
+
+strong {
+  color: var(--accent);
+  font-weight: 800;
+}
+
+/* ---- Lists ------------------------------------------------ */
+ul, ol {
+  font-size: 30px;
+  line-height: 1.6;
+  color: #d0d0d0;
+}
+li { font-size: 30px; }
+li::marker, ul li::marker, ol li::marker { color: var(--accent); }
+
+/* Dense-slide mode: <!-- _class: compact --> */
+section.compact ul, section.compact ol { font-size: 22px; line-height: 1.45; }
+section.compact li { font-size: 22px; }
+section.compact p { font-size: 22px; line-height: 1.45; }
+section.compact h2 { font-size: 34px; }
+
+/* Overflow-guarantee fallback tier: <!-- _class: tiny -->
+   Applied automatically by build.js when a slide is STILL too tall
+   even at compact size - one notch smaller again, used only as a
+   last resort before the slide gets split into two. */
+section.tiny ul, section.tiny ol { font-size: 17px; line-height: 1.3; }
+section.tiny li { font-size: 17px; }
+section.tiny p { font-size: 17px; line-height: 1.3; }
+section.tiny h2 { font-size: 26px; }
+section.tiny h3 { font-size: 20px; }
+section.tiny blockquote { font-size: 17px; padding: 8px 14px; }
+section.tiny table { font-size: 13px; }
+section.tiny table th, section.tiny table td { padding: 2px 6px; }
+section.tiny img { max-height: 320px; }
+
+/* ---- Links & code ------------------------------------------ */
+a { color: var(--accent); }
+
+code {
+  background: #1a1a1a;
+  color: var(--accent);
+  border-radius: 4px;
+  padding: 0 6px;
+  font-family: 'Consolas', 'Courier New', monospace;
+}
+
+pre {
+  background: #101010;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 16px;
+  color: var(--accent);
+  font-size: 20px;
+  line-height: 1.5;
+}
+
+blockquote {
+  border-left: 6px solid var(--accent);
+  background: rgba(0, 255, 102, 0.06);
+  color: #d0ffd0;
+  padding: 12px 20px;
+  border-radius: 4px;
+  font-size: 26px;
+}
+
+/* ---- Tables ------------------------------------------------ */
+table { font-size: 24px; }
+table th {
+  background: var(--accent);
+  color: #000;
+  border: 1px solid var(--bg);
+  padding: 8px 14px;
+  font-weight: 700;
+}
+table td {
+  color: #e0e0e0;
+  border: 1px solid var(--accent);
+  padding: 8px 14px;
+}
+
+/* Dense tables (see: autopaginate.js classifies any slide with a
+   table as "compact") get a smaller font + tighter padding so more
+   rows fit before the fixed 720px slide height clips them. */
+section.compact table { font-size: 17px; }
+section.compact table th,
+section.compact table td { padding: 4px 8px; }
+
+/* ---- Image sizing (standalone image slides) ----------------- */
+img {
+  border-radius: 12px;
+  border: 2px solid var(--accent);
+}
+
+/* ---- Split / grid helper: <!-- _class: split --> ------------ */
+section.split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  align-items: center;
+  background: linear-gradient(135deg, #050505 0%, #0f0f0f 100%);
+}
+section.split h1, section.split h2 {
+  text-shadow: 0 0 20px rgba(0, 255, 102, 0.6);
+}
+
+/* ---- Image + text side-by-side ------------------------------
+   <!-- _class: image-right -->  text first, photo on the right
+   <!-- _class: image-left -->   photo on the left, text after
+   Best with: one heading + one short line + one image. */
+section.image-right, section.image-left {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 40px;
+  background: linear-gradient(135deg, #050505 0%, #0f0f0f 100%);
+}
+section.image-left { flex-direction: row-reverse; }
+section.image-right > :not(img),
+section.image-left > :not(img) {
+  flex: 1 1 50%;
+}
+section.image-right img,
+section.image-left img {
+  flex: 0 0 42%;
+  width: 42%;
+  max-height: 420px;
+  object-fit: cover;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+}
+
+/* ---- Quote slide: <!-- _class: quote --> (use markdown "> ...") */
+section.quote {
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  background: radial-gradient(circle at 50% 30%, #101c14 0%, #060606 70%);
+}
+section.quote blockquote {
+  border: none;
+  background: none;
+  font-style: italic;
+  font-size: 44px;
+  color: #eafff0;
+  max-width: 900px;
+  margin: 0 auto;
+  position: relative;
+  padding: 10px 40px;
+}
+section.quote blockquote::before {
+  content: "\201C";
+  position: absolute;
+  top: -50px;
+  left: -10px;
+  font-size: 130px;
+  font-family: Georgia, serif;
+  color: var(--accent);
+  opacity: 0.35;
+}
+
+/* ---- Stat slide: <!-- _class: stat --> (big number + label) --- */
+section.stat {
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+section.stat h1 {
+  font-size: 150px;
+  line-height: 1;
+  text-shadow: none;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+section.stat h3 {
+  margin-top: 8px;
+  font-size: 28px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--accent2);
+}
+
+/* ---- Lead / title slide ------------------------------------------- */
+section.lead {
+  background: radial-gradient(circle at 50% 40%, #111111 0%, #050505 100%);
+}
+section.lead h1 {
+  font-size: 68px;
+  line-height: 1.1;
+  color: var(--accent);
+  text-shadow: 0 0 25px rgba(0, 255, 102, 0.7);
+}
+section.lead h2 {
+  color: var(--accent2);
+  font-size: 34px;
+}
+section.lead::after {
+  content: "\25BC  scroll  \25BC";
+  position: absolute;
+  right: 30px;
+  bottom: 20px;
+  color: var(--accent);
+  font-size: 18px;
+}
+
+/* ---- Big statement slide (one punch line) ------------------------- */
+section.big {
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(135deg, #050505 0%, #0d0d0d 100%);
+}
+section.big h1 {
+  font-size: 66px;
+  line-height: 1.15;
+  color: var(--accent);
+  text-align: center;
+  text-shadow: 0 0 30px rgba(0, 255, 102, 0.8);
+}
+
+/* ---- End / CTA slide ------------------------------------------- */
+section.cta {
+  justify-content: center;
+  align-items: center;
+  background: radial-gradient(circle, var(--accent) 0%, var(--bg) 85%);
+}
+section.cta::before {
+  /* faint decorative rings for a bit of "fun" energy */
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 15% 20%, rgba(255,255,255,0.10) 0 6px, transparent 7px),
+    radial-gradient(circle at 85% 25%, rgba(255,255,255,0.10) 0 5px, transparent 6px),
+    radial-gradient(circle at 20% 80%, rgba(255,255,255,0.10) 0 4px, transparent 5px),
+    radial-gradient(circle at 88% 78%, rgba(255,255,255,0.10) 0 6px, transparent 7px);
+}
+section.cta h1 {
+  color: #000;
+  font-size: 64px;
+  text-align: center;
+}
+section.cta h2 {
+  color: #0a3d0a;
+  font-size: 30px;
+  text-align: center;
+}
+
+/* ---- Footer strip on normal slides ----------------------------- */
+section::after {
+  content: "@LuckyDYoutube \25BA youtube.com/@LuckyDYoutube";
+  position: absolute;
+  right: 30px;
+  bottom: 16px;
+  color: var(--accent);
+  font-size: 14px;
+  opacity: 0.55;
+}

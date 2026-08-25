@@ -1,0 +1,82 @@
+{
+  "ai_providers": {
+    "google": {
+      "name": "Google Gemini",
+      "base_url": "https://generativelanguage.googleapis.com/v1beta",
+      "free_models": [
+        "gemini-3-flash-preview",
+        "gemini-2.5-flash", 
+        "gemini-flash-latest"
+      ],
+      "recommended": "gemini-3-flash-preview",
+      "requires_key": true,
+      "free_tier": true
+    },
+    "openai": {
+      "name": "OpenCode Zen (OpenAI Compatible)",
+      "base_url": "https://opencode.ai/zen/v1", 
+      "free_models": [
+        "nemotron-3-ultra-free",
+        "big-pickle",
+        "mimo-v2.5-free"
+      ],
+      "recommended": "nemotron-3-ultra-free",
+      "requires_key": true,
+      "free_tier": true
+    },
+    "openrouter": {
+      "name": "OpenRouter",
+      "base_url": "https://openrouter.ai/api/v1",
+      "free_models": [
+        "z-ai/glm-5.2:free",
+        "google/gemma-4-31b-it:free",
+        "nvidia/nemotron-3-super-120b-a12b:free",
+        "nvidia/nemotron-3-ultra-550b-a55b:free"
+      ],
+      "recommended": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "requires_key": true,
+      "free_tier": true
+    },
+    "ollama": {
+      "name": "Ollama (Local)",
+      "base_url": "http://127.0.0.1:11434/v1",
+      "free_models": [
+        "llama3.2:3b",
+        "gemma3:4b",
+        "phi3:mini",
+        "mistral:7b",
+        "codellama:7b"
+      ],
+      "recommended": "llama3.2:3b",
+      "requires_key": false,
+      "free_tier": true,
+      "local": true
+    },
+    "deepseek": {
+      "name": "DeepSeek",
+      "base_url": "https://api.deepseek.com/v1",
+      "free_models": [
+        "deepseek-chat",
+        "deepseek-coder",
+        "deepseek-lite"
+      ],
+      "recommended": "deepseek-chat",
+      "requires_key": true,
+      "free_tier": true,
+      "note": "Free tier available, check current status"
+    }
+  },
+  "default_provider": "google",
+  "fallback_chain": [
+    "google",
+    "openai", 
+    "ollama",
+    "openrouter"
+  ],
+  "model_resolution": {
+    "auto_select": true,
+    "prefer_free": true,
+    "cache_duration_hours": 24,
+    "fallback_to_cached": true
+  }
+}

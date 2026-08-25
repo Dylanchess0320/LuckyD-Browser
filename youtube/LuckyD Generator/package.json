@@ -1,0 +1,12 @@
+{
+  "name": "luckyd-deck-generator",
+  "version": "1.0.0",
+  "private": true,
+  "description": "LuckyD YouTube deck generator - Marp pipeline with real-browser overflow checking",
+  "dependencies": {
+    "puppeteer": "^23.0.0"
+  },
+  "allowScripts": {
+    "puppeteer@23.11.1": true
+  }
+}
