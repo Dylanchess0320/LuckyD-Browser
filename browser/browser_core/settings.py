@@ -2,19 +2,30 @@
 
 from __future__ import annotations
 
+import contextlib
+import copy
 import json
 import os
 import secrets
 import sys
+import time
 from pathlib import Path
 from urllib.parse import quote_plus
 
-if getattr(sys, "frozen", False):
-    # Packaged build: per-user data dir (writable even under Program Files,
-    # survives reinstalls — same model as Chrome/VS Code).
-    DATA_DIR = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "LuckyDBrowser"
-else:
-    DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+
+def _data_dir() -> Path:
+    if getattr(sys, "frozen", False):
+        # Packaged build: per-user data dir (writable even under Program Files,
+        # survives reinstalls — same model as Chrome/VS Code).
+        base = os.environ.get("LOCALAPPDATA", "").strip()
+        if base:
+            return Path(base) / "LuckyDBrowser"
+        # Fallback when LOCALAPPDATA is missing (rare) — not Path("").
+        return Path.home() / "AppData" / "Local" / "LuckyDBrowser"
+    return Path(__file__).resolve().parent.parent / "data"
+
+
+DATA_DIR = _data_dir()
 SETTINGS_PATH = DATA_DIR / "settings.json"
 
 SEARCH_ENGINES = {
@@ -81,7 +92,7 @@ class SettingsStore:
 
     def __init__(self, path: Path = SETTINGS_PATH):
         self._path = path
-        self._data = dict(DEFAULTS)
+        self._data = copy.deepcopy(DEFAULTS)
         self.load()
         if self._ensure_local_tokens():
             self.save()
@@ -92,7 +103,17 @@ class SettingsStore:
                 # utf-8-sig accepts the UTF-8 BOM that PowerShell 5's Set-Content
                 # prepends — without it the BOM breaks JSON parsing silently and
                 # settings silently fall back to defaults (ask me how I know).
-                loaded = json.loads(self._path.read_text(encoding="utf-8-sig"))
+                text = self._path.read_text(encoding="utf-8-sig")
+                try:
+                    loaded = json.loads(text)
+                except Exception as exc:
+                    # Preserve corrupt file for debugging instead of silently dropping.
+                    with contextlib.suppress(Exception):
+                        corrupt = self._path.with_name(
+                            f"settings.corrupt.{int(time.time())}.json"
+                        )
+                        self._path.replace(corrupt)
+                    raise exc
                 if isinstance(loaded, dict):
                     self._data.update(loaded)
                     if self._migrate_legacy_terminal_cli():
@@ -110,9 +131,13 @@ class SettingsStore:
         auto-discovery can select the packaged interactive CLI.
         """
         raw = str(self._data.get("terminal_cli", "") or "").strip()
-        if not raw or Path(raw).name.casefold() != "luckyd-code.exe":
+        if not raw:
             return False
-        cli = Path(raw).with_name("luckyd-cli.exe")
+        # Expand %VARS% / ~ so is_file check works for user-copied paths.
+        expanded = Path(os.path.expandvars(os.path.expanduser(raw)))
+        if expanded.name.casefold() != "luckyd-code.exe":
+            return False
+        cli = expanded.with_name("luckyd-cli.exe")
         self._data["terminal_cli"] = str(cli) if cli.is_file() else ""
         return True
 
@@ -136,7 +161,10 @@ class SettingsStore:
     def save(self) -> None:
         try:
             self._path.parent.mkdir(parents=True, exist_ok=True)
-            self._path.write_text(json.dumps(self._data, indent=2), encoding="utf-8")
+            tmp = self._path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(self._data, indent=2), encoding="utf-8")
+            # Atomic replace — power loss or AV lock can't leave a truncated file.
+            tmp.replace(self._path)
         except Exception:
             pass
 

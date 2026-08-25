@@ -60,7 +60,7 @@ def _desktop_exe() -> Path | None:
     try:  # canonical Desktop path, redirection-aware
         import ctypes
 
-        buf = ctypes.create_unicode_buffer(260)
+        buf = ctypes.create_unicode_buffer(520)
         # SHGetFolderPathW(hwnd, csidl=0x0010 DESKTOPDIRECTORY, token, flags, path)
         if ctypes.windll.shell32.SHGetFolderPathW(None, 0x0010, None, 0, buf) == 0 and buf.value:
             candidates.append(Path(buf.value) / "luckyd-cli.exe")
@@ -184,7 +184,7 @@ def _agent2_dir() -> Path | None:
     try:  # canonical Desktop path, redirection-aware
         import ctypes
 
-        buf = ctypes.create_unicode_buffer(260)
+        buf = ctypes.create_unicode_buffer(520)
         # SHGetFolderPathW(hwnd, csidl=0x0010 DESKTOPDIRECTORY, token, flags, path)
         if ctypes.windll.shell32.SHGetFolderPathW(None, 0x0010, None, 0, buf) == 0 and buf.value:
             candidates.append(Path(buf.value) / "coding-agent")
@@ -326,11 +326,16 @@ def _mesh_shell_command(shell: str) -> list[str]:
     """Resolve a mesh-* shell to its absolute executable (allowlisted)."""
     import shutil
 
-    exe = shutil.which(MESH_SHELLS[shell])
-    if not exe:
+    raw = shutil.which(MESH_SHELLS[shell])
+    if not raw:
         raise FileNotFoundError(
             f"Agent Mesh shell '{shell}' is not installed (missing: {MESH_SHELLS[shell]})"
         )
+    exe = str(Path(raw).resolve())
+    # Validate it's a real file — mitigates PATH hijack TOCTOU where a fake
+    # exe appears between availability check and spawn.
+    if not Path(exe).is_file():
+        raise FileNotFoundError(f"Agent Mesh shell '{shell}' resolved to non-file: {exe}")
     return [exe]
 
 
@@ -412,7 +417,15 @@ def _spawn_pty(
     # raises cffi's "argument env: 'dict' object is not an instance of str",
     # which broke every terminal tab. Build the same block pywinpty's
     # PtyProcess.spawn() produces (see winpty/ptyprocess.py).
-    env_block = "\0".join(f"{k}={v}" for k, v in env.items()) + "\0"
+    # Sanitize: NUL bytes would truncate the block and leak/corrupt env.
+    sanitized = {}
+    for k, v in env.items():
+        if not k or "=" in k or "\0" in k:
+            continue
+        kk = k.replace("\0", "")
+        vv = str(v).replace("\0", "").replace("\r", "").replace("\n", "")
+        sanitized[kk] = vv
+    env_block = "\0".join(f"{k}={v}" for k, v in sanitized.items()) + "\0"
     pty.spawn(appname, cmdline=cmdline, cwd=cwd, env=env_block)
     return pty
 
@@ -467,8 +480,11 @@ class TerminalServer:
                 cli2_path=self.cli2_path,
             )
         except Exception as exc:  # pywinpty missing or spawn failed
+            # Don't leak internal paths to WS client — log detail server-side.
             with contextlib.suppress(Exception):
-                ws.send(f"\r\n\x1b[31m[terminal failed to start: {exc}]\x1b[0m\r\n")
+                print(f"[terminal] spawn failed: {exc}")
+            with contextlib.suppress(Exception):
+                ws.send("\r\n\x1b[31m[terminal failed to start]\x1b[0m\r\n")
                 ws.close()
             return
 
@@ -540,7 +556,8 @@ class TerminalServer:
         except ImportError:
             return False
         try:
-            self._server = serve(self._handle, self.host, self.port)
+            # Limit WS frame size — unbounded messages can OOM via pty.write.
+            self._server = serve(self._handle, self.host, self.port, max_size=1 << 20)
         except OSError:
             return False
         self._thread = threading.Thread(

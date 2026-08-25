@@ -19,11 +19,17 @@ import sys
 import time
 from pathlib import Path
 
-if getattr(sys, "frozen", False):
-    # Packaged build: per-user data dir (same model as settings.py).
-    DATA_DIR = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "LuckyDBrowser"
-else:
-    DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+
+def _data_dir() -> Path:
+    if getattr(sys, "frozen", False):
+        base = os.environ.get("LOCALAPPDATA", "").strip()
+        if base:
+            return Path(base) / "LuckyDBrowser"
+        return Path.home() / "AppData" / "Local" / "LuckyDBrowser"
+    return Path(__file__).resolve().parent.parent / "data"
+
+
+DATA_DIR = _data_dir()
 
 SESSION_VERSION = 1
 
@@ -86,6 +92,12 @@ class SessionStore:
         try:
             data = json.loads(self._path.read_text(encoding="utf-8-sig"))
         except Exception:
+            with contextlib.suppress(Exception):
+                if self._path.exists():
+                    corrupt = self._path.with_name(
+                        f"session.corrupt.{int(time.time())}.json"
+                    )
+                    self._path.replace(corrupt)
             return {}
         if not isinstance(data, dict) or data.get("version") != SESSION_VERSION:
             return {}
@@ -105,13 +117,15 @@ class SessionStore:
         }
         try:
             self._path.parent.mkdir(parents=True, exist_ok=True)
-            # Rotate: the previous save survives as session.prev.json so
-            # "Reopen Previous Session" always has one generation of backup.
-            if self._path.exists():
-                with contextlib.suppress(Exception):
-                    self._path.replace(self._prev_path())
             tmp = self._path.with_name(self._path.name + ".tmp")
             tmp.write_text(json.dumps(payload, indent=1), encoding="utf-8")
+            # Preserve previous generation before overwriting — copy old file
+            # to .prev so "Reopen Previous Session" works, then atomically
+            # replace current with tmp. No window where neither exists.
+            if self._path.exists():
+                with contextlib.suppress(Exception):
+                    # Copy, don't move, so we keep old content as backup.
+                    self._prev_path().write_bytes(self._path.read_bytes())
             tmp.replace(self._path)
         except Exception:
             return False
@@ -134,3 +148,5 @@ class SessionStore:
         """Forget the saved session (e.g. after a clean shutdown with no tabs)."""
         with contextlib.suppress(Exception):
             self._path.unlink(missing_ok=True)
+        with contextlib.suppress(Exception):
+            self._prev_path().unlink(missing_ok=True)

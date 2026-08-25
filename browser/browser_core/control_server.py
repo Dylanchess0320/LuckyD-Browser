@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import hmac
 import json
 import os
 import threading
@@ -165,7 +166,18 @@ def make_handler(backend, token: str = "", harness=None, settings=None):
             # 127.0.0.1:9777 with a normal cross-origin fetch().
             if not token:
                 return True  # only true if a caller explicitly disabled it
-            return self.headers.get("Authorization", "") == f"Bearer {token}"
+            return hmac.compare_digest(
+                self.headers.get("Authorization", ""), f"Bearer {token}"
+            )
+
+        def _host_ok(self) -> bool:
+            """DNS rebinding defense: Host must be loopback if present."""
+            host = self.headers.get("Host", "")
+            if not host:
+                return True
+            # Allow 127.0.0.1[:port], localhost[:port], ::1
+            h = host.split(":")[0].lower()
+            return h in ("127.0.0.1", "localhost", "::1")
 
         def _origin_ok(self) -> bool:
             """Reject cross-origin browser fetches outright (defense in depth).
@@ -294,6 +306,8 @@ def make_handler(backend, token: str = "", harness=None, settings=None):
         def _fail(self, code: int, exc: Exception) -> None:
             self._send(code, {"ok": False, "error": str(exc) or repr(exc)})
 
+        _MAX_BODY = 1 << 20  # 1 MB — prevents OOM via Content-Length: 2GB
+
         def _body(self) -> dict:
             try:
                 size = int(self.headers.get("Content-Length", 0) or 0)
@@ -301,8 +315,13 @@ def make_handler(backend, token: str = "", harness=None, settings=None):
                 size = 0
             if size <= 0:
                 return {}
+            if size > self._MAX_BODY:
+                return {}
             try:
-                data = json.loads(self.rfile.read(size) or b"{}")
+                raw = self.rfile.read(size) or b"{}"
+                if len(raw) > self._MAX_BODY:
+                    return {}
+                data = json.loads(raw)
                 return data if isinstance(data, dict) else {}
             except Exception:
                 return {}
@@ -338,6 +357,8 @@ def make_handler(backend, token: str = "", harness=None, settings=None):
         _NAV_PATHS = ("/", "/help", "/dashboard", "/hq", "/mesh", "/terminal")
 
         def do_GET(self):
+            if not self._host_ok():
+                return self._send(403, {"ok": False, "error": "forbidden host"})
             if not self._origin_ok():
                 return self._send(403, {"ok": False, "error": "forbidden origin"})
             parsed = urlparse(self.path)
@@ -398,6 +419,8 @@ def make_handler(backend, token: str = "", harness=None, settings=None):
                 return self._fail(500, exc)
 
         def do_POST(self):
+            if not self._host_ok():
+                return self._send(403, {"ok": False, "error": "forbidden host"})
             if not self._origin_ok():
                 return self._send(403, {"ok": False, "error": "forbidden origin"})
             if not self._authorized():

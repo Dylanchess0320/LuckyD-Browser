@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.10] - 2026-08-25
+
+### Fixed
+- **Hardened platform** — `settings.py` now uses `copy.deepcopy(DEFAULTS)` (fixes shared `zoom_levels` mutation), atomic `tmp+replace` saves with corrupt-file backup, and expanded `terminal_cli` migration; `session.py` atomic save with proper `prev` backup and corrupt handling; `terminal_server.py` NUL-sanitizes env block, validates mesh exe, 520-char Desktop buffer, max WS frame 1 MB, and generic spawn error; `control_server.py` now uses `hmac.compare_digest` (constant-time), 1 MB body limit, and DNS-rebinding `Host` check.
+- **Build hygiene** — `browser/version_info.txt` now tracked via `!.gitignore` negation (fresh clones build), large local dirs (`LuckyD App/`, `youtube/`, `archive/*`) ignored.
+
 ## [2.5.9] - 2026-08-25
 
 ### Fixed

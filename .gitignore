@@ -106,7 +106,8 @@ browser/build/
 browser/dist/
 browser/build_err.txt
 browser/build_log.txt
-browser/version_info.txt
+# version_info.txt IS source (Windows version resource for PyInstaller) — must be tracked
+!browser/version_info.txt
 browser/_dbg_src.js
 browser/test_*.py
 # selftest output captures (dev runs)
@@ -134,6 +135,18 @@ nexus/build-and-install.bat
 nexus/_removed/
 build-apk.bat
 build-apk.sh
+
+# ── Local scratch / large binaries (never commit) ─────────────────────
+LuckyD App/
+archive/browser-snapshots/
+archive/diagnostics/
+archive/external-reference/
+youtube/
+browser/LuckyD-Launch/
+browser/installer/*.log
+browser/installer/*.log.*
+browser/installer/iscc_log.txt
+*.lnk
 
 # ── Vendored third-party reference codebases ──────────────────────────
 external/
