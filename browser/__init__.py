@@ -1,6 +1,6 @@
 ﻿"""LuckyD Browser â€” a full-featured Chromium-based web browser for Windows."""
 
-__version__ = "2.5.3"
+__version__ = "2.5.5"
 
 # Shown once after an update (first launch with a new version).
 WHATS_NEW = (
