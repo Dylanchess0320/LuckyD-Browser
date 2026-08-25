@@ -1,369 +1,189 @@
 <div align="center">
 
-# 🌐 LuckyD Browser v2.4
+# 🌐 LuckyD Browser v2.5.10 — Hardened
 
-> **The complete AI automation & development platform built into your browser.**
+> **The AI browser that doesn't break. Free, unlimited, offline AI + a full coding platform in one window.**
 >
-> Record workflows. Run multiple agents. Extract structured data. Code in parallel.  
-> All offline, all private, all in one window.
+> Agent Mesh. Self-healing workflows. 70+ code tools. Real ConPTY terminals.  
+> All private, all loopback-only, all in one window.
 
 [![CI](https://github.com/Dylanchess0320/LuckyD-Browser/actions/workflows/ci.yml/badge.svg)](https://github.com/Dylanchess0320/LuckyD-Browser/actions/workflows/ci.yml)
 [![Python 3.10–3.12](https://img.shields.io/badge/python-3.10--3.12-blue.svg)](https://www.python.org/downloads/)
+[![Version](https://img.shields.io/badge/version-2.5.10-green.svg)](https://github.com/Dylanchess0320/LuckyD-Browser/releases/tag/v2.5.10)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Latest Release](https://img.shields.io/github/v/release/Dylanchess0320/LuckyD-Browser?color=green)](https://github.com/Dylanchess0320/LuckyD-Browser/releases)
 
-<img src="docs/screenshots/sidebar.png" alt="LuckyD Browser AI sidebar" width="720">
+<img src="docs/screenshots/sidebar.png" alt="LuckyD Browser AI sidebar + Agent Mesh" width="720">
 
 ---
 
-**[⬇️ Download v2.4.0](https://github.com/Dylanchess0320/LuckyD-Browser/releases/tag/v2.4.0)** · **[Browser Guide](README-LuckyD-Browser.md)** · **[What's New](browser/LuckyD-Launch/RELEASE_NOTES_2.4.0.md)** · **[Changelog](CHANGELOG.md)**
+**[⬇️ Download v2.5.10](https://github.com/Dylanchess0320/LuckyD-Browser/releases/tag/v2.5.10)** · **[Browser Guide](README-LuckyD-Browser.md)** · **[What's New](#-whats-new-in-2510)** · **[Changelog](CHANGELOG.md)** · **[Security](SECURITY.md)**
 
 </div>
 
 ---
 
-## What is LuckyD Browser?
+## Why LuckyD
 
-- **Multiple Agents** — support for agent handoffs, team creation, and message passing between specialist agents (researcher, coder, reviewer, tester). Use `/agent list` to view active agents, `/agent handoff researcher` to research a topic, `/agent team create` to create a parallel agent team, and `/agent message` to send messages between agents.
+| | **LuckyD 2.5.10** | Comet / Dia | Edge + Copilot | Chrome + Gemini |
+|---|---|---|---|---|
+| Free AI **with no account/key** | ✅ unlimited, local Ollama | ❌ | ❌ | ❌ |
+| **Offline** | ✅ | ❌ | ❌ | ❌ |
+| **9 Agent Mesh CLIs** (Claude, Codex, Copilot, Qwen, OpenCode, Cline, OpenClaw, DeepSeek, Pi) | ✅ | ❌ | ❌ | ❌ |
+| Real **ConPTY terminals** in tabs | ✅ | ❌ | ❌ | ❌ |
+| Self-healing **workflow recorder** | ✅ | limited | limited | limited |
+| Open source MIT | ✅ | ❌ | ❌ | ❌ |
+| No admin to install | ✅ | ✅ | ✅ | ✅ |
 
+> The others rent you their AI. **LuckyD runs yours — and it doesn't crash your terminal.**
 
-LuckyD Browser is a **Chromium-based browser + AI coding environment + multi-agent orchestration platform** for Windows. It merges everyday browsing, AI-powered automation, and professional development tools into one seamless experience.
+---
 
-**Key idea:** Use free local AI (or your favorite cloud provider) to record workflows, drive the browser autonomously, extract data, and run multiple agents in parallel—all without leaving your browser tabs.
+## ✨ What's New in 2.5.10
+
+### 🔧 Hardened Platform
+The `2.5.8` terminal took every shell down (`dict` vs NUL-block). `2.5.10` locks it down:
+
+- **Settings/Session atomic** — `tmp → replace`, corrupt backup (`settings.corrupt.*.json`), `deepcopy(DEFAULTS)` fix, `DATA_DIR` fallback, expanded `terminal_cli` migration
+- **Terminal sanitized** — NUL-filtered `env_block`, 520-char Desktop buffer, mesh `PATH` validation, generic spawn error (no path leak), `max_size 1MB` WS
+- **Control API hardened** — `hmac.compare_digest` (constant-time), 1 MB body limit, DNS-rebinding `Host` check
+- **Build hygiene** — `browser/version_info.txt` now tracked, large locals (`LuckyD App/`, `youtube/`) ignored, `ruff` + `black` green
+- **CI green** — `pytest` mocked `PySide6` on Linux so `test_browser_integrations.py` collects everywhere
+
+### 🕸️ Agent Mesh (2.5.8–2.5.9)
+One workspace, **9 live CLIs** on their own ConPTY:
+
+```
+🟠 Claude  🟢 Codex  ⚫ Copilot  🟣 Qwen  🔵 OpenCode  🟡 Cline  🦞 OpenClaw  🐋 DeepSeek  ⚪ Pi
+```
+
+- **Dock** — 9 chips in the terminal tab (`#meshdock`), dimmed when not installed, `mesh install <name>` hint
+- **Mesh workspace** (`Ctrl+Alt+M`, toolbar, Tools menu, dashboard) — 4 live panes: **Agent 1** · **Agent 2** · **PowerShell** · **CMD**, each an iframe'd `ws://127.0.0.1:9881?token=…&shell=…` with its own PTY
+- **Terminal page** now injects `WS_TOKEN` + `MESH_META` and wires `chip` → `switchShell()`
+
+### 🩹 Terminal Fix (2.5.9)
+`_spawn_pty()` passed `env=dict` to `pywinpty.PTY.spawn()` → `cffi: 'dict' not str` → every `Agent`/`Agent2`/`PowerShell`/`CMD`/`mesh-*` → `[terminal failed to start]`. Fixed to `"\0".join(f"{k}={v}" …) + "\0"` matching `winpty/ptyprocess.py`.
+
+### 🤖 OpenCode Zen + Resilient Updater (2.5.8)
+- **OpenCode provider** via `OPENCODE_API_KEY`
+- **Updater** retries, validates `is_newer`, shows `WHATS_NEW` toast once per version
+
+---
 
 ## 🎯 Core Features
 
 | Feature | What you get |
 |---------|-------------|
-| **🤖 AI Sidebar** | Page-aware chat, model picker, visual Q&A, Explain/Summarize/Translate, autonomous browser agent |
-| **🎬 Workflow Recorder & Replay** | Record clicks, typing, scrolling → replay with intelligent element matching that adapts when pages change |
-| **📊 Structured Data Extraction** | Ask AI to turn any webpage into JSON—automate data scraping without code |
-| **⚡ Multi-Agent Terminal Mesh** | Run parallel LuckyD Agent sessions, PowerShell, or CMD tabs. Swap AI providers per agent. |
-| **💻 Coding Agent HQ** | Full `luckyd-code` IDE inside a browser tab: 70+ tools, memory graph, sessions, background tasks |
-| **📱 Real Daily-Driver Browser** | Tabs, bookmarks, history, downloads, incognito, ad/tracker blocker, Reader/Focus modes, themes, command palette |
-| **🔒 Private by Default** | Local-first AI, loopback-only APIs, no telemetry, no bundled keys |
+| **🤖 AI Sidebar** | Page-aware chat, per-provider model picker, visual Q&A, Explain/Summarize/Translate, autonomous agent driving your **real, visible tab** |
+| **🕸️ Agent Mesh** | 9 CLIs on ConPTY + 4-pane workspace (Agent 1 / Agent 2 / PowerShell / CMD) — `Ctrl+Alt+M` |
+| **💻 In-Browser Terminal** | `xterm.js` + `pywinpty` ConPTY + `websockets` bridge (`:9881?token=`), `LUCKYD_AGENT_SLOT=1/2`, resizes via `set_size(cols,rows)` |
+| **🎬 Workflows** | Record `Control API` `/act` → replay with fingerprint scoring (self-healing) + schedules (`/schedules`) |
+| **📊 Extract** | `POST /extract` → instruction + JSON schema → AI-parsed page text |
+| **📱 Daily-Driver** | Tabs, groups (collapse chip, 6-color), vertical tabs, side pane, bookmarks bar, history, downloads (speed/ETA/pause), incognito, adblock, Reader/Focus, zoom memory, screenshots, themes (incl. Synthwave Konami), command palette |
+| **🔒 Private** | Loopback-only (`9777`/`9881` + `terminal_token`/`browser_api_token`), no telemetry, no bundled keys |
 
 ---
 
-## 🚀 What's New in v2.4.0
+## 📥 Install in 10 seconds
 
-### Multi-Terminal Agent Mesh
-Open multiple independent terminal tabs running **LuckyD Agent, PowerShell, or CMD**—each with its own ConPTY (real Windows console). Switch between agents and power tools without context switching.
+1. **[Get LuckyDBrowserSetup-2.5.10.exe](https://github.com/Dylanchess0320/LuckyD-Browser/releases/tag/v2.5.10)** (171.7 MB)
+2. Run — per-user, no admin → `%LOCALAPPDATA%\Programs\LuckyDBrowser` + Start Menu + desktop shortcut
+3. Leave **“Set up free unlimited local AI”** checked → Ollama + `llama3.2:3b` (~2 GB) auto-installs
+4. `Ctrl+Shift+A` → chat offline. Or bring your own keys: Gemini, Groq, DeepSeek, OpenAI, Anthropic, Z.ai, OpenRouter, Cline, OpenCode.
 
-```
-[Agent 1 (LuckyD)] [Agent 2 (LuckyD)] [PowerShell] [CMD]
-```
-
-Pick different AI providers per agent—one uses Ollama locally, another uses Gemini, a third uses your OpenAI key. All at once.
-
-### Workflow Recorder with Self-Healing Replay
-1. **Record:** Click, type, scroll, interact with a page. The browser captures every step.
-2. **Save:** Workflows are stored and can be scheduled (run every 15m, hourly, daily, etc.).
-3. **Replay:** Run the workflow against a changed page. **Intelligent element matching** finds the right button even if the page layout shifted.
-
-Use it for data entry, testing, or routine tasks—the replay adapts gracefully.
-
-### Structured Data Extraction
-Ask the AI to analyze a visible page and return JSON:
-
-```
-"Extract all products with price, rating, and availability into JSON"
-→ [{ "name": "...", "price": 99.99, "rating": 4.5, ... }, ...]
-```
-
-No need to write scrapers or CSS selectors. The AI reads what it sees and structures it for you.
-
-### Enhanced Dashboard & Service Tiles
-- Every LuckyD service (Agent HQ, Terminal, Workflows, Network Monitor, etc.) is a tile on the dashboard.
-- Health probes show live status (green/grey dot).
-- Add new tools by editing `platform_tiles.json`—zero code changes needed.
-
-### Reliability & Polish
-- ✅ Fixed userscript engine (YouTube ad blocker, Video Speed Controller now work correctly)
-- ✅ Repaired in-app updates (clean Windows Installer integration, session restore)
-- ✅ Enhanced workflow replay accuracy
-- ✅ 111+ self-tests, all green
+Silent: `LuckyDBrowserSetup-2.5.10.exe /VERYSILENT /NORESTART`
 
 ---
 
-### Keyboard Power User?
+## 🕸️ Agent Mesh in Action
+
+```powershell
+# Each chip is a real PTY:
+ws://127.0.0.1:9881?token=<per-profile> &cols=120&rows=30&shell=mesh-claude
+ws://127.0.0.1:9881?token=<per-profile> &cols=120&rows=30&shell=mesh-codex
+# ...
+```
+
+- **Agent 1** `luckyd-cli.exe` (`main.py` via `main.spec`) — rich REPL, `/help`, `/tools`, `AgentHandoff`, `TeamCreate`…
+- **Agent 2** `F:\coding-agent\main.py` or `run.bat` via `cmd /c` — its own checkout/workspace
+- **System** `powershell.exe -NoLogo -NoExit` / `cmd.exe`
+- **Mesh** `claude`/`codex`/`copilot`/`qwen`/`opencode`/`cline`/`openclaw`/`dsh`/`pi` via `shutil.which` allowlist
+
+Switch live with the dock — no dead PTY (missing CLIs explain `mesh install <name>`).
+
+---
+
+## ⌨️ Keyboard
 
 | Shortcut | Action |
 |----------|--------|
-| `Ctrl+Shift+A` | Toggle AI sidebar |
-| `Ctrl+Shift+H` | Open Coding Agent HQ |
-| `Ctrl+Shift+T` | Open Terminal Mesh (Agent/PowerShell/CMD tabs) |
+| `Ctrl+Shift+A` | AI Sidebar |
+| `Ctrl+Shift+H` | Agent HQ |
+| `Ctrl+`` ` / `Ctrl+Shift+`` ` | Terminal (Agent / PowerShell) |
+| `Ctrl+Alt+M` | Agent Mesh (4 panes) |
 | `Ctrl+K` | Command palette |
-| `Ctrl+Alt+R` / `Ctrl+Shift+F` | Reader Mode / Focus Mode |
-| `Ctrl+Alt+S` / `Ctrl+Shift+S` | Read Later queue / Full-page screenshot |
-| `Ctrl+/` | Keyboard shortcuts reference |
+| `Ctrl+Alt+R` / `Ctrl+Shift+F` | Reader / Focus |
+| `Ctrl+Shift+S` / `Ctrl+Alt+S` | Screenshot / Read Later |
 
 ---
 
-## 🔌 LuckyD Code — The Integrated IDE
+## 🛠️ LuckyD Code — Full IDE in a Tab
 
-LuckyD Code is a **full coding-agent IDE** that runs inside the browser as a tab. It ships with:
+70+ tools (file, shell, git, web, LSP, SQLite, memory), multi-provider LLM, MCP (`mcp__<server>__<tool>`), sessions (`--continue`/`--resume`), `AGENTS.md`/`.clinerules`/`.goosehints`/`CLAUDE.md` ingestion, `/cost`, `/undo`, memory graph.
 
-- **70+ built-in tools** — file editing, shell commands, git, web search/fetch, browser automation, LSP code intelligence, SQLite, persistent memory
-- **Multi-provider LLM support** — DeepSeek, OpenAI, Anthropic, Google, Z.ai, OpenRouter, or free local models (Ollama)
-- **MCP (Model Context Protocol)** — plug in any MCP server; tools auto-register
-- **Session persistence** — every conversation is auto-saved; pick up where you left off
-- **Project-aware** — auto-loads `AGENTS.md`, `.clinerules`, `.goosehints`, `CLAUDE.md` into the system prompt
-- **Multi-turn agent loop** — with memory, checkpoints, and background tasks
-- **VS Code extension** — webview chat UI embedded in your editor
-
-### Agent Mesh Terminal Integration
-
-The **Agent Mesh** gives you terminal tabs for multiple AI agents plus system shells, all running in parallel inside the browser:
-
-| Agent | What it does |
-|-------|-------------|
-| **LuckyD Agent 1** | Main `luckyd-code` agent. Full coding tools, web search, git, memory. |
-| **LuckyD Agent 2** | Secondary agent from your projects directory. Different LLM provider, independent workspace. |
-| **PowerShell** | Windows PowerShell with full environment. |
-| **CMD** | Windows Command Prompt. |
-
-Swap AI providers on the fly with `/model` commands. Each agent keeps its own session and memory. Run workflows, coding tasks, and system automation in parallel.
+```
+Provider        Env var              Default model
+Ollama (local)  —                    llama3.2:3b (free, offline)
+OpenCode        OPENCODE_API_KEY     zen
+DeepSeek        DEEPSEEK_API_KEY     deepseek-chat
+OpenAI          OPENAI_API_KEY       gpt-4o
+Anthropic       ANTHROPIC_API_KEY    claude-sonnet-4
+Google          GOOGLE_API_KEY       gemini-2.0-flash
+OpenRouter      OPENROUTER_API_KEY   —
+Z.ai            ZAI_API_KEY          glm-4.5
+Cline/ClinePass CLINEPASS_API_KEY    —
+```
 
 ---
 
-## 📥 Installation & Quick Start
+## 🔐 Privacy
 
-### Download & Install
+- Local-first Ollama → prompts never leave device
+- `browser_api_token` + `terminal_token` (`secrets.token_urlsafe(32)`) per-profile, `127.0.0.1` only, `fetch` needs `Authorization: Bearer …` or `?token=…`
+- No telemetry, no bundled keys, incognito touches nothing
 
-1. **[Get LuckyDBrowserSetup-2.4.0.exe](https://github.com/Dylanchess0320/LuckyD-Browser/releases/tag/v2.4.0)** (176.3 MB)
-2. Run the installer. No admin rights needed—installs to `%LOCALAPPDATA%\Programs\LuckyDBrowser`.
-3. Launch from Start Menu or desktop shortcut.
-4. (Optional) AI bootstrap runs once—skips if you only want cloud providers.
+---
 
-### No Account. No Keys. No Cost.
+## 🏗️ Build from Source
 
-The installer sets up free **Ollama** + `llama3.2:3b` (offline, local AI). Your prompts never leave your machine.
-
-Prefer cloud? Connect your own keys for Gemini, Groq, DeepSeek, OpenAI, Anthropic, Z.ai, OpenRouter, or log in with Cline.
-
-### Build from Source
-
-```bat
+```powershell
 git clone https://github.com/Dylanchess0320/LuckyD-Browser.git
 cd LuckyD-Browser
-python -m pip install -r requirements.txt
-python main.py --help
+pip install -r requirements.txt
+
+# Run dev
+python -m browser.main  # or browser\run_browser.bat
+
+# Build 2.5.10 (PyInstaller 6.21 + Inno 6)
+powershell -File browser/installer/build_installer.ps1
+# → browser/installer/output/LuckyDBrowserSetup-2.5.10.exe (171.7 MB)
 ```
 
 ---
 
-## 🛠️ LuckyD Code Configuration
-
-```bat
-cd LuckyD-Browser
-
-:: 1. Copy the example .env
-copy .env.example .env
-
-:: 2. Edit .env and add your API key(s)
-::    DEEPSEEK_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY, etc.
-
-:: 3. Run the agent
-run.bat
-```
-
-**Providers table:**
-
-| Provider | Env var | Default model |
-|----------|---------|---------------|
-| DeepSeek | `DEEPSEEK_API_KEY` | deepseek-chat |
-| OpenAI | `OPENAI_API_KEY` | gpt-4o |
-| Anthropic | `ANTHROPIC_API_KEY` | claude-sonnet-4 |
-| Google | `GOOGLE_API_KEY` | gemini-2.0-flash |
-| Ollama (local) | *(none)* | codellama |
-| Z.ai (GLM) | `ZAI_API_KEY` | glm-4.5 |
-| OpenRouter | `OPENROUTER_API_KEY` | deepseek/deepseek-chat-v3.1 |
-| ClinePass | `CLINEPASS_API_KEY` | cline-pass/kimi-k3 |
-
-### Swap Models at Runtime
+## 📚 Structure
 
 ```
-/model openai gpt-4o
-/model anthropic claude-sonnet-4
-/model zai glm-4.6
-```
-
-### Sessions & Resume
-
-Every run auto-saves. Resume anytime:
-
-```
-python main.py --continue          # Resume last session
-python main.py --resume conv_2025  # Resume by ID
-/sessions                          # List in REPL
-/resume conv_2025                  # Switch mid-session
-```
-
-### Project Rules
-
-Auto-loaded into every session:
-- `AGENTS.md` — agent personality & constraints
-- `.clinerules` — Cline-compatible rules
-- `.goosehints` — Goose framework hints
-- `CLAUDE.md` — Anthropic instructions
-
----
-
-## 🔐 Privacy & Security
-
-- **Local-first:** With Ollama, your prompts and page data never leave your machine.
-- **No telemetry:** LuckyD Browser phones home zero times.
-- **Loopback-only:** Control API, Agent HQ, Terminal, Network Monitor all bind to `127.0.0.1`.
-- **Secrets scanning:** Built-in secret detection; `.env` never committed.
-- **Sandboxed execution:** Shell commands run isolated with safety guardrails.
-
-## 📚 Project Structure
-
-```
-LuckyD-Browser/
-├── browser/                 ← Chromium browser + UI
-│   ├── LuckyD-Launch/       ← Release notes & build artifacts
-│   ├── browser_core/        ← Tile registry, services, dashboard
-│   ├── installer/           ← Windows installer (NSIS)
-│   └── ...                  ← UI, profiles, userscripts
-├── core/                    ← LuckyD Code agent engine
-│   ├── agent_loop.py        ← Main agent loop
-│   ├── llm_client.py        ← Multi-provider LLM support
-│   ├── context_manager.py   ← Memory & context
-│   ├── hooks.py             ← Agent callbacks
-│   └── checkpoint.py        ← Session persistence
-├── tools/                   ← 70+ agent tools
-│   ├── file_tools.py        ← File I/O
-│   ├── bash_tool.py         ← Shell execution
-│   ├── git_tools.py         ← Git operations
-│   ├── web_tools.py         ← Web search/fetch
-│   ├── browser_tools.py     ← Control API integration
-│   ├── lsp_tools.py         ← Code intelligence
-│   ├── memory_tools.py      ← Persistent memory
-│   ├── terminal_cli2.py     ← Agent Mesh support
-│   └── ...                  ← MCP, SQLite, scheduler, etc.
-├── llm/                     ← Provider-specific implementations
-├── vscode-extension/        ← VS Code webview chat
-├── data/                    ← Runtime data (sessions, memory, tasks)
-├── docs/                    ← Documentation
-├── tests/                   ← Test suite
-├── .env.example             ← Template for API keys
-├── main.py                  ← Agent REPL entry point
-├── ui.py                    ← Terminal UI
-├── config.py                ← Runtime configuration
-├── run.bat                  ← Windows launcher
-└── README.md                ← This file
+browser/  (PySide6/Qt WebEngine, Control API :9777, Terminal :9881, Dashboard/HQ/Mesh)
+core/     (agent loop, llm_client, checkpoint)
+tools/    (70+ tools incl. agent_orchestration, subagent)
+tests/    (120 tests — test_browser_integrations.py now mocks PySide6 on Linux CI)
 ```
 
 ---
 
-## 🎓 Advanced Usage
+## 🙏 Credits
 
-### MCP (Model Context Protocol)
+Chromium · Ollama · Qt · xterm.js · pywinpty · PyInstaller · Inno Setup
 
-Extend the agent with any MCP server:
-
-```json
-{
-  "mcpServers": {
-    "filesystem": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/code"]
-    },
-    "github": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-github"],
-      "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_..." }
-    }
-  }
-}
-```
-
-Tools auto-register as `mcp__<server>__<tool>`.
-
-### Skills System
-
-Auto-discovered skills in `skills/*.md`:
-
-```yaml
----
-name: top-picks
-description: Find the best X by category
-version: 1.0.0
-tags: [ranking, research]
----
-
-# How to use this skill...
-```
-
-Defined in `LUCKYD.md` with intent patterns—auto-triggered by the agent.
-
-### Project Rules
-
-Create any of these files in your project root to auto-inject conventions:
-
-- `AGENTS.md` — Agent personality & capabilities
-- `.clinerules` — Cline-compatible rules
-- `.goosehints` — Goose framework hints
-- `CLAUDE.md` — Anthropic instructions
-- `LUCKYD.md` — LuckyD Code project rules
-
----
-
-## 🤝 Contributing
-
-We'd love your help! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-**Before starting:** Please read [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
-
-**Security issues?** Report privately via [SECURITY.md](SECURITY.md).
-
-### Development Setup
-
-```bat
-git clone https://github.com/Dylanchess0320/LuckyD-Browser.git
-cd LuckyD-Browser
-python -m pip install -r requirements-dev.txt
-```
-
-Run tests:
-
-```bat
-pytest tests/
-python -m black --check .
-python -m ruff check .
-```
-
-### Build the Browser Installer
-
-```bat
-cd browser
-python -m PyInstaller LuckyDBrowser.spec
-::    → dist/LuckyDBrowserSetup-2.4.0.exe
-```
-
----
-
-## 📄 License
-
-Distributed under the **MIT License**. See [LICENSE](LICENSE) for details.
-
----
-
-## 🙏 Acknowledgments
-
-**LuckyD Browser** and **LuckyD Code** are powered by:
-
-- [Chromium](https://www.chromium.org/) — the web engine
-- [Ollama](https://ollama.com/) — free, offline LLMs
-- [PyInstaller](https://pyinstaller.org/) — executable packaging
-- [Qt](https://www.qt.io/) — desktop UI (WebEngine)
-- [xterm.js](https://xtermjs.org/) — terminal emulation
-- The open-source community
-
----
-
-**Made with ❤️ by [Dylan Chess](https://github.com/Dylanchess0320)**
-
-**Get started:** [Download v2.4.0 →](https://github.com/Dylanchess0320/LuckyD-Browser/releases/tag/v2.4.0)
+**Made with ❤️ by [Dylan Chess](https://github.com/Dylanchess0320) — [⭐ Star it](https://github.com/Dylanchess0320/LuckyD-Browser) if it saves you a bill.**
