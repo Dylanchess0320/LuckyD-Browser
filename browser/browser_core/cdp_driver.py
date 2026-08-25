@@ -181,7 +181,7 @@ class CdpDriver:
                 return "element not found"
             await self._page.click_at(coords["x"], coords["y"])  # focus
             await self._page.evaluate(
-                "const a = document.activeElement;" " if (a && a.select) a.select();"
+                "const a = document.activeElement; if (a && a.select) a.select();"
             )
             await self._page.insert_text(text)  # replaces selected content
             await asyncio.sleep(0.2)

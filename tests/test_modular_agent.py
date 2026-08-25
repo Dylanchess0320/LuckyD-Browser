@@ -27,7 +27,6 @@ def mod_response(text="", tool_calls=None):
 
 
 class TestModularAgentInit:
-
     def test_defaults(self):
         with patch("llm.ProviderRouter"):
             from core.agent_loop import CodingAgent
@@ -69,7 +68,6 @@ class TestModularAgentInit:
 
 
 class TestModularAgentRun:
-
     @pytest.mark.asyncio
     async def test_simple_reply(self, modular_agent):
         modular_agent.llm_client = AsyncMock()

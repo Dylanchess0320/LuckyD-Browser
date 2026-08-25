@@ -15,7 +15,6 @@ def store(tmp_path):
 
 
 class TestMemoryStore:
-
     def test_add(self, store):
         store.add(content="User likes Python 3.10", tags=["python"], source="test")
         ctx = store.get_context("Python", limit=5)

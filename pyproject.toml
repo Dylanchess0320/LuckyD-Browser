@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "luckyd-code"
-version = "2.2.0"
+version = "3.6.0"
 description = "AI-powered coding agent with multi-LLM support, memory graph, and VS Code integration"
 readme = "README.md"
-license = {text = "Proprietary"}
+license = {text = "MIT"}
 requires-python = ">=3.10,<3.13"
 authors = [
     {name = "LuckyD", email = "dev@luckyd.ai"},
@@ -17,7 +17,7 @@ classifiers = [
     "Development Status :: 4 - Beta",
     "Environment :: Console",
     "Intended Audience :: Developers",
-    "License :: Other/Proprietary License",
+    "License :: OSI Approved :: MIT License",
     "Natural Language :: English",
     "Operating System :: Microsoft :: Windows",
     "Operating System :: POSIX :: Linux",
@@ -30,7 +30,7 @@ classifiers = [
 ]
 dependencies = [
     "httpx>=0.27,<1.0",
-    "rich>=13.7,<14.0",
+    "rich>=13.7,<15.0",
     "pydantic>=2.5,<3.0",
     "python-dotenv>=1.0,<2.0",
     "typing-extensions>=4.9,<5.0",
@@ -56,6 +56,9 @@ dev = [
     "mkdocs>=1.5,<2.0",
     "mkdocs-material>=9.5,<10.0",
     "mkdocstrings>=0.24,<1.0",
+    "mkdocstrings-python>=1.10,<2.0",
+    "mkdocs-git-revision-date-localized-plugin>=1.2,<2.0",
+    "mkdocs-minify-plugin>=0.8,<1.0",
     "pydocstyle>=6.3,<7.0",
     "bandit>=1.7,<2.0",
     "pip-audit>=2.6,<3.0",

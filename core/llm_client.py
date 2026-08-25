@@ -667,8 +667,7 @@ class LLMClient:
                 # fresh_token() failed silently upstream in providers.py).
                 why = "The Cline session token was rejected or has expired."
                 hint = (
-                    "Run `cline` (or `cline auth`) to re-login, or set "
-                    "CLINEPASS_API_KEY in .env."
+                    "Run `cline` (or `cline auth`) to re-login, or set CLINEPASS_API_KEY in .env."
                 )
             else:
                 why = detail or "The API key was rejected by the provider."

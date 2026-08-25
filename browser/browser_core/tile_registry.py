@@ -91,6 +91,25 @@ class Tile:
     cwd: str = ""
 
 
+def _child_env() -> dict:
+    """OS environment merged with the repo .env, for tiles spawned as child
+    processes (e.g. Deck Studio's node server, which needs GOOGLE_API_KEY for
+    AI image generation). Without this, subprocess.Popen only inherits the
+    real Windows environment -- values that live solely in the repo .env
+    (like GOOGLE_API_KEY) never reach the child, even though studio/.env's
+    comment claims they're injected. .env values fill gaps; real OS-set vars
+    still win so an explicit system env var is never shadowed."""
+    merged = dict(os.environ)
+    try:
+        from .ai_bridge import _load_env
+
+        for key, value in _load_env().items():
+            merged.setdefault(key, value)
+    except Exception:
+        pass
+    return merged
+
+
 def _expand(p: str) -> str:
     out = os.path.expandvars(os.path.expanduser(p or ""))
     # %APPDIR% = folder containing the running exe (frozen) or the browser
@@ -102,6 +121,15 @@ def _expand(p: str) -> str:
             appdir = str(Path(__file__).resolve().parent.parent)
         out = out.replace("%APPDIR%", appdir)
         out = out.replace("{app}", appdir)
+        # Frozen onedir builds keep bundled data (studio/, assets/, ...) in
+        # the _internal folder (sys._MEIPASS), NOT beside the exe — so an
+        # exe-relative path like <install>\studio doesn't exist and Popen
+        # dies with NotADirectoryError(267). Fall back to the _MEIPASS copy.
+        meipass = getattr(sys, "_MEIPASS", None)
+        if meipass and not os.path.exists(out) and out.startswith(appdir):
+            alt = str(Path(meipass) / os.path.relpath(out, appdir))
+            if os.path.exists(alt):
+                out = alt
     return out
 
 
@@ -195,7 +223,7 @@ def ensure_autostart(tiles: list[Tile] | None = None) -> None:
         if probe_tile(t)["up"]:
             continue  # something else already serves it
         try:
-            kwargs: dict = {"cwd": t.cwd or None}
+            kwargs: dict = {"cwd": t.cwd or None, "env": _child_env()}
             if os.name == "nt":
                 kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
             _launched[t.id] = subprocess.Popen(  # nosec B603 — config-owned argv
@@ -213,7 +241,7 @@ def tile_anchor(tile: Tile, status: dict | None = None) -> str:
     classes = "tile"
     if tile.extra_class:
         classes += f" {tile.extra_class}"
-    title = f'{tile.name} — {"running" if up else "not responding"}'
+    title = f"{tile.name} — {'running' if up else 'not responding'}"
     dot_color = "#34d399" if up else "#9aa1b5"
     return (
         f'<a class="{classes}" href="{tile.url}" title="{title}">'

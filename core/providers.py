@@ -75,14 +75,22 @@ PROVIDER_DEFAULTS = {
         "env_base": "ZAI_BASE_URL",
         "env_model": "ZAI_MODEL",
         "default_base": "https://api.z.ai/api/paas/v4",
-        "default_model": "glm-4.5",
+        "default_model": "glm-4.5-flash",
     },
+    # OpenRouter hosts a rotating no-cost "free pool" of models (pricing = $0,
+    # id suffixed with ":free"). The pool changes over time, so whenever you see
+    # a paid-looking default here, prefer one of the free ones via OPENROUTER_MODEL.
+    # Verified-free as of this snapshot (pick one, or set any `…:free` id):
+    #   - nvidia/nemotron-3-ultra-550b-a55b:free   (strong general/free, 1M ctx)
+    #   - nvidia/nemotron-3.5-lightning:free      (fast, agentic, 1M ctx)
+    #   - nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free
+    #   - google/gemma-4-31b-it:free             (Google free, vision-capable)
     "openrouter": {
         "env_key": "OPENROUTER_API_KEY",
         "env_base": "OPENROUTER_BASE_URL",
         "env_model": "OPENROUTER_MODEL",
         "default_base": "https://openrouter.ai/api/v1",
-        "default_model": "deepseek/deepseek-chat-v3.1",
+        "default_model": "nvidia/nemotron-3-ultra-550b-a55b:free",
     },
     # ClinePass (Cline flat-subscription gateway) — OpenAI-compatible.
     # Key comes from CLINEPASS_API_KEY, else the logged-in Cline CLI session.

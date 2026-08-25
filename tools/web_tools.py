@@ -208,7 +208,7 @@ class WebSearchTool(ToolBase):
                     title = r.get("title", "").strip()
                     href = r.get("href", "")
                     body = r.get("body", "").strip()
-                    results.append(f"  [{i+1}] {title}\n      {href}\n      {body}")
+                    results.append(f"  [{i + 1}] {title}\n      {href}\n      {body}")
             return results
 
         try:
@@ -270,7 +270,7 @@ class WebSearchTool(ToolBase):
                 if i < len(snippets):
                     snippet = re.sub(r"<[^>]+>", "", snippets[i]).strip()
                     snippet = html_mod.unescape(snippet)
-                results.append(f"  [{i+1}] {title}\n      {href}\n      {snippet}")
+                results.append(f"  [{i + 1}] {title}\n      {href}\n      {snippet}")
 
             return results
 

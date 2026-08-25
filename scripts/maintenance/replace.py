@@ -1,4 +1,4 @@
-﻿f = "C:\\Users\\dylan\\OneDrive\\Desktop\\movie-recommender\\android-app\\app\\src\\main\\java\\com\\dylan\\whattowatch\\feed\\FeedAdapter.kt"
+f = "C:\\Users\\dylan\\OneDrive\\Desktop\\movie-recommender\\android-app\\app\\src\\main\\java\\com\\dylan\\whattowatch\\feed\\FeedAdapter.kt"
 with open(f, encoding="utf-8") as fh:
     c = fh.read()
 old = '            binding.meta.text = "   \u2605    " +\n                if (t.mediaType == "movie") "Movie" else "TV Show"'

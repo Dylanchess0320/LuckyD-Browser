@@ -24,6 +24,7 @@
 - **Project rules** — auto-loads `AGENTS.md`, `.clinerules`, `.goosehints`, `CLAUDE.md` into the system prompt.
 - **VS Code extension** — webview-based chat UI inside your editor.
 - **Safe by default** — sandboxed shell execution, secret scanning, `.env` never committed.
+- **Multiple Agents** — support for agent handoffs, team creation, and message passing between specialist agents (researcher, coder, reviewer, tester). Use `/agent list` to view active agents, `/agent handoff researcher` to research a topic, `/agent team create` to create a parallel agent team, and `/agent message` to send messages between agents.
 
 ## Quick Start
 

@@ -455,7 +455,7 @@ async def main():
     runner = BenchmarkRunner(output_dir=args.output)
     report = await runner.run_suite(args.suite)
 
-    print(f"\n{'='*50}")
+    print(f"\n{'=' * 50}")
     print(f"Results: {report.succeeded}/{report.total_tasks} passed ({report.success_rate:.0%})")
     print(f"Avg latency: {report.avg_latency_ms:.0f}ms")
     print(f"Total cost: ${report.total_cost_usd:.4f}")

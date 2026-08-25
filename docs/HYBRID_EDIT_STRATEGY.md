@@ -183,6 +183,7 @@ SEARCH_RE = re.compile(
     re.DOTALL | re.MULTILINE,
 )
 
+
 def parse_edits(reply: str) -> list[Edit]: ...
 ```
 

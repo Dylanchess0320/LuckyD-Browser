@@ -21,7 +21,6 @@ def tmp_project(tmp_path):
 
 
 class TestToolRegistry:
-
     def test_tools_registered(self):
         import tools.bash_tool
         import tools.file_tools
@@ -51,7 +50,6 @@ class TestToolRegistry:
 
 
 class TestReadTool:
-
     @pytest.mark.asyncio
     async def test_read_file(self, tmp_project):
         from tools.registry import registry
@@ -71,7 +69,6 @@ class TestReadTool:
 
 
 class TestWriteTool:
-
     @pytest.mark.asyncio
     async def test_write_file(self, tmp_project):
         from tools.registry import registry
@@ -84,7 +81,6 @@ class TestWriteTool:
 
 
 class TestGlobTool:
-
     @pytest.mark.asyncio
     async def test_glob_py(self, tmp_project):
         from tools.registry import registry
@@ -95,7 +91,6 @@ class TestGlobTool:
 
 
 class TestBashTool:
-
     @pytest.mark.asyncio
     async def test_simple_command(self):
         from tools.registry import registry
@@ -107,7 +102,6 @@ class TestBashTool:
 
 
 class TestUtilityTools:
-
     @pytest.mark.asyncio
     async def test_read_exists(self, tmp_project):
         from tools.registry import registry

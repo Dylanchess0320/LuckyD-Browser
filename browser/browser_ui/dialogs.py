@@ -396,7 +396,7 @@ class ScriptsDialog(QDialog):
             tag = "built-in" if script.builtin else "user"
             item = QListWidgetItem(f"{script.name}  ({tag})")
             item.setToolTip(
-                f"{script.path}\nmatches: {', '.join(script.matches)}\n" f"run at: {script.run_at}"
+                f"{script.path}\nmatches: {', '.join(script.matches)}\nrun at: {script.run_at}"
             )
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
             item.setCheckState(

@@ -92,6 +92,17 @@ _CLINE_USAGE_FREE_TIER = frozenset(_CLINE_USAGE_CATALOG[:6])
 # flat-subscription quota.
 _CLINEPASS_FREE_TIER = frozenset()
 
+# OpenRouter's no-cost "free pool" (pricing = $0, id suffixed with ":free").
+# Mirror of the curated list in core/providers.py — keep the two in sync.
+# The pool rotates over time; verify against https://openrouter.ai/models?max_price=0
+# if models start returning "model not found".
+_OPENROUTER_FREE_TIER = [
+    "nvidia/nemotron-3-ultra-550b-a55b:free",
+    "nvidia/nemotron-3.5-lightning:free",
+    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+    "google/gemma-4-31b-it:free",
+]
+
 # Aliases accepted in "/model <provider> <name>" on top of canonical names.
 _PROVIDER_ALIASES = {
     "cline-pass": "clinepass",
@@ -104,18 +115,20 @@ def model_catalog() -> list[dict]:
 
     Returns a list of sections, each with a cost ``tier`` ("free" | "paid"),
     a human ``label``, and ``groups`` of {provider, models}. Free covers local
-    Ollama + the Cline Usage rate-limited free tier; everything else is paid.
+    Ollama, Google's Gemini free tier, and OpenRouter's :free pool.
+    Cline/ClinePass removed 2026-08-23 at user's request — no longer needed
+    as a provider. (_CLINEPASS_CATALOG / _CLINE_USAGE_CATALOG stay defined
+    above so /model <id> switching still works if you ever re-add a Cline key
+    manually; they're just not advertised here.)
     """
-    cline_free = [m for m in _CLINE_USAGE_CATALOG if m in _CLINE_USAGE_FREE_TIER]
-    cline_paid = [m for m in _CLINE_USAGE_CATALOG if m not in _CLINE_USAGE_FREE_TIER]
-    clinepass_paid = list(_CLINEPASS_CATALOG)
     return [
         {
             "tier": "free",
             "label": "Free — $0",
             "groups": [
-                {"provider": "Ollama", "models": ["codellama", "llama3.1", "mistral", "phi3"]},
-                {"provider": "Cline Usage (free tier)", "models": cline_free},
+                {"provider": "Ollama (local)", "models": ["llama3.2:3b"]},
+                {"provider": "Google Gemini (free tier)", "models": ["gemini-3-flash-preview", "gemini-2.5-flash"]},
+                {"provider": "OpenRouter (free tier)", "models": list(_OPENROUTER_FREE_TIER)},
             ],
         },
         {
@@ -136,7 +149,7 @@ def model_catalog() -> list[dict]:
                 },
                 {
                     "provider": "Google",
-                    "models": ["gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"],
+                    "models": ["gemini-2.5-pro", "gemini-1.5-pro"],
                 },
                 {
                     "provider": "DeepSeek",
@@ -151,8 +164,6 @@ def model_catalog() -> list[dict]:
                         "google/gemini-2.0-flash-001",
                     ],
                 },
-                {"provider": "ClinePass (subscription)", "models": clinepass_paid},
-                {"provider": "Cline Usage (credit-billed)", "models": cline_paid},
             ],
         },
     ]

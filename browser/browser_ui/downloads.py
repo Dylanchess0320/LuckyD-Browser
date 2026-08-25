@@ -168,8 +168,7 @@ class DownloadsDock(QDockWidget):
             item.setText(f"🚫 {download.downloadFileName()} — cancelled")
         elif state == states.DownloadInterrupted:
             item.setText(
-                f"⚠ {download.downloadFileName()} — interrupted: "
-                f"{download.interruptReasonString()}"
+                f"⚠ {download.downloadFileName()} — interrupted: {download.interruptReasonString()}"
             )
 
     def _clear_completed(self) -> None:

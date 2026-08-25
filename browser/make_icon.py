@@ -19,19 +19,19 @@ BIG = SIZE * SS
 ASSETS = Path(__file__).resolve().parent / "assets"
 
 # brand palette (matches dashboard: blue #5b9dff / purple #b46bff / green #34d399)
-BG_TL = (0x0B, 0x10, 0x20)
-BG_TR = (0x10, 0x1A, 0x30)
-BG_BL = (0x18, 0x20, 0x46)
-BG_BR = (0x2E, 0x1F, 0x55)
+BG_TL = (0x07, 0x0A, 0x16)
+BG_TR = (0x0C, 0x13, 0x26)
+BG_BL = (0x14, 0x1B, 0x3E)
+BG_BR = (0x3A, 0x22, 0x6E)
 BLUE = (0x5B, 0x9D, 0xFF)
 PURPLE = (0xC2, 0x7B, 0xFF)
 GREEN = (0x34, 0xD3, 0x99)
 GOLD = (0xFF, 0xD6, 0x33)
-WHITE = (0xF4, 0xF7, 0xFF)
+WHITE = (0xF6, 0xF9, 0xFF)
 
 CX = CY = BIG // 2
 GLOBE_R = int(BIG * 0.300)  # orbit ring radius
-RING_W = int(BIG * 0.052)  # ring thickness
+RING_W = int(BIG * 0.062)  # ring thickness (thicker -> holds up at 16px favicon size)
 CORE_R = int(BIG * 0.060)  # center dot radius
 CORNER = int(BIG * 0.225)  # tile corner radius
 PAD = int(BIG * 0.015)  # tile inset
@@ -97,20 +97,21 @@ def draw_ring(img):
 
 
 def draw_globe(img):
+    """One crisp outline + a single meridian. The old version layered two
+    translucent circles plus two meridians, which anti-aliases into a grey
+    smudge once downscaled to a 16px favicon -- this reads cleanly at any size."""
     d = ImageDraw.Draw(img)
-    lw = max(2, int(BIG * 0.012))
+    lw = max(3, int(BIG * 0.016))
     wr = int(GLOBE_R * 0.58)
     hr = int(GLOBE_R * 0.58)
     box = [CX - wr, CY - hr, CX + wr, CY + hr]
-    d.ellipse(box, outline=(WHITE[0], WHITE[1], WHITE[2], 200), width=lw)
-    d.ellipse(box, outline=(WHITE[0], WHITE[1], WHITE[2], 120), width=lw)
-    # meridians
-    for k in (-1, 1):
-        d.ellipse(
-            [CX + k * hr - hr, CY - hr, CX + k * hr + hr, CY + hr],
-            outline=(WHITE[0], WHITE[1], WHITE[2], 90),
-            width=max(2, lw - 1),
-        )
+    d.ellipse(box, outline=(WHITE[0], WHITE[1], WHITE[2], 235), width=lw)
+    # single meridian for a "globe" read without adding clutter
+    d.ellipse(
+        [CX - hr * 0.42, CY - hr, CX + hr * 0.42, CY + hr],
+        outline=(WHITE[0], WHITE[1], WHITE[2], 140),
+        width=max(2, lw - 2),
+    )
 
 
 def star4(img, cx, cy, radius, rot=0, color=GOLD):
@@ -145,14 +146,18 @@ def main():
         [CX - CORE_R, CY - CORE_R, CX + CORE_R, CY + CORE_R],
         fill=(GREEN[0], GREEN[1], GREEN[2], 255),
     )
-    # lucky spark in the ring's open gap (upper right)
-    star4(
-        img,
-        int(CX + GLOBE_R * 0.74),
-        int(CY - GLOBE_R * 0.74),
-        int(BIG * 0.048),
-        rot=math.radians(-15),
-    )
+    # lucky spark in the ring's open gap (upper right) -- soft glow first so
+    # the star reads as a glint of light, not a flat gold dot
+    spark_x = int(CX + GLOBE_R * 0.74)
+    spark_y = int(CY - GLOBE_R * 0.74)
+    for i in range(10, 0, -1):
+        r = int(BIG * 0.09 * (i / 10))
+        a = round(70 * (i / 10) ** 2)
+        ImageDraw.Draw(img).ellipse(
+            [spark_x - r, spark_y - r, spark_x + r, spark_y + r],
+            fill=(GOLD[0], GOLD[1], GOLD[2], a),
+        )
+    star4(img, spark_x, spark_y, int(BIG * 0.058), rot=math.radians(-15))
     # tile border
     ImageDraw.Draw(img).rounded_rectangle(
         tile_path(), radius=CORNER, outline=(0x2A, 0x35, 0x66, 235), width=int(BIG * 0.008)

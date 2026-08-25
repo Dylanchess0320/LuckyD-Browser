@@ -26,7 +26,9 @@ export function setOpenRouterKey(key) {
   } catch { /* ignore */ }
 }
 
-export const DEFAULT_MODEL = 'openai/gpt-4o-mini'
+// FREE-ONLY: default must be a $0 model so Nexus can never spend money by
+// accident. Free ids churn — if this 404s/429s, re-list and update.
+export const DEFAULT_MODEL = 'google/gemma-4-31b-it:free'
 
 const headers = () => ({
   Authorization: `Bearer ${getKey()}`,

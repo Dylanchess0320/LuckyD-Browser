@@ -264,7 +264,7 @@ def make_handler(backend, token: str = "", harness=None, settings=None):
                     hq_splash_html(
                         "",
                         "error",
-                        "No harness supervisor is wired " "into this Control API instance.",
+                        "No harness supervisor is wired into this Control API instance.",
                         settings=settings,
                     )
                 )

@@ -9,6 +9,7 @@ site_url: https://luckyd.github.io/coding-agent/
 repo_name: luckyd/coding-agent
 repo_url: https://github.com/luckyd/coding-agent
 edit_uri: edit/main/docs/docs/
+docs_dir: docs/docs
 
 theme:
   name: material
@@ -72,15 +73,13 @@ markdown_extensions:
 plugins:
   - search
   - mkdocstrings:
-      default:
-        handlers:
-          python:
-            paths: [".."]
-            options:
-              show_source: true
-              show_root_heading: true
-              show_category_heading: true
-              docstring_style: google
+      handlers:
+        python:
+          paths: [".."]
+          options:
+            show_source: true
+            show_root_heading: true
+            docstring_style: google
   - git-revision-date-localized:
       enabled: !ENV [CI, false]
   - minify:
@@ -92,17 +91,17 @@ nav:
       - Getting Started: guide/getting-started.md
       - Installation: guide/installation.md
       - Configuration: guide/configuration.md
-      - Usage: guide/usage.md
-      - Tools: guide/tools.md
-      - Memory System: guide/memory.md
-      - Providers: guide/providers.md
-      - Docker: guide/docker.md
-  - Reference:
-      - API: reference/api.md
-      - CLI: reference/cli.md
-      - Configuration: reference/configuration.md
-  - Development:
-      - Contributing: ../CONTRIBUTING.md
-      - Changelog: ../CHANGELOG.md
-      - Security: ../SECURITY.md
-      - Code of Conduct: ../CODE_OF_CONDUCT.md
+
+# NOTE: guide/usage.md, guide/tools.md, guide/memory.md, guide/providers.md,
+# guide/docker.md, reference/api.md, reference/cli.md, and
+# reference/configuration.md were referenced here but don't exist yet under
+# docs/docs/ — removed from nav rather than left as build-breaking links.
+# Add them back here once those pages are actually written.
+#
+# A "Development" section previously linked CONTRIBUTING.md, CHANGELOG.md,
+# SECURITY.md, and CODE_OF_CONDUCT.md via ../ paths. MkDocs cannot include
+# nav pages from outside docs_dir (docs/docs/) under any relative path —
+# not a typo, a structural limitation — so those 404'd in strict mode.
+# Those files intentionally stay at the repo root (GitHub surfaces them
+# there automatically); repo_url above is how the docs site links out to
+# them instead of duplicating their content inside docs_dir.

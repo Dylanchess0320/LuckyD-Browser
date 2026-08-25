@@ -233,5 +233,5 @@ class ApprovalHook(AgentPlugin):
         return {
             "role": "tool",
             "tool_call_id": request.call_id,
-            "content": f"Tool approval timed out after {self.timeout_ms/1000}s for '{request.tool_name}'.",
+            "content": f"Tool approval timed out after {self.timeout_ms / 1000}s for '{request.tool_name}'.",
         }

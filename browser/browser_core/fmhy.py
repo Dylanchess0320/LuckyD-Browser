@@ -123,7 +123,7 @@ class FmhyIndex:
         scored: list[tuple[int, dict]] = []
         for entry in self._entries:
             hay = (
-                f"{entry['name']} {entry['desc']} " f"{entry['section']} {entry['category']}"
+                f"{entry['name']} {entry['desc']} {entry['section']} {entry['category']}"
             ).lower()
             score = 0
             for term in terms:

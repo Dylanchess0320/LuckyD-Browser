@@ -1,5 +1,4 @@
 class TestProviders:
-
     def test_resolve_provider_config(self, monkeypatch):
         from core.providers import resolve_provider_config
 
@@ -17,7 +16,6 @@ class TestProviders:
 
 
 class TestMessageBuilder:
-
     def test_build_system(self):
         from core.message_builder import MessageBuilder
 
@@ -36,7 +34,6 @@ class TestMessageBuilder:
 
 
 class TestContextManager:
-
     def test_estimate_tokens(self):
         from core.context_manager import estimate_tokens
 
@@ -64,7 +61,6 @@ class TestContextManager:
 
 
 class TestHooks:
-
     def test_register_before_tool(self):
         from core.hooks import get_hooks, reset_hooks
 
@@ -88,7 +84,6 @@ class TestHooks:
 
 
 class TestCheckpoint:
-
     def test_record_and_list(self, tmp_path, monkeypatch):
         from core.checkpoint import CheckpointManager
 
@@ -111,7 +106,6 @@ class TestCheckpoint:
 
 
 class TestLLMClient:
-
     def test_create_openai(self):
         from llm import LLMClient, LLMConfig
 

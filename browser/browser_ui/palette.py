@@ -1,4 +1,4 @@
-﻿"""Command palette: Ctrl+K for fuzzy search over tabs, bookmarks, history, actions."""
+"""Command palette: Ctrl+K for fuzzy search over tabs, bookmarks, history, actions."""
 
 from __future__ import annotations
 
@@ -92,7 +92,7 @@ class CommandPalette(QWidget):
                 u, tt = v.url().toString(), v.title() or "New Tab"
                 self._items.append(
                     (
-                        f"tab:{i+1}",
+                        f"tab:{i + 1}",
                         f"⇥ {tt} — {u[:50]}",
                         v.icon(),
                         lambda vv=v: self._mw.tabs.setCurrentWidget(vv),  # switch, don't dupe

@@ -47,5 +47,4 @@ python main.py
 
 - Check the [Installation Guide](installation.md) for detailed setup instructions
 - Learn about [Configuration](configuration.md) options
-- Explore the [Tools](tools.md) available to the agent
-- See [Usage](usage.md) for more command examples
+- Tools and detailed usage guides are coming soon

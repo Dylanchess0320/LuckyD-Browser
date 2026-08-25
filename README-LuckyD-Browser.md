@@ -69,7 +69,7 @@ Prefer a cloud model instead? The sidebar supports 9 more providers — see
 
 | Surface | What it is | Open it |
 |---|---|---|
-| **AI Sidebar** | Chat (Markdown bubbles), per-provider model picker, page-aware Q&A, 📷 visual Q&A, and an **autonomous agent that drives your real tab** — orange highlight ring, step narration, Stop button | `Ctrl+Shift+A` |
+| **AI Sidebar** | Chat (Markdown bubbles), per-provider model picker, page-aware Q&A, 📷 visual Q&A, and an **autonomous agent that drives your real tab** — orange highlight ring, step narration, Stop button. Agent can research, code, review, and test — use `/agent handoff researcher`, `/agent handoff coder`, or `/agent team create`. | `Ctrl+Shift+A` |
 | **Coding Agent HQ** | The full `luckyd-code` workspace as a browser tab: 70+ tools, memory graph, sessions, orchestration, background tasks — auto-starts with the browser | ⚡ button or `Ctrl+Shift+H` |
 | **In-browser Terminal** | Real terminals on Windows ConPTY via xterm.js — the `luckyd-code` agent CLI **and** plain PowerShell/CMD, each tab its own independent session | `Ctrl+`` ` / `Ctrl+Shift+`` ` |
 | **Workflows** | Record Control-API actions into named automations and replay them with self-healing element matching | Tools → Workflows… |

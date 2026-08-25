@@ -348,9 +348,7 @@ class ProjectReport:
         if d.unused:
             lines.append(f"- Possibly unused: {', '.join(d.unused[:15])}")
         if d.possibly_outdated:
-            lines.append(
-                f"- Possibly outdated (unpinned): " f"{', '.join(d.possibly_outdated[:15])}"
-            )
+            lines.append(f"- Possibly outdated (unpinned): {', '.join(d.possibly_outdated[:15])}")
         lines.append("")
         # Patterns
         lines.append("## Code Patterns")
@@ -547,14 +545,14 @@ class ProjectIntelligence:
         if ".gitignore" not in lower_names:
             recs.append("Add a .gitignore — none found at project root.")
         if not any((root / ci).exists() for ci in _CI_FILES):
-            recs.append("Add CI configuration (e.g. .github/workflows) — " "no CI config detected.")
+            recs.append("Add CI configuration (e.g. .github/workflows) — no CI config detected.")
         if "license" not in lower_names and "license.md" not in lower_names:
             recs.append("Add a LICENSE file — none found.")
 
         if report is not None:
             for f, n in report.structure.largest_files:
                 if n > _GIANT_FILE_LINES:
-                    recs.append(f"Consider splitting `{f}` — {n:,} lines " f"(giant file).")
+                    recs.append(f"Consider splitting `{f}` — {n:,} lines (giant file).")
             if report.structure.max_depth > _DEEP_NESTING_DEPTH:
                 recs.append(
                     f"Directory nesting is {report.structure.max_depth} "
@@ -562,7 +560,7 @@ class ProjectIntelligence:
                 )
             if report.dependencies.unused:
                 recs.append(
-                    f"Review {len(report.dependencies.unused)} possibly " f"unused dependencies."
+                    f"Review {len(report.dependencies.unused)} possibly unused dependencies."
                 )
         return recs
 

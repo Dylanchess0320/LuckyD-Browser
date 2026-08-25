@@ -129,3 +129,6 @@ build-apk.sh
 
 # ── Vendored third-party reference codebases ──────────────────────────
 external/
+
+# ── Local build output (frozen exe + its runtime state) ────────────────
+bin/

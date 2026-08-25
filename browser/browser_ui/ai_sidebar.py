@@ -729,7 +729,7 @@ class AiSidebar(QDockWidget):
             self._append("<i>Open a web page first.</i>")
             return
         self._shot_prompt = self.input.text().strip() or (
-            "Describe this page: what is it, what stands out, " "anything actionable?"
+            "Describe this page: what is it, what stands out, anything actionable?"
         )
         self.input.clear()
         self.status.setText("capturing screenshot…")
@@ -792,8 +792,7 @@ class AiSidebar(QDockWidget):
         url = view.url().toString() if view else ""
         self.agent_input.clear()
         self._append(
-            f"<b style='color:{_P.get('accent', '#f9a24f')}'>Agent task:</b> "
-            f"{html.escape(task)}"
+            f"<b style='color:{_P.get('accent', '#f9a24f')}'>Agent task:</b> {html.escape(task)}"
         )
         use_cdp = bool(url) and url.startswith(
             ("http://", "https://", "file://localhost", "file://", "about:")
@@ -875,8 +874,7 @@ class AiSidebar(QDockWidget):
 
     def _start_harness_agent(self, task: str) -> None:
         self._append(
-            f"<b style='color:{_P.get('accent2', '#9d4ff9')}'>Coding agent:</b> "
-            f"{html.escape(task)}"
+            f"<b style='color:{_P.get('accent2', '#9d4ff9')}'>Coding agent:</b> {html.escape(task)}"
         )
         full_task = task + self._control_api_hint()
         worker = _HarnessWorker(

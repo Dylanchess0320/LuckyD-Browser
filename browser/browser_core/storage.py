@@ -106,7 +106,7 @@ class Storage:
 
     def add_bookmark(self, url: str, title: str, folder: str = "") -> None:
         self._conn.execute(
-            "INSERT OR REPLACE INTO bookmarks (url, title, folder, created) " "VALUES (?, ?, ?, ?)",
+            "INSERT OR REPLACE INTO bookmarks (url, title, folder, created) VALUES (?, ?, ?, ?)",
             (url, title or "", folder, time.time()),
         )
         self._conn.commit()

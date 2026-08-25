@@ -1,7 +1,7 @@
 """Self-contained AI bridge: speaks to multiple LLM providers via httpx directly.
 
-No dependence on the repo's `llm/` package — reads keys from the repo .env
-(or process env). Local keyless servers (Ollama, LM Studio — free, unlimited,
+No dependence on the repo's `llm/` package â€” reads keys from the repo .env
+(or process env). Local keyless servers (Ollama, LM Studio â€” free, unlimited,
 offline) are auto-detected FIRST and need no API key at all; cloud providers
 (Google Gemini free tier, Groq free tier, Z.ai, OpenRouter, DeepSeek, OpenAI,
 Anthropic) act as optional boosters further down the fallback chain.
@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import sys
 from pathlib import Path
 
 import httpx
@@ -24,20 +25,29 @@ _PROVIDER_SPECS = [
     (
         "google",
         "GOOGLE_API_KEY",
-        "gemini-2.0-flash",
+        "gemini-3-flash-preview",
         "https://generativelanguage.googleapis.com/v1beta",
         "gemini",
     ),
     ("groq", "GROQ_API_KEY", "llama-3.3-70b-versatile", "https://api.groq.com/openai/v1", "openai"),
     ("zai", "ZAI_API_KEY", "glm-4.5-flash", "https://api.z.ai/api/paas/v4", "openai"),
+    # OpenRouter free pool rotates â€” `:free` ids are $0. Defaulting free here so
+    # the browser sidebar never silently spends credits: nvidia nemotron-3 ultra
+    # 550b-a55b (free), or google/gemma-4-31b-it:free, nvidia/nemotron-3.5-lightning:free
     (
         "openrouter",
         "OPENROUTER_API_KEY",
-        "deepseek/deepseek-chat-v3.1",
+        "nvidia/nemotron-3-ultra-550b-a55b:free",
         "https://openrouter.ai/api/v1",
         "openai",
     ),
-    ("deepseek", "DEEPSEEK_API_KEY", "deepseek-v4-flash", "https://api.deepseek.com", "openai"),
+    (
+        "deepseek",
+        "DEEPSEEK_API_KEY",
+        "deepseek-v4-flash",
+        "https://api.deepseek.com",
+        "openai",
+    ),
     ("openai", "OPENAI_API_KEY", "gpt-4o", "https://api.openai.com/v1", "openai"),
     (
         "anthropic",
@@ -48,15 +58,15 @@ _PROVIDER_SPECS = [
     ),
 ]
 
-# Keyless local servers — probed at startup, registered before keyed clouds.
-# Any OpenAI-compatible /v1 endpoint works (Ollama, LM Studio, llama.cpp…).
+# Keyless local servers â€” probed at startup, registered before keyed clouds.
+# Any OpenAI-compatible /v1 endpoint works (Ollama, LM Studio, llama.cppâ€¦).
 # (name, host env override, default host, model env override)
 _LOCAL_SPECS = [
     ("ollama", "OLLAMA_HOST", "http://127.0.0.1:11434", "OLLAMA_MODEL"),
     ("lmstudio", "LMSTUDIO_HOST", "http://127.0.0.1:1234", ""),
 ]
 
-# Preferred local chat/agent models — first substring match in the server's
+# Preferred local chat/agent models â€” first substring match in the server's
 # installed-model list wins; otherwise the first installed model is used.
 # Small CPU-friendly models rank first: most machines have no GPU.
 _LOCAL_MODEL_PREF = (
@@ -105,23 +115,24 @@ _VISION_HINTS = (
     "phi-3-vision",
     "phi-3.5-vision",
     "phi-4-multimodal",
+    "minimax-m",
 )
 # Substrings that veto a hint match (text-only variants of vision lines).
 _VISION_EXCLUDE = ("gemma3:1b", "gemma-3-1b")
 
-# ClinePass (Cline flat-subscription gateway) — OpenAI-compatible.
+# ClinePass (Cline flat-subscription gateway) â€” OpenAI-compatible.
 # Auth: CLINEPASS_API_KEY from .env, else the logged-in Cline CLI session.
 _CLINEPASS_BASE = "https://api.cline.bot/api/v1"
 _CLINEPASS_MODEL = "cline-pass/deepseek-v4-pro"
 
-# Curated fallback for api.cline.bot — the gateway has no public model
+# Curated fallback for api.cline.bot â€” the gateway has no public model
 # catalog endpoint (only /chat/completions). Sources: ClinePass docs model
 # table (subscription) + Cline API docs (credit-billed), 2026-07.
 _CLINEPASS_CATALOG = [
-    # ── Included in the ClinePass flat subscription — these work with a
+    # â”€â”€ Included in the ClinePass flat subscription â€” these work with a
     # $0 (even negative) credit balance; usage counts against the sub quota.
     "cline-pass/kimi-k3",
-    "cline-pass/deepseek-v4-flash",  # fast + cheapest — great agent model
+    "cline-pass/deepseek-v4-flash",  # fast + cheapest â€” great agent model
     "cline-pass/kimi-k2.7-code",
     "cline-pass/kimi-k2.6",
     "cline-pass/deepseek-v4-pro",
@@ -132,19 +143,19 @@ _CLINEPASS_CATALOG = [
     "cline-pass/qwen3.7-plus",
 ]
 
-# Cline Usage (credit-billed / free tier) — same gateway, usage-based billing.
+# Cline Usage (credit-billed / free tier) â€” same gateway, usage-based billing.
 # Free-tier models work at $0.00 but are rate-limited; credit models deduct
 # from your Cline Credits balance.   Sources: Cline API docs, 2026-07.
 _CLINE_USAGE_MODEL = "deepseek/deepseek-chat"
 _CLINE_USAGE_CATALOG = [
-    # ── Free tier (rate-limited, $0.00 — needs non-negative credit balance)
+    # â”€â”€ Free tier (rate-limited, $0.00 â€” needs non-negative credit balance)
     "minimax/minimax-m2.5",
-    "deepseek/deepseek-chat",  # DeepSeek V3 — fast general model
-    "deepseek/deepseek-r1",  # DeepSeek R1 — reasoning model
+    "deepseek/deepseek-chat",  # DeepSeek V3 â€” fast general model
+    "deepseek/deepseek-r1",  # DeepSeek R1 â€” reasoning model
     "meta-llama/llama-3.2-3b-instruct",  # Small Llama, quick responses
     "google/gemini-2.0-flash",  # Google Gemini free tier
     "qwen/qwen3-8b",  # Qwen 3 small, CPU-friendly
-    # ── Credit-billed — deduct from Cline Credits balance
+    # â”€â”€ Credit-billed â€” deduct from Cline Credits balance
     "google/gemini-2.5-pro",
     "anthropic/claude-sonnet-4-6",
     "openai/gpt-4o",
@@ -153,16 +164,37 @@ _CLINE_USAGE_CATALOG = [
 ]
 
 
+def _env_paths() -> list[Path]:
+    """Every .env location to read, in priority order (first hit wins per key).
+
+    Dev: the repo-root .env (ENV_PATH). Frozen onedir: this module's __file__
+    lives under _internal, so ENV_PATH resolves to <install>\\.env beside the
+    exe â€” while the .env the installer actually ships (and the one users are
+    told to put real keys into) is _internal\\.env == sys._MEIPASS/.env.
+    Reading all candidates means keys added to _internal\\.env in an installed
+    app actually reach the AI bridge instead of being silently ignored.
+    """
+    paths = [ENV_PATH]
+    meipass = getattr(sys, "_MEIPASS", None)
+    if meipass:
+        paths.append(Path(meipass) / ".env")
+    if getattr(sys, "frozen", False):
+        paths.append(Path(sys.executable).resolve().parent / ".env")
+    return paths
+
+
 def _load_env() -> dict[str, str]:
     env: dict[str, str] = {}
     try:
-        if ENV_PATH.exists():
-            for line in ENV_PATH.read_text(encoding="utf-8").splitlines():
+        for path in _env_paths():
+            if not path.exists():
+                continue
+            for line in path.read_text(encoding="utf-8").splitlines():
                 line = line.strip()
                 if not line or line.startswith("#") or "=" not in line:
                     continue
                 key, _, value = line.partition("=")
-                env[key.strip()] = value.strip().strip('"').strip("'")
+                env.setdefault(key.strip(), value.strip().strip('"').strip("'"))
     except Exception:
         pass
     for key, value in os.environ.items():
@@ -181,14 +213,27 @@ class AIBridge:
         # Remember which providers are keyless locals (used by
         # default_provider; _LOCAL_SPECS itself may change under tests).
         self._local_names = {name for name, *_ in _LOCAL_SPECS}
-        self._detect_clinepass(env)
+        # Cline/ClinePass removed 2026-08-23 at user's request â€” Google and
+        # OpenRouter cover the free tier now. self._detect_clinepass(env) is
+        # intentionally not called; _CLINEPASS_* constants stay defined below
+        # only because fetch_models() references them as a catalog fallback
+        # if a provider ever gets manually re-added.
+        self._clinepass_from_session = False
         for name, key_name, model, base_url, kind in _PROVIDER_SPECS:
             key = env.get(key_name, "").strip()
             if not key:
                 continue
-            # Per-provider model override, e.g. DEEPSEEK_MODEL=deepseek-v4-pro
+            # Per-provider overrides, e.g. DEEPSEEK_MODEL=deepseek-v4-pro or
+            # OPENAI_BASE_URL=https://opencode.ai/zen/v1 (repointing the
+            # "openai" slot at a different OpenAI-compatible gateway/free
+            # model). Previously only the model override was read here, so
+            # a repointed base_url silently kept hitting the hardcoded
+            # default host with the wrong provider's key -> guaranteed 401
+            # and, for a specifically-selected provider, no fallback (the
+            # fallback chain only kicks in on "auto").
             prefix = key_name.removesuffix("_API_KEY")
             model = env.get(f"{prefix}_MODEL", "").strip() or model
+            base_url = env.get(f"{prefix}_BASE_URL", "").strip() or base_url
             self._configs[name] = (model, base_url, key, kind)
 
     def _detect_clinepass(self, env) -> None:
@@ -196,7 +241,7 @@ class AIBridge:
 
         Both share the same auth: CLINEPASS_API_KEY from .env, else the
         logged-in Cline CLI session.  The session path registers whenever a
-        login exists on disk — even with every access token expired.  Tokens
+        login exists on disk â€” even with every access token expired.  Tokens
         are refreshed via the stored WorkOS refresh token lazily before each
         call (off the UI thread), so ClinePass and Cline Usage stay available
         with the Cline terminal closed.
@@ -210,15 +255,15 @@ class AIBridge:
             try:
                 token = cline_session.stored_token()
             except RuntimeError:
-                token = ""  # expired now — refreshed lazily before each call
-        # else: no session, token stays "" — catalog fallback will work
+                token = ""  # expired now â€” refreshed lazily before each call
+        # else: no session, token stays "" â€” catalog fallback will work
         base = env.get("CLINEPASS_BASE_URL", "").strip() or _CLINEPASS_BASE
 
-        # ── ClinePass (flat subscription) ──────────────────────────────
+        # â”€â”€ ClinePass (flat subscription) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         model = env.get("CLINEPASS_MODEL", "").strip() or _CLINEPASS_MODEL
         self._configs["clinepass"] = (model, base, token, "openai")
 
-        # ── Cline Usage (credit-billed / free tier) ────────────────────
+        # â”€â”€ Cline Usage (credit-billed / free tier) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         usage_model = env.get("CLINE_USAGE_MODEL", "").strip() or _CLINE_USAGE_MODEL
         self._configs["cline-usage"] = (usage_model, base, token, "openai")
 
@@ -254,9 +299,9 @@ class AIBridge:
         """Return the highest-priority available provider.
 
         Preference order (matches this module's docstring):
-          1. Local keyless servers (Ollama, LM Studio) — free, unlimited,
+          1. Local keyless servers (Ollama, LM Studio) â€” free, unlimited,
              offline, no key or login needed
-          2. cline-usage — Cline free tier, when auth actually exists
+          2. cline-usage â€” Cline free tier, when auth actually exists
              (API key or a logged-in Cline CLI session)
           3. Cloud keyed providers, in _PROVIDER_SPECS order
         """
@@ -308,7 +353,7 @@ class AIBridge:
         self._configs[provider] = (model.strip(), info[1], info[2], info[3])
 
     def fetch_models(self, provider: str) -> list[str]:
-        """Model ids available on a provider — live catalog when it has one
+        """Model ids available on a provider â€” live catalog when it has one
         (Ollama, LM Studio, most OpenAI-compatible hosts), curated fallback
         for ClinePass / Cline Usage (gateway exposes no catalog), current
         model otherwise."""
@@ -359,7 +404,7 @@ class AIBridge:
             if info is None:
                 continue
             if name in ("clinepass", "cline-usage") and self._clinepass_from_session:
-                # Session tokens live ~1h — re-read before every call;
+                # Session tokens live ~1h â€” re-read before every call;
                 # fresh_token() refreshes via WorkOS when they expire.
                 try:
                     token = cline_session.fresh_token()
@@ -374,9 +419,9 @@ class AIBridge:
             except Exception as exc:
                 last_err = exc
         if last_err is not None:
-            raise RuntimeError(f"all providers failed — last error: {last_err}")
+            raise RuntimeError(f"all providers failed â€” last error: {last_err}")
         raise RuntimeError(
-            "no AI providers configured — install Ollama and run "
+            "no AI providers configured â€” install Ollama and run "
             "`ollama pull qwen3:4b`, or add cloud keys to the repo .env"
         )
 
@@ -406,11 +451,11 @@ class AIBridge:
             if key:
                 # An EMPTY / whitespace-only Authorization header ('Bearer ' /
                 # 'Bearer  ') makes h11 raise "Illegal header value b'Bearer '"
-                # at send time — never send it without a real key.
+                # at send time â€” never send it without a real key.
                 headers["Authorization"] = f"Bearer {key}"
 
         text = ""
-        # Local keyless models can be slow on CPU — allow a longer first token.
+        # Local keyless models can be slow on CPU â€” allow a longer first token.
         timeout = 300.0 if not api_key else 60.0
         async with (
             httpx.AsyncClient(timeout=timeout) as client,
