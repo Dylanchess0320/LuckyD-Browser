@@ -16,6 +16,77 @@ _WS_PORT = 9881  # must match browser_app's "terminal_port" default
 _SHELL_LABELS = {"agent": "Agent", "agent2": "Agent 2", "powershell": "PowerShell", "cmd": "CMD"}
 
 
+
+# Agent Mesh dock — the CLIs wired in via terminal_server.MESH_SHELLS, shown
+# as an agent picker in the terminal tab. (shell, label, emoji, accent, blurb)
+_MESH_AGENTS = {
+    "mesh-claude": ("Claude", "🟠", "#d97706", "Anthropic · architect"),
+    "mesh-codex": ("Codex", "🟢", "#10b981", "OpenAI · builder"),
+    "mesh-copilot": ("Copilot", "⚫", "#8b9bb4", "GitHub · reviewer"),
+    "mesh-qwen": ("Qwen", "🟣", "#a855f7", "Qwen · test writer"),
+    "mesh-opencode": ("OpenCode", "🔵", "#3b82f6", "Anomaly · implementer"),
+    "mesh-cline": ("Cline", "🟡", "#eab308", "autonomous builder"),
+    "mesh-openclaw": ("OpenClaw", "🦞", "#ef4444", "100+ skills"),
+    "mesh-dsh": ("DeepSeek", "🐋", "#06b6d4", "DeepSeek harness"),
+    "mesh-pi": ("Pi", "⚪", "#94a3b8", "minimal toolkit"),
+}
+
+
+def _mesh_available() -> dict:
+    """Which mesh agent CLIs are installed (probed via terminal_server)."""
+    try:
+        from browser_core import terminal_server
+
+        return terminal_server.mesh_shells_available()
+    except Exception:
+        return {}
+
+
+def _mesh_dock_html() -> str:
+    """Render the Agent Mesh dock: one chip per agent, dimmed when the CLI
+    isn't installed (clicking it explains how to install via `mesh install`)."""
+    avail = _mesh_available()
+    chips = []
+    for shell, (label, emoji, color, blurb) in _MESH_AGENTS.items():
+        ok = avail.get(shell, False)
+        cls = "chip" + (" on" if ok else " off")
+        state = "ready" if ok else "not installed"
+        chips.append(
+            f'<button class="{cls}" data-sh="{shell}" data-avail="{str(ok).lower()}" '
+            f'style="--ac:{color}" title="{label} — {blurb} ({state})">'
+            f'<span class="ce">{emoji}</span>{label}</button>'
+        )
+    return (
+        '<div id="meshdock"><div id="meshhead"><span class="mh-t">◈ AGENT MESH</span>'
+        '<span class="mh-s">pick an agent — each gets its own live PTY session</span></div>'
+        '<div id="meshchips">' + "".join(chips) + "</div></div>"
+    )
+
+
+def _mesh_dock_css() -> str:
+    return (
+        "#meshdock{position:fixed;top:37px;left:0;right:0;z-index:50;"
+        "background:linear-gradient(180deg,#0d1320,#0b0f16);"
+        "border-bottom:1px solid #1e293b;padding:10px 14px 12px}"
+        "#meshhead{display:flex;align-items:baseline;gap:10px;margin-bottom:9px}"
+        "#meshhead .mh-t{color:#e2e8f0;letter-spacing:.14em;font-size:12px;font-weight:800}"
+        "#meshhead .mh-s{color:#475569;font-size:11px;font-weight:500}"
+        "#meshchips{display:flex;flex-wrap:wrap;gap:8px}"
+        ".chip{display:flex;align-items:center;gap:7px;padding:6px 12px;border-radius:999px;"
+        "border:1px solid #1e293b;background:#0f1622;color:#cbd5e1;cursor:pointer;"
+        "font:600 12px/1 system-ui,Segoe UI,Arial;transition:all .15s ease}"
+        ".chip .ce{font-size:13px}"
+        ".chip:hover{border-color:var(--ac);transform:translateY(-1px);"
+        "box-shadow:0 4px 14px rgba(0,0,0,.4)}"
+        ".chip.on{border-color:color-mix(in srgb,var(--ac) 55%,transparent)}"
+        ".chip.sel,.chip.on:active{border-color:var(--ac);color:#fff;"
+        "background:color-mix(in srgb,var(--ac) 18%,#0f1622);"
+        "box-shadow:0 0 12px color-mix(in srgb,var(--ac) 35%,transparent)}"
+        ".chip.off{opacity:.42}.chip.off:hover{opacity:.75}"
+    )
+
+
+
 def terminal_html(settings=None, shell: str = "agent") -> str:
     """The terminal tab page. Connects to the PTY bridge over WebSocket.
 
@@ -32,12 +103,17 @@ def terminal_html(settings=None, shell: str = "agent") -> str:
         with contextlib.suppress(AttributeError):
             token = str(settings.get("terminal_token", "") or "")
     shell = (shell or "agent").strip().lower()
-    if shell not in _SHELL_LABELS:
+    labels = dict(_SHELL_LABELS)
+    labels.update({name: meta[0] for name, meta in _MESH_AGENTS.items()})
+    if shell not in labels:
         shell = "agent"
     return (
         _HTML.replace("__WS_URL__", f"ws://{_WS_HOST}:{port}")
         .replace("__WS_TOKEN__", json.dumps(token))
         .replace("__SHELL__", shell)
+        .replace("__MESH_CSS__", _mesh_dock_css())
+        .replace("__MESH_DOCK__", _mesh_dock_html())
+        .replace("__MESH_META__", json.dumps({k: v[0] for k, v in _MESH_AGENTS.items()}))
     )
 
 
@@ -68,6 +144,7 @@ _HTML = """<!doctype html>
   #status{color:#64748b;font-weight:500;font-size:12px}
   #hint{margin-left:auto;color:#475569;font-weight:500;font-size:11px}
   #wrap{position:absolute;top:37px;left:0;right:0;bottom:0;padding:6px 4px}
+  body.has-mesh #wrap{top:calc(37px + var(--dockh,110px))}
   #term{height:100%}
   #menu{position:fixed;z-index:99;min-width:200px;background:#0f1622;
         border:1px solid #1e293b;border-radius:8px;padding:4px;display:none;
@@ -83,6 +160,7 @@ _HTML = """<!doctype html>
       font:600 11px/1 system-ui;padding:4px 10px;border-radius:6px;cursor:pointer}
   .sh:hover{color:#cbd5e1;border-color:#334155}
   .sh.on{color:#34d399;border-color:#34d399;background:rgba(52,211,153,.08)}
+  __MESH_CSS__
 </style></head><body>
 <div id="bar"><span id="dot" class="dot"></span><b id="title">&#9000; Terminal</b>
   <button class="sh" data-sh="agent" title="LuckyD Code agent CLI">Agent</button>
@@ -91,6 +169,7 @@ _HTML = """<!doctype html>
   <button class="sh" data-sh="cmd" title="Plain cmd.exe console">CMD</button>
   <span id="status">connecting&hellip;</span>
   <span id="hint">Ctrl+Shift+C copy &middot; Ctrl+Shift+V paste &middot; right-click for menu</span></div>
+__MESH_DOCK__
 <div id="wrap"><div id="term"></div></div>
 <div id="menu">
   <div class="mi" data-a="copy">Copy <span>Ctrl+Shift+C</span></div>
@@ -105,13 +184,17 @@ _HTML = """<!doctype html>
 const WS_URL = "__WS_URL__";
 const WS_TOKEN = __WS_TOKEN__;
 let SHELL = "__SHELL__";
-const SHELL_LABELS = {agent: 'Agent', agent2: 'Agent 2', powershell: 'PowerShell', cmd: 'CMD'};
+const S_CORE = {agent:'Agent', agent2:'Agent 2', powershell:'PowerShell', cmd:'CMD'};
+const MESH_META = __MESH_META__;
+const SHELL_LABELS = Object.assign({}, S_CORE, MESH_META);
 const dot = document.getElementById('dot');
 const statusEl = document.getElementById('status');
 const titleEl = document.getElementById('title');
 function paintShell(){
   document.querySelectorAll('.sh').forEach(b =>
     b.classList.toggle('on', b.dataset.sh === SHELL));
+  document.querySelectorAll('.chip').forEach(c =>
+    c.classList.toggle('sel', c.dataset.sh === SHELL));
   const label = SHELL_LABELS[SHELL] || 'Agent';
   titleEl.innerHTML = '&#9000; Terminal — ' + label;
   document.title = 'Terminal — ' + label;
@@ -127,6 +210,21 @@ function switchShell(name){
 }
 document.querySelectorAll('.sh').forEach(b =>
   b.addEventListener('click', () => switchShell(b.dataset.sh)));
+// Agent Mesh chips: installed agents switch shells; missing ones explain how
+// to install instead of spawning a dead PTY.
+document.querySelectorAll('.chip').forEach(c =>
+  c.addEventListener('click', () => {
+    if (c.dataset.avail === 'true') { switchShell(c.dataset.sh); }
+    else flash((c.textContent.trim() || 'Agent') + ' is not installed — run: mesh install ' + c.dataset.sh.replace('mesh-',''));
+  }));
+const dock = document.getElementById('meshdock');
+if (dock) {
+  document.body.classList.add('has-mesh');
+  const setDockH = () => document.body.style.setProperty('--dockh', dock.offsetHeight + 'px');
+  setDockH();
+  if (typeof ResizeObserver !== 'undefined')
+    new ResizeObserver(() => { setDockH(); setTimeout(refit, 30); }).observe(dock);
+}
 paintShell();
 const term = new Terminal({
   cursorBlink: true, convertEol: false, fontSize: 14,

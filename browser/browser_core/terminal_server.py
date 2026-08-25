@@ -281,7 +281,57 @@ def _agent2_command(cli2_path: str = "") -> list[str]:
 # classic terminal); "agent2" is the standalone coding-agent checkout on the
 # Desktop (the second agent, launched by the LuckyD Code shortcut);
 # "powershell"/"cmd" are plain system shells for everyday commands.
-SHELLS = ("agent", "agent2", "powershell", "cmd")
+# The mesh-* entries expose the Agent Mesh CLIs (see ~/agent-mesh) as
+# first-class terminal shells — each spawns the real agent CLI on its own
+# ConPTY. Availability is probed with shutil.which() so agents that aren't
+# installed simply don't render in the terminal page's dock.
+SHELLS = (
+    "agent",
+    "agent2",
+    "powershell",
+    "cmd",
+    "mesh-claude",
+    "mesh-codex",
+    "mesh-copilot",
+    "mesh-qwen",
+    "mesh-opencode",
+    "mesh-cline",
+    "mesh-openclaw",
+    "mesh-dsh",
+    "mesh-pi",
+)
+
+# Agent Mesh shells: shell name -> executable resolved on PATH.
+MESH_SHELLS = {
+    "mesh-claude": "claude",
+    "mesh-codex": "codex",
+    "mesh-copilot": "copilot",
+    "mesh-qwen": "qwen",
+    "mesh-opencode": "opencode",
+    "mesh-cline": "cline",
+    "mesh-openclaw": "openclaw",
+    "mesh-dsh": "dsh",
+    "mesh-pi": "pi",
+}
+
+
+def mesh_shells_available() -> dict[str, bool]:
+    """Which Agent Mesh shells can actually spawn right now (exe on PATH)."""
+    import shutil
+
+    return {name: bool(shutil.which(exe)) for name, exe in MESH_SHELLS.items()}
+
+
+def _mesh_shell_command(shell: str) -> list[str]:
+    """Resolve a mesh-* shell to its absolute executable (allowlisted)."""
+    import shutil
+
+    exe = shutil.which(MESH_SHELLS[shell])
+    if not exe:
+        raise FileNotFoundError(
+            f"Agent Mesh shell '{shell}' is not installed (missing: {MESH_SHELLS[shell]})"
+        )
+    return [exe]
 
 
 def _shell_command(shell: str, cli_path: str = "", cli2_path: str = "") -> list[str]:
@@ -293,6 +343,8 @@ def _shell_command(shell: str, cli_path: str = "", cli2_path: str = "") -> list[
         return ["cmd.exe"]
     if shell == "agent2":
         return _agent2_command(cli2_path)
+    if shell in MESH_SHELLS:
+        return _mesh_shell_command(shell)
     return _cli_command(cli_path)
 
 
