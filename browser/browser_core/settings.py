@@ -109,9 +109,7 @@ class SettingsStore:
                 except Exception as exc:
                     # Preserve corrupt file for debugging instead of silently dropping.
                     with contextlib.suppress(Exception):
-                        corrupt = self._path.with_name(
-                            f"settings.corrupt.{int(time.time())}.json"
-                        )
+                        corrupt = self._path.with_name(f"settings.corrupt.{int(time.time())}.json")
                         self._path.replace(corrupt)
                     raise exc
                 if isinstance(loaded, dict):

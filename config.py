@@ -32,7 +32,9 @@ BASE_ENV_FILE = PROJECT_DIR / ".env"
 # The browser gives its two terminal agents distinct slots.  A slot-specific
 # overlay preserves each agent's live /model choice without changing the
 # other agent or the shared provider credentials in .env.
-_agent_slot = "".join(c for c in os.environ.get("LUCKYD_AGENT_SLOT", "") if c.isalnum() or c in "-_")
+_agent_slot = "".join(
+    c for c in os.environ.get("LUCKYD_AGENT_SLOT", "") if c.isalnum() or c in "-_"
+)
 ENV_FILE = PROJECT_DIR / f".luckyd-agent-{_agent_slot}.env" if _agent_slot else BASE_ENV_FILE
 
 # Runtime data lives under data/ so the repo root stays clean

@@ -440,7 +440,11 @@ def _persist_model_selection(provider: str, model: str) -> None:
         pending = set(values)
         rewritten = []
         for line in lines:
-            key = line.split("=", 1)[0].strip() if "=" in line and not line.lstrip().startswith("#") else ""
+            key = (
+                line.split("=", 1)[0].strip()
+                if "=" in line and not line.lstrip().startswith("#")
+                else ""
+            )
             if key in values:
                 rewritten.append(f"{key}={values[key]}")
                 pending.discard(key)

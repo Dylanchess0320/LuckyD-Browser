@@ -89,7 +89,9 @@ class AgentHandoffTool(ToolBase):
         },
     }
 
-    async def execute(self, role: str, task: str, model: str = "", base_url: str = "") -> ToolOutput:
+    async def execute(
+        self, role: str, task: str, model: str = "", base_url: str = ""
+    ) -> ToolOutput:
         agent_name = f"{role}-{uuid.uuid4().hex[:6]}"
         _register_agent(agent_name, role)
 

@@ -609,8 +609,7 @@ def step2() -> None:
 
     check(
         "harness mode honors saved setting",
-        win.ai_sidebar.harness_box.isChecked()
-        == bool(win.settings.get("harness_mode", True)),
+        win.ai_sidebar.harness_box.isChecked() == bool(win.settings.get("harness_mode", True)),
     )
     check(
         "harness supervisor wired",

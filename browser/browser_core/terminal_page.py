@@ -16,7 +16,6 @@ _WS_PORT = 9881  # must match browser_app's "terminal_port" default
 _SHELL_LABELS = {"agent": "Agent", "agent2": "Agent 2", "powershell": "PowerShell", "cmd": "CMD"}
 
 
-
 # Agent Mesh dock — the CLIs wired in via terminal_server.MESH_SHELLS, shown
 # as an agent picker in the terminal tab. (shell, label, emoji, accent, blurb)
 _MESH_AGENTS = {
@@ -84,7 +83,6 @@ def _mesh_dock_css() -> str:
         "box-shadow:0 0 12px color-mix(in srgb,var(--ac) 35%,transparent)}"
         ".chip.off{opacity:.42}.chip.off:hover{opacity:.75}"
     )
-
 
 
 def terminal_html(settings=None, shell: str = "agent") -> str:

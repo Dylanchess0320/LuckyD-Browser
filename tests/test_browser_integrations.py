@@ -107,9 +107,7 @@ def test_local_control_secrets_are_created_and_terminal_requires_one(tmp_path: P
 def test_agent_mesh_keeps_all_four_sessions_visible() -> None:
     page = mesh_html("mesh-test-token")
     assert page.count("<iframe") == 4
-    assert all(
-        f"shell={shell}" in page for shell in ("agent", "agent2", "powershell", "cmd")
-    )
+    assert all(f"shell={shell}" in page for shell in ("agent", "agent2", "powershell", "cmd"))
     assert 'const MESH_TOKEN = "mesh-test-token"' in page
 
 
@@ -118,13 +116,13 @@ def test_agent_workspace_uses_no_lightning_icon() -> None:
     source = (Path(__file__).parents[1] / "browser" / "browser_core" / "dashboard.py").read_text(
         encoding="utf-8"
     )
-    assert 'class=\'spin\'>⚡' not in source
+    assert "class='spin'>⚡" not in source
 
 
 def test_installer_removes_legacy_desktop_shortcut() -> None:
-    installer = (Path(__file__).parents[1] / "browser" / "installer" / "LuckyDBrowser.iss").read_text(
-        encoding="utf-8-sig"
-    )
+    installer = (
+        Path(__file__).parents[1] / "browser" / "installer" / "LuckyDBrowser.iss"
+    ).read_text(encoding="utf-8-sig")
     assert "{autodesktop}\\LuckyDBrowser.lnk" in installer
     assert "{userprograms}\\LuckyD Browser.lnk" in installer
     assert 'Name: "desktopicon"' in installer and "Flags: checkedonce" in installer

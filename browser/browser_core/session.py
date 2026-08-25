@@ -94,9 +94,7 @@ class SessionStore:
         except Exception:
             with contextlib.suppress(Exception):
                 if self._path.exists():
-                    corrupt = self._path.with_name(
-                        f"session.corrupt.{int(time.time())}.json"
-                    )
+                    corrupt = self._path.with_name(f"session.corrupt.{int(time.time())}.json")
                     self._path.replace(corrupt)
             return {}
         if not isinstance(data, dict) or data.get("version") != SESSION_VERSION:

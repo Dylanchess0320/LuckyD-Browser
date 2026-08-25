@@ -166,9 +166,7 @@ def make_handler(backend, token: str = "", harness=None, settings=None):
             # 127.0.0.1:9777 with a normal cross-origin fetch().
             if not token:
                 return True  # only true if a caller explicitly disabled it
-            return hmac.compare_digest(
-                self.headers.get("Authorization", ""), f"Bearer {token}"
-            )
+            return hmac.compare_digest(self.headers.get("Authorization", ""), f"Bearer {token}")
 
         def _host_ok(self) -> bool:
             """DNS rebinding defense: Host must be loopback if present."""

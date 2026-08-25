@@ -173,7 +173,13 @@ def asset_sha256(asset: dict) -> str:
     """Return GitHub's SHA-256 asset digest, or an empty string if absent."""
     digest = str(asset.get("digest") or "")
     algorithm, separator, value = digest.partition(":")
-    return value.lower() if separator and algorithm.lower() == "sha256" and re.fullmatch(r"[0-9a-f]{64}", value.lower()) else ""
+    return (
+        value.lower()
+        if separator
+        and algorithm.lower() == "sha256"
+        and re.fullmatch(r"[0-9a-f]{64}", value.lower())
+        else ""
+    )
 
 
 def _asset_reachable(url: str, timeout: float = 10.0) -> bool:

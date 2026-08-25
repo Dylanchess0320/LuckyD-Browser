@@ -484,7 +484,9 @@ class MainWindow(QMainWindow):
 
         tools_menu = mbar.addMenu("&Tools")
         self._add(tools_menu, "Coding Agent", self.open_hq, "Ctrl+Shift+H")
-        self._add(tools_menu, "Agent Mesh (4 parallel sessions)", self.open_agent_mesh, "Ctrl+Alt+M")
+        self._add(
+            tools_menu, "Agent Mesh (4 parallel sessions)", self.open_agent_mesh, "Ctrl+Alt+M"
+        )
         self._add(tools_menu, "Agent Terminal", lambda: self.open_terminal("agent"), "Ctrl+`")
         self._add(tools_menu, "Agent 2 Terminal", lambda: self.open_terminal("agent2"))
         self._add(
