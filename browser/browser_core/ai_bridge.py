@@ -422,9 +422,7 @@ class AIBridge:
             # Zen's live catalog mixes paid Claude/GPT/GLM tiers in with the
             # free ones — keep only $0 models: everything in the synced
             # catalog plus any future "-free" suffixed release.
-            models = [
-                m for m in models if m.endswith("-free") or m in _OPENCODE_FREE_CATALOG
-            ]
+            models = [m for m in models if m.endswith("-free") or m in _OPENCODE_FREE_CATALOG]
         if not models:
             if provider == "clinepass":
                 models = list(_CLINEPASS_CATALOG)

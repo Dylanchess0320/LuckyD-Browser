@@ -102,6 +102,7 @@ def current_version() -> str:
             CURRENT_VERSION = exe
     return CURRENT_VERSION
 
+
 # ── Configuration ────────────────────────────────────────────────────────────
 # The GitHub repository that hosts the browser's releases. This MUST be a public
 # repo (the updater runs unauthenticated on end-user machines). Point it at the
