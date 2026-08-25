@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.9] - 2026-08-25
+
+### Fixed
+- **Terminal completely broken (every shell)** — `browser_core/terminal_server.py:_spawn_pty()` passed the environment as a `dict` to `pywinpty.PTY.spawn()`, which expects a NUL-joined block string (`"k=v\0..."`). `cffi` raised `argument env: 'dict' object is not an instance of str` and the bridge replied `[terminal failed to start: ...]` on every WS connection, so Agent 1, Agent 2, PowerShell, CMD, and all nine Agent Mesh CLIs were dead. Now builds `env_block = "\0".join(f"{k}={v}" …) + "\0"` matching `winpty/ptyprocess.py`. Bumped `browser/__init__.py`, `version_info.txt`, `installer/LuckyDBrowser.iss` to 2.5.9.
+
 ## [3.2.0] - 2026-08-12
 
 ### Added

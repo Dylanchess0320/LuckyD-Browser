@@ -407,7 +407,13 @@ def _spawn_pty(
         env["LUCKYD_AGENT_SLOT"] = "1"
     elif shell == "agent2":
         env["LUCKYD_AGENT_SLOT"] = "2"
-    pty.spawn(appname, cmdline=cmdline, cwd=cwd, env=env)
+    # pywinpty's PTY.spawn() expects the environment as a NUL-joined block
+    # string ("name=value\0name=value\0…"), NOT a dict — passing a dict
+    # raises cffi's "argument env: 'dict' object is not an instance of str",
+    # which broke every terminal tab. Build the same block pywinpty's
+    # PtyProcess.spawn() produces (see winpty/ptyprocess.py).
+    env_block = "\0".join(f"{k}={v}" for k, v in env.items()) + "\0"
+    pty.spawn(appname, cmdline=cmdline, cwd=cwd, env=env_block)
     return pty
 
 
