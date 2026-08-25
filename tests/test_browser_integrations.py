@@ -4,9 +4,25 @@ from __future__ import annotations
 
 import asyncio
 import json
+import sys
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from unittest.mock import MagicMock
+
+# updater.py imports PySide6.QtCore at top-level (QThread/Signal) — not
+# installed on Linux CI. Mock before importing browser modules so collection
+# succeeds on all CI runners (ubuntu/windows). Real browser tests run with Qt.
+for _mod in (
+    "PySide6",
+    "PySide6.QtCore",
+    "PySide6.QtGui",
+    "PySide6.QtWidgets",
+    "PySide6.QtWebEngineCore",
+    "PySide6.QtWebEngineWidgets",
+):
+    if _mod not in sys.modules:
+        sys.modules[_mod] = MagicMock()
 
 import config
 import main
