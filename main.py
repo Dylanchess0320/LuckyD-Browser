@@ -135,26 +135,93 @@ _PROVIDER_ALIASES = {
 }
 
 
-def model_catalog() -> list[dict]:
+def _load_free_providers() -> dict:
+    """Load free model catalog from browser/models/providers_config.json."""
+    try:
+        path = Path(__file__).parent / "browser" / "models" / "providers_config.json"
+        data = json.loads(path.read_text(encoding="utf-8-sig"))
+        return data.get("ai_providers", {})
+    except Exception:
+        return {}
+
+
+def _is_free_provider_available(pid: str, pinfo: dict) -> bool:
+    """Check if a provider's free models would actually work (key present or local)."""
+    if pinfo.get("local"):
+        # Ollama is always considered available — runs locally, no key needed
+        return True
+    env_key = pinfo.get("env_key")
+    if not env_key:
+        return False
+    # For OpenCode/OpenRouter/etc, check if API key is set in current env
+    # or if .env has it (via config.load_env which already ran)
+    return bool(os.environ.get(env_key, "").strip())
+
+
+def model_catalog(free_only: bool = False) -> list[dict]:
     """Tiered model catalog for ui.show_models() and the web /api/models panel.
 
     Returns a list of sections, each with a cost ``tier`` ("free" | "paid"),
     a human ``label``, and ``groups`` of {provider, models}. Free covers local
-    Ollama + the Cline Usage rate-limited free tier; everything else is paid.
+    Ollama + all $0 models from browser/models/providers_config.json.
+
+    When ``free_only`` is True, returns only the free tier — filtered to
+    providers where the free models would actually work (API key present or
+    local). This powers ``/model free`` for v2.2.
     """
     cline_free = [m for m in _CLINE_USAGE_CATALOG if m in _CLINE_USAGE_FREE_TIER]
     cline_paid = [m for m in _CLINE_USAGE_CATALOG if m not in _CLINE_USAGE_FREE_TIER]
     clinepass_paid = list(_CLINEPASS_CATALOG)
-    return [
-        {
-            "tier": "free",
-            "label": "Free — $0",
-            "groups": [
-                {"provider": "Ollama", "models": ["codellama", "llama3.1", "mistral", "phi3"]},
-                {"provider": "OpenCode Zen (free)", "models": list(_OPENCODE_FREE_CATALOG)},
+
+    # Build free groups from providers_config.json (single source of truth for $0 models)
+    free_providers = _load_free_providers()
+    free_groups: list[dict] = []
+    if free_providers:
+        # Sort: available providers first, then alphabetically
+        def _sort_key(item: tuple[str, dict]) -> tuple[int, str]:
+            pid, pinfo = item
+            available = _is_free_provider_available(pid, pinfo)
+            return (0 if available else 1, pid)
+
+        for pid, pinfo in sorted(free_providers.items(), key=_sort_key):
+            models = pinfo.get("free_models", [])
+            if not models:
+                continue
+            # Only include free tier that is marked free_tier=true
+            if not pinfo.get("free_tier"):
+                continue
+            name = pinfo.get("name", pid)
+            # Mark availability in provider label for UI: "✓" if key present
+            available = _is_free_provider_available(pid, pinfo)
+            label = f"{name} ✓" if available else f"{name} (needs {pinfo.get('env_key','key')})"
+            # For free_only, skip providers where we'd need a missing key (except local)
+            if free_only and not available:
+                continue
+            free_groups.append({"provider": label, "models": models})
+        # Fallback to hardcoded if config gave no groups (should not happen)
+        if not free_groups:
+            free_groups = [
+                {"provider": "Ollama ✓", "models": ["codellama", "llama3.1", "mistral", "phi3"]},
+                {"provider": "OpenCode Zen (free) ✓", "models": list(_OPENCODE_FREE_CATALOG)},
                 {"provider": "Cline Usage (free tier)", "models": cline_free},
-            ],
-        },
+            ]
+    else:
+        free_groups = [
+            {"provider": "Ollama", "models": ["codellama", "llama3.1", "mistral", "phi3"]},
+            {"provider": "OpenCode Zen (free)", "models": list(_OPENCODE_FREE_CATALOG)},
+            {"provider": "Cline Usage (free tier)", "models": cline_free},
+        ]
+
+    free_section = {
+        "tier": "free",
+        "label": "Free — $0 ✓ = ready to use",
+        "groups": free_groups,
+    }
+    if free_only:
+        return [free_section]
+
+    return [
+        free_section,
         {
             "tier": "paid",
             "label": "Paid — costs money",
@@ -551,6 +618,12 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
         parts = cmd.split(maxsplit=1)
         if len(parts) > 1:
             raw = parts[1].strip()
+            # v2.2: "/model free" — show only free models that actually work (key present or local)
+            if raw.lower() in ("free", "--free", "free --check", "--free --check"):
+                ui.info("Free models that work (✓ = ready to use right now):")
+                ui.show_models(model_catalog(free_only=True))
+                ui.info("Tip: /model <id> to switch, e.g. /model nemotron-3-ultra-free")
+                return False
             # Parse "provider model_id" or just "model_id"
             provider = None
             desired = raw
@@ -584,6 +657,7 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
         else:
             ui.info(f"Model: {agent.model}")
             ui.show_models(model_catalog())
+            ui.info("Tip: /model free shows only free models that work right now")
 
     elif cmd == "refresh":
         invalidate_cache()

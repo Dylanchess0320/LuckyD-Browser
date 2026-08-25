@@ -139,6 +139,7 @@ SLASH_COMMANDS: list[tuple[str, str]] = [
     ("/tools", "List available tools"),
     ("/memory", "Show stored memories"),
     ("/model", "Show or switch model (free vs paid)"),
+    ("/model free", "Show only free models that work ✓"),
     ("/refresh", "Refresh model cache"),
     ("/save", "Save conversation to JSON"),
     ("/cost", "Show token usage and cost"),
