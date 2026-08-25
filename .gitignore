@@ -148,5 +148,11 @@ browser/installer/*.log.*
 browser/installer/iscc_log.txt
 *.lnk
 
+# ── Archive scratch (see archive/README.md) — safe to delete ───────────
+archive/$path
+archive/*snapshot*.json
+archive/*.txt
+!archive/README.md
+
 # ── Vendored third-party reference codebases ──────────────────────────
 external/
