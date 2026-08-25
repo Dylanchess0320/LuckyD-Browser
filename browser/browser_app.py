@@ -36,7 +36,10 @@ class BrowserApp:
         self.qapp.setApplicationDisplayName("LuckyD Browser")
         self.qapp.setOrganizationName("LuckyD")
 
-        icon_path = ASSETS_DIR / "icon.png"
+        # Use the multi-resolution ICO for title bars, taskbar, Alt+Tab and
+        # dialogs.  The old PNG is a mostly-transparent legacy mark and
+        # becomes invisible against light Windows title bars.
+        icon_path = ASSETS_DIR / "professional_icon.ico"
         if icon_path.exists():
             self.qapp.setWindowIcon(QIcon(str(icon_path)))
 
@@ -179,7 +182,8 @@ class BrowserApp:
             port = int(self.settings.get("terminal_port", 9881))
             cli = str(self.settings.get("terminal_cli", "") or "")
             cli2 = str(self.settings.get("terminal_cli2", "") or "")
-            server = TerminalServer(port=port, cli_path=cli, cli2_path=cli2)
+            token = str(self.settings.get("terminal_token", "") or "")
+            server = TerminalServer(port=port, cli_path=cli, cli2_path=cli2, token=token)
             if not server.start():
                 print("[browser] terminal bridge not started (pywinpty/websockets?)")
                 self.terminal_server = None

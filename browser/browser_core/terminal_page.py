@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import json
 from pathlib import Path
 
 # Vendored xterm assets: browser/browser_core/terminal_page.py → ../assets/terminal
@@ -24,13 +25,31 @@ def terminal_html(settings=None, shell: str = "agent") -> str:
     gets its own independent ConPTY session, so terminals multiply freely.
     """
     port = _WS_PORT
+    token = ""
     if settings is not None:
         with contextlib.suppress(TypeError, ValueError, AttributeError):
             port = int(settings.get("terminal_port", _WS_PORT) or _WS_PORT)
+        with contextlib.suppress(AttributeError):
+            token = str(settings.get("terminal_token", "") or "")
     shell = (shell or "agent").strip().lower()
     if shell not in _SHELL_LABELS:
         shell = "agent"
-    return _HTML.replace("__WS_URL__", f"ws://{_WS_HOST}:{port}").replace("__SHELL__", shell)
+    return (
+        _HTML.replace("__WS_URL__", f"ws://{_WS_HOST}:{port}")
+        .replace("__WS_TOKEN__", json.dumps(token))
+        .replace("__SHELL__", shell)
+    )
+
+
+def mesh_html(token: str = "") -> str:
+    """Four live, independent terminal sessions in one Agent Mesh workspace.
+
+    Each pane is the same authenticated terminal page used by a normal
+    terminal tab, so every session receives its own WebSocket and ConPTY.
+    Keeping the renderer in an iframe avoids a fragile second xterm bridge
+    and means the one-terminal and mesh experiences stay feature-identical.
+    """
+    return _MESH_HTML.replace("__MESH_TOKEN__", json.dumps(token))
 
 
 _HTML = """<!doctype html>
@@ -84,6 +103,7 @@ _HTML = """<!doctype html>
 <script src="/static/terminal/xterm-addon-fit.js"></script>
 <script>
 const WS_URL = "__WS_URL__";
+const WS_TOKEN = __WS_TOKEN__;
 let SHELL = "__SHELL__";
 const SHELL_LABELS = {agent: 'Agent', agent2: 'Agent 2', powershell: 'PowerShell', cmd: 'CMD'};
 const dot = document.getElementById('dot');
@@ -130,7 +150,8 @@ function connect(){
   setState('', 'connecting…');
   // Advertise our real dimensions so the bridge spawns the PTY at the right
   // size — a birth-size mismatch makes fullscreen CLIs wrap off-screen.
-  ws = new WebSocket(WS_URL + '?cols=' + term.cols + '&rows=' + term.rows + '&shell=' + SHELL);
+  ws = new WebSocket(WS_URL + '?token=' + encodeURIComponent(WS_TOKEN) +
+    '&cols=' + term.cols + '&rows=' + term.rows + '&shell=' + SHELL);
   ws.onopen = () => { retry = 0; setState('on', 'connected'); refit(); term.focus(); };
   ws.onmessage = (ev) => {
     if (typeof ev.data === 'string') term.write(ev.data);
@@ -233,4 +254,61 @@ document.addEventListener('keydown', ev => { if (ev.key === 'Escape') hideMenu()
 try { fit.fit(); } catch(e) {}
 connect();
 setTimeout(refit, 60);
+</script></body></html>"""
+
+
+_MESH_HTML = """<!doctype html>
+<html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Agent Mesh — LuckyD Browser</title>
+<style>
+  :root{color-scheme:dark}html,body{margin:0;height:100%;background:#070b12;color:#e2e8f0;
+    font:13px/1.35 system-ui,-apple-system,"Segoe UI",sans-serif;overflow:hidden}
+  header{height:54px;box-sizing:border-box;display:flex;align-items:center;gap:12px;padding:0 18px;
+    border-bottom:1px solid #243044;background:linear-gradient(110deg,#101927,#0b111d)}
+  h1{font-size:15px;margin:0;color:#f8fafc;letter-spacing:.01em}h1 span{color:#42d9ff}
+  .sub{color:#8492a8;font-size:12px}.key{margin-left:auto;color:#9fb4cb;font-size:11px}
+  main{height:calc(100% - 54px);box-sizing:border-box;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+    grid-template-rows:repeat(2,minmax(0,1fr));gap:8px;padding:8px}
+  section{min-width:0;min-height:0;border:1px solid #223047;border-radius:9px;overflow:hidden;background:#0b1019;
+    display:flex;flex-direction:column;box-shadow:0 8px 24px rgba(0,0,0,.2)}
+  .pane-head{height:31px;box-sizing:border-box;display:flex;align-items:center;gap:8px;padding:0 10px;
+    background:#111a29;border-bottom:1px solid #202d42;color:#d7e3f3;font-weight:650}
+  .dot{width:8px;height:8px;border-radius:50%;background:#34d399;box-shadow:0 0 10px rgba(52,211,153,.6)}
+  .role{color:#8190a8;font-weight:500;font-size:11px}.open{margin-left:auto;color:#72d9ff;text-decoration:none;
+    font-weight:600;font-size:11px}.open:hover{color:#e1f7ff;text-decoration:underline}
+  iframe{border:0;display:block;flex:1;min-height:0;width:100%;background:#0b0f16}
+  @media(max-width:760px){header{height:48px;padding:0 11px}.sub,.key{display:none}
+    main{height:calc(100% - 48px);grid-template-columns:1fr;grid-template-rows:repeat(4,minmax(220px,1fr));
+      overflow:auto}.pane-head{position:sticky;top:0;z-index:1}}
+</style></head><body>
+<header><h1><span>🕸</span> Agent Mesh</h1><span class="sub">Four independent sessions, one workspace</span>
+<span class="key" id="mesh-status">Loading harness status…</span></header>
+<main>
+  <section><div class="pane-head"><i class="dot"></i>Agent 1 <span class="role">primary coding agent</span>
+    <a class="open" href="/terminal?shell=agent" target="_blank" rel="noopener">Open tab ↗</a></div>
+    <iframe src="/terminal?shell=agent" title="Agent 1 terminal"></iframe></section>
+  <section><div class="pane-head"><i class="dot"></i>Agent 2 <span class="role">independent teammate</span>
+    <a class="open" href="/terminal?shell=agent2" target="_blank" rel="noopener">Open tab ↗</a></div>
+    <iframe src="/terminal?shell=agent2" title="Agent 2 terminal"></iframe></section>
+  <section><div class="pane-head"><i class="dot"></i>PowerShell <span class="role">system shell</span>
+    <a class="open" href="/terminal?shell=powershell" target="_blank" rel="noopener">Open tab ↗</a></div>
+    <iframe src="/terminal?shell=powershell" title="PowerShell terminal"></iframe></section>
+  <section><div class="pane-head"><i class="dot"></i>CMD <span class="role">system shell</span>
+    <a class="open" href="/terminal?shell=cmd" target="_blank" rel="noopener">Open tab ↗</a></div>
+    <iframe src="/terminal?shell=cmd" title="Command Prompt terminal"></iframe></section>
+</main><script>
+const MESH_TOKEN = __MESH_TOKEN__;
+async function refreshMeshStatus(){
+  const status = document.getElementById('mesh-status');
+  try {
+    const r = await fetch('/status', {headers: MESH_TOKEN ? {'Authorization': 'Bearer ' + MESH_TOKEN} : {}});
+    const s = await r.json();
+    const tools = Number(s.harness_tools || 0);
+    status.textContent = s.harness
+      ? 'Harness online · 4 sessions · ' + (tools || '…') + ' tools'
+      : (s.harness_starting ? 'Harness starting · 4 sessions ready' : 'Harness offline · terminals still available');
+  } catch (_) { status.textContent = '4 independent sessions'; }
+}
+refreshMeshStatus(); setInterval(refreshMeshStatus, 5000);
 </script></body></html>"""

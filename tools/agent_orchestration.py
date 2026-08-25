@@ -69,7 +69,7 @@ class AgentHandoffTool(ToolBase):
     """Hand off a subtask to a specialist role: researcher, coder, reviewer, tester."""
 
     name = "AgentHandoff"
-    description = "Hand off a subtask to a specialist agent. Use: researcher (web search, docs), coder (implement), reviewer (audit), tester (test). Chain: researcher → coder → reviewer."
+    description = "Hand off a subtask to a specialist agent. Use: researcher (web search, docs), coder (implement), reviewer (audit), tester (test). Chain: researcher → coder → reviewer. Optionally pin the specialist to a specific model (e.g. a different local Ollama model) via 'model'."
     aliases = ["Handoff", "DelegateTo"]
     timeout_sec = 600.0
     parameters = {
@@ -79,9 +79,17 @@ class AgentHandoffTool(ToolBase):
             "description": "The specialist role to hand off to",
         },
         "task": {"type": "string", "description": "The specific task for the specialist agent"},
+        "model": {
+            "type": "string",
+            "description": "Optional model override for this specialist (e.g. an Ollama model name like 'mistral' or 'phi3'). Defaults to the main agent's configured model.",
+        },
+        "base_url": {
+            "type": "string",
+            "description": "Optional API base URL override for this specialist (e.g. a different Ollama host). Defaults to the main agent's configured base_url.",
+        },
     }
 
-    async def execute(self, role: str, task: str) -> ToolOutput:
+    async def execute(self, role: str, task: str, model: str = "", base_url: str = "") -> ToolOutput:
         agent_name = f"{role}-{uuid.uuid4().hex[:6]}"
         _register_agent(agent_name, role)
 
@@ -91,8 +99,8 @@ class AgentHandoffTool(ToolBase):
         cfg = get_config()
         sub = CodingAgent(
             api_key=cfg["api_key"],
-            base_url=cfg["base_url"],
-            model=cfg["model"],
+            base_url=base_url.strip() or cfg["base_url"],
+            model=model.strip() or cfg["model"],
             temperature=cfg["temperature"],
             max_tokens=cfg["max_tokens"],
         )
@@ -146,6 +154,18 @@ class TeamCreateTool(ToolBase):
                         "type": "string",
                         "description": "Detailed task. Be specific — include files, functions, acceptance criteria.",
                     },
+                    "model": {
+                        "type": "string",
+                        "description": "Optional model override for this agent (e.g. a different local Ollama model per team member, like 'phi3' vs 'mistral'). Defaults to the main agent's configured model.",
+                    },
+                    "base_url": {
+                        "type": "string",
+                        "description": "Optional API base URL override for this agent (e.g. a different Ollama host). Defaults to the main agent's configured base_url.",
+                    },
+                    "max_turns": {
+                        "type": "integer",
+                        "description": "Optional max turns for this agent (default 10, capped at 20).",
+                    },
                 },
                 "required": ["name", "role", "task"],
             },
@@ -176,12 +196,14 @@ class TeamCreateTool(ToolBase):
             role = agent_def.get("role", "")
             task = agent_def.get("task", "")
             max_turns = min(agent_def.get("max_turns", 10), 20)
+            model = str(agent_def.get("model", "") or "").strip()
+            base_url = str(agent_def.get("base_url", "") or "").strip()
             _register_agent(name, role)
 
             sub = CodingAgent(
                 api_key=cfg["api_key"],
-                base_url=cfg["base_url"],
-                model=cfg["model"],
+                base_url=base_url or cfg["base_url"],
+                model=model or cfg["model"],
                 temperature=cfg["temperature"],
                 max_tokens=cfg["max_tokens"],
             )

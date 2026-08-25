@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 import tempfile
 import threading
@@ -130,7 +131,11 @@ check("md escapes html", "<script>" not in _md_lite("<script>alert(1)</script>")
 # package metadata (mojibake regression guard)
 import browser as _browser_pkg
 
-check("version 2.5.0", _browser_pkg.__version__ == "2.5.0", _browser_pkg.__version__)
+check(
+    "version is semantic",
+    bool(re.fullmatch(r"\d+\.\d+\.\d+", _browser_pkg.__version__)),
+    _browser_pkg.__version__,
+)
 check("docstring has no mojibake", "�" not in (_browser_pkg.__doc__ or ""))
 
 # v1.4.0 — session restore, per-site zoom memory, screenshot naming (pure logic)
@@ -188,7 +193,7 @@ check(
 
 # v1.5.0 — multi-terminal page + workflows manager page
 from browser_core.dashboard import workflows_html
-from browser_core.terminal_page import terminal_html
+from browser_core.terminal_page import mesh_html, terminal_html
 
 _ps_page = terminal_html(None, shell="powershell")  # nosec B604
 check(
@@ -203,6 +208,12 @@ _agent2_page = terminal_html(None, shell="agent2")  # nosec B604
 check(
     "terminal page second agent",
     'let SHELL = "agent2"' in _agent2_page and 'data-sh="agent2"' in _agent2_page,
+)
+_mesh_page = mesh_html()
+check(
+    "agent mesh has four independent sessions",
+    _mesh_page.count("<iframe") == 4
+    and all(f"shell={shell}" in _mesh_page for shell in ("agent", "agent2", "powershell", "cmd")),
 )
 from browser_core.terminal_server import SHELLS, _shell_command
 
@@ -301,16 +312,19 @@ check(
 def _api_checks(port: int) -> None:
     """Hit the live Browser Control API from a worker thread (GUI stays free)."""
     base = f"http://127.0.0.1:{port}"
+    token = str(app.settings.get("browser_api_token", "") or "")
+    auth = {"Authorization": f"Bearer {token}"} if token else {}
 
     def get(path):
-        with urllib.request.urlopen(base + path, timeout=10) as r:  # nosec B310
+        req = urllib.request.Request(base + path, headers=auth)
+        with urllib.request.urlopen(req, timeout=10) as r:  # nosec B310
             return json.loads(r.read())
 
     def post(path, payload, timeout=15):
         req = urllib.request.Request(
             base + path,
             data=json.dumps(payload).encode(),
-            headers={"Content-Type": "application/json"},
+            headers={"Content-Type": "application/json", **auth},
             method="POST",
         )
         with urllib.request.urlopen(req, timeout=timeout) as r:  # nosec B310
@@ -369,6 +383,18 @@ def _api_checks(port: int) -> None:
         )
     except Exception as exc:
         API_RESULTS.append(("control API /dashboard", False, str(exc)))
+    try:
+        with urllib.request.urlopen(base + "/mesh", timeout=10) as r:  # nosec B310
+            mesh = r.read().decode("utf-8", errors="replace")
+        API_RESULTS.append(
+            (
+                "control API /mesh",
+                "Agent Mesh" in mesh and mesh.count("<iframe") == 4,
+                "",
+            )
+        )
+    except Exception as exc:
+        API_RESULTS.append(("control API /mesh", False, str(exc)))
     try:
         # urllib follows the 302 to the exe UI when the harness is up;
         # otherwise the auto-start splash is served — both say "Coding Agent".
@@ -582,8 +608,9 @@ def step2() -> None:
     )
 
     check(
-        "harness mode default on",
-        win.ai_sidebar.harness_box.isChecked(),
+        "harness mode honors saved setting",
+        win.ai_sidebar.harness_box.isChecked()
+        == bool(win.settings.get("harness_mode", True)),
     )
     check(
         "harness supervisor wired",

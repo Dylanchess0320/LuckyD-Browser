@@ -92,7 +92,13 @@ res.json
 
 # Local-only artifacts (kept on disk, not in repo)
 luckyd-code.exe
+luckyd-cli.exe
 Switch-ClineAccount.bat
+
+# Per-agent overlay env files + local dev scratch (never commit — may hold keys)
+.luckyd-agent-*.env
+.verify_*.py
+RuffCheck.txt
 
 # LuckyD Browser runtime data + build artifacts
 browser/data/
@@ -107,9 +113,11 @@ browser/test_*.py
 selftest_out.txt
 selftest_err.txt
 *.spec
-# …but the browser's PyInstaller recipe IS source — it carries the curated
-# exclude list (py3.10.0 dis-bug workarounds) and bundle layout.
+# …but these PyInstaller recipes ARE source — they carry the curated exclude
+# lists (py3.10.0 dis-bug workarounds) and bundle layout.
 !browser/LuckyDBrowser.spec
+!main.spec
+!luckyd-code.spec
 browser/LuckyD-Launch/*.exe
 browser/installer/output/*.exe
 browser/installer/output/

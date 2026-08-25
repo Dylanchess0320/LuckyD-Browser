@@ -28,7 +28,12 @@ def _project_dir() -> Path:
 
 
 PROJECT_DIR = _project_dir()
-ENV_FILE = PROJECT_DIR / ".env"
+BASE_ENV_FILE = PROJECT_DIR / ".env"
+# The browser gives its two terminal agents distinct slots.  A slot-specific
+# overlay preserves each agent's live /model choice without changing the
+# other agent or the shared provider credentials in .env.
+_agent_slot = "".join(c for c in os.environ.get("LUCKYD_AGENT_SLOT", "") if c.isalnum() or c in "-_")
+ENV_FILE = PROJECT_DIR / f".luckyd-agent-{_agent_slot}.env" if _agent_slot else BASE_ENV_FILE
 
 # Runtime data lives under data/ so the repo root stays clean
 DATA_DIR = PROJECT_DIR / "data"
@@ -47,17 +52,18 @@ def load_env() -> None:
     """Load .env -- .env values override any stale pre-existing env vars.
     Uses utf-8-sig to safely strip a leading BOM.
     """
-    if not ENV_FILE.exists():
-        return
-    raw = ENV_FILE.read_text(encoding="utf-8-sig")
-    for line in raw.splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
+    # Shared credentials/config first, then this terminal agent's model
+    # overlay.  In a normal standalone CLI run both paths are the same.
+    for path in dict.fromkeys((BASE_ENV_FILE, ENV_FILE)):
+        if not path.exists():
             continue
-        key, _, val = line.partition("=")
-        key = key.strip()
-        val = val.strip().strip('"').strip("'")
-        os.environ[key] = val
+        raw = path.read_text(encoding="utf-8-sig")
+        for line in raw.splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, val = line.partition("=")
+            os.environ[key.strip()] = val.strip().strip('"').strip("'")
 
 
 load_env()

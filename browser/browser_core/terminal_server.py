@@ -1,8 +1,8 @@
 """In-browser terminal — WebSocket ↔ PTY bridge for the LuckyD Code CLI.
 
-Serves a real interactive ``luckyd-code`` terminal to a browser tab:
+Serves a real interactive ``luckyd-cli`` terminal to a browser tab:
 
-    [ xterm.js tab ] ──ws──▶ [ this bridge ] ──ConPTY──▶ [ luckyd-code CLI ]
+    [ xterm.js tab ] ──ws──▶ [ this bridge ] ──ConPTY──▶ [ luckyd-cli CLI ]
 
 The bridge runs a small ``websockets.sync.server`` in a daemon thread. Each
 connection spawns the CLI on a Windows ConPTY (via ``pywinpty``) so the
@@ -18,6 +18,7 @@ through the agent's shell tools, so it must never be exposed off-loopback.
 from __future__ import annotations
 
 import contextlib
+import hmac
 import json
 import os
 import subprocess
@@ -40,11 +41,20 @@ def _expand(path: str) -> Path:
 
 
 def _desktop_exe() -> Path | None:
-    """Locate ``luckyd-code.exe`` on the user's real Desktop.
+    """Locate the interactive ``luckyd-cli.exe`` on the user's real Desktop.
 
     Uses the Windows Known Folder API (CSIDL_DESKTOPDIRECTORY) so it works even
     when the Desktop is OneDrive-redirected (e.g. ``…\\OneDrive\\Desktop``),
     falling back to the common plain/OneDrive locations.
+
+    NOTE: looks for ``luckyd-cli.exe`` (built from ``main.py`` via
+    ``main.spec``), NOT ``luckyd-code.exe`` (built from ``web_server.py`` via
+    ``luckyd-code.spec``). The latter is a headless HTTP server with no stdin
+    loop -- spawning it on this ConPTY just prints a server banner and hangs
+    with no prompt to type into. Only luckyd-cli.exe is a real interactive
+    REPL (rich UI, /help, /tools, /model, and every registered tool
+    including the multi-agent "mesh" tools in tools/agent_orchestration.py
+    and tools/subagent_tool.py).
     """
     candidates: list[Path] = []
     try:  # canonical Desktop path, redirection-aware
@@ -53,17 +63,17 @@ def _desktop_exe() -> Path | None:
         buf = ctypes.create_unicode_buffer(260)
         # SHGetFolderPathW(hwnd, csidl=0x0010 DESKTOPDIRECTORY, token, flags, path)
         if ctypes.windll.shell32.SHGetFolderPathW(None, 0x0010, None, 0, buf) == 0 and buf.value:
-            candidates.append(Path(buf.value) / "luckyd-code.exe")
+            candidates.append(Path(buf.value) / "luckyd-cli.exe")
     except Exception:
         pass
     home = Path.home()
     one_drive = os.environ.get("ONEDRIVE", "").strip()  # Windows env names are case-insensitive
     candidates += [
-        home / "Desktop" / "luckyd-code.exe",
-        home / "OneDrive" / "Desktop" / "luckyd-code.exe",
+        home / "Desktop" / "luckyd-cli.exe",
+        home / "OneDrive" / "Desktop" / "luckyd-cli.exe",
     ]
     if one_drive:
-        candidates.append(Path(one_drive) / "Desktop" / "luckyd-code.exe")
+        candidates.append(Path(one_drive) / "Desktop" / "luckyd-cli.exe")
     for cand in candidates:
         if cand.exists():
             return cand
@@ -89,12 +99,22 @@ def _cli_command(cli_path: str = "") -> list[str]:
     Resolution order (first existing wins):
       1. ``cli_path`` argument — the browser's ``terminal_cli`` setting.
       2. ``LUCKYD_CLI`` env var (a ``.py`` runs under a real interpreter).
-      3. The standalone ``luckyd-code.exe`` on the user's Desktop (their build).
-      4. ``luckyd-code.exe`` at the repo root (dev build).
-      5. Live source: ``python main.py`` from the repo root — only when that
-         file actually exists. (In the frozen app neither the repo exe nor
-         ``main.py`` exists beside ``LuckyDBrowser.exe``, and the exe bundled
-         in ``_internal`` is the harness SERVER, not an interactive CLI.)
+      3. The standalone ``luckyd-cli.exe`` on the user's Desktop (their build).
+      4. ``luckyd-cli.exe`` at the repo root (dev build).
+      5. ``luckyd-cli.exe`` beside the frozen browser exe / its _internal
+         folder (packaged installer -- see LuckyDBrowser.spec's datas).
+      6. Live source: ``python main.py`` from the repo root — only when that
+         file actually exists AND a Python interpreter is on PATH (dev
+         checkouts only; a frozen install has neither).
+
+    ``luckyd-code.exe`` is deliberately never a candidate here: it is the
+    Harness HQ backend (built from ``web_server.py``) -- a headless HTTP
+    server with no stdin loop at all. Spawning it on this ConPTY just prints
+    a server banner and hangs with no prompt to type into. luckyd-cli.exe
+    (built from ``main.py`` via ``main.spec``) is the real interactive REPL:
+    rich UI, /help, /tools, /model, and every registered tool including the
+    multi-agent "mesh" tools (AgentHandoff, TeamCreate, SendMessage,
+    ReceiveMessage, ListAgents, SubAgent).
 
     Raises ``FileNotFoundError`` with remediation guidance when nothing is
     found — the bridge prints it in the terminal instead of spawning a
@@ -103,6 +123,19 @@ def _cli_command(cli_path: str = "") -> list[str]:
     override = cli_path.strip() or os.environ.get("LUCKYD_CLI", "").strip()
     if override:
         p = _expand(override)
+        if not p.is_file():
+            raise FileNotFoundError(f"terminal_cli does not exist: {p}")
+        # Pre-2.5.6 settings pointed here.  It is the HTTP harness, not a
+        # REPL; silently using the sibling CLI keeps existing installs usable.
+        if p.name.casefold() == "luckyd-code.exe":
+            interactive = p.with_name("luckyd-cli.exe")
+            if interactive.is_file():
+                p = interactive
+            else:
+                raise FileNotFoundError(
+                    f"terminal_cli points to {p.name}, the headless HQ server. "
+                    "Set it to luckyd-cli.exe or main.py instead."
+                )
         if p.suffix.lower() == ".py":
             interp = _python_for_scripts()
             if interp is None:
@@ -115,9 +148,18 @@ def _cli_command(cli_path: str = "") -> list[str]:
     desktop = _desktop_exe()
     if desktop is not None:
         return [str(desktop)]
-    repo_exe = _REPO_ROOT / "luckyd-code.exe"
+    repo_exe = _REPO_ROOT / "luckyd-cli.exe"
     if repo_exe.exists():
         return [str(repo_exe)]
+    if getattr(sys, "frozen", False):
+        # PyInstaller extracts to _internal/ beside the running exe.
+        base_dir = Path(sys.executable).resolve().parent
+        for cand in (
+            base_dir / "luckyd-cli.exe",
+            base_dir / "_internal" / "luckyd-cli.exe",
+        ):
+            if cand.exists():
+                return [str(cand)]
     live = _REPO_ROOT / "main.py"
     if live.exists():
         interp = _python_for_scripts()
@@ -125,8 +167,8 @@ def _cli_command(cli_path: str = "") -> list[str]:
             return [interp, str(live)]
     raise FileNotFoundError(
         "no LuckyD Code CLI found — set the browser's terminal_cli setting "
-        "(or the LUCKYD_CLI env var) to a luckyd-code.exe or main.py, "
-        "or put luckyd-code.exe back on the Desktop"
+        "(or the LUCKYD_CLI env var) to a luckyd-cli.exe or main.py, "
+        "or put luckyd-cli.exe back on the Desktop"
     )
 
 
@@ -277,6 +319,15 @@ def _client_options(ws) -> tuple[int, int, str]:
     return max(20, min(cols, 500)), max(5, min(rows, 200)), shell
 
 
+def _client_token(ws) -> str:
+    """Extract the browser-only WebSocket credential without logging it."""
+    try:
+        path = getattr(getattr(ws, "request", None), "path", "") or ""
+        return str(parse_qs(urlparse(path).query).get("token", [""])[0])
+    except (TypeError, ValueError, IndexError):
+        return ""
+
+
 def _spawn_pty(
     cli_path: str = "",
     shell: str = "agent",
@@ -299,7 +350,12 @@ def _spawn_pty(
         cwd = str(_agent2_cwd(cli2_path))
     else:
         cwd = str(Path.home())
-    pty.spawn(appname, cmdline=cmdline, cwd=cwd, env=None)
+    env = dict(os.environ)
+    if shell == "agent":
+        env["LUCKYD_AGENT_SLOT"] = "1"
+    elif shell == "agent2":
+        env["LUCKYD_AGENT_SLOT"] = "2"
+    pty.spawn(appname, cmdline=cmdline, cwd=cwd, env=env)
     return pty
 
 
@@ -312,11 +368,13 @@ class TerminalServer:
         port: int = DEFAULT_PORT,
         cli_path: str = "",
         cli2_path: str = "",
+        token: str = "",
     ):
         self.host = host
         self.port = int(port)
         self.cli_path = cli_path  # explicit CLI override (browser `terminal_cli` setting)
         self.cli2_path = cli2_path  # 2nd-agent override (browser `terminal_cli2` setting)
+        self._token = token
         self._server = None
         self._thread: threading.Thread | None = None
         self._clients: set = set()
@@ -326,8 +384,21 @@ class TerminalServer:
     def running(self) -> bool:
         return self._thread is not None and self._thread.is_alive()
 
+    def _authorized(self, ws) -> bool:
+        """Whether this client supplied this profile's terminal credential."""
+        return bool(self._token) and hmac.compare_digest(self._token, _client_token(ws))
+
     def _handle(self, ws) -> None:
         """Bridge one WebSocket connection to one fresh PTY."""
+        # A loopback port is reachable from every page open in the browser.
+        # Require the per-profile secret that only the locally served terminal
+        # page receives, before a WebSocket can create a shell with the user's
+        # permissions.  An empty server token is deliberately fail-closed so
+        # a direct TerminalServer use cannot accidentally expose a PTY.
+        if not self._authorized(ws):
+            with contextlib.suppress(Exception):
+                ws.close(code=1008, reason="terminal authentication required")
+            return
         try:
             cols, rows, shell = _client_options(ws)
             pty = _spawn_pty(

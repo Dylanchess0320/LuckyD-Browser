@@ -16,8 +16,17 @@ if (-not (Test-Path (Join-Path $src $exeName))) {
     throw "Build not found at $src - build the exe with PyInstaller first."
 }
 
+# Keep the Apps & features entry in sync with the actual signed/bundled EXE
+# rather than a stale literal in this developer-friendly installer.
+$appVersion = (Get-Item (Join-Path $src $exeName)).VersionInfo.ProductVersion
+if ([string]::IsNullOrWhiteSpace($appVersion)) { $appVersion = '2.5.7' }
+
 Write-Host "Installing $appName to $dest ..."
-if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
+# A running app can keep Qt WebEngine files open. Stop only LuckyD's own
+# process before replacing this explicitly scoped per-user install folder.
+Get-Process LuckyDBrowser -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Start-Sleep -Milliseconds 500
+if (Test-Path $dest) { Remove-Item -LiteralPath $dest -Recurse -Force }
 Copy-Item $src $dest -Recurse
 
 # --- Shortcuts ---
@@ -41,7 +50,7 @@ $regPath = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\LuckyDBrow
 $uninstallScript = Join-Path $dest 'uninstall.ps1'
 New-Item -Path $regPath -Force | Out-Null
 Set-ItemProperty $regPath 'DisplayName' $appName
-Set-ItemProperty $regPath 'DisplayVersion' '1.3.0'
+Set-ItemProperty $regPath 'DisplayVersion' $appVersion
 Set-ItemProperty $regPath 'Publisher' 'LuckyD'
 Set-ItemProperty $regPath 'InstallLocation' $dest
 Set-ItemProperty $regPath 'DisplayIcon' (Join-Path $dest $exeName)

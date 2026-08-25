@@ -142,9 +142,10 @@ _JS = r"""<script>
 const ENGINES = { google: 'https://www.google.com/search?q=', bing: 'https://www.bing.com/search?q=',
   ddg: 'https://duckduckgo.com/?q=', brave: 'https://search.brave.com/search?q=' };
 const APPS = [
-  ['⚡', 'Coding Agent', '/hq'],
+  ['⌘', 'Coding Agent', '/hq'],
   ['🤖', 'AI Assistant', 'luckyd://assistant'],
-  ['🖥️', 'Terminal', '/terminal'],
+  ['🕸️', 'Agent Mesh', '/mesh'],
+  ['🖥️', 'Agent Terminal', '/terminal'],
   ['🎬', 'Workflows', '/workflows'],
   ['📡', 'Network', '/network'],
   ['🔖', 'Bookmarks', 'luckyd://bookmarks'],
@@ -224,7 +225,8 @@ async function refreshStatus() {
     const r = await fetch('/status', { headers: DASH_TOKEN ? { 'Authorization': 'Bearer ' + DASH_TOKEN } : {} });
     const s = await r.json();
     if (s.harness) {
-      setPill('pill-harness', 'ok', 'coding agent online');
+      const tools = Number(s.harness_tools || 0);
+      setPill('pill-harness', 'ok', tools ? 'coding agent online · ' + tools + ' tools' : 'coding agent online');
     } else if (s.harness_starting) {
       setPill('pill-harness', 'warn', 'coding agent starting…');
     } else {
@@ -370,7 +372,7 @@ def hq_splash_html(harness_url: str, state: str, detail: str = "", settings=None
         refresh = ""
     else:
         body = (
-            "<div class='spin'>⚡</div><h2>Starting your coding agent…</h2>"
+            "<div class='spin'>⌘</div><h2>Starting your coding agent…</h2>"
             "<p class='dim'>This page opens automatically when it's ready.</p>"
         )
         refresh = "<meta http-equiv='refresh' content='3'>"

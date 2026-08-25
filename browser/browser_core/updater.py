@@ -27,8 +27,12 @@ Security notes
 
 from __future__ import annotations
 
+import contextlib
+import hashlib
+import html as _html
 import json
 import re
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -62,14 +66,19 @@ def _exe_file_version() -> str:
             return ""
         val = ctypes.c_void_p()
         vlen = ctypes.wintypes.UINT()
-        # \VarFileInfo\Translation -> primary language id
+        # \VarFileInfo\Translation is two 16-bit values: language and
+        # codepage.  Reading a single uint16 and shifting it (as older builds
+        # did) always produced codepage 1200, so valid version resources such
+        # as 0409/04B0 could not be read in frozen installs.
         if not ctypes.windll.version.VerQueryValueW(
             data, r"\VarFileInfo\Translation", ctypes.byref(val), ctypes.byref(vlen)
         ):
             return ""
-        lang = ctypes.cast(val, ctypes.POINTER(ctypes.c_uint16)).contents.value
-        codepage = (lang >> 16) or 1200
-        sub = f"\\StringFileInfo\\{lang & 0xFFFF:04x}{codepage:04x}\\FileVersion"
+        if vlen.value < 4:
+            return ""
+        translation = ctypes.cast(val, ctypes.POINTER(ctypes.c_uint16 * 2)).contents
+        lang, codepage = translation[0], translation[1]
+        sub = f"\\StringFileInfo\\{lang:04x}{codepage:04x}\\FileVersion"
         if not ctypes.windll.version.VerQueryValueW(
             data, sub, ctypes.byref(val), ctypes.byref(vlen)
         ):
@@ -110,9 +119,6 @@ def current_version() -> str:
 GITHUB_REPO = "Dylanchess0320/LuckyD-Browser"
 
 GITHUB_LATEST_API = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-# Substrings that identify the Windows installer asset in a release.
-INSTALLER_ASSET_HINTS = ("setup", ".exe")
-
 _USER_AGENT = f"LuckyDBrowser/{CURRENT_VERSION} (+https://luckycode.xyz)"
 _TIMEOUT = 12  # seconds for the metadata call
 
@@ -125,6 +131,7 @@ class ReleaseInfo:
     url: str  # human-readable release page (fallback / "open in tab")
     installer_url: str = ""  # direct .exe asset URL (may be empty)
     installer_size: int = 0  # bytes, if known
+    installer_sha256: str = ""  # GitHub asset digest, when published
     notes: str = ""  # release notes / changelog
     name: str = ""  # release title
 
@@ -141,6 +148,49 @@ def is_newer(candidate: str, current: str = CURRENT_VERSION) -> bool:
     # Pad to equal length so (1,4) < (1,4,1) compares correctly.
     n = max(len(c), len(cur))
     return c + (0,) * (n - len(c)) > cur + (0,) * (n - len(cur))
+
+
+def is_installer_asset(asset: dict, version: str = "") -> bool:
+    """Whether a GitHub release asset is a LuckyD Browser installer.
+
+    A release can also carry source zips, extension CRXs, checksums, or other
+    executables.  Selecting the first partially matching asset made the
+    updater download unrelated files when no installer was attached.
+    """
+    name = str(asset.get("name") or "").casefold()
+    if not (name.endswith(".exe") and "luckyd" in name and "browser" in name and "setup" in name):
+        return False
+    # The release script publishes this exact format.  Enforce it when a
+    # version is known so an accidentally attached previous installer can
+    # never be selected for a newer release.
+    if version:
+        normalized = re.escape(version.lstrip("vV").casefold())
+        return bool(re.fullmatch(rf"luckydbrowsersetup-v?{normalized}\.exe", name))
+    return True
+
+
+def asset_sha256(asset: dict) -> str:
+    """Return GitHub's SHA-256 asset digest, or an empty string if absent."""
+    digest = str(asset.get("digest") or "")
+    algorithm, separator, value = digest.partition(":")
+    return value.lower() if separator and algorithm.lower() == "sha256" and re.fullmatch(r"[0-9a-f]{64}", value.lower()) else ""
+
+
+def _asset_reachable(url: str, timeout: float = 10.0) -> bool:
+    """Cheap HEAD probe: does this download URL actually resolve?
+
+    Used by the Atom-feed fallback to validate an installer URL we derived
+    from the release-script's fixed naming instead of from the JSON API.
+    Returns False (never raises) for 404, TLS trouble, or a dead host.
+    """
+    try:
+        req = urllib.request.Request(url, method="HEAD", headers={"User-Agent": _USER_AGENT})
+        with urllib.request.urlopen(req, timeout=timeout) as resp:  # nosec B310
+            return resp.status == 200
+    except urllib.error.HTTPError:
+        return False
+    except Exception:
+        return False
 
 
 class GitHubReleasesSource:
@@ -168,18 +218,70 @@ class GitHubReleasesSource:
             notes=data.get("body") or "",
             name=data.get("name") or tag,
         )
-        # Pick the installer asset (first .exe whose name mentions "setup").
+        # Pick only the browser installer asset, never an arbitrary release
+        # executable or source archive.
         assets: list[dict] = data.get("assets") or []
-
-        def _score(a: dict) -> int:
-            name = (a.get("name") or "").lower()
-            return sum(h in name for h in INSTALLER_ASSET_HINTS)
-
-        installers = sorted(assets, key=_score, reverse=True)
+        installers = [asset for asset in assets if is_installer_asset(asset, info.version)]
         if installers:
             best = installers[0]
             info.installer_url = best.get("browser_download_url") or ""
             info.installer_size = int(best.get("size") or 0)
+            info.installer_sha256 = asset_sha256(best)
+        return info
+
+    def fetch_latest_atom(self) -> ReleaseInfo:
+        """Fetch the newest release via GitHub's Atom feed (rate-limit safe).
+
+        The JSON ``/releases/latest`` endpoint allows only 60 unauthenticated
+        requests/hour per IP, and a browser that auto-checks shortly after
+        every launch can trip that — at which point the updater surfaces
+        bare "HTTP 403" error codes. The public Atom feed serves fully
+        rendered HTML on the same host end-users already reach, so it is a
+        robust fallback that never counts against that API budget.
+
+        The feed reports the newest tag, release page, and notes but not the
+        attached asset binaries, so the installer URL is derived from the
+        release script's fixed naming (``LuckyDBrowserSetup-<version>.exe``)
+        and confirmed live with a cheap HEAD probe rather than assumed.
+        """
+        feed_url = f"https://github.com/{self.repo}/releases.atom"
+        req = urllib.request.Request(feed_url, headers={"User-Agent": _USER_AGENT})
+        with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:  # nosec B310
+            body = resp.read().decode("utf-8", "replace")
+
+        # The newest entry is the first <entry> block; others are historical.
+        m = re.search(r"<entry>(.*?)</entry>", body, re.S)
+        block = m.group(1) if m else body
+
+        def _field(tag: str) -> str:
+            mm = re.search(rf"<{tag}[^>]*>(.*?)</{tag}>", block, re.S)
+            return mm.group(1).strip() if mm else ""
+
+        tag_id = _field("id")  # e.g. tag:github.com,2025:Repository/123/v2.5.8
+        version = ""
+        mm = re.search(r"/v?(\d+(?:\.\d+){1,3})\s*$", tag_id)
+        if mm:
+            version = mm.group(1)
+        title = _field("title")
+        if not version:
+            mm = re.search(r"v?(\d+(?:\.\d+){1,3})", title)
+            version = mm.group(1) if mm else ""
+        href = re.search(r'<link[^>]*\shref="([^"]+)"', block)
+        release_url = href.group(1) if href else f"https://github.com/{self.repo}/releases/latest"
+        notes = _html.unescape(re.sub(r"<[^>]+>", "", _field("content"))).strip()
+        if not notes:
+            notes = _html.unescape(title)
+        name = title or (f"v{version}" if version else version or "latest")
+
+        info = ReleaseInfo(version=version, url=release_url, notes=notes, name=name)
+        if version:
+            repo_verified = version.lstrip("vV")
+            candidate = (
+                f"https://github.com/{self.repo}/releases/download/"
+                f"v{repo_verified}/LuckyDBrowserSetup-{repo_verified}.exe"
+            )
+            if _asset_reachable(candidate):
+                info.installer_url = candidate
         return info
 
 
@@ -204,18 +306,39 @@ class UpdateChecker(QThread):
         super().__init__(parent)
         self.source = source or GitHubReleasesSource()
 
+    def _atom_fallback(self) -> ReleaseInfo | None:
+        """Best-effort Atom feed check — not subject to the per-IP API limit."""
+        try:
+            return self.source.fetch_latest_atom()
+        except Exception:
+            return None
+
     def run(self) -> None:
+        reason = ""
+        info: ReleaseInfo | None = None
         try:
             info = self.source.fetch_latest()
         except urllib.error.HTTPError as exc:
             # 404 simply means the repo has no releases yet.
             if exc.code == 404:
                 self.up_to_date.emit()
+                return
+            # 403 / 429 = GitHub API rate limit. The Atom feed is not API
+            # rate-limited, so fall back to it instead of exposing a bare
+            # "HTTP 403" error code to the user.
+            if exc.code in (403, 429):
+                info = self._atom_fallback()
+                reason = f"HTTP {exc.code} (GitHub rate limit)"
             else:
-                self.failed.emit(f"HTTP {exc.code}")
-            return
+                reason = f"HTTP {exc.code}"
         except Exception as exc:  # offline, DNS, timeout, bad JSON …
-            self.failed.emit(str(exc))
+            # The JSON API may be blocked while github.com is reachable;
+            # give the Atom feed a chance regardless of failure type.
+            info = self._atom_fallback()
+            reason = str(exc)
+
+        if info is None:
+            self.failed.emit(reason or "network error, no fallback available")
             return
 
         if info.version and is_newer(info.version):
@@ -225,6 +348,7 @@ class UpdateChecker(QThread):
                     "url": info.url,
                     "installer_url": info.installer_url,
                     "installer_size": info.installer_size,
+                    "installer_sha256": info.installer_sha256,
                     "notes": info.notes,
                     "name": info.name,
                 }
@@ -246,16 +370,29 @@ class ReleaseDownloader(QThread):
     progress = Signal(int, int)
     finished_ok = Signal(str)
     failed = Signal(str)
+    cancelled = Signal()
 
-    def __init__(self, url: str, dest: Path, expected_size: int = 0, parent=None):
+    def __init__(
+        self,
+        url: str,
+        dest: Path,
+        expected_size: int = 0,
+        expected_sha256: str = "",
+        parent=None,
+    ):
         super().__init__(parent)
         self.url = url
         self.dest = Path(dest)
         self.expected_size = expected_size
+        self.expected_sha256 = expected_sha256.lower()
+
+    def cancel(self) -> None:
+        """Request cooperative cancellation rather than killing a live I/O thread."""
+        self.requestInterruption()
 
     def run(self) -> None:
         try:
-            if urllib.parse.urlparse(self.url).scheme.lower() not in ("http", "https"):
+            if urllib.parse.urlparse(self.url).scheme.lower() != "https":
                 raise ValueError(f"Unsupported download URL: {self.url!r}")
             req = urllib.request.Request(self.url, headers={"User-Agent": _USER_AGENT})
             self.dest.parent.mkdir(parents=True, exist_ok=True)
@@ -267,16 +404,51 @@ class ReleaseDownloader(QThread):
             ):
                 total = int(resp.headers.get("Content-Length") or self.expected_size or 0)
                 while True:
+                    if self.isInterruptionRequested():
+                        with contextlib.suppress(OSError):
+                            tmp.unlink()
+                        self.cancelled.emit()
+                        return
                     chunk = resp.read(1 << 16)  # 64 KiB
                     if not chunk:
                         break
                     fh.write(chunk)
                     received += len(chunk)
                     self.progress.emit(received, total)
-            if self.expected_size and received < self.expected_size:
-                self.failed.emit("Download incomplete")
-                return
-            tmp.replace(self.dest)
+            if self.expected_size and received != self.expected_size:
+                with contextlib.suppress(OSError):
+                    tmp.unlink()
+                raise RuntimeError("Downloaded update size did not match the release asset")
+            if self.expected_sha256:
+                digest = hashlib.sha256(tmp.read_bytes()).hexdigest()
+                if digest != self.expected_sha256:
+                    with contextlib.suppress(OSError):
+                        tmp.unlink()
+                    raise RuntimeError("Downloaded update SHA-256 did not match the release asset")
+            # Windows Defender (or another AV) often grabs a lock on a
+            # freshly-written .exe to scan it right as we try to rename it
+            # into place -- the rename loses that race with a transient
+            # WinError 5 (Access is denied). Retry with backoff instead of
+            # failing outright; build_installer.ps1 hits the identical class
+            # of locked-file problem and handles it the same way.
+            last_exc: Exception | None = None
+            for attempt in range(6):
+                if self.isInterruptionRequested():
+                    with contextlib.suppress(OSError):
+                        tmp.unlink()
+                    self.cancelled.emit()
+                    return
+                try:
+                    tmp.replace(self.dest)
+                    last_exc = None
+                    break
+                except OSError as exc:
+                    last_exc = exc
+                    time.sleep(0.5 * (attempt + 1))
+            if last_exc is not None:
+                with contextlib.suppress(Exception):
+                    tmp.unlink()
+                raise last_exc
             self.finished_ok.emit(str(self.dest))
         except Exception as exc:
             self.failed.emit(str(exc))

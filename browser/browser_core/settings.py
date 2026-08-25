@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import secrets
 import sys
 from pathlib import Path
 from urllib.parse import quote_plus
@@ -43,8 +44,8 @@ DEFAULTS = {
     # lets the luckyd-code.exe harness drive tabs; see browser/README.md).
     "browser_api_enabled": True,
     "browser_api_port": 9777,
-    # Auto-generated on first run if empty (see BrowserApp._ensure_token in
-    # browser_app.py) — binding to 127.0.0.1 does NOT make this safe to leave
+    # Auto-generated on first run by SettingsStore — binding to 127.0.0.1
+    # does NOT make this safe to leave
     # unauthenticated, since any page open in the browser itself can still
     # reach it with a normal cross-origin fetch(). Do not hand-set to "".
     "browser_api_token": "",
@@ -60,6 +61,10 @@ DEFAULTS = {
     # — required as a ?token= query param since the browser WebSocket API
     # can't set an Authorization header.
     "terminal_token": "",
+    # Full-agent mode is on for new profiles; users can still opt out in the
+    # sidebar, and that choice is persisted separately from auto-start.
+    "harness_mode": True,
+    "harness_autostart": True,
     # Auto-update: silently check for a newer release shortly after launch.
     "update_auto_check": True,
     # A version tag the user chose to skip (don't prompt for it again).
@@ -78,6 +83,8 @@ class SettingsStore:
         self._path = path
         self._data = dict(DEFAULTS)
         self.load()
+        if self._ensure_local_tokens():
+            self.save()
 
     def load(self) -> None:
         try:
@@ -88,8 +95,43 @@ class SettingsStore:
                 loaded = json.loads(self._path.read_text(encoding="utf-8-sig"))
                 if isinstance(loaded, dict):
                     self._data.update(loaded)
+                    if self._migrate_legacy_terminal_cli():
+                        self.save()
         except Exception:
             pass  # corrupted settings fall back to defaults
+
+    def _migrate_legacy_terminal_cli(self) -> bool:
+        """Repair the old terminal setting that targeted the HQ web server.
+
+        Older browser releases wrote ``luckyd-code.exe`` into ``terminal_cli``.
+        That executable runs ``web_server.py`` and has no interactive prompt,
+        so terminal tabs appeared to hang.  Replace it with the sibling
+        ``luckyd-cli.exe`` when available; otherwise clear it so normal
+        auto-discovery can select the packaged interactive CLI.
+        """
+        raw = str(self._data.get("terminal_cli", "") or "").strip()
+        if not raw or Path(raw).name.casefold() != "luckyd-code.exe":
+            return False
+        cli = Path(raw).with_name("luckyd-cli.exe")
+        self._data["terminal_cli"] = str(cli) if cli.is_file() else ""
+        return True
+
+    def _ensure_local_tokens(self) -> bool:
+        """Create secrets for localhost control surfaces on first run.
+
+        Loopback is not a trust boundary for browser features: an arbitrary
+        website can ask the user's browser to connect to a loopback port.
+        Both the tab-control HTTP API and the terminal's WebSocket-to-PTY
+        bridge therefore need unguessable, per-profile credentials.  The
+        values stay in the user's settings file and never need to be entered
+        manually.
+        """
+        changed = False
+        for key in ("browser_api_token", "terminal_token"):
+            if not str(self._data.get(key, "") or "").strip():
+                self._data[key] = secrets.token_urlsafe(32)
+                changed = True
+        return changed
 
     def save(self) -> None:
         try:

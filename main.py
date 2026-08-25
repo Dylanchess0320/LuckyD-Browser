@@ -43,6 +43,7 @@ _PROVIDER_DISPLAY_NAMES = {
     "ollama": "Ollama",
     "zai": "Z.ai",
     "openrouter": "OpenRouter",
+    "opencode": "OpenCode Zen",
     "clinepass": "ClinePass",
     "cline-usage": "Cline (usage)",
 }
@@ -92,6 +93,41 @@ _CLINE_USAGE_FREE_TIER = frozenset(_CLINE_USAGE_CATALOG[:6])
 # flat-subscription quota.
 _CLINEPASS_FREE_TIER = frozenset()
 
+# OpenCode Zen (opencode.ai) free catalog — every model on this gateway is
+# $0. Mirror of browser/browser_core/ai_bridge.py's _OPENCODE_FREE_CATALOG —
+# keep the two in sync.
+_OPENCODE_FREE_CATALOG = [
+    "big-pickle",
+    "deepseek-v4-flash-free",
+    "glm-4.7-free",
+    "glm-5-free",
+    "grok-code",
+    "hy3-free",
+    "hy3-preview-free",
+    "kimi-k2.5-free",
+    "laguna-s-2.1-free",
+    "ling-2.6-flash-free",
+    "ling-3.0-flash-free",
+    "ling-3.0-tiny-free",
+    "longcat-2.0-free",
+    "mimo-v2-flash-free",
+    "mimo-v2-omni-free",
+    "mimo-v2-pro-free",
+    "mimo-v2.5-free",
+    "minimax-m2.1-free",
+    "minimax-m2.5-free",
+    "minimax-m3-free",
+    "muse-spark-1.2-contributor-free",
+    "nemotron-3-super-free",
+    "nemotron-3-ultra-free",
+    "nemotron-3.5-lightning-free",
+    "north-mini-code-free",
+    "qwen3.6-plus-free",
+    "ring-2.6-1t-free",
+    "trinity-large-preview-free",
+    "x-preview-f-free",
+]
+
 # Aliases accepted in "/model <provider> <name>" on top of canonical names.
 _PROVIDER_ALIASES = {
     "cline-pass": "clinepass",
@@ -115,6 +151,7 @@ def model_catalog() -> list[dict]:
             "label": "Free — $0",
             "groups": [
                 {"provider": "Ollama", "models": ["codellama", "llama3.1", "mistral", "phi3"]},
+                {"provider": "OpenCode Zen (free)", "models": list(_OPENCODE_FREE_CATALOG)},
                 {"provider": "Cline Usage (free tier)", "models": cline_free},
             ],
         },
@@ -199,7 +236,7 @@ def _match_cline_model(desired: str) -> tuple[str, str] | None:
     print("  Pick from /model (no args), or force any model with:")
     print("    /model <provider> <name>   e.g. /model cline-usage openai/gpt-4o")
     print("  Providers: openai, anthropic, google, ollama, deepseek, zai,")
-    print("             openrouter, clinepass (subscription), cline-usage (free/credits)")
+    print("             openrouter, opencode, clinepass (subscription), cline-usage (free/credits)")
     return None
 
 
@@ -258,6 +295,7 @@ def _resolve_provider(provider_hint: str | None, model_name: str) -> dict:
         "ollama": (None, "OLLAMA_HOST", "OLLAMA_MODEL"),
         "zai": ("ZAI_API_KEY", "ZAI_BASE_URL", "ZAI_MODEL"),
         "openrouter": ("OPENROUTER_API_KEY", "OPENROUTER_BASE_URL", "OPENROUTER_MODEL"),
+        "opencode": ("OPENCODE_API_KEY", "OPENCODE_BASE_URL", "OPENCODE_MODEL"),
         "clinepass": ("CLINEPASS_API_KEY", "CLINEPASS_BASE_URL", "CLINEPASS_MODEL"),
         # Same gateway + auth as ClinePass; only the model env var differs.
         "cline-usage": ("CLINEPASS_API_KEY", "CLINEPASS_BASE_URL", "CLINE_USAGE_MODEL"),
@@ -292,11 +330,13 @@ def _resolve_provider(provider_hint: str | None, model_name: str) -> dict:
         _base_defaults = {
             "clinepass": "https://api.cline.bot/api/v1",
             "cline-usage": "https://api.cline.bot/api/v1",
+            "opencode": "https://opencode.ai/zen/v1",
         }
         base_url = os.environ.get(env_base, "") or _base_defaults.get(provider_hint, "")
         _model_defaults = {
             "clinepass": "cline-pass/kimi-k3",
             "cline-usage": "deepseek/deepseek-chat",
+            "opencode": "nemotron-3-ultra-free",
         }
         resolved_model = (
             model_name or os.environ.get(env_model, "") or _model_defaults.get(provider_hint, "")
@@ -365,7 +405,55 @@ def _switch_model(agent, provider: str | None = None, model_name: str = ""):
         provider=agent.provider_name,
         model=model,
     )
+    _persist_model_selection(provider, model)
     ui.success(f"Switched to {agent.provider_name} / {model}")
+
+
+def _persist_model_selection(provider: str, model: str) -> None:
+    """Persist an interactive ``/model`` switch for the next agent launch.
+
+    Each terminal agent runs ``main.py`` from its own checkout, so writing
+    that checkout's ``.env`` keeps Agent 1 and Agent 2 independent while the
+    newly selected model is already active in the current request loop.
+    """
+    from config import ENV_FILE
+
+    provider = str(provider or "").strip().lower()
+    model = str(model or "").strip()
+    env_key = {
+        "openai": "OPENAI_MODEL",
+        "anthropic": "ANTHROPIC_MODEL",
+        "google": "GOOGLE_MODEL",
+        "ollama": "OLLAMA_MODEL",
+        "deepseek": "CODING_AGENT_MODEL",
+        "zai": "ZAI_MODEL",
+        "openrouter": "OPENROUTER_MODEL",
+        "opencode": "OPENCODE_MODEL",
+        "clinepass": "CLINEPASS_MODEL",
+        "cline-usage": "CLINE_USAGE_MODEL",
+    }.get(provider)
+    if not env_key or not model:
+        return
+    try:
+        lines = ENV_FILE.read_text(encoding="utf-8-sig").splitlines() if ENV_FILE.exists() else []
+        values = {"CODING_AGENT_PROVIDER": provider, env_key: model}
+        pending = set(values)
+        rewritten = []
+        for line in lines:
+            key = line.split("=", 1)[0].strip() if "=" in line and not line.lstrip().startswith("#") else ""
+            if key in values:
+                rewritten.append(f"{key}={values[key]}")
+                pending.discard(key)
+            else:
+                rewritten.append(line)
+        if pending:
+            if rewritten and rewritten[-1].strip():
+                rewritten.append("")
+            rewritten.extend(f"{key}={values[key]}" for key in sorted(pending))
+        ENV_FILE.write_text("\n".join(rewritten) + "\n", encoding="utf-8")
+        os.environ.update(values)
+    except OSError as exc:
+        ui.warn(f"Model switched for this session, but could not save it: {exc}")
 
 
 # ── Slash commands ────────────────────────────────────────────────────
@@ -468,6 +556,7 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
                 "clinepass",
                 "cline",
                 "openrouter",
+                "opencode",
                 "anthropic",
                 "deepseek",
                 "openai",

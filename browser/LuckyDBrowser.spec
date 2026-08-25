@@ -1,6 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-from PyInstaller.utils.hooks import collect_all
+from PyInstaller.utils.hooks import collect_all, collect_submodules
 
 # pywinpty powers the in-browser terminal (browser_core.terminal_server does
 # a lazy "from winpty import PTY"), so modulegraph never sees it — collect the
@@ -9,6 +9,7 @@ from PyInstaller.utils.hooks import collect_all
 # beside it in _internal/winpty/. Without these the /terminal tab's WS->PTY
 # bridge dies on every connection with "terminal failed to start".
 wp_datas, wp_binaries, wp_hiddenimports = collect_all('winpty')
+ws_hiddenimports = collect_submodules('websockets')
 
 a = Analysis(
     ['main.py'],
@@ -40,6 +41,10 @@ a = Analysis(
            # relative to _internal (its __file__.parent.parent) in the frozen app.
            ('browser_core', 'browser/browser_core'),
            ('../luckyd-code.exe', '.'),
+           # The real interactive terminal CLI (main.py via main.spec) --
+           # distinct from luckyd-code.exe above (the headless HQ server).
+           # browser_core/terminal_server.py's "agent" shell spawns this one.
+           ('../luckyd-cli.exe', '.'),
            # Ship the clean template (never the dev .env — it holds real keys),
            # plus a ready-made _internal/.env so the bundled harness/terminal
            # exes default to free local Ollama on end-user machines.
@@ -52,7 +57,7 @@ a = Analysis(
     # websockets + winpty are imported lazily (CDP driver / screenshots /
     # terminal bridge) - pin them. assets/ ships recursively, including
     # assets/terminal/ (the vendored xterm.js page the /terminal tab needs).
-    hiddenimports=['websockets'] + wp_hiddenimports,
+    hiddenimports=ws_hiddenimports + wp_hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -86,7 +91,7 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     version='version_info.txt',
-    icon=['assets\\icon.ico'],
+    icon=['assets\\professional_icon.ico'],
 )
 coll = COLLECT(
     exe,

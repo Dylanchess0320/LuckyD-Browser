@@ -17,7 +17,7 @@ from browser_core.session import tab_record, window_record
 from browser_core.updater import ReleaseDownloader, UpdateChecker
 from browser_core.zoom import clamp_zoom, origin_key, remember, zoom_for
 from PySide6.QtCore import QSize, Qt, QTimer, QUrl, Signal
-from PySide6.QtGui import QAction, QGuiApplication, QImage, QKeySequence, QShortcut
+from PySide6.QtGui import QAction, QGuiApplication, QIcon, QImage, QKeySequence, QShortcut
 from PySide6.QtWebEngineCore import QWebEnginePage
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWidgets import (
@@ -69,6 +69,9 @@ class MainWindow(QMainWindow):
         self.settings = app.settings
         self.storage = app.storage
         self.incognito = incognito
+        app_icon = ASSETS_DIR / "professional_icon.ico"
+        if app_icon.exists():
+            self.setWindowIcon(QIcon(str(app_icon)))
 
         if incognito:
             # Off-the-record profile: cookies/cache vanish when window closes.
@@ -216,15 +219,15 @@ class MainWindow(QMainWindow):
         bar.addAction(self.ai_act)
 
         # ── Coding Agent ───────────────────────────────────────────────
-        hq_act = QAction("⚡", self)
+        hq_act = QAction("⌘", self)
         hq_act.setToolTip("Open the coding agent workspace (Ctrl+Shift+H)")
         hq_act.triggered.connect(self.open_hq)
         bar.addAction(hq_act)
 
-        term_act = QAction("🖥", self)
-        term_act.setToolTip("Open a live LuckyD Code terminal (Ctrl+`)")
-        term_act.triggered.connect(self.open_terminal)
-        bar.addAction(term_act)
+        mesh_act = QAction("🕸", self)
+        mesh_act.setToolTip("Open Agent Mesh — four parallel sessions (Ctrl+Alt+M)")
+        mesh_act.triggered.connect(self.open_agent_mesh)
+        bar.addAction(mesh_act)
 
         if self.incognito:
             incog_label = QLabel(" 🕶 Incognito", self)
@@ -481,6 +484,7 @@ class MainWindow(QMainWindow):
 
         tools_menu = mbar.addMenu("&Tools")
         self._add(tools_menu, "Coding Agent", self.open_hq, "Ctrl+Shift+H")
+        self._add(tools_menu, "Agent Mesh (4 parallel sessions)", self.open_agent_mesh, "Ctrl+Alt+M")
         self._add(tools_menu, "Agent Terminal", lambda: self.open_terminal("agent"), "Ctrl+`")
         self._add(tools_menu, "Agent 2 Terminal", lambda: self.open_terminal("agent2"))
         self._add(
@@ -661,6 +665,22 @@ class MainWindow(QMainWindow):
         else:
             self.toasts.show(
                 "Terminal needs the Browser Control API (Tools → Browser Control API)",
+                kind="error",
+            )
+
+    def open_agent_mesh(self) -> None:
+        """Open the first-class Agent Mesh workspace with four live sessions."""
+        term = getattr(self._app, "terminal_server", None)
+        if term is None or not term.running:
+            starter = getattr(self._app, "start_terminal_server", None)
+            if callable(starter):
+                starter()
+        server = getattr(self._app, "control_server", None)
+        if server is not None and server.running:
+            self.open_in_new_tab(QUrl(server.base_url + "/mesh"))
+        else:
+            self.toasts.show(
+                "Agent Mesh needs the Browser Control API (Tools → Browser Control API)",
                 kind="error",
             )
 
@@ -1493,6 +1513,7 @@ class MainWindow(QMainWindow):
         <tr><td><span class='kbd'>Ctrl+Shift+F</span></td><td>Focus mode (hide all chrome)</td></tr>
         <tr><td><span class='kbd'>Ctrl+Shift+A</span></td><td>AI assistant</td></tr>
         <tr><td><span class='kbd'>Ctrl+Shift+H</span></td><td>Coding agent</td></tr>
+        <tr><td><span class='kbd'>Ctrl+Alt+M</span></td><td>Agent Mesh (4 parallel sessions)</td></tr>
         <tr><td><span class='kbd'>Ctrl+`</span></td><td>Agent terminal</td></tr>
         <tr><td><span class='kbd'>Ctrl+Shift+`</span></td><td>PowerShell terminal</td></tr>
         <tr><td><span class='kbd'>Ctrl+K</span></td><td>Command palette</td></tr>
@@ -1529,6 +1550,7 @@ class MainWindow(QMainWindow):
 
         dlg = QDialog(self)
         dlg.setWindowTitle(f"About {APP_DISPLAY}")
+        dlg.setWindowIcon(self.windowIcon())
         lay = QVBoxLayout(dlg)
         text = QLabel(
             f"<h3>🍀 {APP_DISPLAY}</h3>"
@@ -1719,7 +1741,13 @@ class MainWindow(QMainWindow):
 
         version = str(info.get("version") or "latest")
         dest = Path(tempfile.gettempdir()) / f"{APP_DISPLAY}-update-{version}.exe"
-        dl = ReleaseDownloader(url, dest, int(info.get("installer_size") or 0), parent=self)
+        dl = ReleaseDownloader(
+            url,
+            dest,
+            int(info.get("installer_size") or 0),
+            str(info.get("installer_sha256") or ""),
+            parent=self,
+        )
         self._release_dl = dl
 
         def _on_progress(received: int, total: int) -> None:
@@ -1737,7 +1765,8 @@ class MainWindow(QMainWindow):
         dl.progress.connect(_on_progress)
         dl.finished_ok.connect(_on_done)
         dl.failed.connect(_on_error)
-        progress.canceled.connect(dl.terminate)
+        progress.canceled.connect(dl.cancel)
+        dl.cancelled.connect(progress.close)
         dl.start()
 
     def _apply_update(self, installer_path: str, version: str) -> None:

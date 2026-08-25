@@ -66,7 +66,7 @@ from browser_core.dashboard import (
 from browser_core.extract import build_messages, parse_json_loose
 from browser_core.netmon import NetMonitor, to_har
 from browser_core.scheduler import INTERVALS, ScheduleStore
-from browser_core.terminal_page import STATIC_DIR, terminal_html
+from browser_core.terminal_page import STATIC_DIR, mesh_html, terminal_html
 from browser_core.workflows import (
     INDEXED_ACTIONS,
     WorkflowRecorder,
@@ -94,6 +94,7 @@ _ROUTES = (
     ("GET  /help", "this route list"),
     ("GET  /dashboard", "live new-tab dashboard (HTML hub of the platform)"),
     ("GET  /hq", "coding agent workspace — opens the exe UI (auto-starts if needed)"),
+    ("GET  /mesh", "Agent Mesh — four parallel terminal sessions in one workspace"),
     ("GET  /terminal", "live LuckyD Code terminal in a tab (xterm.js + PTY)"),
     ("GET  /status", "browser state + harness/AI reachability"),
     ("GET  /tabs", "open tabs (index, url, title, active)"),
@@ -334,7 +335,7 @@ def make_handler(backend, token: str = "", harness=None, settings=None):
         # gated by _origin_ok() (direct navigation never sends a mismatched
         # Origin) and get the token injected into their own JS instead, the
         # same pattern web_server.py uses for its landing page.
-        _NAV_PATHS = ("/", "/help", "/dashboard", "/hq", "/terminal")
+        _NAV_PATHS = ("/", "/help", "/dashboard", "/hq", "/mesh", "/terminal")
 
         def do_GET(self):
             if not self._origin_ok():
@@ -355,6 +356,8 @@ def make_handler(backend, token: str = "", harness=None, settings=None):
                     return self._send_html(dashboard_html(settings, token))
                 if path == "/hq":
                     return self._hq(query)
+                if path == "/mesh":
+                    return self._send_html(mesh_html(token))
                 if path == "/terminal":
                     shell = (query.get("shell") or ["agent"])[0]
                     # B604 false positive: `shell` is an allowlisted terminal profile name.

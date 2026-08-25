@@ -17,10 +17,10 @@
 ; ???????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
 
 #define AppName      "LuckyD Browser"
-#define AppVersion   "2.5.5"
+#define AppVersion   "2.5.8"
 #define AppPublisher "LuckyD"
 #define AppExeName   "LuckyDBrowser.exe"
-#define AppURL       "https://github.com/luckyd/coding-agent"
+#define AppURL       "https://github.com/Dylanchess0320/LuckyD-Browser"
 
 [Setup]
 AppId={{A69ECBB6-BDCC-4A32-B71A-A4F13A1569B2}
@@ -31,11 +31,11 @@ AppPublisher={#AppPublisher}
 AppPublisherURL={#AppURL}
 AppSupportURL={#AppURL}
 AppUpdatesURL={#AppURL}
-VersionInfoVersion=2.5.5.0
+VersionInfoVersion=2.5.8.0
 VersionInfoCompany={#AppPublisher}
 VersionInfoDescription={#AppName} Setup
 VersionInfoProductName={#AppName}
-VersionInfoProductVersion=2.5.5.0
+VersionInfoProductVersion=2.5.8.0
 ; Per-user install ??? no admin rights required (admin users may opt into all-users).
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
@@ -46,8 +46,8 @@ MinVersion=10.0
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir=output
-OutputBaseFilename=LuckyDBrowserSetup-2.5.5
-SetupIconFile=..\assets\icon.ico
+OutputBaseFilename=LuckyDBrowserSetup-2.5.8
+SetupIconFile=..\assets\professional_icon.ico
 UninstallDisplayName={#AppName}
 UninstallDisplayIcon={app}\{#AppExeName}
 Compression=lzma2/ultra64
@@ -61,7 +61,7 @@ LicenseFile=..\..\LICENSE
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
-Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Additional shortcuts:"
+Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: checkedonce
 
 [Files]
 ; Everything PyInstaller produced ??? LuckyDBrowser.exe plus the _internal
@@ -70,6 +70,17 @@ Source: "..\dist\LuckyDBrowser\*"; DestDir: "{app}"; Flags: ignoreversion recurs
 ; Free local AI bootstrap ??? run post-install (see [Run]) so every user gets
 ; Ollama + a default model without lifting a finger.
 Source: "ollama_setup.ps1"; DestDir: "{app}"; Flags: ignoreversion
+
+[InstallDelete]
+; Pre-2.5.8 installers used this legacy filename.  Inno only updates a
+; shortcut whose name it owns, so it left the old link alongside the current
+; "LuckyD Browser.lnk" link on upgrades.
+Type: files; Name: "{autodesktop}\LuckyDBrowser.lnk"
+Type: files; Name: "{userprograms}\LuckyDBrowser\LuckyDBrowser.lnk"
+; An older build created the app link at the Start Menu root instead of in
+; the product group. Keep the group-owned shortcut below and remove this
+; stale duplicate during every upgrade.
+Type: files; Name: "{userprograms}\LuckyD Browser.lnk"
 
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Comment: "{#AppName} ??? Chromium-based AI browser by LuckyD"
@@ -98,9 +109,6 @@ begin
   KillRunningApp;
   Result := '';
 end;
-
-
-
 
 
 

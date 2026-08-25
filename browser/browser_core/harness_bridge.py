@@ -73,6 +73,46 @@ def _find_exe() -> Path | None:
     return None
 
 
+def _hq_token() -> str:
+    """Return the local HQ bearer token without ever exposing it to the UI.
+
+    ``web_server.py`` creates this file alongside the harness executable.  The
+    browser process is separate from that executable, so it must read the same
+    per-install token before calling protected ``/api/*`` endpoints.  Health
+    is intentionally public, which previously masked this missing-auth bug:
+    startup looked successful but every real agent request received HTTP 401.
+    """
+    override = os.environ.get("LUCKYD_HQ_TOKEN", "").strip()
+    if override:
+        return override
+
+    paths: list[Path] = []
+    executable = _find_exe()
+    if executable is not None:
+        paths.append(executable.parent / ".luckyd-code" / "hq_token")
+
+    # Source checkout fallback.  In a frozen browser this also resolves to
+    # ``_internal/.luckyd-code/hq_token``, where the bundled harness writes.
+    paths.append(Path(__file__).resolve().parent.parent.parent / ".luckyd-code" / "hq_token")
+    if getattr(sys, "frozen", False):
+        paths.append(
+            Path(sys.executable).resolve().parent / "_internal" / ".luckyd-code" / "hq_token"
+        )
+
+    seen: set[Path] = set()
+    for path in paths:
+        if path in seen:
+            continue
+        seen.add(path)
+        try:
+            token = path.read_text(encoding="utf-8").strip()
+        except OSError:
+            continue
+        if token:
+            return token
+    return ""
+
+
 class HarnessBridge:
     """Async client for the luckyd-code.exe harness server."""
 
@@ -151,7 +191,7 @@ class HarnessBridge:
     # ── low-level helpers ─────────────────────────────────────────────
     async def _get(self, path: str, timeout: float = 10.0):
         async with httpx.AsyncClient() as client:
-            r = await client.get(f"{self.base}{path}", timeout=timeout)
+            r = await client.get(f"{self.base}{path}", headers=self._headers(), timeout=timeout)
             r.raise_for_status()
             if "application/json" in r.headers.get("content-type", ""):
                 return r.json()
@@ -162,13 +202,19 @@ class HarnessBridge:
             r = await client.post(
                 f"{self.base}{path}",
                 json=body or {},
-                headers={"Content-Type": "application/json"},
+                headers={"Content-Type": "application/json", **self._headers()},
                 timeout=timeout,
             )
             r.raise_for_status()
             if "application/json" in r.headers.get("content-type", ""):
                 return r.json()
             return r.text
+
+    @staticmethod
+    def _headers() -> dict[str, str]:
+        """Authentication headers for protected harness routes."""
+        token = _hq_token()
+        return {"Authorization": f"Bearer {token}"} if token else {}
 
     # ── capabilities ──────────────────────────────────────────────────
     async def list_tools(self) -> list:
