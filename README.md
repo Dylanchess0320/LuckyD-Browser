@@ -23,6 +23,16 @@
 
 ---
 
+## 🎥 Showcase — Watch LuckyD in Action
+
+> **See LuckyD Browser in action — workflows, Agent Mesh, extraction & daily browsing in one window.**
+
+[![LuckyD Browser — Video Showcase](https://img.youtube.com/vi/La6bxaa7icY/maxresdefault.jpg)](https://www.youtube.com/watch?v=La6bxaa7icY)
+
+**[▶️ Watch on YouTube — https://www.youtube.com/watch?v=La6bxaa7icY](https://www.youtube.com/watch?v=La6bxaa7icY)**
+
+---
+
 ## Why LuckyD
 
 | | **LuckyD 2.5.10** | Comet / Dia | Edge + Copilot | Chrome + Gemini |
