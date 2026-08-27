@@ -4,7 +4,6 @@ __version__ = "3.6.0"
 
 # Shown once after an update (first launch with a new version).
 WHATS_NEW = (
-    "LuckyD v3.6.0 upgrade — unified LuckyD Code v3.6.0 with updated free AI model "
-    "catalogs across Browser, Terminal, AI Assistant & Coding Agent Workspace, "
-    "auto-fallback for free models, and hardened CI/CD pipeline."
+    "LuckyD v3.6.0 Upgrade — LuckyD Code v3.6 Nuitka Agent 1 + LuckyD Code 2.2 Agent 2, "
+    "hardened Auto Updater, verified 100% free high-performance AI models, and unified workspace."
 )

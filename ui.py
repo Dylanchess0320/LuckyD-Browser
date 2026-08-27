@@ -5,6 +5,7 @@ Terminal UI — clean LuckyD Code design with Rich or ANSI fallback.
 from __future__ import annotations
 
 import contextlib
+import os
 import platform
 import re
 import shutil
@@ -241,12 +242,15 @@ class TerminalUI:
         """Clean startup banner."""
         header = self._session_header()
         tip = "Type a task, or /help for commands"
+        agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v3.6.0").strip()
+        agent_name = os.environ.get("LUCKYD_AGENT_NAME", "").strip()
+        ver_label = f"{agent_version}" + (f" ({agent_name})" if agent_name else "")
 
         if self.rich:
             self._console.print()
             title = Text()
             title.append("  LuckyD Code", style=f"bold {BRAND['primary']}")
-            title.append("  v3.6.0", style=BRAND["muted"])
+            title.append(f"  {ver_label}", style=BRAND["muted"])
             self._console.print(title)
             if header:
                 self._console.print(f"  {self._dim(header)}")
@@ -255,7 +259,7 @@ class TerminalUI:
             self._console.print()
         else:
             print(
-                f"\n  {ANSI['bold']}{ANSI['cyan']}LuckyD Code{ANSI['reset']} {ANSI['dim']}v3.6.0{ANSI['reset']}"
+                f"\n  {ANSI['bold']}{ANSI['cyan']}LuckyD Code{ANSI['reset']} {ANSI['dim']}{ver_label}{ANSI['reset']}"
             )
             if header:
                 print(f"  {ANSI['dim']}{header}{ANSI['reset']}")

@@ -1104,7 +1104,9 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
             ui.warn("MCP not configured or no servers connected")
 
     elif cmd == "version":
-        ui.info("LuckyD Code 3.6.0")
+        agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v3.6.0")
+        agent_name = os.environ.get("LUCKYD_AGENT_NAME", "Agent 1")
+        ui.info(f"LuckyD Code {agent_version} ({agent_name})")
 
     elif cmd == "":
         pass  # Empty command
@@ -1492,25 +1494,40 @@ def main():
         elif args[i] == "--resume" and i + 1 < len(args):
             resume_session_id = args[i + 1]
             i += 2
+        elif args[i] == "--agent" and i + 1 < len(args):
+            slot = args[i + 1].strip()
+            if slot == "2":
+                os.environ["LUCKYD_AGENT_SLOT"] = "2"
+                os.environ["LUCKYD_AGENT_NAME"] = "Agent 2"
+                os.environ["LUCKYD_AGENT_VERSION"] = "v2.2.0"
+            else:
+                os.environ["LUCKYD_AGENT_SLOT"] = "1"
+                os.environ["LUCKYD_AGENT_NAME"] = "Agent 1"
+                os.environ["LUCKYD_AGENT_VERSION"] = "v3.6.0"
+            i += 2
         elif args[i] in ("-v", "--version"):
-            print("LuckyD Code 3.6.0")
+            agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v3.6.0")
+            agent_name = os.environ.get("LUCKYD_AGENT_NAME", "")
+            label = f"LuckyD Code {agent_version}" + (f" ({agent_name})" if agent_name else "")
+            print(label)
             sys.exit(0)
         elif args[i] == "--help":
             print(
                 """
-LuckyD Code — AI Coding Agent  v3.6.0
+LuckyD Code — AI Coding Agent
 
 Usage:
-  lucky-code                       Interactive REPL
+  lucky-code                       Interactive REPL (Agent 1 · v3.6.0)
+  lucky-code --agent 2             Interactive REPL (Agent 2 · v2.2.0)
   lucky-code "your query"          One-shot mode
   lucky-code -c                    Continue last session
   lucky-code --resume <id>         Resume specific session
 
 Options:
+  --agent 1|2        Select agent slot (1 = v3.6 Nuitka, 2 = v2.2)
   --model NAME       Model: auto (default), flash, pro, or specific name
-  --provider NAME    Set provider: deepseek, openai, anthropic, google,
-                     ollama, zai, openrouter
-  --thinking         Use the thinking/reasoning model (pro)
+  --provider NAME    Set provider: opencode, openrouter, deepseek, google, ollama, zai, groq
+  --thinking         Use the thinking/reasoning model
   --temp FLOAT       Temperature (default: 0.0)
   -y, --yes          Auto-approve all tool calls (non-interactive mode)
   --max-turns N      Override max agent turns (default: 30)

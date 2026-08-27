@@ -93,6 +93,7 @@ res.json
 # Local-only artifacts (kept on disk, not in repo)
 luckyd-code.exe
 luckyd-cli.exe
+luckyd-code-v3.6.exe
 Switch-ClineAccount.bat
 
 # Per-agent overlay env files + local dev scratch (never commit — may hold keys)

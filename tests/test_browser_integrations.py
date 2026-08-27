@@ -135,7 +135,7 @@ def test_agent_workspace_uses_no_lightning_icon() -> None:
     assert "class='spin'>⚡" not in source
 
 
-def test_antigravity_cli_integration() -> None:
+def test_antigravity_cli_integration(monkeypatch, tmp_path: Path) -> None:
     from browser.browser_core.terminal_page import _MESH_AGENTS, _SHELL_LABELS
     from browser.browser_core.terminal_server import SHELLS, _mesh_shell_command
 
@@ -143,6 +143,12 @@ def test_antigravity_cli_integration() -> None:
     assert "agy" in SHELLS
     assert "mesh-agy" in _MESH_AGENTS
     assert _SHELL_LABELS.get("mesh-agy") == "Antigravity"
+    mock_agy = tmp_path / "agy.exe"
+    mock_agy.touch()
+    monkeypatch.setattr(
+        "browser.browser_core.terminal_server._find_mesh_exe",
+        lambda exe: str(mock_agy) if exe == "agy" else None,
+    )
     cmd = _mesh_shell_command("mesh-agy")
     assert len(cmd) == 1 and cmd[0].lower().endswith("agy.exe")
 

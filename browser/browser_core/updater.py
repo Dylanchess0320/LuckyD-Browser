@@ -153,19 +153,17 @@ def is_newer(candidate: str, current: str = CURRENT_VERSION) -> bool:
 def is_installer_asset(asset: dict, version: str = "") -> bool:
     """Whether a GitHub release asset is a LuckyD Browser installer.
 
-    A release can also carry source zips, extension CRXs, checksums, or other
-    executables.  Selecting the first partially matching asset made the
-    updater download unrelated files when no installer was attached.
+    Matches LuckyDBrowserSetup*.exe or any LuckyD Browser setup executable.
     """
     name = str(asset.get("name") or "").casefold()
-    if not (name.endswith(".exe") and "luckyd" in name and "browser" in name and "setup" in name):
+    if not (name.endswith(".exe") and "luckyd" in name and ("browser" in name or "setup" in name)):
         return False
-    # The release script publishes this exact format.  Enforce it when a
-    # version is known so an accidentally attached previous installer can
-    # never be selected for a newer release.
     if version:
         normalized = re.escape(version.lstrip("vV").casefold())
-        return bool(re.fullmatch(rf"luckydbrowsersetup-v?{normalized}\.exe", name))
+        return bool(
+            re.search(rf"luckyd.*browser.*setup.*v?{normalized}\.exe", name)
+            or re.search(rf"luckydbrowsersetup-v?{normalized}\.exe", name)
+        )
     return True
 
 
@@ -228,6 +226,8 @@ class GitHubReleasesSource:
         # executable or source archive.
         assets: list[dict] = data.get("assets") or []
         installers = [asset for asset in assets if is_installer_asset(asset, info.version)]
+        if not installers:
+            installers = [asset for asset in assets if is_installer_asset(asset, "")]
         if installers:
             best = installers[0]
             info.installer_url = best.get("browser_download_url") or ""
@@ -282,12 +282,24 @@ class GitHubReleasesSource:
         info = ReleaseInfo(version=version, url=release_url, notes=notes, name=name)
         if version:
             repo_verified = version.lstrip("vV")
-            candidate = (
-                f"https://github.com/{self.repo}/releases/download/"
-                f"v{repo_verified}/LuckyDBrowserSetup-{repo_verified}.exe"
-            )
-            if _asset_reachable(candidate):
-                info.installer_url = candidate
+            candidates = [
+                (
+                    f"https://github.com/{self.repo}/releases/download/"
+                    f"v{repo_verified}/LuckyDBrowserSetup-{repo_verified}.exe"
+                ),
+                (
+                    f"https://github.com/{self.repo}/releases/download/"
+                    f"{repo_verified}/LuckyDBrowserSetup-{repo_verified}.exe"
+                ),
+                (
+                    f"https://github.com/{self.repo}/releases/download/"
+                    f"v{repo_verified}/LuckyDBrowserSetup.exe"
+                ),
+            ]
+            for cand in candidates:
+                if _asset_reachable(cand):
+                    info.installer_url = cand
+                    break
         return info
 
 
