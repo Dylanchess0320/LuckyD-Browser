@@ -124,7 +124,6 @@ _OPENCODE_FREE_CATALOG = [
     "minimax-m2.5-free",
     "minimax-m3-free",
     "muse-spark-1.2-contributor-free",
-    "nemotron-3-super-free",
     "nemotron-3-ultra-free",
     "nemotron-3.5-lightning-free",
     "north-mini-code-free",

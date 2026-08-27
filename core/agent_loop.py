@@ -664,7 +664,7 @@ class CodingAgent:
                 and assistant_msg.get("content", "").startswith("[API Error:")
                 and (self.model.endswith("-free") or getattr(self._provider_config, "provider", "") == "opencode")
             ):
-                _free_fallbacks = ["mimo-v2.5-free", "hy3-free", "laguna-s-2.1-free", "big-pickle"]
+                _free_fallbacks = ["nemotron-3-ultra-free", "hy3-free", "laguna-s-2.1-free", "nemotron-3.5-lightning-free", "deepseek-v4-flash-free", "mimo-v2.5-free", "muse-spark-1.2-contributor-free", "big-pickle"]
                 for _alt_model in _free_fallbacks:
                     if _alt_model == self.model:
                         continue

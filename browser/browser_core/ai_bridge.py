@@ -146,26 +146,21 @@ _CLINEPASS_CATALOG = [
 # sidebar picker complete when the live catalog request fails. All of these
 # are tool-capable unless noted; [V] marks vision-capable entries.
 _OPENCODE_ZEN_BASE = "https://opencode.ai/zen/v1"
-_OPENCODE_ZEN_DEFAULT = "mimo-v2.5-free"
-_FREE_TOP_ZEN = (
-    "mimo-v2.5-free",
-    "big-pickle",
-    "hy3-free",
-    "laguna-s-2.1-free",
-)
+_OPENCODE_ZEN_DEFAULT = "nemotron-3-ultra-free"
 _OPENCODE_FREE_CATALOG = [
-    "mimo-v2.5-free",  # [V]
-    "big-pickle",
+    "nemotron-3-ultra-free",
     "hy3-free",
     "laguna-s-2.1-free",
+    "nemotron-3.5-lightning-free",
     "deepseek-v4-flash-free",
+    "mimo-v2.5-free",  # [V]
+    "muse-spark-1.2-contributor-free",  # [V]
+    "big-pickle",
     "glm-4.7-free",
     "glm-5-free",
     "grok-code",  # [V]
-    "hy3-free",
     "hy3-preview-free",
     "kimi-k2.5-free",  # [V]
-    "laguna-s-2.1-free",
     "ling-2.6-flash-free",
     "ling-3.0-flash-free",
     "ling-3.0-tiny-free",
@@ -173,14 +168,9 @@ _OPENCODE_FREE_CATALOG = [
     "mimo-v2-flash-free",
     "mimo-v2-omni-free",  # [V]
     "mimo-v2-pro-free",  # [V]
-    "mimo-v2.5-free",  # [V]
     "minimax-m2.1-free",
     "minimax-m2.5-free",
     "minimax-m3-free",
-    "muse-spark-1.2-contributor-free",  # [V]
-    "nemotron-3-super-free",
-    "nemotron-3-ultra-free",
-    "nemotron-3.5-lightning-free",
     "north-mini-code-free",
     "qwen3.6-plus-free",  # [V]
     "ring-2.6-1t-free",
@@ -216,15 +206,18 @@ _OPENROUTER_FREE_FALLBACK = [
 # reasoning + vision). Free-tier Google/Groq/Cline are intentionally
 # EXCLUDED here because they rate-limit aggressively.
 _FREE_TOP_ZEN = [
-    "nemotron-3-ultra-free",  # flagship — 550B, best overall
-    "nemotron-3-super-free",
-    "kimi-k2.5-free",  # vision + long context
+    "nemotron-3-ultra-free",  # flagship — 550B, verified working
+    "hy3-free",  # fast, verified working
+    "laguna-s-2.1-free",  # verified live
+    "nemotron-3.5-lightning-free",
+    "deepseek-v4-flash-free",
     "mimo-v2.5-free",  # vision
-    "qwen3.6-plus-free",  # vision
     "muse-spark-1.2-contributor-free",  # vision
+    "big-pickle",
+    "kimi-k2.5-free",  # vision + long context
     "glm-4.7-free",
     "grok-code",  # vision, coder
-    "deepseek-v4-flash-free",
+    "qwen3.6-plus-free",  # vision
     "minimax-m3-free",
 ]
 _FREE_TOP_ZEN_SET = set(_FREE_TOP_ZEN)
@@ -473,15 +466,14 @@ class AIBridge:
                 models = []
         if self.is_opencode_zen(provider):
             # LuckyD: ONLY free TOP models (no rate limits) — clean picker
-            # and rotation members always visible. Live catalog is ignored
-            # beyond confirming the endpoint is reachable; the curated top
-            # set is authoritative until vetted.
+            # and rotation members always visible.
             if models:
-                # Confirm endpoint up — keep curated order, but push
-                # live-present models slightly ahead for fidelity
                 live_set = set(models)
-                models = sorted(list(_FREE_TOP_ZEN), key=lambda m: (0 if m in live_set else 1, _FREE_TOP_ZEN.index(m)))
-            # empty live (no network/auth) falls through to fallback below
+                live_top = [m for m in _FREE_TOP_ZEN if m in live_set]
+                extra_live = [m for m in models if m.endswith("-free") and m not in live_top]
+                models = (live_top + extra_live) if (live_top or extra_live) else list(_FREE_TOP_ZEN)
+            else:
+                models = list(_FREE_TOP_ZEN)
         if not models:
             if provider == "clinepass":
                 models = list(_CLINEPASS_CATALOG)
@@ -547,10 +539,8 @@ class AIBridge:
                             return text, name
                         except Exception as exc:
                             last_err = exc
-                            msg = str(exc)
-                            is_rate = "429" in msg or "rate" in msg.lower() or "quota" in msg.lower()
-                            if not is_rate:
-                                break  # non-rate error — try next provider pool entry
+                            # On any free-model failure (unsupported, rate limit, 500, timeout),
+                            # keep trying remaining free models in the pool
                             continue
                     # all top models for this Zen gateway failed — keep last_err and try next pool member
                     continue
@@ -596,22 +586,18 @@ class AIBridge:
                 except RuntimeError as exc:
                     last_err = exc
                     continue
-            # For explicit provider that is Zen, allow per-model rotation on 429 as well
+            # For explicit provider that is Zen, allow per-model rotation on any failure
             if provider is not None and self.is_opencode_zen(name):
-                for offset in range(len(_FREE_TOP_ZEN)):
-                    idx = (self._free_cursor + offset) % len(_FREE_TOP_ZEN)
-                    m = _FREE_TOP_ZEN[idx]
+                configured_m = info[0]
+                candidates = [configured_m] + [m for m in _FREE_TOP_ZEN if m != configured_m]
+                for m in candidates:
                     trial = (m, info[1], info[2], info[3])
                     try:
                         text = await self._call(name, trial, messages, on_token)
-                        self._free_cursor = (idx + 1) % len(_FREE_TOP_ZEN)
                         self._configs[name] = trial
                         return text, name
                     except Exception as exc:
                         last_err = exc
-                        msg = str(exc)
-                        if "429" not in msg and "rate" not in msg.lower():
-                            break
                         continue
                 continue
             try:
@@ -619,6 +605,17 @@ class AIBridge:
                 return text, name
             except Exception as exc:
                 last_err = exc
+                if self.is_opencode_zen(name):
+                    configured_m = info[0]
+                    for m in [alt for alt in _FREE_TOP_ZEN if alt != configured_m]:
+                        trial = (m, info[1], info[2], info[3])
+                        try:
+                            text = await self._call(name, trial, messages, on_token)
+                            self._configs[name] = trial
+                            return text, name
+                        except Exception as inner_exc:
+                            last_err = inner_exc
+                            continue
         if last_err is not None:
             raise RuntimeError(f"all providers failed — last error: {last_err}")
         raise RuntimeError(
