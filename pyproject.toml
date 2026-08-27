@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "luckyd-code"
-version = "2.2.0"
+version = "3.6.0"
 description = "AI-powered coding agent with multi-LLM support, memory graph, and VS Code integration"
 readme = "README.md"
 license = {text = "Proprietary"}

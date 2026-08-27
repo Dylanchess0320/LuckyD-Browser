@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.6.0] - 2026-08-27
+
+### Added
+- **LuckyD Code v3.6 & Browser Upgrade** — Unified v3.6.0 release across LuckyD Browser, LuckyD Code CLI, AI Sidebar Assistant, Terminal PTY server, and Coding Agent Workspace.
+- **Audited Free AI Models Catalog** — Curated zero-cost ($0) AI models across OpenCode Zen, OpenRouter :free, Ollama, Groq, Z.ai, and Google; pruned unsupported/deprecated free models (such as `nemotron-3-super-free`).
+- **Resilient Multi-Model Auto-Fallback** — Autonomous agent loop automatically detects free-tier rate limits or transient errors and hot-swaps to top-tier free fallback models (`nemotron-3-ultra-free`, `hy3-free`, `laguna-s-2.1-free`, `nemotron-3.5-lightning-free`, `deepseek-v4-flash-free`, `mimo-v2.5-free`, `muse-spark-1.2-contributor-free`, `big-pickle`).
+
+### Fixed
+- **CI/CD Quality & Formatting** — Fixed Black and Ruff linting/formatting issues across Python modules, tests, and CI workflows.
+
 ## [2.5.11] - 2026-08-27
 
 ### Added

@@ -246,7 +246,7 @@ class TerminalUI:
             self._console.print()
             title = Text()
             title.append("  LuckyD Code", style=f"bold {BRAND['primary']}")
-            title.append("  v2.2.0", style=BRAND["muted"])
+            title.append("  v3.6.0", style=BRAND["muted"])
             self._console.print(title)
             if header:
                 self._console.print(f"  {self._dim(header)}")
@@ -255,7 +255,7 @@ class TerminalUI:
             self._console.print()
         else:
             print(
-                f"\n  {ANSI['bold']}{ANSI['cyan']}LuckyD Code{ANSI['reset']} {ANSI['dim']}v2.2.0{ANSI['reset']}"
+                f"\n  {ANSI['bold']}{ANSI['cyan']}LuckyD Code{ANSI['reset']} {ANSI['dim']}v3.6.0{ANSI['reset']}"
             )
             if header:
                 print(f"  {ANSI['dim']}{header}{ANSI['reset']}")
@@ -692,8 +692,16 @@ class TerminalUI:
                         padding=(0, 1),
                         expand=False,
                     )
-                    table.add_column("#", justify="right", style=BRAND["muted"], no_wrap=True, width=4)
-                    table.add_column("Model", style=BRAND["primary"], no_wrap=False, overflow="fold", min_width=22)
+                    table.add_column(
+                        "#", justify="right", style=BRAND["muted"], no_wrap=True, width=4
+                    )
+                    table.add_column(
+                        "Model",
+                        style=BRAND["primary"],
+                        no_wrap=False,
+                        overflow="fold",
+                        min_width=22,
+                    )
                     table.add_column("Provider", style="white", no_wrap=True)
                     table.add_column("Status", justify="center", no_wrap=True, width=10)
 
@@ -715,7 +723,9 @@ class TerminalUI:
                         for m in group.get("models", []) or []:
                             n += 1
                             # Find global index for this model (first match)
-                            g_idx = next((k for k, v in flat.items() if v[1] == m and v[0] == pkey), n)
+                            g_idx = next(
+                                (k for k, v in flat.items() if v[1] == m and v[0] == pkey), n
+                            )
                             is_current = m.lower() == cur_norm
                             status = ""
                             status_style = BRAND["muted"]
@@ -731,8 +741,16 @@ class TerminalUI:
                             else:
                                 status = "—"
 
-                            num_txt = Text(str(g_idx), style=f"bold {BRAND['success']}" if is_current else BRAND["muted"])
-                            model_txt = Text(m, style=f"bold {BRAND['primary']}" if is_current else BRAND["primary"])
+                            num_txt = Text(
+                                str(g_idx),
+                                style=f"bold {BRAND['success']}" if is_current else BRAND["muted"],
+                            )
+                            model_txt = Text(
+                                m,
+                                style=(
+                                    f"bold {BRAND['primary']}" if is_current else BRAND["primary"]
+                                ),
+                            )
                             if is_current:
                                 model_txt.append("  ◀", style=BRAND["success"])
                             prov_txt = Text(prov_clean, style="white")
@@ -767,7 +785,9 @@ class TerminalUI:
                 pass
 
         # ── ANSI fallback ─────────────────────────────────────────────
-        print(f"\n  {ANSI['bold']}{ANSI['cyan']}Model Catalog{ANSI['reset']}  {ANSI['dim']}· free · $0 · fuzzy search{ANSI['reset']}")
+        print(
+            f"\n  {ANSI['bold']}{ANSI['cyan']}Model Catalog{ANSI['reset']}  {ANSI['dim']}· free · $0 · fuzzy search{ANSI['reset']}"
+        )
         if cur_norm:
             print(f"  {ANSI['dim']}active: {current_model}{ANSI['reset']}")
         for section in sections or []:
@@ -777,7 +797,9 @@ class TerminalUI:
             dot = "●" if tier == "free" else "○"
             print(f"\n  {c}{dot} {label}{ANSI['reset']}")
             print(f"  {ANSI['dim']}{'─'*56}{ANSI['reset']}")
-            print(f"  {ANSI['dim']} {'#':>3}  {'Model':<28} {'Provider':<18} {'Status'}{ANSI['reset']}")
+            print(
+                f"  {ANSI['dim']} {'#':>3}  {'Model':<28} {'Provider':<18} {'Status'}{ANSI['reset']}"
+            )
             print(f"  {ANSI['dim']} {'─'*3}  {'─'*28} {'─'*18} {'─'*8}{ANSI['reset']}")
             g = 0
             for group in section.get("groups", []) or []:
@@ -790,12 +812,26 @@ class TerminalUI:
                     g += 1
                     g_idx = next((k for k, v in flat.items() if v[1] == m), g)
                     is_cur = m.lower() == cur_norm
-                    status = "◀ active" if is_cur else ("✓ ready" if is_available else "needs key" if "needs" in prov_label.lower() else "—")
+                    status = (
+                        "◀ active"
+                        if is_cur
+                        else (
+                            "✓ ready"
+                            if is_available
+                            else "needs key" if "needs" in prov_label.lower() else "—"
+                        )
+                    )
                     sc = ANSI["green"] if is_cur or is_available else ANSI["dim"]
                     cur_mark = f" {ANSI['green']}◀{ANSI['reset']}" if is_cur else ""
-                    print(f"  {ANSI['dim']}{g_idx:>3}{ANSI['reset']}  {ANSI['cyan']}{m:<28}{ANSI['reset']} {prov_clean:<18} {sc}{status}{ANSI['reset']}{cur_mark}")
-        print(f"\n  {ANSI['dim']}Pick: {ANSI['reset']}{ANSI['cyan']}/model 12{ANSI['reset']} {ANSI['dim']}or {ANSI['reset']}{ANSI['cyan']}/model nemotron{ANSI['reset']} {ANSI['dim']}· fuzzy: kimi, qwen, spark, gpt{ANSI['reset']}")
-        print(f"  {ANSI['dim']}Tip: type part of the name — it knows what you want{ANSI['reset']}\n")
+                    print(
+                        f"  {ANSI['dim']}{g_idx:>3}{ANSI['reset']}  {ANSI['cyan']}{m:<28}{ANSI['reset']} {prov_clean:<18} {sc}{status}{ANSI['reset']}{cur_mark}"
+                    )
+        print(
+            f"\n  {ANSI['dim']}Pick: {ANSI['reset']}{ANSI['cyan']}/model 12{ANSI['reset']} {ANSI['dim']}or {ANSI['reset']}{ANSI['cyan']}/model nemotron{ANSI['reset']} {ANSI['dim']}· fuzzy: kimi, qwen, spark, gpt{ANSI['reset']}"
+        )
+        print(
+            f"  {ANSI['dim']}Tip: type part of the name — it knows what you want{ANSI['reset']}\n"
+        )
         return flat
 
     # ── Input prompt ───────────────────────────────────────────────
@@ -867,7 +903,12 @@ class TerminalUI:
             try:
                 from rich.prompt import Prompt
 
-                return Prompt.ask(f"[{BRAND['muted']}]{prompt}[/]", default=default, console=self._console, show_default=False)
+                return Prompt.ask(
+                    f"[{BRAND['muted']}]{prompt}[/]",
+                    default=default,
+                    console=self._console,
+                    show_default=False,
+                )
             except Exception:
                 pass
         try:
@@ -1083,7 +1124,12 @@ class WebUI:
         self._emit({"type": "tools", "tools": list(tools)})
 
     def show_models(
-        self, sections: list[dict], *, current_model: str = "", current_provider: str = "", numbered: bool = True
+        self,
+        sections: list[dict],
+        *,
+        current_model: str = "",
+        current_provider: str = "",
+        numbered: bool = True,
     ) -> None:
         """Send the tiered model catalog to the browser's models panel."""
         self._emit({"type": "models", "sections": sections})

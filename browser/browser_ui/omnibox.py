@@ -23,7 +23,9 @@ class Omnibox(QLineEdit):
         super().__init__(parent)
         self._settings = settings
         self._storage = storage
-        self.setPlaceholderText("Search Google or type a URL  •  ?ask AI about this page  •  Ctrl+K commands")
+        self.setPlaceholderText(
+            "Search Google or type a URL  •  ?ask AI about this page  •  Ctrl+K commands"
+        )
         self.setClearButtonEnabled(True)
 
         self._model = QStringListModel(self)

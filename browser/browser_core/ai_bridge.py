@@ -471,7 +471,9 @@ class AIBridge:
                 live_set = set(models)
                 live_top = [m for m in _FREE_TOP_ZEN if m in live_set]
                 extra_live = [m for m in models if m.endswith("-free") and m not in live_top]
-                models = (live_top + extra_live) if (live_top or extra_live) else list(_FREE_TOP_ZEN)
+                models = (
+                    (live_top + extra_live) if (live_top or extra_live) else list(_FREE_TOP_ZEN)
+                )
             else:
                 models = list(_FREE_TOP_ZEN)
         if not models:

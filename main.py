@@ -172,7 +172,7 @@ def model_catalog(free_only: bool = False) -> list[dict]:
 
     When ``free_only`` is True, returns only the free tier — filtered to
     providers where the free models would actually work (API key present or
-    local). This powers ``/model free`` for v2.2.
+    local). This powers ``/model free`` for v3.6.
     """
     cline_free = [m for m in _CLINE_USAGE_CATALOG if m in _CLINE_USAGE_FREE_TIER]
     cline_paid = [m for m in _CLINE_USAGE_CATALOG if m not in _CLINE_USAGE_FREE_TIER]
@@ -221,7 +221,13 @@ def model_catalog(free_only: bool = False) -> list[dict]:
             if free_only and not available:
                 # still keep models in seen_models so they don't reappear elsewhere
                 continue
-            free_groups.append({"provider": label, "models": deduped, "provider_key": pid if pid != "openai" else "opencode"})
+            free_groups.append(
+                {
+                    "provider": label,
+                    "models": deduped,
+                    "provider_key": pid if pid != "openai" else "opencode",
+                }
+            )
         # Fallback to hardcoded if config gave no groups (should not happen)
         if not free_groups:
             free_groups = [
@@ -333,6 +339,7 @@ def _match_cline_model(desired: str) -> tuple[str, str] | None:
 
 # ── Free-model fuzzy matching (opencode-style) ─────────────────────────
 
+
 def _free_entries() -> list[tuple[str, str]]:
     """Every free model that actually works: (provider, model_id).
 
@@ -402,7 +409,7 @@ def _fuzzy_score(query: str, model_id: str, provider: str) -> float:
         return 100.0
     # Provider-qualified exact like "opencode nemotron" -> boost
     if q.startswith(prov + " "):
-        rest = q[len(prov):].strip()
+        rest = q[len(prov) :].strip()
         if rest and rest in norm:
             return 92.0
 
@@ -418,7 +425,6 @@ def _fuzzy_score(query: str, model_id: str, provider: str) -> float:
 
     # Token containment
     q_tokens = q.split()
-    m_tokens = norm.split()
     if q_tokens and all(t in norm for t in q_tokens):
         # All tokens present — strong signal (e.g. "nemotron ultra")
         return 80.0 if len(q_tokens) > 1 else 76.0
@@ -490,7 +496,13 @@ def _resolve_free_query(query: str) -> tuple[str, str] | None:
         from rich.table import Table as _Table
 
         if ui.rich:
-            t = _Table(box=_box.ROUNDED, show_header=True, header_style="dim", border_style="dim", padding=(0, 1))
+            t = _Table(
+                box=_box.ROUNDED,
+                show_header=True,
+                header_style="dim",
+                border_style="dim",
+                padding=(0, 1),
+            )
             t.add_column("#", justify="right", style="dim", width=3)
             t.add_column("Model", style="cyan")
             t.add_column("Provider", style="white")
@@ -825,7 +837,7 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
         # "/model 12"           → pick by number from free catalog
         # "/model <provider> <name>" → direct provider switch
         # "/model <fuzzy>"      → fuzzy across all free models (e.g. nemotron, kimi, qwen, spark)
-        raw = cmd[len("model"):].strip()
+        raw = cmd[len("model") :].strip()
         low = raw.lower()
 
         def _current_provider_name() -> str:
@@ -882,7 +894,9 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
             # Built-in terminal picker — no separate bat file needed
             if sys.stdin.isatty():
                 try:
-                    choice = await asyncio.to_thread(ui.prompt_text, "Select model (number / name, Enter to cancel)")
+                    choice = await asyncio.to_thread(
+                        ui.prompt_text, "Select model (number / name, Enter to cancel)"
+                    )
                 except Exception:
                     choice = ""
                 choice = (choice or "").strip()
@@ -899,10 +913,24 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
                 # Text choice → try provider-prefixed first, then fuzzy
                 prov = None
                 des = choice
-                for p in ("cline-usage", "cline-pass", "clinepass", "cline", "openrouter", "opencode", "groq", "zai", "google", "ollama", "deepseek", "openai", "anthropic"):
+                for p in (
+                    "cline-usage",
+                    "cline-pass",
+                    "clinepass",
+                    "cline",
+                    "openrouter",
+                    "opencode",
+                    "groq",
+                    "zai",
+                    "google",
+                    "ollama",
+                    "deepseek",
+                    "openai",
+                    "anthropic",
+                ):
                     if choice.lower().startswith(p + " "):
                         prov = _PROVIDER_ALIASES.get(p, p)
-                        des = choice[len(p) + 1:].strip()
+                        des = choice[len(p) + 1 :].strip()
                         break
                 if prov:
                     _switch_model(agent, provider=prov, model_name=des)
@@ -918,7 +946,15 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
             return False
 
         # Explicit browse variants
-        if low in ("free", "--free", "free --check", "--free --check", "list", "free list", "list free"):
+        if low in (
+            "free",
+            "--free",
+            "free --check",
+            "--free --check",
+            "list",
+            "free list",
+            "list free",
+        ):
             sections = model_catalog(free_only=True)
             flat = ui.show_models(
                 sections,
@@ -927,7 +963,9 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
             )
             if sys.stdin.isatty():
                 try:
-                    choice = await asyncio.to_thread(ui.prompt_text, "Select model (number / name, Enter to cancel)")
+                    choice = await asyncio.to_thread(
+                        ui.prompt_text, "Select model (number / name, Enter to cancel)"
+                    )
                 except Exception:
                     choice = ""
                 choice = (choice or "").strip()
@@ -949,7 +987,9 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
                 current_model=getattr(agent, "model", "") or "",
                 current_provider=_current_provider_name(),
             )
-            ui.info("Tip: /model <name> fuzzy-switches free models · /model free for free-only picker")
+            ui.info(
+                "Tip: /model <name> fuzzy-switches free models · /model free for free-only picker"
+            )
             return False
 
         # Numeric pick without prior browse: "/model 12"
@@ -1064,7 +1104,7 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
             ui.warn("MCP not configured or no servers connected")
 
     elif cmd == "version":
-        ui.info("LuckyD Code 2.2.0")
+        ui.info("LuckyD Code 3.6.0")
 
     elif cmd == "":
         pass  # Empty command
@@ -1265,23 +1305,28 @@ def _cli_model(args):
         print("  lucky-code model list              — browse free catalog (interactive)")
         print("  lucky-code model all               — browse free + paid")
         print("  lucky-code model <n>               — pick by number (e.g. model 12)")
-        print("  lucky-code model <name>            — fuzzy (e.g. model nemotron, model kimi, model qwen)")
+        print(
+            "  lucky-code model <name>            — fuzzy (e.g. model nemotron, model kimi, model qwen)"
+        )
         print("  lucky-code model <provider> <name> — direct (e.g. model opencode grok-code)")
         print("\nTip: inside the terminal use /model — same fuzzy picker, no restart needed.")
         return
 
     low0 = " ".join(args).strip().lower()
     if low0 in ("list", "free", "--free", "free --check", "list free", "free list"):
-        ui.show_models(model_catalog(free_only=True), current_model=current, current_provider=cur_prov)
+        ui.show_models(
+            model_catalog(free_only=True), current_model=current, current_provider=cur_prov
+        )
         print("Switch: lucky-code model <name>  e.g. lucky-code model nemotron")
         return
     if low0 in ("all", "paid", "free all", "all free", "full"):
-        ui.show_models(model_catalog(free_only=False), current_model=current, current_provider=cur_prov)
+        ui.show_models(
+            model_catalog(free_only=False), current_model=current, current_provider=cur_prov
+        )
         return
 
     # ── Resolve the desired model ────────────────────────────────────
     raw_query = " ".join(args).strip()
-    desired = raw_query
 
     # Numeric pick: "12" from free catalog
     if raw_query.strip().isdigit():
@@ -1328,7 +1373,21 @@ def _cli_model(args):
         # Provider-prefixed direct switch
         provider = None
         picked = ""
-        for p in ("cline-usage", "cline-pass", "clinepass", "cline", "openrouter", "opencode", "groq", "zai", "google", "ollama", "deepseek", "openai", "anthropic"):
+        for p in (
+            "cline-usage",
+            "cline-pass",
+            "clinepass",
+            "cline",
+            "openrouter",
+            "opencode",
+            "groq",
+            "zai",
+            "google",
+            "ollama",
+            "deepseek",
+            "openai",
+            "anthropic",
+        ):
             if raw_query.lower().startswith(p + " "):
                 provider = _PROVIDER_ALIASES.get(p, p)
                 picked = raw_query[len(p) + 1 :].strip()
@@ -1434,12 +1493,12 @@ def main():
             resume_session_id = args[i + 1]
             i += 2
         elif args[i] in ("-v", "--version"):
-            print("LuckyD Code 2.2.0")
+            print("LuckyD Code 3.6.0")
             sys.exit(0)
         elif args[i] == "--help":
             print(
                 """
-LuckyD Code — AI Coding Agent  v2.2.0
+LuckyD Code — AI Coding Agent  v3.6.0
 
 Usage:
   lucky-code                       Interactive REPL

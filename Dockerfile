@@ -42,7 +42,7 @@ FROM python:3.11-slim AS runtime
 
 LABEL maintainer="LuckyD <dev@luckyd.ai>"
 LABEL description="LuckyD Code — AI-powered coding agent"
-LABEL version="2.2.0"
+LABEL version="3.6.0"
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

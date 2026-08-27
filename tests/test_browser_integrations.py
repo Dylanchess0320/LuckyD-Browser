@@ -136,8 +136,8 @@ def test_agent_workspace_uses_no_lightning_icon() -> None:
 
 
 def test_antigravity_cli_integration() -> None:
+    from browser.browser_core.terminal_page import _MESH_AGENTS, _SHELL_LABELS
     from browser.browser_core.terminal_server import SHELLS, _mesh_shell_command
-    from browser.browser_core.terminal_page import _SHELL_LABELS, _MESH_AGENTS
 
     assert "mesh-agy" in SHELLS
     assert "agy" in SHELLS

@@ -130,7 +130,9 @@ class MainWindow(QMainWindow):
     def _show_welcome_hint(self) -> None:
         """One friendly toast per session: shortcuts + free AI hint."""
         with contextlib.suppress(Exception):
-            self.toast("Tip: ? in address bar asks AI • Ctrl+K commands • Esc exits fullscreen", "info")
+            self.toast(
+                "Tip: ? in address bar asks AI • Ctrl+K commands • Esc exits fullscreen", "info"
+            )
 
     def _apply_theme(self) -> None:
         """Apply the current theme (called on startup and when theme changes)."""

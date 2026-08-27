@@ -493,9 +493,8 @@ class LLMClient:
         # Omit stream_options on free / non-standard OpenAI endpoints to prevent HTTP 400
         if stream and not (self.model.endswith("-free") or "free" in self.model.lower()):
             payload["stream_options"] = {"include_usage": True}
-        if (
-            ("pro" in self.model.lower() or "reasoner" in self.model.lower())
-            and not (self.model.endswith("-free") or "free" in self.model.lower())
+        if ("pro" in self.model.lower() or "reasoner" in self.model.lower()) and not (
+            self.model.endswith("-free") or "free" in self.model.lower()
         ):
             payload["thinking"] = {"type": "enabled"}
             payload["reasoning_effort"] = "high"

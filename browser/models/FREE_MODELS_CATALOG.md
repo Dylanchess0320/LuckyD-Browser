@@ -4,7 +4,7 @@ Synced from **opencode's open model registry** ([models.dev](https://models.dev)
 `free_models` below means **$0 per token** in that registry — verified, not guessed.
 Across all 88 providers in the registry there are 961 free models; the ones wired into LuckyD are listed here.
 
-## OpenCode Zen (opencode's own gateway) — 29 free
+## OpenCode Zen (opencode's own gateway) — 28 free
 
 - `big-pickle`
 - `deepseek-v4-flash-free`
@@ -27,7 +27,6 @@ Across all 88 providers in the registry there are 961 free models; the ones wire
 - `minimax-m2.5-free`
 - `minimax-m3-free`
 - `muse-spark-1.2-contributor-free`
-- `nemotron-3-super-free`
 - `nemotron-3-ultra-free`
 - `nemotron-3.5-lightning-free`
 - `north-mini-code-free`

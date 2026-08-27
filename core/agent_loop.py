@@ -662,13 +662,27 @@ class CodingAgent:
             if (
                 isinstance(assistant_msg, dict)
                 and assistant_msg.get("content", "").startswith("[API Error:")
-                and (self.model.endswith("-free") or getattr(self._provider_config, "provider", "") == "opencode")
+                and (
+                    self.model.endswith("-free")
+                    or getattr(self._provider_config, "provider", "") == "opencode"
+                )
             ):
-                _free_fallbacks = ["nemotron-3-ultra-free", "hy3-free", "laguna-s-2.1-free", "nemotron-3.5-lightning-free", "deepseek-v4-flash-free", "mimo-v2.5-free", "muse-spark-1.2-contributor-free", "big-pickle"]
+                _free_fallbacks = [
+                    "nemotron-3-ultra-free",
+                    "hy3-free",
+                    "laguna-s-2.1-free",
+                    "nemotron-3.5-lightning-free",
+                    "deepseek-v4-flash-free",
+                    "mimo-v2.5-free",
+                    "muse-spark-1.2-contributor-free",
+                    "big-pickle",
+                ]
                 for _alt_model in _free_fallbacks:
                     if _alt_model == self.model:
                         continue
-                    print(f"\n  [AUTO-FALLBACK] Free model '{self.model}' unavailable; switching to '{_alt_model}'...")
+                    print(
+                        f"\n  [AUTO-FALLBACK] Free model '{self.model}' unavailable; switching to '{_alt_model}'..."
+                    )
                     self.model = _alt_model
                     self.llm_client.model = _alt_model
                     try:
