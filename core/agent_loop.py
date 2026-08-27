@@ -185,7 +185,9 @@ class CodingAgent:
             "google": "Google",
             "ollama": "Ollama",
             "zai": "Z.ai",
+            "groq": "Groq",
             "openrouter": "OpenRouter",
+            "opencode": "OpenCode Zen",
             "clinepass": "ClinePass",
             "cline-usage": "Cline (usage)",
         }
@@ -655,6 +657,33 @@ class CodingAgent:
                     self._emit_event(AgentEventType.ERROR, {"error": "API failed after 3 retries"})
                     return final_text or "[ERR] API connection failed after 3 retries."
                 continue
+
+            # If the response returned an API error on a free-tier model, attempt transparent fallback
+            if (
+                isinstance(assistant_msg, dict)
+                and assistant_msg.get("content", "").startswith("[API Error:")
+                and (self.model.endswith("-free") or getattr(self._provider_config, "provider", "") == "opencode")
+            ):
+                _free_fallbacks = ["mimo-v2.5-free", "hy3-free", "laguna-s-2.1-free", "big-pickle"]
+                for _alt_model in _free_fallbacks:
+                    if _alt_model == self.model:
+                        continue
+                    print(f"\n  [AUTO-FALLBACK] Free model '{self.model}' unavailable; switching to '{_alt_model}'...")
+                    self.model = _alt_model
+                    self.llm_client.model = _alt_model
+                    try:
+                        _alt_msg = await self.llm_client.chat_stream(
+                            messages=modified_messages,
+                            tools=tools,
+                            stream_callback=self.callbacks.stream_token,
+                            think_callback=self.callbacks.stream_think_token,
+                        )
+                        if _alt_msg and not _alt_msg.get("content", "").startswith("[API Error:"):
+                            print(f"  [AUTO-FALLBACK] Succeeded on '{_alt_model}'")
+                            assistant_msg = _alt_msg
+                            break
+                    except Exception:
+                        continue
 
             consecutive_errors = 0
             for hook in self.hooks.after_model:

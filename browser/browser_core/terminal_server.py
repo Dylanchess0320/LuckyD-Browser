@@ -290,6 +290,8 @@ SHELLS = (
     "agent2",
     "powershell",
     "cmd",
+    "mesh-agy",
+    "mesh-antigravity",
     "mesh-claude",
     "mesh-codex",
     "mesh-copilot",
@@ -299,10 +301,16 @@ SHELLS = (
     "mesh-openclaw",
     "mesh-dsh",
     "mesh-pi",
+    "agy",
+    "antigravity",
 )
 
 # Agent Mesh shells: shell name -> executable resolved on PATH.
 MESH_SHELLS = {
+    "mesh-agy": "agy",
+    "mesh-antigravity": "agy",
+    "agy": "agy",
+    "antigravity": "agy",
     "mesh-claude": "claude",
     "mesh-codex": "codex",
     "mesh-copilot": "copilot",
@@ -315,21 +323,36 @@ MESH_SHELLS = {
 }
 
 
-def mesh_shells_available() -> dict[str, bool]:
-    """Which Agent Mesh shells can actually spawn right now (exe on PATH)."""
+def _find_mesh_exe(exe_name: str) -> str | None:
+    """Find an agent CLI executable on PATH or in standard user locations."""
     import shutil
 
-    return {name: bool(shutil.which(exe)) for name, exe in MESH_SHELLS.items()}
+    found = shutil.which(exe_name)
+    if found:
+        return found
+    if exe_name in ("agy", "antigravity"):
+        for cand in (
+            Path.home() / "AppData" / "Local" / "agy" / "bin" / f"{exe_name}.exe",
+            Path.home() / "AppData" / "Local" / "agy" / "bin" / "agy.exe",
+            Path.home() / ".gemini" / "antigravity-cli" / "bin" / "agy.exe",
+        ):
+            if cand.is_file():
+                return str(cand)
+    return None
+
+
+def mesh_shells_available() -> dict[str, bool]:
+    """Which Agent Mesh shells can actually spawn right now (exe on PATH)."""
+    return {name: bool(_find_mesh_exe(exe)) for name, exe in MESH_SHELLS.items()}
 
 
 def _mesh_shell_command(shell: str) -> list[str]:
     """Resolve a mesh-* shell to its absolute executable (allowlisted)."""
-    import shutil
-
-    raw = shutil.which(MESH_SHELLS[shell])
+    exe_name = MESH_SHELLS[shell]
+    raw = _find_mesh_exe(exe_name)
     if not raw:
         raise FileNotFoundError(
-            f"Agent Mesh shell '{shell}' is not installed (missing: {MESH_SHELLS[shell]})"
+            f"Agent Mesh shell '{shell}' is not installed (missing: {exe_name})"
         )
     exe = str(Path(raw).resolve())
     # Validate it's a real file — mitigates PATH hijack TOCTOU where a fake

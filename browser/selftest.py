@@ -218,6 +218,12 @@ check(
 from browser_core.terminal_server import SHELLS, _shell_command
 
 check("terminal bridge allowlists 2nd agent", "agent2" in SHELLS)
+check("terminal bridge allowlists antigravity", "mesh-agy" in SHELLS and "agy" in SHELLS)
+try:
+    _cmd_agy = _shell_command("mesh-agy")
+    check("antigravity CLI resolves", bool(_cmd_agy and _cmd_agy[0]), " ".join(_cmd_agy)[:120])
+except FileNotFoundError as _exc:
+    check("antigravity CLI resolves", False, str(_exc)[:120])
 try:
     _cmd2 = _shell_command("agent2")
     check("2nd agent CLI resolves", bool(_cmd2 and _cmd2[0]), " ".join(_cmd2)[:120])

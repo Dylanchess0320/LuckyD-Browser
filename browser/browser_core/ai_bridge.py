@@ -146,9 +146,18 @@ _CLINEPASS_CATALOG = [
 # sidebar picker complete when the live catalog request fails. All of these
 # are tool-capable unless noted; [V] marks vision-capable entries.
 _OPENCODE_ZEN_BASE = "https://opencode.ai/zen/v1"
-_OPENCODE_ZEN_DEFAULT = "nemotron-3-ultra-free"
-_OPENCODE_FREE_CATALOG = [
+_OPENCODE_ZEN_DEFAULT = "mimo-v2.5-free"
+_FREE_TOP_ZEN = (
+    "mimo-v2.5-free",
     "big-pickle",
+    "hy3-free",
+    "laguna-s-2.1-free",
+)
+_OPENCODE_FREE_CATALOG = [
+    "mimo-v2.5-free",  # [V]
+    "big-pickle",
+    "hy3-free",
+    "laguna-s-2.1-free",
     "deepseek-v4-flash-free",
     "glm-4.7-free",
     "glm-5-free",
@@ -199,6 +208,27 @@ _OPENROUTER_FREE_FALLBACK = [
     "poolside/laguna-xs-2.1:free",
 ]
 
+# ── Curated FREE top models with no strict rate limits ────────────────
+# These are the $0 models that run without per-minute throttling and are
+# therefore safe to rotate through on 429s. Local Ollama/LMStudio are
+# always unlimited (no key, no quota); OpenCode Zen's $0 gateway is
+# generous and the models below are the highest-quality picks (size +
+# reasoning + vision). Free-tier Google/Groq/Cline are intentionally
+# EXCLUDED here because they rate-limit aggressively.
+_FREE_TOP_ZEN = [
+    "nemotron-3-ultra-free",  # flagship — 550B, best overall
+    "nemotron-3-super-free",
+    "kimi-k2.5-free",  # vision + long context
+    "mimo-v2.5-free",  # vision
+    "qwen3.6-plus-free",  # vision
+    "muse-spark-1.2-contributor-free",  # vision
+    "glm-4.7-free",
+    "grok-code",  # vision, coder
+    "deepseek-v4-flash-free",
+    "minimax-m3-free",
+]
+_FREE_TOP_ZEN_SET = set(_FREE_TOP_ZEN)
+
 # Cline Usage (credit-billed / free tier) — same gateway, usage-based billing.
 # Free-tier models work at $0.00 but are rate-limited; credit models deduct
 # from your Cline Credits balance.   Sources: Cline API docs, 2026-07.
@@ -243,6 +273,8 @@ class AIBridge:
         self._configs: dict[str, tuple[str, str, str, str]] = {}
         self._model_cache: dict[str, list[str]] = {}
         self._clinepass_from_session = False
+        # Round-robin cursor for free unlimited model rotation (Zen top pool)
+        self._free_cursor: int = 0
         # Local keyless servers first: free + unlimited should be the default.
         self._configs.update(self._detect_local(env))
         # Remember which providers are keyless locals (used by
@@ -259,6 +291,11 @@ class AIBridge:
             model = env.get(f"{prefix}_MODEL", "").strip() or model
             base_url = env.get(f"{prefix}_BASE_URL", "").strip() or base_url
             self._configs[name] = (model, base_url, key, kind)
+        # Register OpenCode Zen ($0 free gateway, key optional)
+        opencode_key = env.get("OPENCODE_API_KEY", "").strip()
+        opencode_base = env.get("OPENCODE_BASE_URL", "").strip() or _OPENCODE_ZEN_BASE
+        opencode_model = env.get("OPENCODE_MODEL", "").strip() or _OPENCODE_ZEN_DEFAULT
+        self._configs["opencode"] = (opencode_model, opencode_base, opencode_key, "openai")
 
     def _detect_clinepass(self, env) -> None:
         """Register ClinePass subscription + Cline Usage (credit-billed/free tier).
@@ -387,11 +424,27 @@ class AIBridge:
             return
         self._configs[provider] = (model.strip(), info[1], info[2], info[3])
 
+    def free_top_models(self) -> list[str]:
+        """Cherry-picked free top models with no strict rate limits (Zen)."""
+        return list(_FREE_TOP_ZEN)
+
+    def _free_unlimited_providers(self) -> list[str]:
+        """Providers with no rate limits — local + Zen free gateway."""
+        order: list[str] = []
+        for name in self._local_names:
+            if name in self._configs:
+                order.append(name)
+        # Zen free (via opencode or openai pointed at zen) is also unlimited
+        for name in ("opencode", "openai"):
+            if name in self._configs and self.is_opencode_zen(name) and name not in order:
+                order.append(name)
+        return order
+
     def fetch_models(self, provider: str) -> list[str]:
         """Model ids available on a provider — live catalog when it has one
         (Ollama, LM Studio, most OpenAI-compatible hosts), curated fallback
         for ClinePass / Cline Usage (gateway exposes no catalog), current
-        model otherwise."""
+        model otherwise. For LuckyD we expose ONLY free top models."""
         info = self._configs.get(provider)
         if info is None:
             return []
@@ -418,43 +471,124 @@ class AIBridge:
                 ]
             except Exception:
                 models = []
-        if self.is_opencode_zen(provider) and models:
-            # Zen's live catalog mixes paid Claude/GPT/GLM tiers in with the
-            # free ones — keep only $0 models: everything in the synced
-            # catalog plus any future "-free" suffixed release.
-            models = [m for m in models if m.endswith("-free") or m in _OPENCODE_FREE_CATALOG]
+        if self.is_opencode_zen(provider):
+            # LuckyD: ONLY free TOP models (no rate limits) — clean picker
+            # and rotation members always visible. Live catalog is ignored
+            # beyond confirming the endpoint is reachable; the curated top
+            # set is authoritative until vetted.
+            if models:
+                # Confirm endpoint up — keep curated order, but push
+                # live-present models slightly ahead for fidelity
+                live_set = set(models)
+                models = sorted(list(_FREE_TOP_ZEN), key=lambda m: (0 if m in live_set else 1, _FREE_TOP_ZEN.index(m)))
+            # empty live (no network/auth) falls through to fallback below
         if not models:
             if provider == "clinepass":
                 models = list(_CLINEPASS_CATALOG)
             elif provider == "cline-usage":
                 models = list(_CLINE_USAGE_CATALOG)
             elif self.is_opencode_zen(provider):
-                # OpenCode Zen free gateway — full $0 catalog from models.dev.
-                models = list(_OPENCODE_FREE_CATALOG)
+                # Only free top (no rate limits) — not the full 29-model catalog
+                models = list(_FREE_TOP_ZEN)
             elif provider == "openrouter":
+                # Only free tier; sorted :free first for the picker
                 models = list(_OPENROUTER_FREE_FALLBACK)
             else:
                 models = [model]
-        if model in models:
+        # Ensure the current model is present (user override may be outside top)
+        if model not in models and model in _OPENCODE_FREE_CATALOG:
+            # If it's a valid free model but not top, keep it visible at top
+            models.insert(0, model)
+        elif model in models:
             models.remove(model)
-        models.insert(0, model)  # current model first
+            models.insert(0, model)
+        elif model not in models and self.is_opencode_zen(provider) and model.endswith("-free"):
+            models.insert(0, model)
         if provider == "openrouter" and len(models) > 1:
-            # Free models first (stable): the paid catalog dwarfs :free, and
-            # nobody should have to scroll 300 rows to find a $0 option.
             models = sorted(models, key=lambda m: not m.endswith(":free"))
+        # For Zen, pin top order: _FREE_TOP_ZEN order first, then any extra
+        if self.is_opencode_zen(provider):
+            top_order = {m: i for i, m in enumerate(_FREE_TOP_ZEN)}
+            models = sorted(models, key=lambda m: top_order.get(m, 999))
         self._model_cache[provider] = models
         return models
 
     async def chat(self, messages, provider=None, on_token=None):
+        # Auto (no provider) uses the free unlimited rotation first: local
+        # keyless servers + Zen top free models round-robin on every call and
+        # on 429 rate-limit. Explicit provider skips rotation.
+        if provider is None:
+            # Prefer free unlimited pool before falling back to any provider
+            free_pool = self._free_unlimited_providers()
+            # If we have a Zen free gateway, try its top models round-robin
+            # before touching rate-limited clouds.
+            for name in free_pool:
+                info = self._configs.get(name)
+                if info is None:
+                    continue
+                if self.is_opencode_zen(name):
+                    last_err = None
+                    # Try up to len(_FREE_TOP_ZEN) models starting at cursor
+                    for offset in range(len(_FREE_TOP_ZEN)):
+                        idx = (self._free_cursor + offset) % len(_FREE_TOP_ZEN)
+                        m = _FREE_TOP_ZEN[idx]
+                        trial = (m, info[1], info[2], info[3])
+                        if name in ("clinepass", "cline-usage") and self._clinepass_from_session:
+                            try:
+                                token = cline_session.fresh_token()
+                                trial = (m, info[1], token, info[3])
+                            except RuntimeError as exc:
+                                last_err = exc
+                                break
+                        try:
+                            text = await self._call(name, trial, messages, on_token)
+                            self._free_cursor = (idx + 1) % len(_FREE_TOP_ZEN)
+                            self._configs[name] = trial
+                            return text, name
+                        except Exception as exc:
+                            last_err = exc
+                            msg = str(exc)
+                            is_rate = "429" in msg or "rate" in msg.lower() or "quota" in msg.lower()
+                            if not is_rate:
+                                break  # non-rate error — try next provider pool entry
+                            continue
+                    # all top models for this Zen gateway failed — keep last_err and try next pool member
+                    continue
+                # Local (ollama/lmstudio) — single model, no inner rotation
+                if name in ("clinepass", "cline-usage") and self._clinepass_from_session:
+                    try:
+                        token = cline_session.fresh_token()
+                        info = (info[0], info[1], token, info[3])
+                        self._configs[name] = info
+                    except RuntimeError as exc:
+                        last_err = exc
+                        continue
+                try:
+                    text = await self._call(name, info, messages, on_token)
+                    return text, name
+                except Exception as exc:
+                    last_err = exc
+                    # local rarely 429 — if it does, try Zen next
+                    continue
+            # No free unlimited succeeded — fall through to full provider fallback
         order = [provider] if provider else self.providers()
         last_err: Exception | None = None
         for name in order:
+            # Skip members already tried in the free unlimited fast-path above
+            if provider is None and name in self._free_unlimited_providers():
+                # For Zen we already cycled all top models; the current model in config is already tried.
+                # Only retry the free pool's current configured model once more with the generic path.
+                # To avoid double-dipping, skip unless the error was non-rate and we want a second chance.
+                # Instead just skip - full fallback below covers rate-limited clouds.
+                if self.is_opencode_zen(name):
+                    continue
+                # local already tried — skip
+                if name in self._local_names:
+                    continue
             info = self._configs.get(name)
             if info is None:
                 continue
             if name in ("clinepass", "cline-usage") and self._clinepass_from_session:
-                # Session tokens live ~1h — re-read before every call;
-                # fresh_token() refreshes via WorkOS when they expire.
                 try:
                     token = cline_session.fresh_token()
                     info = (info[0], info[1], token, info[3])
@@ -462,6 +596,24 @@ class AIBridge:
                 except RuntimeError as exc:
                     last_err = exc
                     continue
+            # For explicit provider that is Zen, allow per-model rotation on 429 as well
+            if provider is not None and self.is_opencode_zen(name):
+                for offset in range(len(_FREE_TOP_ZEN)):
+                    idx = (self._free_cursor + offset) % len(_FREE_TOP_ZEN)
+                    m = _FREE_TOP_ZEN[idx]
+                    trial = (m, info[1], info[2], info[3])
+                    try:
+                        text = await self._call(name, trial, messages, on_token)
+                        self._free_cursor = (idx + 1) % len(_FREE_TOP_ZEN)
+                        self._configs[name] = trial
+                        return text, name
+                    except Exception as exc:
+                        last_err = exc
+                        msg = str(exc)
+                        if "429" not in msg and "rate" not in msg.lower():
+                            break
+                        continue
+                continue
             try:
                 text = await self._call(name, info, messages, on_token)
                 return text, name

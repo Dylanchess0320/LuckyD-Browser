@@ -21,6 +21,11 @@ from pathlib import Path
 AGENT_DIR = Path(__file__).parent
 sys.path.insert(0, str(AGENT_DIR))
 
+if sys.platform == "win32":
+    with contextlib.suppress(Exception):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 # Load .env FIRST -- it sets CODING_AGENT_PROVIDER / *_API_KEY that
 # core/providers.py reads from os.environ. Importing config before any
 # other module that pulls in providers guarantees the .env provider/key win.
@@ -42,6 +47,7 @@ _PROVIDER_DISPLAY_NAMES = {
     "google": "Google",
     "ollama": "Ollama",
     "zai": "Z.ai",
+    "groq": "Groq",
     "openrouter": "OpenRouter",
     "opencode": "OpenCode Zen",
     "clinepass": "ClinePass",
@@ -175,6 +181,11 @@ def model_catalog(free_only: bool = False) -> list[dict]:
 
     # Build free groups from providers_config.json (single source of truth for $0 models)
     free_providers = _load_free_providers()
+    # "openai" entry duplicates the opencode gateway list verbatim — prefer
+    # the canonical "opencode" name so the catalog says "OpenCode Zen", not
+    # "OpenAI-compatible / OpenCode Zen".
+    if "openai" in free_providers and "opencode" in free_providers:
+        free_providers = {k: v for k, v in free_providers.items() if k != "openai"}
     free_groups: list[dict] = []
     if free_providers:
         # Sort: available providers first, then alphabetically
@@ -183,6 +194,7 @@ def model_catalog(free_only: bool = False) -> list[dict]:
             available = _is_free_provider_available(pid, pinfo)
             return (0 if available else 1, pid)
 
+        seen_models: set[str] = set()
         for pid, pinfo in sorted(free_providers.items(), key=_sort_key):
             models = pinfo.get("free_models", [])
             if not models:
@@ -190,14 +202,27 @@ def model_catalog(free_only: bool = False) -> list[dict]:
             # Only include free tier that is marked free_tier=true
             if not pinfo.get("free_tier"):
                 continue
+            # Deduplicate: "openai" entry in providers_config.json duplicates
+            # the opencode gateway list verbatim — skip the alias to avoid
+            # showing the same 28 models twice in the catalog.
+            deduped = [m for m in models if m.lower() not in seen_models]
+            # If >80% would be duplicates, this provider is an alias — skip it
+            if pid == "openai" and len(deduped) < len(models) * 0.2:
+                continue
+            if not deduped:
+                continue
+            for m in deduped:
+                seen_models.add(m.lower())
+            # Also include Cline free tier inline if this is cline-usage alias (handled below)
             name = pinfo.get("name", pid)
             # Mark availability in provider label for UI: "✓" if key present
             available = _is_free_provider_available(pid, pinfo)
             label = f"{name} ✓" if available else f"{name} (needs {pinfo.get('env_key','key')})"
             # For free_only, skip providers where we'd need a missing key (except local)
             if free_only and not available:
+                # still keep models in seen_models so they don't reappear elsewhere
                 continue
-            free_groups.append({"provider": label, "models": models})
+            free_groups.append({"provider": label, "models": deduped, "provider_key": pid if pid != "openai" else "opencode"})
         # Fallback to hardcoded if config gave no groups (should not happen)
         if not free_groups:
             free_groups = [
@@ -307,6 +332,183 @@ def _match_cline_model(desired: str) -> tuple[str, str] | None:
     return None
 
 
+# ── Free-model fuzzy matching (opencode-style) ─────────────────────────
+
+def _free_entries() -> list[tuple[str, str]]:
+    """Every free model that actually works: (provider, model_id).
+
+    Aggregates browser/models/providers_config.json + Cline free tier.
+    Deduplicated by model id (first provider wins). This is the single
+    source of truth for ``/model <fuzzy>``.
+    """
+    seen: set[str] = set()
+    entries: list[tuple[str, str]] = []
+    # 1) providers_config.json (opencode, openrouter, groq, zai, ollama…)
+    try:
+        free_providers = _load_free_providers()
+        for pid, pinfo in free_providers.items():
+            if not pinfo.get("free_tier"):
+                continue
+            models = pinfo.get("free_models", [])
+            # "openai" entry duplicates opencode gateway models — fold into opencode
+            provider = "opencode" if pid == "openai" else pid
+            # Only map known valid providers; groq is now valid, others skip unknown
+            for mid in models:
+                key = mid.lower()
+                if key in seen:
+                    continue
+                seen.add(key)
+                entries.append((provider, str(mid)))
+    except Exception:
+        pass
+    # 2) Fallback if config missing — hardcoded opencode catalog
+    if not entries:
+        for mid in _OPENCODE_FREE_CATALOG:
+            if mid.lower() not in seen:
+                seen.add(mid.lower())
+                entries.append(("opencode", mid))
+    # 3) Cline Usage free tier (same gateway as ClinePass but $0)
+    for mid in _CLINE_USAGE_CATALOG:
+        if mid in _CLINE_USAGE_FREE_TIER and mid.lower() not in seen:
+            seen.add(mid.lower())
+            entries.append(("cline-usage", mid))
+    return entries
+
+
+def _norm_model(s: str) -> str:
+    """Lowercase + replace separators with spaces for token matching."""
+    s = s.lower().strip()
+    for ch in "-_/:.":
+        s = s.replace(ch, " ")
+    return " ".join(s.split())
+
+
+def _fuzzy_score(query: str, model_id: str, provider: str) -> float:
+    """Score 0-100 for how well query matches model_id (and provider)."""
+    import difflib
+
+    q = _norm_model(query)
+    raw = model_id.lower()
+    norm = _norm_model(model_id)
+    prov = provider.lower()
+
+    if not q:
+        return 0.0
+    # Exact / suffix wins
+    if q == norm or raw == query.strip().lower():
+        return 100.0
+    if raw.endswith("/" + query.strip().lower()):
+        return 96.0
+    if q == _norm_model(provider + " " + model_id):
+        return 100.0
+    # Provider-qualified exact like "opencode nemotron" -> boost
+    if q.startswith(prov + " "):
+        rest = q[len(prov):].strip()
+        if rest and rest in norm:
+            return 92.0
+
+    # Substring in raw id
+    if query.strip().lower() in raw:
+        # Prefer short, prefix-ish matches
+        if raw.startswith(query.strip().lower()):
+            return 90.0
+        if raw.endswith(query.strip().lower()):
+            return 86.0
+        # score penalised slightly by length distance
+        return max(78.0, 88.0 - (len(raw) - len(query)) * 0.15)
+
+    # Token containment
+    q_tokens = q.split()
+    m_tokens = norm.split()
+    if q_tokens and all(t in norm for t in q_tokens):
+        # All tokens present — strong signal (e.g. "nemotron ultra")
+        return 80.0 if len(q_tokens) > 1 else 76.0
+    if q_tokens:
+        matched = sum(1 for t in q_tokens if t in norm)
+        if matched:
+            base = 55.0 + matched * 9.0
+            ratio = difflib.SequenceMatcher(None, q, norm).ratio()
+            return base * 0.55 + ratio * 45.0
+
+    # Pure fuzzy fallback
+    ratio = difflib.SequenceMatcher(None, q, norm).ratio()
+    if ratio > 0.62:
+        return ratio * 78.0
+    ratio2 = difflib.SequenceMatcher(None, query.strip().lower(), raw).ratio()
+    return max(ratio, ratio2) * 52.0
+
+
+def _fuzzy_match_free(query: str, limit: int = 8) -> list[tuple[str, str, float]]:
+    """Ranked free-model matches for query. Returns [(provider, model, score)...] sorted desc."""
+    entries = _free_entries()
+    scored: list[tuple[str, str, float]] = []
+    for prov, mid in entries:
+        s = _fuzzy_score(query, mid, prov)
+        if s >= 28.0:
+            scored.append((prov, mid, s))
+    scored.sort(key=lambda t: t[2], reverse=True)
+    return scored[:limit]
+
+
+def _resolve_free_query(query: str) -> tuple[str, str] | None:
+    """Fuzzy-resolve query to a single free model. On ambiguity shows a picker.
+
+    Returns (provider, model) on a confident match, otherwise None after
+    printing disambiguation. Never guesses.
+    """
+    candidates = _fuzzy_match_free(query, limit=8)
+    if not candidates:
+        ui.warn(f"No free model matches '{query}'")
+        # Suggest closest 3
+        all_free = _free_entries()
+        import difflib as _dif
+
+        names = [mid for _, mid in all_free]
+        close = _dif.get_close_matches(query, names, n=3, cutoff=0.45)
+        if close:
+            print("  Did you mean:")
+            for c in close:
+                print(f"    {c}  →  /model {c}")
+        print("  Run /model to browse all free models.")
+        return None
+
+    # High-confidence single winner: score gap + absolute threshold
+    top_score = candidates[0][2]
+    second_score = candidates[1][2] if len(candidates) > 1 else 0.0
+    if top_score >= 84.0 and (top_score - second_score) >= 12.0:
+        return candidates[0][0], candidates[0][1]
+    # Exact substring uniqueness at top
+    if top_score >= 76.0 and len([c for c in candidates if c[2] >= 70.0]) == 1:
+        return candidates[0][0], candidates[0][1]
+
+    # Ambiguous — show top 5 in a compact table
+    top = candidates[:5]
+    if len(top) == 1:
+        return top[0][0], top[0][1]
+    ui.warn(f"Multiple matches for '{query}':")
+    try:
+        from rich import box as _box
+        from rich.table import Table as _Table
+
+        if ui.rich:
+            t = _Table(box=_box.ROUNDED, show_header=True, header_style="dim", border_style="dim", padding=(0, 1))
+            t.add_column("#", justify="right", style="dim", width=3)
+            t.add_column("Model", style="cyan")
+            t.add_column("Provider", style="white")
+            t.add_column("Score", justify="right", style="dim", width=6)
+            for i, (prov, mid, sc) in enumerate(top, 1):
+                t.add_row(str(i), mid, prov, f"{sc:.0f}")
+            ui._console.print(t)
+        else:
+            raise ImportError
+    except Exception:
+        for i, (prov, mid, sc) in enumerate(top, 1):
+            print(f"  {i}. {mid:<36} {prov}  ({sc:.0f})")
+    print(f"  Pick one: /model {top[0][1]}  or  /model 1  (number from list above)")
+    # If exactly 2-3 and scores close, don't auto-pick — let user choose
+    return None
+
+
 def _prompt_and_save_api_key(env_var: str, provider_name: str) -> str:
     """Interactively prompt the user for an API key and persist it to .env."""
     ui.warn(f"No API key found for {provider_name}.")
@@ -361,6 +563,7 @@ def _resolve_provider(provider_hint: str | None, model_name: str) -> dict:
         "google": ("GOOGLE_API_KEY", "GOOGLE_BASE_URL", "GOOGLE_MODEL"),
         "ollama": (None, "OLLAMA_HOST", "OLLAMA_MODEL"),
         "zai": ("ZAI_API_KEY", "ZAI_BASE_URL", "ZAI_MODEL"),
+        "groq": ("GROQ_API_KEY", "GROQ_BASE_URL", "GROQ_MODEL"),
         "openrouter": ("OPENROUTER_API_KEY", "OPENROUTER_BASE_URL", "OPENROUTER_MODEL"),
         "opencode": ("OPENCODE_API_KEY", "OPENCODE_BASE_URL", "OPENCODE_MODEL"),
         "clinepass": ("CLINEPASS_API_KEY", "CLINEPASS_BASE_URL", "CLINEPASS_MODEL"),
@@ -494,6 +697,7 @@ def _persist_model_selection(provider: str, model: str) -> None:
         "ollama": "OLLAMA_MODEL",
         "deepseek": "CODING_AGENT_MODEL",
         "zai": "ZAI_MODEL",
+        "groq": "GROQ_MODEL",
         "openrouter": "OPENROUTER_MODEL",
         "opencode": "OPENCODE_MODEL",
         "clinepass": "CLINEPASS_MODEL",
@@ -615,49 +819,193 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
             ui.error(f"Memory error: {e}")
 
     elif cmd.startswith("model"):
-        parts = cmd.split(maxsplit=1)
-        if len(parts) > 1:
-            raw = parts[1].strip()
-            # v2.2: "/model free" — show only free models that actually work (key present or local)
-            if raw.lower() in ("free", "--free", "free --check", "--free --check"):
-                ui.info("Free models that work (✓ = ready to use right now):")
-                ui.show_models(model_catalog(free_only=True))
-                ui.info("Tip: /model <id> to switch, e.g. /model nemotron-3-ultra-free")
-                return False
-            # Parse "provider model_id" or just "model_id"
-            provider = None
-            desired = raw
-            for p in (
-                "cline-usage",
-                "cline-pass",
-                "clinepass",
-                "cline",
-                "openrouter",
-                "opencode",
-                "anthropic",
-                "deepseek",
-                "openai",
-                "google",
-                "ollama",
-                "zai",
-            ):
-                if raw.lower().startswith(p + " "):
-                    provider = _PROVIDER_ALIASES.get(p, p)
-                    desired = raw[len(p) + 1 :].strip()
-                    break
-            if provider:
-                _switch_model(agent, provider=provider, model_name=desired)
+        # ── Professional free-model browser + fuzzy picker (opencode-style) ──
+        # "/model"              → browse free catalog with numbers + interactive prompt
+        # "/model free" / list  → same (explicit)
+        # "/model all"          → full catalog (free + paid)
+        # "/model 12"           → pick by number from free catalog
+        # "/model <provider> <name>" → direct provider switch
+        # "/model <fuzzy>"      → fuzzy across all free models (e.g. nemotron, kimi, qwen, spark)
+        raw = cmd[len("model"):].strip()
+        low = raw.lower()
+
+        def _current_provider_name() -> str:
+            try:
+                return getattr(getattr(agent, "_provider_config", None), "provider", "") or ""
+            except Exception:
+                return ""
+
+        def _flat_for_catalog(free_only: bool) -> dict[int, tuple[str, str]]:
+            """Build the same number→(provider,model) map that ui.show_models() uses."""
+            sections = model_catalog(free_only=free_only)
+            flat: dict[int, tuple[str, str]] = {}
+            idx = 0
+            for section in sections or []:
+                for group in section.get("groups", []) or []:
+                    label = str(group.get("provider", ""))
+                    # mirror _provider_key logic in ui.show_models
+                    low_label = label.lower()
+                    if "opencode" in low_label:
+                        pkey = "opencode"
+                    elif "openrouter" in low_label:
+                        pkey = "openrouter"
+                    elif "ollama" in low_label:
+                        pkey = "ollama"
+                    elif "openai" in low_label:
+                        pkey = "opencode"
+                    elif "z.ai" in low_label or low_label.strip().startswith("zai"):
+                        pkey = "zai"
+                    elif "groq" in low_label:
+                        pkey = "groq"
+                    elif "google" in low_label or "gemini" in low_label or "gemma" in low_label:
+                        pkey = "google"
+                    elif "cline" in low_label:
+                        pkey = "cline-usage" if "usage" in low_label else "clinepass"
+                    elif "deepseek" in low_label:
+                        pkey = "deepseek"
+                    else:
+                        pkey = label.split()[0].lower() if label else "opencode"
+                    if group.get("provider_key"):
+                        pkey = str(group["provider_key"])
+                    for m in group.get("models", []) or []:
+                        idx += 1
+                        flat[idx] = (pkey, str(m))
+            return flat
+
+        # ── No args → browse free catalog + interactive picker
+        if not raw:
+            sections = model_catalog(free_only=True)
+            flat = ui.show_models(
+                sections,
+                current_model=getattr(agent, "model", "") or "",
+                current_provider=_current_provider_name(),
+            )
+            # Built-in terminal picker — no separate bat file needed
+            if sys.stdin.isatty():
+                try:
+                    choice = await asyncio.to_thread(ui.prompt_text, "Select model (number / name, Enter to cancel)")
+                except Exception:
+                    choice = ""
+                choice = (choice or "").strip()
+                if not choice:
+                    return False
+                if choice.isdigit():
+                    n = int(choice)
+                    hit = flat.get(n)
+                    if hit:
+                        _switch_model(agent, provider=hit[0], model_name=hit[1])
+                    else:
+                        ui.warn(f"No model #{n} — pick 1…{len(flat)}")
+                    return False
+                # Text choice → try provider-prefixed first, then fuzzy
+                prov = None
+                des = choice
+                for p in ("cline-usage", "cline-pass", "clinepass", "cline", "openrouter", "opencode", "groq", "zai", "google", "ollama", "deepseek", "openai", "anthropic"):
+                    if choice.lower().startswith(p + " "):
+                        prov = _PROVIDER_ALIASES.get(p, p)
+                        des = choice[len(p) + 1:].strip()
+                        break
+                if prov:
+                    _switch_model(agent, provider=prov, model_name=des)
+                else:
+                    hit = _resolve_free_query(choice)
+                    if hit is None:
+                        # also try legacy cline exact (covers paid ClinePass picks)
+                        hit2 = _match_cline_model(choice)
+                        if hit2:
+                            _switch_model(agent, provider=hit2[0], model_name=hit2[1])
+                    else:
+                        _switch_model(agent, provider=hit[0], model_name=hit[1])
+            return False
+
+        # Explicit browse variants
+        if low in ("free", "--free", "free --check", "--free --check", "list", "free list", "list free"):
+            sections = model_catalog(free_only=True)
+            flat = ui.show_models(
+                sections,
+                current_model=getattr(agent, "model", "") or "",
+                current_provider=_current_provider_name(),
+            )
+            if sys.stdin.isatty():
+                try:
+                    choice = await asyncio.to_thread(ui.prompt_text, "Select model (number / name, Enter to cancel)")
+                except Exception:
+                    choice = ""
+                choice = (choice or "").strip()
+                if choice.isdigit() and choice:
+                    hit = flat.get(int(choice))
+                    if hit:
+                        _switch_model(agent, provider=hit[0], model_name=hit[1])
+                    else:
+                        ui.warn(f"No model #{choice}")
+                elif choice:
+                    hit = _resolve_free_query(choice)
+                    if hit:
+                        _switch_model(agent, provider=hit[0], model_name=hit[1])
+            return False
+
+        if low in ("all", "paid", "free all", "all free", "show all", "full"):
+            ui.show_models(
+                model_catalog(free_only=False),
+                current_model=getattr(agent, "model", "") or "",
+                current_provider=_current_provider_name(),
+            )
+            ui.info("Tip: /model <name> fuzzy-switches free models · /model free for free-only picker")
+            return False
+
+        # Numeric pick without prior browse: "/model 12"
+        if low.isdigit():
+            flat = _flat_for_catalog(free_only=True)
+            n = int(low)
+            hit = flat.get(n)
+            if hit:
+                _switch_model(agent, provider=hit[0], model_name=hit[1])
             else:
-                # No provider given — resolve against the Cline catalogs so
-                # "/model kimi-k3" -> clinepass, "/model deepseek-chat" ->
-                # cline-usage. Unknown names are rejected, never guessed.
-                hit = _match_cline_model(desired)
-                if hit:
-                    _switch_model(agent, provider=hit[0], model_name=hit[1])
-        else:
-            ui.info(f"Model: {agent.model}")
-            ui.show_models(model_catalog())
-            ui.info("Tip: /model free shows only free models that work right now")
+                ui.warn(f"No model #{n} — run /model to see 1…{len(flat)}")
+                # Show catalog to help
+                ui.show_models(
+                    model_catalog(free_only=True),
+                    current_model=getattr(agent, "model", "") or "",
+                    current_provider=_current_provider_name(),
+                )
+            return False
+
+        # Provider-prefixed direct switch: "/model opencode nemotron-3-ultra-free"
+        provider = None
+        desired = raw
+        for p in (
+            "cline-usage",
+            "cline-pass",
+            "clinepass",
+            "cline",
+            "openrouter",
+            "opencode",
+            "groq",
+            "anthropic",
+            "deepseek",
+            "openai",
+            "google",
+            "ollama",
+            "zai",
+        ):
+            if low.startswith(p + " "):
+                provider = _PROVIDER_ALIASES.get(p, p)
+                desired = raw[len(p) + 1 :].strip()
+                break
+        if provider:
+            _switch_model(agent, provider=provider, model_name=desired)
+            return False
+
+        # ── Fuzzy free-model resolve (the main opencode-style path) ──
+        # "/model nemotron" / "/model kimi" / "/model qwen" / "/model spark" etc.
+        hit = _resolve_free_query(raw)
+        if hit:
+            _switch_model(agent, provider=hit[0], model_name=hit[1])
+            return False
+        # Fallback: legacy exact Cline match (covers subscription picks like kimi-k3)
+        hit2 = _match_cline_model(raw)
+        if hit2:
+            _switch_model(agent, provider=hit2[0], model_name=hit2[1])
 
     elif cmd == "refresh":
         invalidate_cache()
@@ -850,17 +1198,19 @@ async def run_repl(agent: CodingAgent):
 
 
 def _cli_model(args):
-    """luckyd-code model [list | <model-id>]
+    """luckyd-code model [list | <fuzzy-name> | <number>]
 
-    Without arguments: show the current model from .env / resolved config.
-    With 'list':       print the ClinePass + Cline Usage model catalog.
-    With a model id:   validate it against the catalog (module-level
-                       _CLINEPASS_CATALOG / _CLINE_USAGE_CATALOG) and write
-                       the matching env vars — CLINEPASS_MODEL or
-                       CLINE_USAGE_MODEL, plus CODING_AGENT_PROVIDER — to
-                       .env permanently.
+    Professional, opencode-style free-model switcher for the CLI.
+
+    - No args:            show current model + hint
+    - "list" / "free":    browse free catalog (Panel + Table)
+    - "all":              free + paid catalog
+    - "<number>":         pick by number from free catalog
+    - "<fuzzy>"           fuzzy — e.g. ``nemotron``, ``kimi``, ``qwen``, ``spark``
+    - "<provider> <name>" direct — e.g. ``opencode nemotron-3-ultra-free``
     """
     from config import ENV_FILE
+    from core.providers import PROVIDER_DEFAULTS
 
     def _read_env_pairs() -> dict:
         pairs = {}
@@ -886,78 +1236,148 @@ def _cli_model(args):
         lines.append(f"{key}={value}")
         return lines
 
-    def _current_model():
-        """Best-effort read of the active model identity."""
+    def _current_model_and_provider() -> tuple[str, str]:
         pairs = _read_env_pairs()
-        provider = pairs.get("CODING_AGENT_PROVIDER", "").lower()
-        if provider == "cline-usage":
-            if pairs.get("CLINE_USAGE_MODEL"):
-                return pairs["CLINE_USAGE_MODEL"]
-        elif pairs.get("CLINEPASS_MODEL"):
-            return pairs["CLINEPASS_MODEL"]
-        try:
-            from core.providers import resolve_provider_config
+        prov = pairs.get("CODING_AGENT_PROVIDER", "").lower()
+        cur = ""
+        if prov == "cline-usage" and pairs.get("CLINE_USAGE_MODEL"):
+            cur = pairs["CLINE_USAGE_MODEL"]
+        elif prov == "clinepass" and pairs.get("CLINEPASS_MODEL"):
+            cur = pairs["CLINEPASS_MODEL"]
+        elif prov and pairs.get(PROVIDER_DEFAULTS.get(prov, {}).get("env_model", "")):
+            cur = pairs.get(PROVIDER_DEFAULTS[prov]["env_model"], "")
+        if not cur:
+            try:
+                from core.providers import resolve_provider_config
 
-            cfg = resolve_provider_config()
-            return cfg.get("model", "unknown")
-        except Exception:
-            return "unknown"
+                cfg = resolve_provider_config()
+                cur = cfg.get("model", "unknown")
+                prov = cfg.get("provider", prov)
+            except Exception:
+                cur = "unknown"
+        return cur, prov
 
-    if not args or args == ["list"]:
-        current = _current_model()
-        print(f"Current model: {current}\n")
-        if args == ["list"]:
-            print("── ClinePass subscription models (flat rate) ─────────────────────")
-            for m in _CLINEPASS_CATALOG:
-                marker = " ◀ current" if m == current else ""
-                print(f"  {m}{marker}")
-            print("\n── Cline Usage — free tier ($0.00, rate-limited) ─────────────────")
-            for m in _CLINE_USAGE_CATALOG:
-                if m not in _CLINE_USAGE_FREE_TIER:
-                    continue
-                marker = " ◀ current" if m == current else ""
-                print(f"  {m}{marker}")
-            print("\n── Cline Usage — credit-billed ───────────────────────────────────")
-            for m in _CLINE_USAGE_CATALOG:
-                if m in _CLINE_USAGE_FREE_TIER:
-                    continue
-                marker = " ◀ current" if m == current else ""
-                print(f"  {m}{marker}")
-            print("\nSet one with:  lucky-code model <model-id>")
+    current, cur_prov = _current_model_and_provider()
+
+    # ── Browse modes (no separate bat file — built into the CLI) ─────
+    if not args:
+        print(f"Current: {cur_prov}/{current}\n")
+        print("Usage:")
+        print("  lucky-code model list              — browse free catalog (interactive)")
+        print("  lucky-code model all               — browse free + paid")
+        print("  lucky-code model <n>               — pick by number (e.g. model 12)")
+        print("  lucky-code model <name>            — fuzzy (e.g. model nemotron, model kimi, model qwen)")
+        print("  lucky-code model <provider> <name> — direct (e.g. model opencode grok-code)")
+        print("\nTip: inside the terminal use /model — same fuzzy picker, no restart needed.")
+        return
+
+    low0 = " ".join(args).strip().lower()
+    if low0 in ("list", "free", "--free", "free --check", "list free", "free list"):
+        ui.show_models(model_catalog(free_only=True), current_model=current, current_provider=cur_prov)
+        print("Switch: lucky-code model <name>  e.g. lucky-code model nemotron")
+        return
+    if low0 in ("all", "paid", "free all", "all free", "full"):
+        ui.show_models(model_catalog(free_only=False), current_model=current, current_provider=cur_prov)
+        return
+
+    # ── Resolve the desired model ────────────────────────────────────
+    raw_query = " ".join(args).strip()
+    desired = raw_query
+
+    # Numeric pick: "12" from free catalog
+    if raw_query.strip().isdigit():
+        # Build flat index exactly like ui.show_models does
+        sections = model_catalog(free_only=True)
+        flat: dict[int, tuple[str, str]] = {}
+        idx = 0
+        for section in sections:
+            for group in section.get("groups", []):
+                label = str(group.get("provider", ""))
+                low_label = label.lower()
+                if "opencode" in low_label:
+                    pkey = "opencode"
+                elif "openrouter" in low_label:
+                    pkey = "openrouter"
+                elif "ollama" in low_label:
+                    pkey = "ollama"
+                elif "openai" in low_label:
+                    pkey = "opencode"
+                elif "z.ai" in low_label or low_label.strip().startswith("zai"):
+                    pkey = "zai"
+                elif "groq" in low_label:
+                    pkey = "groq"
+                elif "google" in low_label or "gemini" in low_label or "gemma" in low_label:
+                    pkey = "google"
+                elif "cline" in low_label:
+                    pkey = "cline-usage" if "usage" in low_label else "clinepass"
+                elif "deepseek" in low_label:
+                    pkey = "deepseek"
+                else:
+                    pkey = label.split()[0].lower() if label else "opencode"
+                if group.get("provider_key"):
+                    pkey = str(group["provider_key"])
+                for m in group.get("models", []) or []:
+                    idx += 1
+                    flat[idx] = (pkey, str(m))
+        n = int(raw_query.strip())
+        hit = flat.get(n)
+        if not hit:
+            print(f"No model #{n} — run: lucky-code model list  (1…{len(flat)})")
+            return
+        provider, picked = hit
+    else:
+        # Provider-prefixed direct switch
+        provider = None
+        picked = ""
+        for p in ("cline-usage", "cline-pass", "clinepass", "cline", "openrouter", "opencode", "groq", "zai", "google", "ollama", "deepseek", "openai", "anthropic"):
+            if raw_query.lower().startswith(p + " "):
+                provider = _PROVIDER_ALIASES.get(p, p)
+                picked = raw_query[len(p) + 1 :].strip()
+                break
+        if provider:
+            # direct — no fuzzy, use exactly what user typed
+            pass
         else:
-            print("Usage: lucky-code model list          — show full catalog")
-            print("       lucky-code model <model-id>    — switch permanently")
-        return
+            # Fuzzy over the free catalog (opencode-style: knows what you want)
+            hit = _resolve_free_query(raw_query)
+            # Fallback to legacy exact Cline match for subscription models
+            if hit is None:
+                hit = _match_cline_model(raw_query)
+            if not hit:
+                print("Run: lucky-code model list  to browse free models")
+                return
+            provider, picked = hit
 
-    # ── Switch model ───────────────────────────────────────────────────
-    desired = args[0].strip()
-    hit = _match_cline_model(desired)
-    if not hit:
-        print("Run: lucky-code model list  to see available models")
-        return
-
-    provider, picked = hit
+    # ── Persist to .env (generic — works for any provider) ──────────
+    defaults = PROVIDER_DEFAULTS.get(provider, PROVIDER_DEFAULTS.get("opencode"))
+    env_model = defaults.get("env_model") if defaults else None
 
     lines = []
     if ENV_FILE.exists():
         lines = ENV_FILE.read_text(encoding="utf-8-sig").splitlines()
 
-    if provider == "clinepass":
-        lines = _set_env_key(lines, "CLINEPASS_MODEL", picked)
-        lines = _set_env_key(lines, "CODING_AGENT_PROVIDER", "clinepass")
-    else:
-        lines = _set_env_key(lines, "CLINE_USAGE_MODEL", picked)
-        lines = _set_env_key(lines, "CODING_AGENT_PROVIDER", "cline-usage")
+    if env_model:
+        lines = _set_env_key(lines, env_model, picked)
+    lines = _set_env_key(lines, "CODING_AGENT_PROVIDER", provider)
 
     ENV_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8-sig")
+
+    # Friendly tier label
     if provider == "clinepass":
         tier = "ClinePass subscription"
+    elif provider == "opencode":
+        tier = "OpenCode Zen — free $0"
+    elif provider == "openrouter":
+        tier = "OpenRouter — free"
+    elif provider in ("groq", "zai", "google", "ollama"):
+        tier = f"{_PROVIDER_DISPLAY_NAMES.get(provider, provider)} — free"
     elif picked in _CLINE_USAGE_FREE_TIER:
         tier = "Cline Usage — free tier"
     else:
-        tier = "Cline Usage — credit-billed"
-    print(f"Model set to: {picked}  [{tier}]")
-    print("Restart the terminal for the change to take effect.")
+        tier = provider
+
+    print(f"Model set to: {picked}  [{tier} → {provider}]")
+    print("Restart the terminal (or /model inside the REPL) for the change to take effect.")
 
 
 # ── Entry point ────────────────────────────────────────────────────────

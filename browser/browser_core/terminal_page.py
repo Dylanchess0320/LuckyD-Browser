@@ -13,12 +13,22 @@ _WS_HOST = "127.0.0.1"
 _WS_PORT = 9881  # must match browser_app's "terminal_port" default
 
 # Keep in sync with terminal_server.SHELLS (allowlist lives there).
-_SHELL_LABELS = {"agent": "Agent", "agent2": "Agent 2", "powershell": "PowerShell", "cmd": "CMD"}
+_SHELL_LABELS = {
+    "agent": "Agent",
+    "agent2": "Agent 2",
+    "powershell": "PowerShell",
+    "cmd": "CMD",
+    "mesh-agy": "Antigravity",
+    "mesh-antigravity": "Antigravity",
+    "agy": "Antigravity",
+    "antigravity": "Antigravity",
+}
 
 
 # Agent Mesh dock — the CLIs wired in via terminal_server.MESH_SHELLS, shown
 # as an agent picker in the terminal tab. (shell, label, emoji, accent, blurb)
 _MESH_AGENTS = {
+    "mesh-agy": ("Antigravity", "🛸", "#38bdf8", "Google DeepMind · AGY"),
     "mesh-claude": ("Claude", "🟠", "#d97706", "Anthropic · architect"),
     "mesh-codex": ("Codex", "🟢", "#10b981", "OpenAI · builder"),
     "mesh-copilot": ("Copilot", "⚫", "#8b9bb4", "GitHub · reviewer"),

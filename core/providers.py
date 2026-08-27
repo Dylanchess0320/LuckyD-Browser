@@ -17,6 +17,7 @@ VALID_PROVIDERS = {
     "ollama",
     "deepseek",
     "zai",
+    "groq",
     "openrouter",
     "opencode",
     "clinepass",
@@ -30,6 +31,7 @@ PROVIDER_NAMES = {
     "google": "Google",
     "ollama": "Ollama",
     "zai": "Z.ai (GLM)",
+    "groq": "Groq",
     "openrouter": "OpenRouter",
     "opencode": "OpenCode Zen",
     "clinepass": "ClinePass",
@@ -79,6 +81,13 @@ PROVIDER_DEFAULTS = {
         "default_base": "https://api.z.ai/api/paas/v4",
         "default_model": "glm-4.5",
     },
+    "groq": {
+        "env_key": "GROQ_API_KEY",
+        "env_base": "GROQ_BASE_URL",
+        "env_model": "GROQ_MODEL",
+        "default_base": "https://api.groq.com/openai/v1",
+        "default_model": "groq/compound-mini",
+    },
     "openrouter": {
         "env_key": "OPENROUTER_API_KEY",
         "env_base": "OPENROUTER_BASE_URL",
@@ -93,7 +102,7 @@ PROVIDER_DEFAULTS = {
         "env_base": "OPENCODE_BASE_URL",
         "env_model": "OPENCODE_MODEL",
         "default_base": "https://opencode.ai/zen/v1",
-        "default_model": "nemotron-3-ultra-free",
+        "default_model": "mimo-v2.5-free",
     },
     # ClinePass (Cline flat-subscription gateway) — OpenAI-compatible.
     # Key comes from CLINEPASS_API_KEY, else the logged-in Cline CLI session.
@@ -323,6 +332,7 @@ def detect_api_format(provider: str) -> str:
         "ollama": "openai",  # Ollama uses OpenAI-compatible
         "deepseek": "openai",  # DeepSeek uses OpenAI-compatible
         "zai": "openai",  # Z.ai GLM uses OpenAI-compatible endpoint
+        "groq": "openai",  # Groq uses OpenAI-compatible
         "openrouter": "openai",  # OpenRouter uses OpenAI-compatible
         "opencode": "openai",  # OpenCode Zen is OpenAI-compatible
         "clinepass": "openai",  # ClinePass gateway is OpenAI-compatible

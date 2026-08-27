@@ -332,9 +332,10 @@ class AiSidebar(QDockWidget):
 
         row = QHBoxLayout()
         self.input = QLineEdit(body)
-        self.input.setPlaceholderText("Ask about this page or anything…")
-        self.input.returnPressed.connect(self._send)
+        self.input.setPlaceholderText("Ask about this page or anything…  (Enter to send)")
+        self.input.setToolTip("Tip: check 'Page context' to include the current page text")
         self.send_btn = QPushButton("Send", body)
+        self.send_btn.setToolTip("Send to AI (Enter)")
         self.send_btn.clicked.connect(self._send)
         row.addWidget(self.input, 1)
         row.addWidget(self.send_btn)
@@ -402,17 +403,32 @@ class AiSidebar(QDockWidget):
         providers = ", ".join(self.bridge.providers()) or "none set up"
         muted = _P.get("muted", "#9aa1b5")
         text_c = _P.get("text", "#e8ecf5")
+        accent = _P.get("accent", "#5b9dff")
+        # Friendly onboarding: short steps, free rotation hint, keyboard tips
+        free_hint = ""
+        try:
+            free_pool = getattr(self.bridge, "free_top_models", lambda: [])()
+            if free_pool:
+                free_hint = f"Free top models (auto-rotating): {', '.join(free_pool[:3])}…"
+        except Exception:
+            pass
         self._blocks = [
             {
                 "role": "raw",
                 "text": (
-                    f"<div style='color:{muted};padding:4px 2px'>"
-                    f"<b style='color:{text_c}'>🤖 Assistant</b><br>"
-                    "Ask about this page, use a quick action, or give the "
-                    "agent a task — it drives the current tab while you "
-                    "watch.<br>"
-                    f"<span style='font-size:11px'>AI: "
-                    f"{html.escape(providers)}</span></div>"
+                    f"<div style='color:{muted};padding:6px 2px;line-height:1.5'>"
+                    f"<b style='color:{text_c};font-size:14px'>🤖 Assistant — ready</b><br>"
+                    f"<span>Ask about this page, summarise, or give the agent a task — it drives the current tab while you watch.</span><br>"
+                    f"<div style='margin:6px 0;padding:8px 10px;background:rgba(255,255,255,.04);border:1px solid {_P.get('border','#232c42')};border-radius:10px'>"
+                    f"<b style='color:{accent}'>Quick start:</b><br>"
+                    f"• <b>Summarize</b> or <b>📷 Look at page</b> — one-tap page help<br>"
+                    f"• Type a question below (☑ Page context includes the page)<br>"
+                    f"• Agent box below: “Search this site for X, report back”<br>"
+                    f"</div>"
+                    f"<span style='font-size:11px'>AI: {html.escape(providers)}</span><br>"
+                    f"<span style='font-size:11px;color:{accent}'>{html.escape(free_hint)}</span><br>"
+                    f"<span style='font-size:11px'>Tips: <b>?</b> in address bar asks AI • <b>Ctrl+K</b> palette • <b>Esc</b> exits fullscreen</span>"
+                    f"</div>"
                 ),
             }
         ]

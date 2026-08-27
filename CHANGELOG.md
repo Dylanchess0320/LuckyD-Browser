@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.11] - 2026-08-27
+
+### Added
+- **Free Model Picker & Multi-Provider Hub** — Interactive `/model free` command, numeric selection (`model 12`), fuzzy search (`model nemotron`), and direct provider routing (`model opencode <name>`).
+- **Terminal & Agent Enhancements** — Hardened multi-agent terminal integration, enhanced Agent Mesh CLIs, and improved session reliability.
+
 ## [2.5.10] - 2026-08-25
 
 ### Fixed

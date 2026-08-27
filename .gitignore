@@ -138,6 +138,7 @@ build-apk.sh
 
 # ── Local scratch / large binaries (never commit) ─────────────────────
 LuckyD App/
+LuckyD APK/
 archive/browser-snapshots/
 archive/diagnostics/
 archive/external-reference/

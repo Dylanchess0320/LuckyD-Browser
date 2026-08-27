@@ -146,6 +146,7 @@ const APPS = [
   ['🤖', 'AI Assistant', 'luckyd://assistant'],
   ['🕸️', 'Agent Mesh', '/mesh'],
   ['🖥️', 'Agent Terminal', '/terminal'],
+  ['🛸', 'Antigravity CLI', '/terminal?shell=mesh-agy'],
   ['🎬', 'Workflows', '/workflows'],
   ['📡', 'Network', '/network'],
   ['🔖', 'Bookmarks', 'luckyd://bookmarks'],

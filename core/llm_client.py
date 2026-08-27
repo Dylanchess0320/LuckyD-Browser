@@ -485,13 +485,18 @@ class LLMClient:
             "messages": messages,
             "temperature": self.temperature,
             "max_tokens": self.max_tokens,
-            "tools": tools or [],
-            "tool_choice": "auto",
             "stream": stream,
         }
-        if stream:
+        if tools:
+            payload["tools"] = tools
+            payload["tool_choice"] = "auto"
+        # Omit stream_options on free / non-standard OpenAI endpoints to prevent HTTP 400
+        if stream and not (self.model.endswith("-free") or "free" in self.model.lower()):
             payload["stream_options"] = {"include_usage": True}
-        if "pro" in self.model.lower() or "reasoner" in self.model.lower():
+        if (
+            ("pro" in self.model.lower() or "reasoner" in self.model.lower())
+            and not (self.model.endswith("-free") or "free" in self.model.lower())
+        ):
             payload["thinking"] = {"type": "enabled"}
             payload["reasoning_effort"] = "high"
         return payload
@@ -573,7 +578,7 @@ class LLMClient:
                 content_chunks.append(token)
                 if stream_callback:
                     stream_callback(token)
-            for tc in delta.get("tool_calls", []):
+            for tc in delta.get("tool_calls") or []:
                 idx = tc.get("index", 0)
                 if idx not in tool_calls_map:
                     tool_calls_map[idx] = {"id": "", "name": "", "arguments": ""}

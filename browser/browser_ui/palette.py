@@ -1,4 +1,4 @@
-﻿"""Command palette: Ctrl+K for fuzzy search over tabs, bookmarks, history, actions."""
+"""Command palette: Ctrl+K for fuzzy search over tabs, bookmarks, history, actions."""
 
 from __future__ import annotations
 
@@ -111,6 +111,7 @@ class CommandPalette(QWidget):
             ("AI Assistant", self._mw.show_assistant),
             ("Coding Agent", self._mw.open_hq),
             ("Agent Terminal", self._mw.open_terminal),
+            ("Antigravity Terminal", lambda: self._mw.open_terminal("mesh-agy")),
             ("PowerShell Terminal", lambda: self._mw.open_terminal("powershell")),
             ("Workflows", self._mw.open_workflows),
             ("Save Screenshot", self._mw.save_screenshot),

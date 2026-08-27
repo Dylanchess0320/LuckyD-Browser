@@ -135,6 +135,18 @@ def test_agent_workspace_uses_no_lightning_icon() -> None:
     assert "class='spin'>⚡" not in source
 
 
+def test_antigravity_cli_integration() -> None:
+    from browser.browser_core.terminal_server import SHELLS, _mesh_shell_command
+    from browser.browser_core.terminal_page import _SHELL_LABELS, _MESH_AGENTS
+
+    assert "mesh-agy" in SHELLS
+    assert "agy" in SHELLS
+    assert "mesh-agy" in _MESH_AGENTS
+    assert _SHELL_LABELS.get("mesh-agy") == "Antigravity"
+    cmd = _mesh_shell_command("mesh-agy")
+    assert len(cmd) == 1 and cmd[0].lower().endswith("agy.exe")
+
+
 def test_installer_removes_legacy_desktop_shortcut() -> None:
     installer = (
         Path(__file__).parents[1] / "browser" / "installer" / "LuckyDBrowser.iss"

@@ -120,9 +120,17 @@ class MainWindow(QMainWindow):
 
         self.tabs.tabCloseRequested.connect(self._on_tab_closed)
 
+        # Friendly hint toast on startup (only once per version)
+        QTimer.singleShot(1800, self._show_welcome_hint)
+
         # ── silent update check shortly after startup ─────────────────
         if self.settings.get("update_auto_check", True):
             QTimer.singleShot(8000, lambda: self.check_for_updates(silent=True))
+
+    def _show_welcome_hint(self) -> None:
+        """One friendly toast per session: shortcuts + free AI hint."""
+        with contextlib.suppress(Exception):
+            self.toast("Tip: ? in address bar asks AI • Ctrl+K commands • Esc exits fullscreen", "info")
 
     def _apply_theme(self) -> None:
         """Apply the current theme (called on startup and when theme changes)."""
@@ -181,22 +189,22 @@ class MainWindow(QMainWindow):
         self.addToolBar(bar)
 
         self.back_act = QAction("←", self)
-        self.back_act.setToolTip("Back (Alt+Left)")
+        self.back_act.setToolTip("Back (Alt+Left) — mouse back button also works")
         self.back_act.triggered.connect(lambda: self._nav("back"))
         bar.addAction(self.back_act)
 
         self.forward_act = QAction("→", self)
-        self.forward_act.setToolTip("Forward (Alt+Right)")
+        self.forward_act.setToolTip("Forward (Alt+Right) — mouse forward button also works")
         self.forward_act.triggered.connect(lambda: self._nav("forward"))
         bar.addAction(self.forward_act)
 
         self.reload_act = QAction("⟳", self)
-        self.reload_act.setToolTip("Reload (F5)")
+        self.reload_act.setToolTip("Reload (F5 / Ctrl+R)")
         self.reload_act.triggered.connect(lambda: self._nav("reload"))
         bar.addAction(self.reload_act)
 
         home_act = QAction("🏠", self)
-        home_act.setToolTip("Home")
+        home_act.setToolTip("Home (new tab dashboard)")
         home_act.triggered.connect(self.go_home)
         bar.addAction(home_act)
 
@@ -206,26 +214,26 @@ class MainWindow(QMainWindow):
         bar.addWidget(self.omnibox)
 
         self.star_act = QAction("☆", self)
-        self.star_act.setToolTip("Bookmark this page (Ctrl+D)")
+        self.star_act.setToolTip("Bookmark this page (Ctrl+D) — ★ when saved")
         self.star_act.triggered.connect(self.toggle_bookmark)
         bar.addAction(self.star_act)
 
         # ── AI Assistant ───────────────────────────────────────────────
         bar.addSeparator()
         self.ai_act = QAction("🤖", self)
-        self.ai_act.setToolTip("AI Assistant (Ctrl+Shift+A)")
+        self.ai_act.setToolTip("AI Assistant — chat, summarise, vision, agent (Ctrl+Shift+A)")
         self.ai_act.setCheckable(True)
         self.ai_act.triggered.connect(self._toggle_assistant)
         bar.addAction(self.ai_act)
 
         # ── Coding Agent ───────────────────────────────────────────────
         hq_act = QAction("⌘", self)
-        hq_act.setToolTip("Open the coding agent workspace (Ctrl+Shift+H)")
+        hq_act.setToolTip("Coding Agent workspace — 70+ tools, auto-start (Ctrl+Shift+H)")
         hq_act.triggered.connect(self.open_hq)
         bar.addAction(hq_act)
 
         mesh_act = QAction("🕸", self)
-        mesh_act.setToolTip("Open Agent Mesh — four parallel sessions (Ctrl+Alt+M)")
+        mesh_act.setToolTip("Agent Mesh — four parallel sessions (Ctrl+Alt+M)")
         mesh_act.triggered.connect(self.open_agent_mesh)
         bar.addAction(mesh_act)
 
@@ -489,6 +497,7 @@ class MainWindow(QMainWindow):
         )
         self._add(tools_menu, "Agent Terminal", lambda: self.open_terminal("agent"), "Ctrl+`")
         self._add(tools_menu, "Agent 2 Terminal", lambda: self.open_terminal("agent2"))
+        self._add(tools_menu, "Antigravity Terminal", lambda: self.open_terminal("mesh-agy"))
         self._add(
             tools_menu,
             "PowerShell Terminal",
@@ -579,7 +588,8 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence("Alt+Left"), self, activated=lambda: self._nav("back"))
         QShortcut(QKeySequence("Alt+Right"), self, activated=lambda: self._nav("forward"))
         QShortcut(QKeySequence("F5"), self, activated=lambda: self._nav("reload"))
-        QShortcut(QKeySequence("Esc"), self, activated=self._escape)
+        esc = QShortcut(QKeySequence("Esc"), self, activated=self._escape)
+        esc.setContext(Qt.ShortcutContext.WindowShortcut)
         QShortcut(QKeySequence("Ctrl+Tab"), self, activated=lambda: self._cycle_tab(1))
         QShortcut(
             QKeySequence("Ctrl+Shift+Tab"),
@@ -868,6 +878,23 @@ class MainWindow(QMainWindow):
         self.omnibox.selectAll()
 
     def _escape(self) -> None:
+        # 1) YouTube / HTML5 element fullscreen (video player) — must exit via
+        # the page's Fullscreen API so Qt emits toggleOff and restores chrome.
+        if self._video_fs:
+            view = self.tabs.current_view()
+            if view is not None:
+                try:
+                    view.page().triggerAction(QWebEnginePage.WebAction.ExitFullScreen)
+                except Exception:
+                    self._exit_video_fullscreen()
+            else:
+                self._exit_video_fullscreen()
+            return
+        # 2) Window fullscreen (F11) — Esc is expected to leave it too.
+        if self.isFullScreen():
+            self.showNormal()
+            return
+        # 3) Normal Esc: stop loading + hide find bar
         view = self.tabs.current_view()
         if view is not None:
             view.stop()
@@ -1494,7 +1521,7 @@ class MainWindow(QMainWindow):
         <tr><td><span class='kbd'>Alt+Left</span></td><td>Back</td></tr>
         <tr><td><span class='kbd'>Alt+Right</span></td><td>Forward</td></tr>
         <tr><td><span class='kbd'>F5</span></td><td>Reload</td></tr>
-        <tr><td><span class='kbd'>Esc</span></td><td>Stop loading</td></tr>
+        <tr><td><span class='kbd'>Esc</span></td><td>Exit fullscreen / Stop loading / Close find bar</td></tr>
         <tr><th colspan='2'>View</th></tr>
         <tr><td><span class='kbd'>Ctrl+=</span></td><td>Zoom in</td></tr>
         <tr><td><span class='kbd'>Ctrl+-</span></td><td>Zoom out</td></tr>
