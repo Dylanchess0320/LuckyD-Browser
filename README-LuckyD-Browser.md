@@ -55,13 +55,13 @@ Prefer a cloud model instead? The sidebar supports 9 more providers — see
 
 ## 📦 Download & install
 
-**[⬇ Download v3.6.0](https://github.com/Dylanchess0320/LuckyD-Browser/releases/tag/v3.6.0)** (`LuckyDBrowserSetup-3.6.0.exe`)
+**[⬇ Download v3.7.0](https://github.com/Dylanchess0320/LuckyD-Browser/releases/tag/v3.7.0)** (`LuckyDBrowserSetup-3.7.0.exe`)
 
 - Windows 10/11 x64 · per-user install · **no admin rights needed**
 - Installs to `%LOCALAPPDATA%\Programs\LuckyDBrowser`
 - Start Menu shortcut, optional desktop icon, **Settings > Apps** uninstall entry
 - Everything is bundled (Chromium runtime + coding-agent backend) — nothing else required
-- Silent install for scripting: `LuckyDBrowserSetup-3.6.0.exe /VERYSILENT /NORESTART`
+- Silent install for scripting: `LuckyDBrowserSetup-3.7.0.exe /VERYSILENT /NORESTART`
 
 ---
 

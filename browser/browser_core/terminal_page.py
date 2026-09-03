@@ -22,6 +22,7 @@ _SHELL_LABELS = {
     "mesh-antigravity": "Antigravity",
     "agy": "Antigravity",
     "antigravity": "Antigravity",
+    "mesh-hermes": "Hermes",
 }
 
 
@@ -37,6 +38,7 @@ _MESH_AGENTS = {
     "mesh-cline": ("Cline", "🟡", "#eab308", "autonomous builder"),
     "mesh-openclaw": ("OpenClaw", "🦞", "#ef4444", "100+ skills"),
     "mesh-dsh": ("DeepSeek", "🐋", "#06b6d4", "DeepSeek harness"),
+    "mesh-hermes": ("Hermes", "⚕", "#fb923c", "Nous Research · self-improving"),
     "mesh-pi": ("Pi", "⚪", "#94a3b8", "minimal toolkit"),
 }
 

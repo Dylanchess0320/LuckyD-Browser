@@ -4,8 +4,8 @@
 # http://msdn.microsoft.com/en-us/library/ms646997.aspx
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(3, 6, 0, 0),
-    prodvers=(3, 6, 0, 0),
+    filevers=(3, 7, 0, 0),
+    prodvers=(3, 7, 0, 0),
     mask=0x3f,
     flags=0x0,
     OS=0x40004,
@@ -20,12 +20,12 @@ VSVersionInfo(
         '040904B0',
         [StringStruct('CompanyName', 'LuckyD'),
         StringStruct('FileDescription', 'LuckyD Browser'),
-        StringStruct('FileVersion', '3.6.0.0'),
+        StringStruct('FileVersion', '3.7.0.0'),
         StringStruct('InternalName', 'LuckyDBrowser'),
         StringStruct('LegalCopyright', 'Copyright (C) LuckyD'),
         StringStruct('OriginalFilename', 'LuckyDBrowser.exe'),
         StringStruct('ProductName', 'LuckyD Browser'),
-        StringStruct('ProductVersion', '3.6.0.0')])
+        StringStruct('ProductVersion', '3.7.0.0')])
       ]),
     VarFileInfo([VarStruct('Translation', [1033, 1200])])
   ]

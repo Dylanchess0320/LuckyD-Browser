@@ -153,6 +153,50 @@ def test_antigravity_cli_integration(monkeypatch, tmp_path: Path) -> None:
     assert len(cmd) == 1 and cmd[0].lower().endswith("agy.exe")
 
 
+def test_dsh_shell_boots_web_profile(monkeypatch, tmp_path: Path) -> None:
+    """mesh-dsh must spawn `dsh --profile web`, never a bare `dsh`.
+
+    dsh is a profile launcher: a bare invocation exits immediately with
+    `error: --profile <name> is required`, which showed up as an instantly
+    dead terminal pane when the DeepSeek chip was clicked.
+    """
+    from browser.browser_core.terminal_server import _mesh_shell_command
+
+    mock_dsh = tmp_path / "dsh.cmd"
+    mock_dsh.touch()
+    monkeypatch.setattr(
+        "browser.browser_core.terminal_server._find_mesh_exe",
+        lambda exe: str(mock_dsh) if exe == "dsh" else None,
+    )
+    cmd = _mesh_shell_command("mesh-dsh")
+    assert cmd[0].lower().endswith("dsh.cmd")
+    assert cmd[1:] == ["--profile", "web", "--no-open"]
+
+
+def test_hermes_shell_boots_chat(monkeypatch, tmp_path: Path) -> None:
+    """mesh-hermes must spawn `hermes chat`, never a bare `hermes`.
+
+    A bare hermes exits immediately on a closed stdin, which showed up as
+    an instantly dead terminal pane when the Hermes chip was clicked
+    (same class of bug as mesh-dsh before it pinned the web profile).
+    """
+    from browser.browser_core.terminal_page import _MESH_AGENTS, _SHELL_LABELS
+    from browser.browser_core.terminal_server import SHELLS, _mesh_shell_command
+
+    assert "mesh-hermes" in SHELLS
+    assert "mesh-hermes" in _MESH_AGENTS
+    assert _SHELL_LABELS.get("mesh-hermes") == "Hermes"
+    mock_hermes = tmp_path / "hermes.exe"
+    mock_hermes.touch()
+    monkeypatch.setattr(
+        "browser.browser_core.terminal_server._find_mesh_exe",
+        lambda exe: str(mock_hermes) if exe == "hermes" else None,
+    )
+    cmd = _mesh_shell_command("mesh-hermes")
+    assert cmd[0].lower().endswith("hermes.exe")
+    assert cmd[1:] == ["chat"]
+
+
 def test_installer_removes_legacy_desktop_shortcut() -> None:
     installer = (
         Path(__file__).parents[1] / "browser" / "installer" / "LuckyDBrowser.iss"

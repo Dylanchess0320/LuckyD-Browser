@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🌐 LuckyD Browser v3.6.0 — Hardened
+# 🌐 LuckyD Browser v3.7.0 — Hardened
 
 > **The AI browser that doesn't break. Free, unlimited, offline AI + a full coding platform in one window.**
 >
@@ -9,7 +9,7 @@
 
 [![CI](https://github.com/Dylanchess0320/LuckyD-Browser/actions/workflows/ci.yml/badge.svg)](https://github.com/Dylanchess0320/LuckyD-Browser/actions/workflows/ci.yml)
 [![Python 3.10–3.12](https://img.shields.io/badge/python-3.10--3.12-blue.svg)](https://www.python.org/downloads/)
-[![Version](https://img.shields.io/badge/version-3.6.0-green.svg)](https://github.com/Dylanchess0320/LuckyD-Browser/releases/tag/v3.6.0)
+[![Version](https://img.shields.io/badge/version-3.7.0-green.svg)](https://github.com/Dylanchess0320/LuckyD-Browser/releases/tag/v3.7.0)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Latest Release](https://img.shields.io/github/v/release/Dylanchess0320/LuckyD-Browser?color=green)](https://github.com/Dylanchess0320/LuckyD-Browser/releases)
 
@@ -17,7 +17,7 @@
 
 ---
 
-**[⬇️ Download v3.6.0](https://github.com/Dylanchess0320/LuckyD-Browser/releases/tag/v3.6.0)** · **[Browser Guide](README-LuckyD-Browser.md)** · **[Changelog](CHANGELOG.md)** · **[Security](SECURITY.md)**
+**[⬇️ Download v3.7.0](https://github.com/Dylanchess0320/LuckyD-Browser/releases/tag/v3.7.0)** · **[Browser Guide](README-LuckyD-Browser.md)** · **[Changelog](CHANGELOG.md)** · **[Security](SECURITY.md)**
 
 </div>
 
@@ -35,7 +35,7 @@
 
 ## Why LuckyD
 
-| | **LuckyD 3.6.0** | Comet / Dia | Edge + Copilot | Chrome + Gemini |
+| | **LuckyD 3.7.0** | Comet / Dia | Edge + Copilot | Chrome + Gemini |
 |---|---|---|---|---|
 | Free AI **with no account/key** | ✅ unlimited, local Ollama | ❌ | ❌ | ❌ |
 | **Offline** | ✅ | ❌ | ❌ | ❌ |
@@ -96,12 +96,12 @@ One workspace, **9 live CLIs** on their own ConPTY:
 
 ## 📥 Install in 10 seconds
 
-1. **[Get LuckyDBrowserSetup-3.6.0.exe](https://github.com/Dylanchess0320/LuckyD-Browser/releases/tag/v3.6.0)**
+1. **[Get LuckyDBrowserSetup-3.7.0.exe](https://github.com/Dylanchess0320/LuckyD-Browser/releases/tag/v3.7.0)**
 2. Run — per-user, no admin → `%LOCALAPPDATA%\Programs\LuckyDBrowser` + Start Menu + desktop shortcut
 3. Leave **“Set up free unlimited local AI”** checked → Ollama + `llama3.2:3b` (~2 GB) auto-installs
 4. `Ctrl+Shift+A` → chat offline. Or bring your own keys: Gemini, Groq, DeepSeek, OpenAI, Anthropic, Z.ai, OpenRouter, Cline, OpenCode.
 
-Silent: `LuckyDBrowserSetup-3.6.0.exe /VERYSILENT /NORESTART`
+Silent: `LuckyDBrowserSetup-3.7.0.exe /VERYSILENT /NORESTART`
 
 ---
 

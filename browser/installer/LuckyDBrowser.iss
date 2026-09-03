@@ -2,7 +2,7 @@
 ; LuckyD Browser - Windows installer script (Inno Setup 6)
 ;
 ; Produces a single, shareable setup file:
-;   browser\installer\output\LuckyDBrowserSetup-3.6.0.exe
+;   browser\installer\output\LuckyDBrowserSetup-3.7.0.exe
 ;
 ; Anyone can run it - it installs per-user (no admin needed) to
 ; %LOCALAPPDATA%\Programs\LuckyDBrowser with Start Menu / Desktop
@@ -13,7 +13,7 @@
 ; -----------------------------------------------------------------------------
 
 #define AppName      "LuckyD Browser"
-#define AppVersion   "3.6.0"
+#define AppVersion   "3.7.0"
 #define AppPublisher "LuckyD"
 #define AppExeName   "LuckyDBrowser.exe"
 #define AppURL       "https://github.com/Dylanchess0320/LuckyD-Browser"
@@ -27,11 +27,11 @@ AppPublisher={#AppPublisher}
 AppPublisherURL={#AppURL}
 AppSupportURL={#AppURL}
 AppUpdatesURL={#AppURL}
-VersionInfoVersion=3.6.0.0
+VersionInfoVersion=3.7.0.0
 VersionInfoCompany={#AppPublisher}
 VersionInfoDescription={#AppName} Setup
 VersionInfoProductName={#AppName}
-VersionInfoProductVersion=3.6.0.0
+VersionInfoProductVersion=3.7.0.0
 ; Per-user install ??? no admin rights required (admin users may opt into all-users).
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
@@ -42,7 +42,7 @@ MinVersion=10.0
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir=output
-OutputBaseFilename=LuckyDBrowserSetup-3.6.0
+OutputBaseFilename=LuckyDBrowserSetup-3.7.0
 SetupIconFile=..\assets\professional_icon.ico
 CloseApplications=yes
 RestartApplications=no

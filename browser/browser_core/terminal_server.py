@@ -309,6 +309,7 @@ SHELLS = (
     "mesh-cline",
     "mesh-openclaw",
     "mesh-dsh",
+    "mesh-hermes",
     "mesh-pi",
     "agy",
     "antigravity",
@@ -328,7 +329,22 @@ MESH_SHELLS = {
     "mesh-cline": "cline",
     "mesh-openclaw": "openclaw",
     "mesh-dsh": "dsh",
+    "mesh-hermes": "hermes",
     "mesh-pi": "pi",
+}
+
+# Extra default args per mesh shell (appended after the resolved executable).
+# dsh is a profile launcher — a bare `dsh` with no args exits immediately with
+# `error: --profile <name> is required`. The only profile shipped out of the
+# box is `web` (serves the harness UI on 127.0.0.1:3080), so boot that.
+# `--no-open` avoids popping the OS default browser on every spawn — the user
+# is already inside LuckyD Browser and can navigate to the URL themselves.
+# hermes likewise needs its explicit `chat` subcommand — a bare `hermes`
+# exits immediately on a closed stdin, which showed up as an instantly dead
+# terminal pane (same class of bug as the dsh one above).
+MESH_SHELL_ARGS: dict[str, list[str]] = {
+    "mesh-dsh": ["--profile", "web", "--no-open"],
+    "mesh-hermes": ["chat"],
 }
 
 
@@ -356,7 +372,12 @@ def mesh_shells_available() -> dict[str, bool]:
 
 
 def _mesh_shell_command(shell: str) -> list[str]:
-    """Resolve a mesh-* shell to its absolute executable (allowlisted)."""
+    """Resolve a mesh-* shell to its spawn command (allowlisted).
+
+    Returns [absolute exe, *default args]. Most agents are interactive CLIs
+    that need no args; entries in MESH_SHELL_ARGS append fixed launcher args
+    (e.g. dsh requires `--profile <name>` and dies without it).
+    """
     exe_name = MESH_SHELLS[shell]
     raw = _find_mesh_exe(exe_name)
     if not raw:
@@ -368,7 +389,7 @@ def _mesh_shell_command(shell: str) -> list[str]:
     # exe appears between availability check and spawn.
     if not Path(exe).is_file():
         raise FileNotFoundError(f"Agent Mesh shell '{shell}' resolved to non-file: {exe}")
-    return [exe]
+    return [exe, *MESH_SHELL_ARGS.get(shell, [])]
 
 
 def _shell_command(shell: str, cli_path: str = "", cli2_path: str = "") -> list[str]:

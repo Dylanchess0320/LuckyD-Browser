@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.7.0] - 2026-09-03
+
+### Added
+- **Hermes agent in the Agent Mesh terminal dock** — New Hermes chip (`mesh-hermes` shell) spawns `hermes chat` on its own ConPTY; a bare `hermes` exits instantly on closed stdin, so the shell pins the explicit `chat` subcommand (same bug class as the `mesh-dsh` web-profile fix). Availability is probed via PATH, like every other mesh chip.
+- **Hermes regression test** — `test_hermes_shell_boots_chat` asserts the dock chip, shell label, and `hermes chat` spawn command.
+
+### Fixed
+- **DeepSeek harness mesh wiring** — Agent Mesh `doctor` now validates the `DEEPSEEK_API_KEY` against the live API instead of reporting a false OK when the key is revoked, and `mesh launch dsh` prints the LuckyD Browser tab workflow with port/auth pre-flight checks.
+
 ## [3.6.0] - 2026-08-27
 
 ### Added
