@@ -99,6 +99,34 @@ _CSS = r"""  .search { display: flex; background: var(--card); border: 1px solid
   #addform input { flex: 1; background: var(--card); border: 1px solid var(--border);
     border-radius: 10px; color: var(--text); padding: 10px 12px; font-size: 13px; outline: none; }
   #addform button { background: var(--accent); border: none; color: #fff; border-radius: 10px; padding: 0 16px; cursor: pointer; }
+
+  /* Dual-mode Omnibar + AI Response Card */
+  .mode-tabs { display: flex; gap: 8px; margin-bottom: 12px; justify-content: center; }
+  .mode-tab { padding: 6px 16px; border-radius: 999px; background: var(--card);
+    border: 1px solid var(--border); color: var(--muted); font-size: 12px; font-weight: 600;
+    cursor: pointer; transition: all .15s ease; user-select: none; }
+  .mode-tab:hover { color: var(--text); background: rgba(255,255,255,.09); }
+  .mode-tab.active { background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-color: transparent; color: #fff; box-shadow: 0 2px 14px rgba(91,157,255,.32); }
+
+  .ai-chips { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; justify-content: center; }
+  .ai-chip { background: var(--card); border: 1px solid var(--border); border-radius: 999px;
+    padding: 5px 12px; font-size: 11.5px; color: var(--muted); cursor: pointer;
+    transition: transform .12s, border-color .12s, color .12s; }
+  .ai-chip:hover { transform: translateY(-1px); border-color: var(--accent); color: var(--text); }
+
+  #ai-card { margin-top: 20px; padding: 18px 22px; background: rgba(18,24,42,.88);
+    border: 1px solid var(--accent); border-radius: 16px; backdrop-filter: blur(20px);
+    box-shadow: 0 10px 40px rgba(0,0,0,.5), 0 0 25px rgba(91,157,255,.18);
+    display: none; animation: pop .25s ease-out; text-align: left; }
+  #ai-card-header { display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 12px; }
+  #ai-card-header .title { font-size: 13px; font-weight: 700; color: var(--accent); display: flex; align-items: center; gap: 6px; }
+  #ai-card-header .actions { display: flex; gap: 6px; }
+  .ai-btn { background: var(--card); border: 1px solid var(--border); color: var(--muted);
+    border-radius: 8px; font-size: 11.5px; padding: 4px 10px; cursor: pointer; transition: all .12s; }
+  .ai-btn:hover { color: var(--text); border-color: var(--accent); }
+  #ai-card-body { font-size: 13.5px; line-height: 1.65; color: var(--text); white-space: pre-wrap; word-break: break-word; }
 </style>
 </head>
 """
@@ -115,6 +143,11 @@ _BODY = r"""<body>
 </header>
 <div id="party"><div class="burst" id="partytext"></div></div>
 <main>
+  <div class="mode-tabs">
+    <button type="button" class="mode-tab active" id="tab-search" onclick="setSearchMode('search')">🔍 Web Search</button>
+    <button type="button" class="mode-tab" id="tab-ask" onclick="setSearchMode('ask')">⚡ Ask LuckyD AI</button>
+  </div>
+
   <form class="search" id="searchform">
     <select id="engine">
       <option value="google">Google</option>
@@ -123,8 +156,27 @@ _BODY = r"""<body>
       <option value="brave">Brave</option>
     </select>
     <input id="q" placeholder="Search the web or type a URL" autocomplete="off" autofocus>
-    <button type="submit">Go</button>
+    <button type="submit" id="searchbtn">Go</button>
   </form>
+
+  <div class="ai-chips" id="ai-chips">
+    <button type="button" class="ai-chip" onclick="askPreset('Summarize the top AI developments and breakthroughs today')">📰 AI News Digest</button>
+    <button type="button" class="ai-chip" onclick="askPreset('Explain how browser agents work with CDP and local Control APIs')">🧠 Agent Architecture</button>
+    <button type="button" class="ai-chip" onclick="askPreset('Write a Python script to scrape live tables and export clean CSV')">💻 Python Automation</button>
+    <button type="button" class="ai-chip" onclick="askPreset('What are the top security & privacy hardening practices for Windows 11?')">🛡️ Security Checklist</button>
+  </div>
+
+  <div id="ai-card">
+    <div id="ai-card-header">
+      <div class="title"><span>◈</span> <span>LuckyD AI Answer</span></div>
+      <div class="actions">
+        <button type="button" class="ai-btn" onclick="copyAiAnswer()">📋 Copy</button>
+        <button type="button" class="ai-btn" onclick="location.href='luckyd://assistant'">↗️ Open Sidebar</button>
+        <button type="button" class="ai-btn" onclick="closeAiCard()">✕</button>
+      </div>
+    </div>
+    <div id="ai-card-body"></div>
+  </div>
 
   <div class="section">Apps</div>
   <div class="grid" id="apps"></div>
@@ -299,10 +351,73 @@ function render() {
 }
 function save() { localStorage.setItem('ld_shortcuts', JSON.stringify(shortcuts)); }
 
+let currentSearchMode = localStorage.getItem('ld_search_mode') || 'search';
+function setSearchMode(mode) {
+  currentSearchMode = mode;
+  localStorage.setItem('ld_search_mode', mode);
+  const isAsk = mode === 'ask';
+  document.getElementById('tab-search').className = 'mode-tab' + (isAsk ? '' : ' active');
+  document.getElementById('tab-ask').className = 'mode-tab' + (isAsk ? ' active' : '');
+  document.getElementById('engine').style.display = isAsk ? 'none' : 'block';
+  const q = document.getElementById('q');
+  q.placeholder = isAsk ? 'Ask LuckyD AI anything or generate code/analysis…' : 'Search the web or type a URL';
+  document.getElementById('searchbtn').textContent = isAsk ? 'Ask AI' : 'Go';
+}
+setSearchMode(currentSearchMode);
+
+window.__lastAiAnswer = '';
+async function askAI(query) {
+  if (!query.trim()) return;
+  const card = document.getElementById('ai-card');
+  const body = document.getElementById('ai-card-body');
+  card.style.display = 'block';
+  body.textContent = 'Thinking… contacting AI model…';
+  card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  try {
+    const res = await fetch('/ask', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(DASH_TOKEN ? { 'Authorization': 'Bearer ' + DASH_TOKEN } : {})
+      },
+      body: JSON.stringify({ question: query })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const text = data.text || data.answer || (typeof data === 'string' ? data : JSON.stringify(data));
+    body.textContent = text;
+    window.__lastAiAnswer = text;
+  } catch (err) {
+    body.textContent = 'Could not get AI answer: ' + err.message + '\n\nTip: You can open the AI Sidebar directly (Ctrl+Shift+A) or check provider status.';
+  }
+}
+
+function askPreset(prompt) {
+  setSearchMode('ask');
+  document.getElementById('q').value = prompt;
+  askAI(prompt);
+}
+
+function copyAiAnswer() {
+  if (window.__lastAiAnswer) {
+    navigator.clipboard.writeText(window.__lastAiAnswer);
+    party('📋 Copied to clipboard!');
+  }
+}
+
+function closeAiCard() {
+  document.getElementById('ai-card').style.display = 'none';
+}
+
 document.getElementById('searchform').addEventListener('submit', ev => {
   ev.preventDefault();
   const q = document.getElementById('q').value.trim();
   if (!q) return;
+  if (currentSearchMode === 'ask') {
+    askAI(q);
+    return;
+  }
   const engine = document.getElementById('engine').value;
   localStorage.setItem('ld_engine', engine);
   if (/^[^\s]+\.[^\s]{2,}$/.test(q)) { location.href = q.startsWith('http') ? q : 'https://' + q; }

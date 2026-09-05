@@ -146,6 +146,10 @@ exclude = '''
   | venv
   | build
   | dist
+  | node_modules
+  | site
+  | archive
+  | \.transforms
 )/
 '''
 

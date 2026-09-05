@@ -1,23 +1,27 @@
 @echo off
 setlocal EnableDelayedExpansion
 cd /d "%~dp0"
-chcp 65001 >nul 2>&1
 title LuckyD Code - Health Check
 
-:: ── Find Python (same discovery order as run.bat) ───────────────────
+REM -- Find Python (prefer project venv, then Python 3.10-3.12) --
 set "PYTHON="
 if exist ".venv\Scripts\python.exe" (
     set "PYTHON=.venv\Scripts\python.exe"
 ) else if exist "venv\Scripts\python.exe" (
     set "PYTHON=venv\Scripts\python.exe"
 ) else (
-    where py >nul 2>&1
+    py -3.10 -c "import sys" >nul 2>&1
     if !errorlevel! == 0 (
-        set "PYTHON=py -3"
+        set "PYTHON=py -3.10"
     ) else (
-        where python >nul 2>&1
+        python -c "import sys; sys.exit(0 if (3,10) <= sys.version_info[:2] < (3,13) else 1)" >nul 2>&1
         if !errorlevel! == 0 (
             set "PYTHON=python"
+        ) else (
+            where python >nul 2>&1
+            if !errorlevel! == 0 (
+                set "PYTHON=python"
+            )
         )
     )
 )
@@ -27,7 +31,7 @@ if not defined PYTHON (
     exit /b 1
 )
 
-:: ── Python version check ─────────────────────────────────────────────
+REM -- Python version check --
 for /f "tokens=2" %%v in ('%PYTHON% -c "import sys; print(sys.version.split()[0])"') do set "PYVER=%%v"
 echo Using Python !PYVER! (%PYTHON%)
 echo.
@@ -36,11 +40,11 @@ if errorlevel 1 (
     echo [WARN] pyproject.toml requires Python 3.10-3.12; this interpreter is !PYVER!.
     echo        If installs below fail with odd build/wheel errors, install
     echo        Python 3.12 from python.org and re-run this script with:
-    echo          py -3.12 verify.bat   ^(or create a venv with py -3.12 -m venv .venv^)
+    echo          py -3.12 verify.bat   (or create a venv with py -3.12 -m venv .venv)
     echo.
 )
 
-:: ── Ensure dev + browser deps are installed ──────────────────────────
+REM -- Ensure dev + browser deps are installed --
 echo ========================================
 echo  Checking dependencies
 echo ========================================
@@ -50,11 +54,7 @@ echo Installing/verifying browser dependencies from browser\requirements.txt ...
 %PYTHON% -m pip install -q -r browser\requirements.txt
 echo.
 
-:: ── Run each check as its own step; each writes 0/1 to its own marker
-::    file instead of a shared variable. This sidesteps batch's classic
-::    "set inside a parenthesized if-block doesn't reliably persist"
-::    footgun entirely, rather than fighting it with delayed-expansion
-::    escaping tricks.
+REM -- Run each check as its own step --
 set "MARK_DIR=%TEMP%\luckyd-verify-%RANDOM%"
 mkdir "%MARK_DIR%" >nul 2>&1
 
@@ -102,7 +102,7 @@ endlocal
 exit /b %ANY_FAILED%
 
 :record
-:: %1 = check name, %2 = its errorlevel
+REM %1 = check name, %2 = its errorlevel
 if "%~2"=="0" (
     echo [PASS] %~1
 ) else (

@@ -8,6 +8,7 @@ site_author: LuckyD
 site_url: https://luckyd.github.io/coding-agent/
 repo_name: luckyd/coding-agent
 repo_url: https://github.com/luckyd/coding-agent
+docs_dir: docs/docs
 edit_uri: edit/main/docs/docs/
 
 theme:
@@ -72,15 +73,14 @@ markdown_extensions:
 plugins:
   - search
   - mkdocstrings:
-      default:
-        handlers:
-          python:
-            paths: [".."]
-            options:
-              show_source: true
-              show_root_heading: true
-              show_category_heading: true
-              docstring_style: google
+      handlers:
+        python:
+          paths: [".."]
+          options:
+            show_source: true
+            show_root_heading: true
+            show_category_heading: true
+            docstring_style: google
   - git-revision-date-localized:
       enabled: !ENV [CI, false]
   - minify:
@@ -102,7 +102,7 @@ nav:
       - CLI: reference/cli.md
       - Configuration: reference/configuration.md
   - Development:
-      - Contributing: ../CONTRIBUTING.md
-      - Changelog: ../CHANGELOG.md
-      - Security: ../SECURITY.md
-      - Code of Conduct: ../CODE_OF_CONDUCT.md
+      - Contributing: development/contributing.md
+      - Changelog: development/changelog.md
+      - Security: development/security.md
+      - Code of Conduct: development/code-of-conduct.md

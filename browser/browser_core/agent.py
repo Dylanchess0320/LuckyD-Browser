@@ -72,8 +72,8 @@ _SNAPSHOT_JS = r"""
   const text = (document.body ? document.body.innerText : '')
     .replace(/\s+/g, ' ').trim().slice(0, __MAXTEXT__);
   const dlg = window.__ld_dialog || ''; window.__ld_dialog = '';
-  const more = document.documentElement.scrollHeight >
-    window.scrollY + window.innerHeight + 100;
+  const scrollH = document.documentElement ? document.documentElement.scrollHeight : (document.body ? document.body.scrollHeight : 0);
+  const more = scrollH > window.scrollY + window.innerHeight + 100;
   return JSON.stringify({
     url: location.href, title: document.title,
     elements: lines.join('\n'), text: text, dialog: dlg, more_below: more

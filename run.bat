@@ -12,8 +12,7 @@ for /f %%a in ('echo prompt $E ^| cmd') do set "ESC=%%a"
 
 title LuckyD Code
 
-:: ── Find Python ───────────────────────────────────────────────────────
-:: Prefer a project venv, then py launcher, then python on PATH
+REM -- Find Python (prefer project venv, then Python 3.10-3.12) --
 set "PYTHON="
 
 if exist ".venv\Scripts\python.exe" (
@@ -21,13 +20,18 @@ if exist ".venv\Scripts\python.exe" (
 ) else if exist "venv\Scripts\python.exe" (
     set "PYTHON=venv\Scripts\python.exe"
 ) else (
-    where py >nul 2>&1
+    py -3.10 -c "import sys" >nul 2>&1
     if !errorlevel! == 0 (
-        set "PYTHON=py -3"
+        set "PYTHON=py -3.10"
     ) else (
-        where python >nul 2>&1
+        python -c "import sys; sys.exit(0 if (3,10) <= sys.version_info[:2] < (3,13) else 1)" >nul 2>&1
         if !errorlevel! == 0 (
             set "PYTHON=python"
+        ) else (
+            where python >nul 2>&1
+            if !errorlevel! == 0 (
+                set "PYTHON=python"
+            )
         )
     )
 )

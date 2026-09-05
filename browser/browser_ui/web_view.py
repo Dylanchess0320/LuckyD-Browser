@@ -278,11 +278,16 @@ class WebView(QWebEngineView):
                     page.url().toString() + "#:~:text=" + quote(selected[:300], safe="")
                 ),
             )
-            ai_menu = menu.addMenu("AI")
+            ai_menu = menu.addMenu("AI Assistant")
             for action_label, instruction in (
-                ("Explain this", "Explain this clearly:"),
-                ("Summarize this", "Summarize this:"),
-                ("Translate to English", "Translate this to English:"),
+                ("💡 Explain this clearly", "Explain this clearly with intuitive context:"),
+                ("📝 Summarize into bullets", "Summarize this into concise key bullet points:"),
+                ("🔍 Fact-check & verify", "Verify and fact-check the following statement:"),
+                (
+                    "💻 Convert to code / implementation",
+                    "Convert this description or algorithm into clean code:",
+                ),
+                ("🌐 Translate to English", "Translate this to English:"),
             ):
                 ai_menu.addAction(
                     action_label,

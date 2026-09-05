@@ -6,6 +6,7 @@ Borrows patterns from Cline's checkpoint-diff.ts and checkpoint-restore.ts.
 
 from __future__ import annotations
 
+import contextlib
 import difflib
 import json
 from datetime import datetime, timezone
@@ -177,6 +178,12 @@ class CheckpointManager:
                     indent=2,
                 )
             )
+            # Keep checkpoints folder tidy: prune oldest files if count exceeds 50
+            files = sorted(self._persist_dir.glob("*.json"), key=lambda f: f.stat().st_mtime)
+            if len(files) > 50:
+                for old_f in files[:-50]:
+                    with contextlib.suppress(Exception):
+                        old_f.unlink()
         except Exception:
             pass
 

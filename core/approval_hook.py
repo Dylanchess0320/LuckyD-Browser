@@ -6,6 +6,7 @@ Borrows pattern from Cline's tool-approval.ts with file-based IPC mechanism.
 from __future__ import annotations
 
 import json
+import os
 import time
 from collections.abc import Callable
 from datetime import datetime, timezone
@@ -130,7 +131,11 @@ class ApprovalHook(AgentPlugin):
         self.approval_dir = approval_dir
         self.session_id = session_id
         self.timeout_ms = timeout_ms
-        self.auto_approve_all = False
+        self.auto_approve_all = os.environ.get("CODING_AGENT_AUTO_APPROVE", "").lower() in (
+            "1",
+            "true",
+            "yes",
+        ) or os.environ.get("CODING_AGENT_YOLO", "").lower() in ("1", "true", "yes")
 
     def set_permission(self, tool_name: str, level: ToolPermissionLevel):
         _TOOL_PERMISSIONS[tool_name] = level

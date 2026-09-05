@@ -1481,7 +1481,7 @@ def main():
         elif args[i] == "--temp" and i + 1 < len(args):
             temperature = float(args[i + 1])
             i += 2
-        elif args[i] in ("-y", "--yes", "--auto-approve"):
+        elif args[i] in ("-y", "--yes", "--auto-approve", "--yolo"):
             os.environ["CODING_AGENT_AUTO_APPROVE"] = "1"
             i += 1
         elif args[i] == "--max-turns" and i + 1 < len(args):
@@ -1529,7 +1529,7 @@ Options:
   --provider NAME    Set provider: opencode, openrouter, deepseek, google, ollama, zai, groq
   --thinking         Use the thinking/reasoning model
   --temp FLOAT       Temperature (default: 0.0)
-  -y, --yes          Auto-approve all tool calls (non-interactive mode)
+  -y, --yes, --yolo  Auto-approve all tool calls (non-interactive / yolo mode)
   --max-turns N      Override max agent turns (default: 30)
   -c, --continue     Resume most recent session
   --resume <id>      Resume a specific session by ID or prefix

@@ -245,10 +245,13 @@
 
   // ---- observers + timers ----------------------------------------------------
   removeAdDom();
-  new MutationObserver(() => {
-    removeAdDom();
-    dismissBlockPopup();
-  }).observe(document.documentElement, { childList: true, subtree: true });
+  const obsTarget = document.documentElement || document;
+  if (obsTarget) {
+    new MutationObserver(() => {
+      removeAdDom();
+      dismissBlockPopup();
+    }).observe(obsTarget, { childList: true, subtree: true });
+  }
 
   setInterval(() => {
     finishAd();

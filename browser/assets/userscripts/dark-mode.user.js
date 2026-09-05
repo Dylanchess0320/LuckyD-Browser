@@ -24,9 +24,12 @@
   if (document.head) {
     add();
   } else {
-    const obs = new MutationObserver(() => {
-      if (document.head) { add(); obs.disconnect(); }
-    });
-    obs.observe(document.documentElement, { childList: true, subtree: true });
+    const target = document.documentElement || document;
+    if (target) {
+      const obs = new MutationObserver(() => {
+        if (document.head) { add(); obs.disconnect(); }
+      });
+      obs.observe(target, { childList: true, subtree: true });
+    }
   }
 })();

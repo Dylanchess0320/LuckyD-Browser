@@ -311,6 +311,17 @@ class AiSidebar(QDockWidget):
             actions.addWidget(btn)
         layout.addLayout(actions)
 
+        actions2 = QHBoxLayout()
+        for label, slot in (
+            ("📊 Extract Data", self._extract_data),
+            ("🛡️ Audit", self._security_audit),
+            ("📋 Copy Chat", self._copy_chat),
+        ):
+            btn = QPushButton(label, body)
+            btn.clicked.connect(slot)
+            actions2.addWidget(btn)
+        layout.addLayout(actions2)
+
         self.harness_box = QCheckBox(body)
         self.harness_box.setText("\U0001f50c Full coding agent (recommended)")
         self.harness_box.setToolTip(
@@ -705,6 +716,34 @@ class AiSidebar(QDockWidget):
         self._history = []
         self.status.setText("Conversation cleared")
         self._greet()
+
+    def _extract_data(self) -> None:
+        self._quick(
+            "Extract all structured data from this page (tables, key metrics, pricing, "
+            "contact information, lists) into clean Markdown tables and bullet points."
+        )
+
+    def _security_audit(self) -> None:
+        self._quick(
+            "Perform a security & privacy review of this page: identify visible input forms, "
+            "auth mechanisms, external resources, tracker hints, and potential phishing or security concerns."
+        )
+
+    def _copy_chat(self) -> None:
+        lines = []
+        for b in self._blocks:
+            role = str(b.get("role", "info")).upper()
+            text = str(b.get("text", "")).strip()
+            if text:
+                lines.append(f"### {role}\n{text}\n")
+        content = "\n".join(lines)
+        if content:
+            from PySide6.QtGui import QGuiApplication
+
+            QGuiApplication.clipboard().setText(content)
+            self.status.setText("Chat copied to clipboard as Markdown!")
+        else:
+            self.status.setText("Nothing to copy")
 
     def ask(self, question: str) -> None:
         """Programmatic question (e.g. omnibox "?…" prefix) — into the chat."""
