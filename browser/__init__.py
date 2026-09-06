@@ -4,6 +4,7 @@ __version__ = "3.7.0"
 
 # Shown once after an update (first launch with a new version).
 WHATS_NEW = (
-    "LuckyD v3.7.0 Upgrade — Hermes agent joins the Agent Mesh terminal dock, "
-    "DeepSeek harness mesh wiring with API-key health checks, and a mesh research stage."
+    "LuckyD v3.8.0 Upgrade — Deep Research joins the browser: a multi-agent "
+    "research swarm (Tools > Deep Research, Ctrl+Shift+R) with citation-backed "
+    "reports, depth presets, and Gemini, Tavily, Brave, and keyless DDG search."
 )

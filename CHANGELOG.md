@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.8.0] - 2026-09-06
+
+### Added
+- **Deep Research swarm as a native tool** — New `DeepResearch` agent tool (`tools/deep_research_tool.py`, vendored engine in `features/deep_research/`): planner -> parallel grounded workers -> citation-grounded synthesizer -> critic -> claim-level verifier -> finalizer, returning citation-backed markdown plus `data/deep_research/runs/` artifacts.
+- **Multi-provider research backends** — Gemini native grounding, LuckyD stack (Ollama local free, DeepSeek, OpenAI, OpenRouter, ...), keyless DDG (+ frozen-safe HTML fallback), Tavily/Brave premium search (`TAVILY_API_KEY`/`BRAVE_API_KEY`), and an offline mock for tests.
+- **Depth presets + context** — `depth=quick|standard|deep|max`, `context` injection (browser passes the current tab), `max_sources`, per-run budgets, SQLite cache.
+- **Browser hooks** — Tools menu `Deep Research…` (`Ctrl+Shift+R`) and command-palette entry; frozen builds bundle the swarm (features datas + hiddenimports in all 3 PyInstaller specs).
+
 ## [3.7.0] - 2026-09-03
 
 ### Added
