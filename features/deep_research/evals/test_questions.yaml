@@ -1,0 +1,10 @@
+- question: "What are the latest advances in perovskite solar cell efficiency in 2025?"
+  expects_citations: true
+- question: "Compare the approaches of OpenAI, Anthropic, and Google to AI safety."
+  expects_citations: true
+- question: "What caused the 2024 Boeing 737 MAX 9 door plug incident and what were the regulatory consequences?"
+  expects_citations: true
+- question: "What is the current state of room-temperature superconductivity research?"
+  expects_citations: true
+- question: "Summarize the economic effects of the 2023-2024 Red Sea shipping disruptions."
+  expects_citations: true

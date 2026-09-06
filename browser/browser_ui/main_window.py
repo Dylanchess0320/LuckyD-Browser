@@ -509,6 +509,7 @@ class MainWindow(QMainWindow):
         self._add(tools_menu, "Workflows…", self.open_workflows)
         self._add(tools_menu, "Network Monitor", self.open_network_monitor)
         self._add(tools_menu, "Organize Tabs with AI", self.organize_tabs_with_ai)
+        self._add(tools_menu, "Deep Research…", self.open_deep_research, "Ctrl+Shift+R")
         tools_menu.addSeparator()
         self.adblock_act = QAction("Ad-Block Enabled", self, checkable=True)
         self.adblock_act.setChecked(bool(self.settings.get("adblock_enabled", True)))
@@ -719,6 +720,43 @@ class MainWindow(QMainWindow):
                 "Network Monitor needs the Browser Control API (Tools → Browser Control API)",
                 kind="error",
             )
+
+    def open_deep_research(self) -> None:
+        """Prompt for a research question and run it via the DeepResearch agent tool.
+
+        The swarm itself runs in the coding-agent backend (HQ / harness), which
+        has the DeepResearch tool registered. Here we collect the question and
+        hand it to the AI sidebar harness with an explicit instruction to use
+        that tool, so the report comes back with citations + artifact paths.
+        """
+        from PySide6.QtWidgets import QInputDialog
+
+        query, ok = QInputDialog.getText(
+            self,
+            "Deep Research",
+            "Research question:",
+            text="",
+        )
+        query = (query or "").strip()
+        if not ok or not query:
+            return
+        page_hint = ""
+        try:
+            view = self.tabs.current_view()
+            if view is not None and view.url().scheme() in ("http", "https"):
+                page_hint = (
+                    f"\n\nCurrent browser page for extra context: "
+                    f"{view.title() or ''} — {view.url().toString()}"
+                )
+        except Exception:
+            page_hint = ""
+        try:
+            self.ai_sidebar.ask(
+                "Use the DeepResearch tool to research the following question. "
+                "Return the full citation-backed markdown report.\n\n" + query + page_hint
+            )
+        except Exception:
+            self.show_assistant()
 
     # ── side pane (second docked web view) ────────────────────────────
 

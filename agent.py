@@ -22,6 +22,7 @@ import tools.browser_tools
 import tools.config_tool
 import tools.data_tools
 import tools.datetime_tools
+import tools.deep_research_tool
 
 # Auto-register built-in tools (populates the tool registry)
 import tools.file_tools

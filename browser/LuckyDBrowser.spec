@@ -35,6 +35,7 @@ a = Analysis(
            ('../llm', 'llm'),
            ('../memory', 'memory'),
            ('../tools', 'tools'),
+           ('../features', 'features'),
            ('../skills', 'skills'),
            # Ship browser_core (esp. cline_session.py) as a data folder so the
            # bundled core/providers.py can locate it at browser/browser_core/

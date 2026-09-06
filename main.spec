@@ -27,6 +27,7 @@ a = Analysis(
         ('llm', 'llm'),
         ('memory', 'memory'),
         ('tools', 'tools'),
+        ('features', 'features'),
         ('project', 'project'),
         ('skills', 'skills'),
         ('agent.py', '.'),
@@ -42,6 +43,9 @@ a = Analysis(
     hiddenimports=[
         'httpx', 'httpcore', 'h11', 'certifi', 'idna', 'sniffio', 'anyio',
         'cline_session',
+        # Deep Research swarm (tools/deep_research_tool.py + features/deep_research):
+        # langgraph orchestration, Gemini grounding, keyless DDG search.
+        'langgraph', 'langgraph.graph', 'google.genai', 'ddgs',
         # Rich powers the real terminal experience here (unlike
         # luckyd-code.spec, which excludes it -- that exe never renders a
         # prompt so it doesn't need it. This one does.)
@@ -59,7 +63,7 @@ a = Analysis(
         'numpy', 'scipy', 'sklearn', 'pandas', 'matplotlib', 'sentence_transformers',
         'playwright', 'websockets', 'browser_use', 'selenium',
         'PIL', 'mss', 'pyautogui', 'pygetwindow', 'pyperclip', 'win10toast',
-        'yaml', 'jedi', 'ddgs', 'duckduckgo_search', 'requests', 'aiohttp',
+        'yaml', 'jedi', 'requests', 'aiohttp',
         'openai', 'anthropic', 'cryptography',
     ],
     win_no_prefer_redirects=False,

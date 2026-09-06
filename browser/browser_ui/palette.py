@@ -109,6 +109,7 @@ class CommandPalette(QWidget):
         for label, action in [
             ("New Tab", self._mw.new_tab),
             ("AI Assistant", self._mw.show_assistant),
+            ("Deep Research…", self._mw.open_deep_research),
             ("Coding Agent", self._mw.open_hq),
             ("Agent Terminal", self._mw.open_terminal),
             ("Antigravity Terminal", lambda: self._mw.open_terminal("mesh-agy")),

@@ -22,6 +22,7 @@ a = Analysis(
         ('llm', 'llm'),
         ('memory', 'memory'),
         ('tools', 'tools'),
+        ('features', 'features'),
         ('project', 'project'),
         ('skills', 'skills'),
         ('agent.py', '.'),
@@ -37,6 +38,9 @@ a = Analysis(
     hiddenimports=[
         'httpx', 'httpcore', 'h11', 'certifi', 'idna', 'sniffio', 'anyio',
         'cline_session',
+        # Deep Research swarm (tools/deep_research_tool.py + features/deep_research):
+        # langgraph orchestration, Gemini grounding, keyless DDG search.
+        'langgraph', 'langgraph.graph', 'google.genai', 'ddgs',
     ],
     hookspath=[],
     hooksconfig={},
@@ -57,7 +61,7 @@ a = Analysis(
         # CLI front-end (not used by --web)
         'rich', 'prompt_toolkit', 'wcwidth', 'colorama',
         # misc optional tools
-        'yaml', 'jedi', 'ddgs', 'duckduckgo_search', 'requests', 'aiohttp',
+        'yaml', 'jedi', 'requests', 'aiohttp',
         'openai', 'anthropic', 'cryptography',
     ],
     win_no_prefer_redirects=False,
