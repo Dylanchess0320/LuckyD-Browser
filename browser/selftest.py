@@ -410,6 +410,18 @@ def _api_checks(port: int) -> None:
     except Exception as exc:
         API_RESULTS.append(("control API /hq gateway", False, str(exc)))
     try:
+        with urllib.request.urlopen(base + "/research", timeout=10) as r:  # nosec B310
+            res = r.read().decode("utf-8", errors="replace")
+        API_RESULTS.append(
+            (
+                "control API /research",
+                "LuckyD Deep Research" in res and "SWARM" in res,
+                "",
+            )
+        )
+    except Exception as exc:
+        API_RESULTS.append(("control API /research", False, str(exc)))
+    try:
         st = get("/status")
         API_RESULTS.append(
             (

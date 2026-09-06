@@ -1,4 +1,4 @@
-﻿# LuckyD Browser - per-user installer (no admin required).
+# LuckyD Browser - per-user installer (no admin required).
 # Copies the packaged app to %LOCALAPPDATA%\Programs, creates Start Menu +
 # Desktop shortcuts, and registers it in Settings > Apps with an uninstaller.
 #
@@ -19,7 +19,7 @@ if (-not (Test-Path (Join-Path $src $exeName))) {
 # Keep the Apps & features entry in sync with the actual signed/bundled EXE
 # rather than a stale literal in this developer-friendly installer.
 $appVersion = (Get-Item (Join-Path $src $exeName)).VersionInfo.ProductVersion
-if ([string]::IsNullOrWhiteSpace($appVersion)) { $appVersion = '2.5.7' }
+if ([string]::IsNullOrWhiteSpace($appVersion)) { $appVersion = '3.8.0' }
 
 Write-Host "Installing $appName to $dest ..."
 # A running app can keep Qt WebEngine files open. Stop only LuckyD's own

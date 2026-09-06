@@ -1,0 +1,135 @@
+246 INFO: PyInstaller: 6.21.0, contrib hooks: 2026.6
+246 INFO: Python: 3.10.11
+257 INFO: Platform: Windows-10-10.0.26200-SP0
+257 INFO: Python environment: C:\Users\dylan\AppData\Local\Programs\Python\Python310
+260 INFO: Removing temporary files and cleaning cache in C:\Users\dylan\AppData\Local\pyinstaller
+3707 INFO: Module search paths (PYTHONPATH):
+['C:\\Users\\dylan\\OneDrive\\Desktop\\coding-agent\\browser',
+ 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\python310.zip',
+ 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\DLLs',
+ 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib',
+ 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310',
+ 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages',
+ 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\win32',
+ 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\win32\\lib',
+ 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\pythonwin',
+ 'C:\\Users\\dylan\\OneDrive\\Desktop\\coding-agent']
+pygame 2.6.1 (SDL 2.28.4, Python 3.10.11)
+Hello from the pygame community. https://www.pygame.org/contribute.html
+5470 INFO: Appending 'binaries' from .spec
+5471 INFO: Appending 'datas' from .spec
+7961 INFO: checking Analysis
+7961 INFO: Building Analysis because Analysis-00.toc is non existent
+7961 INFO: Looking for Python shared library...
+7961 INFO: Using Python shared library: C:\Users\dylan\AppData\Local\Programs\Python\Python310\python310.dll
+7961 INFO: Running Analysis Analysis-00.toc
+7961 INFO: Target bytecode optimization level: 0
+7961 INFO: Initializing module dependency graph...
+7967 INFO: Initializing module graph hook caches...
+8065 INFO: Analyzing modules for base_library.zip ...
+8689 INFO: Processing standard module hook 'hook-heapq.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\PyInstaller\\hooks'
+8775 INFO: Processing standard module hook 'hook-encodings.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\PyInstaller\\hooks'
+9396 INFO: Processing standard module hook 'hook-math.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\PyInstaller\\hooks'
+10318 INFO: Processing standard module hook 'hook-pickle.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\PyInstaller\\hooks'
+12232 INFO: Caching module dependency graph...
+12272 INFO: Analyzing C:\Users\dylan\OneDrive\Desktop\coding-agent\browser\main.py
+12324 INFO: Processing standard module hook 'hook-PySide6.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\PyInstaller\\hooks'
+12552 INFO: Processing standard module hook 'hook-shiboken6.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\PyInstaller\\hooks'
+12677 INFO: Processing standard module hook 'hook-PySide6.QtNetwork.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\PyInstaller\\hooks'
+14787 INFO: Processing standard module hook 'hook-PySide6.QtCore.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\PyInstaller\\hooks'
+18510 INFO: Processing standard module hook 'hook-PySide6.QtWebEngineCore.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\PyInstaller\\hooks'
+20517 INFO: Processing standard module hook 'hook-PySide6.QtGui.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\PyInstaller\\hooks'
+41764 INFO: Processing standard module hook 'hook-PySide6.QtWebChannel.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\PyInstaller\\hooks'
+42411 INFO: Processing standard module hook 'hook-multiprocessing.util.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\PyInstaller\\hooks'
+42574 INFO: Processing standard module hook 'hook-xml.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\PyInstaller\\hooks'
+42871 INFO: Processing standard module hook 'hook-_ctypes.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\PyInstaller\\hooks'
+43961 INFO: Processing standard module hook 'hook-certifi.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+44060 INFO: Processing standard module hook 'hook-platform.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\PyInstaller\\hooks'
+44314 INFO: Processing standard module hook 'hook-anyio.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+44800 INFO: Processing pre-safe-import-module hook 'hook-typing_extensions.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+44803 INFO: SetuptoolsInfo: initializing cached setuptools info...
+47161 INFO: Processing standard module hook 'hook-difflib.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\PyInstaller\\hooks'
+47322 INFO: Processing standard module hook 'hook-webbrowser.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\PyInstaller\\hooks'
+47358 INFO: Processing standard module hook 'hook-pygments.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\PyInstaller\\hooks'
+48482 INFO: Processing standard module hook 'hook-sqlite3.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\PyInstaller\\hooks'
+48917 INFO: Processing standard module hook 'hook-PySide6.QtWebEngineWidgets.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\PyInstaller\\hooks'
+50140 INFO: Processing standard module hook 'hook-PySide6.QtWidgets.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\PyInstaller\\hooks'
+54494 INFO: Processing standard module hook 'hook-PySide6.QtPrintSupport.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\PyInstaller\\hooks'
+55263 INFO: Processing standard module hook 'hook-websockets.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+56302 INFO: Analyzing hidden import 'websockets.__main__'
+57114 INFO: Analyzing hidden import 'websockets.auth'
+57236 INFO: Analyzing hidden import 'websockets.connection'
+57241 INFO: Analyzing hidden import 'websockets.http'
+57247 INFO: Analyzing hidden import 'websockets.legacy.client'
+57263 INFO: Analyzing hidden import 'websockets.sync.router'
+57274 INFO: Analyzing hidden import 'winpty.tests'
+57279 INFO: Analyzing hidden import 'winpty.tests.test_pty'
+57297 INFO: Processing standard module hook 'hook-pytest.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+57696 INFO: Processing standard module hook 'hook-py.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+57888 INFO: Processing pre-safe-import-module hook 'hook-packaging.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+58065 INFO: Processing pre-safe-import-module hook 'hook-tomli.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+58307 INFO: Processing standard module hook 'hook-sysconfig.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\PyInstaller\\hooks'
+58633 INFO: Processing standard module hook 'hook-numpy.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\PyInstaller\\hooks'
+61302 INFO: Processing standard module hook 'hook-charset_normalizer.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+62397 INFO: Processing standard module hook 'hook-pkg_resources.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\PyInstaller\\hooks'
+63662 INFO: Analyzing hidden import 'winpty.tests.test_ptyprocess'
+63675 INFO: Processing module hooks (post-graph stage)...
+63945 INFO: Processing standard module hook 'hook-xml.etree.cElementTree.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\PyInstaller\\hooks'
+64042 INFO: Processing pre-safe-import-module hook 'hook-win32com.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\_pyinstaller_hooks_contrib\\pre_safe_import_module'
+64134 INFO: Processing standard module hook 'hook-win32com.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+64141 INFO: Processing standard module hook 'hook-pythoncom.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+64224 INFO: Processing standard module hook 'hook-pywintypes.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+65145 INFO: Processing standard module hook 'hook-jinja2.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+69678 INFO: Processing standard module hook 'hook-PySide6.QtPositioning.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\PyInstaller\\hooks'
+71833 INFO: Processing standard module hook 'hook-PySide6.QtQuick.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\PyInstaller\\hooks'
+74564 INFO: Processing standard module hook 'hook-PySide6.QtOpenGL.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\PyInstaller\\hooks'
+79862 INFO: Processing standard module hook 'hook-PySide6.QtQml.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\PyInstaller\\hooks'
+87614 WARNING: QtLibraryInfo(PySide6): QML plugin binary 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\Lib\\site-packages\\PySide6\\qml\\Qt\\labs\\assetdownloader\\qmlassetdownloaderprivateplugin.dll' does not exist!
+132805 INFO: Processing standard module hook 'hook-PySide6.QtQuickWidgets.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\PyInstaller\\hooks'
+134352 INFO: Performing binary vs. data reclassification (16088 entries)
+324019 INFO: Looking for ctypes DLLs
+324052 INFO: Analyzing run-time hooks ...
+324059 INFO: Including run-time hook 'pyi_rth_inspect.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+324076 INFO: Including run-time hook 'pyi_rth_pkgutil.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+324090 INFO: Including run-time hook 'pyi_rth_multiprocessing.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+324106 INFO: Including run-time hook 'pyi_rth_pkgres.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+324123 INFO: Including run-time hook 'pyi_rth_pywintypes.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\_pyinstaller_hooks_contrib\\rthooks'
+324134 INFO: Including run-time hook 'pyi_rth_pythoncom.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\_pyinstaller_hooks_contrib\\rthooks'
+324138 INFO: Including run-time hook 'pyi_rth_pyside6.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+324154 INFO: Processing pre-find-module-path hook 'hook-_pyi_rth_utils.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\PyInstaller\\hooks\\pre_find_module_path'
+324170 INFO: Processing standard module hook 'hook-_pyi_rth_utils.py' from 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\PyInstaller\\hooks'
+325066 INFO: Creating base_library.zip...
+325099 INFO: Looking for dynamic libraries
+329155 INFO: Extra DLL search directories (AddDllDirectory): ['C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\Lib\\site-packages\\shiboken6', 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\numpy.libs']
+329156 INFO: Extra DLL search directories (PATH): ['C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\Lib\\site-packages\\PySide6']
+336818 WARNING: Library not found: could not resolve 'ext-ms-win-uiacore-l1-1-1.dll', dependency of 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\winpty\\OpenConsole.exe'.
+336819 WARNING: Library not found: could not resolve 'ext-ms-win-uiacore-l1-1-0.dll', dependency of 'C:\\Users\\dylan\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\winpty\\OpenConsole.exe'.
+337894 INFO: Warnings written to C:\Users\dylan\OneDrive\Desktop\coding-agent\browser\build\LuckyDBrowser\warn-LuckyDBrowser.txt
+338057 INFO: Graph cross-reference written to C:\Users\dylan\OneDrive\Desktop\coding-agent\browser\build\LuckyDBrowser\xref-LuckyDBrowser.html
+338883 INFO: checking PYZ
+338883 INFO: Building PYZ because PYZ-00.toc is non existent
+338884 INFO: Building PYZ (ZlibArchive) C:\Users\dylan\OneDrive\Desktop\coding-agent\browser\build\LuckyDBrowser\PYZ-00.pyz
+339779 INFO: Building PYZ (ZlibArchive) C:\Users\dylan\OneDrive\Desktop\coding-agent\browser\build\LuckyDBrowser\PYZ-00.pyz completed successfully.
+339818 INFO: checking PKG
+339818 INFO: Building PKG because PKG-00.toc is non existent
+339818 INFO: Building PKG (CArchive) LuckyDBrowser.pkg
+339872 INFO: Building PKG (CArchive) LuckyDBrowser.pkg completed successfully.
+339873 INFO: Bootloader C:\Users\dylan\AppData\Local\Programs\Python\Python310\lib\site-packages\PyInstaller\bootloader\Windows-64bit-intel\runw.exe
+339874 INFO: checking EXE
+339874 INFO: Building EXE because EXE-00.toc is non existent
+339874 INFO: Building EXE from EXE-00.toc
+339874 INFO: Copying bootloader EXE to C:\Users\dylan\OneDrive\Desktop\coding-agent\browser\build\LuckyDBrowser\LuckyDBrowser.exe
+340009 INFO: Copying icon to EXE
+340070 INFO: Copying version information to EXE
+340142 INFO: Copying 0 resources to EXE
+340142 INFO: Embedding manifest in EXE
+340207 INFO: Appending PKG archive to EXE
+340314 INFO: Fixing EXE headers
+340849 INFO: Building EXE from EXE-00.toc completed successfully.
+341097 INFO: checking COLLECT
+341099 INFO: Building COLLECT because COLLECT-00.toc is non existent
+341099 INFO: Removing dir C:\Users\dylan\OneDrive\Desktop\coding-agent\browser\dist\LuckyDBrowser
+347871 INFO: Building COLLECT COLLECT-00.toc
+375487 INFO: Building COLLECT COLLECT-00.toc completed successfully.
+375916 INFO: Build complete! The results are available in: C:\Users\dylan\OneDrive\Desktop\coding-agent\browser\dist
+PYINSTALLER_EXIT_0  

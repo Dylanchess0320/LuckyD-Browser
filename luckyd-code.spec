@@ -11,12 +11,52 @@
 # websockets, PIL, mss, numpy) are excluded; the backend guards them and the HQ
 # core path needs only httpx.
 
+from PyInstaller.utils.hooks import collect_all
+
+# LangGraph's transitive chain (langchain_core -> uuid_utils Rust .pyd,
+# langsmith, xxhash, ...) is imported lazily by the Deep Research swarm. The
+# frozen importer needs the whole tree bundled, otherwise the swarm dies with
+# "module 'langchain_core.runnables'.'base'' not found (No module named
+# 'uuid_utils._uuid_utils')" and llm_calls=0. (The swarm also has a
+# dependency-free sequential fallback, but the graph path needs this.)
+_swarm_datas, _swarm_binaries, _swarm_hidden = [], [], []
+for _pkg in (
+    'langchain_core',
+    'langgraph',
+    'langgraph_checkpoint',
+    'langgraph_prebuilt',
+    'langgraph_sdk',
+    'langsmith',
+    'uuid_utils',
+    'xxhash',
+    'httpx_sse',
+    'orjson',
+    'jsonpatch',
+    'requests_toolbelt',
+    'ddgs',
+    'duckduckgo_search',
+    'trafilatura',
+    'bs4',
+    'beautifulsoup4',
+    'lxml',
+    'tldextract',
+    'tenacity',
+    'google.genai',
+):
+    try:
+        _d, _b, _h = collect_all(_pkg)
+        _swarm_datas += _d
+        _swarm_binaries += _b
+        _swarm_hidden += _h
+    except Exception:
+        pass
+
 block_cipher = None
 
 a = Analysis(
     ['web_server.py'],
     pathex=[],
-    binaries=[],
+    binaries=_swarm_binaries,
     datas=[
         ('core', 'core'),
         ('llm', 'llm'),
@@ -34,14 +74,23 @@ a = Analysis(
         ('browser/browser_core/cline_session.py', '.'),
         # Never embed a developer's real .env/API keys in a distributable harness.
         ('.env.example', '.env.example'),
-    ],
+    ] + _swarm_datas,
     hiddenimports=[
         'httpx', 'httpcore', 'h11', 'certifi', 'idna', 'sniffio', 'anyio',
         'cline_session',
         # Deep Research swarm (tools/deep_research_tool.py + features/deep_research):
-        # langgraph orchestration, Gemini grounding, keyless DDG search.
-        'langgraph', 'langgraph.graph', 'google.genai', 'ddgs',
-    ],
+        # langgraph orchestration, free-model OpenAI-compat providers,
+        # Gemini grounding, keyless DDG search.
+        'langgraph', 'langgraph.graph', 'langchain_core', 'langchain_core.runnables',
+        'langchain_core.runnables.base', 'uuid_utils', 'uuid_utils._uuid_utils',
+        'google.genai', 'ddgs', 'duckduckgo_search',
+        'trafilatura', 'bs4', 'lxml', 'tldextract', 'tenacity',
+        'features.deep_research.models.openai_compat',
+        'features.deep_research.models.router',
+        'features.deep_research.models.luckyd',
+        'features.deep_research.models.mock',
+        'features.deep_research.models.gemini',
+    ] + _swarm_hidden,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

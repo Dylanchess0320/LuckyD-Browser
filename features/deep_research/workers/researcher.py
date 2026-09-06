@@ -311,6 +311,13 @@ def _summarize(
     try:
         return llm.text(role="worker", system=RESEARCHER_SYSTEM, user=user)
     except Exception as e:
+        from ..runtime.budget import BudgetExhausted
+
+        if isinstance(e, BudgetExhausted):
+            # Don't swallow budget exhaustion as a generic "Summary failed":
+            # let run_one_task record stop_reason="budget_exhausted" and keep
+            # the raw evidence quotes for a best-effort report.
+            raise
         return f"Summary failed: {e}"
 
 
@@ -377,7 +384,20 @@ def run_one_task(llm: LLMProvider, task: ResearchTask, worker_id: str) -> Worker
     for i, e in enumerate(evidence):
         e.id = f"e{i}"
 
-    findings = _summarize(llm, task, evidence, worker_id)
+    try:
+        findings = _summarize(llm, task, evidence, worker_id)
+    except BudgetExhausted:
+        # Budget ran out after evidence collection: keep the raw quotes so the
+        # synthesizer can still finalize a best-effort report instead of
+        # crashing the whole run (BudgetExhausted is sticky once raised).
+        stop_reason = "budget_exhausted"
+        if evidence:
+            findings = (
+                "Summary skipped (research budget exhausted). Raw evidence "
+                f"quotes retained for {task.question}"
+            )
+        else:
+            findings = f"No usable evidence was collected for: {task.question}"
     return WorkerResult(
         task_id=task.id,
         worker_id=worker_id,

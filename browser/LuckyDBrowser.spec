@@ -11,10 +11,50 @@ from PyInstaller.utils.hooks import collect_all, collect_submodules
 wp_datas, wp_binaries, wp_hiddenimports = collect_all('winpty')
 ws_hiddenimports = collect_submodules('websockets')
 
+# The Deep Research swarm imports langgraph lazily; its transitive chain
+# (langchain_core -> uuid_utils Rust .pyd, langsmith, xxhash, ...) must be
+# bundled wholesale or the frozen swarm dies with "module
+# 'langchain_core.runnables'.'base'' not found (No module named
+# 'uuid_utils._uuid_utils')" and llm_calls=0. (The swarm also has a
+# dependency-free sequential fallback, but the graph path needs this.)
+# Fetch/search deps (trafilatura/bs4/lxml/tldextract/tenacity/ddgs) are also
+# collected: without them frozen deep-reads yield zero text-backed evidence.
+_swarm_datas, _swarm_binaries, _swarm_hidden = [], [], []
+for _pkg in (
+    'langchain_core',
+    'langgraph',
+    'langgraph_checkpoint',
+    'langgraph_prebuilt',
+    'langgraph_sdk',
+    'langsmith',
+    'uuid_utils',
+    'xxhash',
+    'httpx_sse',
+    'orjson',
+    'jsonpatch',
+    'requests_toolbelt',
+    'ddgs',
+    'duckduckgo_search',
+    'trafilatura',
+    'bs4',
+    'beautifulsoup4',
+    'lxml',
+    'tldextract',
+    'tenacity',
+    'google.genai',
+):
+    try:
+        _d, _b, _h = collect_all(_pkg)
+        _swarm_datas += _d
+        _swarm_binaries += _b
+        _swarm_hidden += _h
+    except Exception:
+        pass
+
 a = Analysis(
     ['main.py'],
     pathex=[],
-    binaries=wp_binaries,
+    binaries=wp_binaries + _swarm_binaries,
     # Bundle the coding-agent backend beside LuckyDBrowser.exe so the frozen
     # app can auto-start the harness anywhere (portable or installed) —
     # browser_core.harness_bridge._find_exe() checks the exe's own folder.
@@ -52,13 +92,36 @@ a = Analysis(
            ('../.env.example', '.env.example'),
            ('installer/env/.env', '.'),
            # Bundled Deck Studio (Marp pipeline UI + decks + themes). The
-           # TileRegistry autostarts it from %APPDIR%\studio; ai.js falls back
-           # to the app-injected GOOGLE_API_KEY, so no secret ships in here.
-           ('studio', 'studio')] + wp_datas,
+            # TileRegistry autostarts it from %APPDIR%\studio; ai.js falls back
+            # to the app-injected GOOGLE_API_KEY, so no secret ships in here.
+            ('studio', 'studio')] + wp_datas + _swarm_datas,
     # websockets + winpty are imported lazily (CDP driver / screenshots /
     # terminal bridge) - pin them. assets/ ships recursively, including
     # assets/terminal/ (the vendored xterm.js page the /terminal tab needs).
-    hiddenimports=ws_hiddenimports + wp_hiddenimports,
+    hiddenimports=ws_hiddenimports + wp_hiddenimports + _swarm_hidden + [
+        'features.deep_research',
+        'features.deep_research.models.openai_compat',
+        'features.deep_research.models.router',
+        'features.deep_research.models.luckyd',
+        'features.deep_research.models.mock',
+        'features.deep_research.models.gemini',
+        'langgraph',
+        'langgraph.graph',
+        'langchain_core',
+        'langchain_core.runnables',
+        'langchain_core.runnables.base',
+        'uuid_utils',
+        'uuid_utils._uuid_utils',
+        'google.genai',
+        'ddgs',
+        'duckduckgo_search',
+        'trafilatura',
+        'bs4',
+        'lxml',
+        'tldextract',
+        'tenacity',
+        'tools.deep_research_tool',
+    ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

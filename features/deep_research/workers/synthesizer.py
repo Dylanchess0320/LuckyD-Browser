@@ -64,12 +64,41 @@ def run_synthesizer(
     if previous_critique:
         user += f"\n\nPrevious critique to address:\n{previous_critique}"
 
-    report = llm.structured(
-        role="synthesizer",
-        system=SYNTHESIZER_SYSTEM,
-        user=user,
-        schema=ResearchReport,
-        temperature=0.4,
-    )
+    try:
+        report = llm.structured(
+            role="synthesizer",
+            system=SYNTHESIZER_SYSTEM,
+            user=user,
+            schema=ResearchReport,
+            temperature=0.4,
+        )
+    except Exception as e:
+        # Small/offline models may fail complex structured synthesis.
+        # Fall back to a findings-based report so the run still completes.
+        from ..schemas import ReportSection
+
+        store.emit(
+            "synthesize",
+            f"structured synthesis failed ({type(e).__name__}); using findings draft",
+            level="warn",
+        )
+        ev_ids = [ev.id for ev in evidence]
+        report = ResearchReport(
+            title=query[:80] if query else "Research report",
+            summary=(
+                "Draft assembled directly from worker findings: the synthesizer "
+                "LLM did not return valid structured output."
+            ),
+            sections=[
+                ReportSection(
+                    heading="Worker findings",
+                    content=findings_text or "(no evidence collected)",
+                    citations=ev_ids,
+                )
+            ],
+            key_findings=[],
+            open_questions=["Re-run with a stronger model for a fully synthesized report."],
+            evidence_ids_used=ev_ids,
+        )
     store.emit("synthesize", f"draft report: {len(report.sections)} sections", level="ok")
     return report, evidence

@@ -64,7 +64,7 @@ DEPTH_PRESETS: dict[str, dict[str, int]] = {
 }
 
 _VALID_BACKENDS = ("auto", "gemini", "ddg", "tavily", "brave", "none")
-_VALID_PROVIDERS = ("auto", "gemini", "luckyd", "mock")
+_VALID_PROVIDERS = ("auto", "gemini", "luckyd", "opencode", "openrouter", "ollama", "mock")
 
 
 class DeepResearchTool(ToolBase):
@@ -115,7 +115,7 @@ class DeepResearchTool(ToolBase):
         },
         "provider": {
             "type": "string",
-            "description": "auto (default), gemini, luckyd, or mock.",
+            "description": "auto (default: free OpenCode Zen pool), gemini, luckyd, opencode, openrouter, ollama, or mock.",
         },
         "dry_run": {
             "type": "boolean",

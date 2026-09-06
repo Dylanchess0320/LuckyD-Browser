@@ -313,9 +313,10 @@ class AiSidebar(QDockWidget):
 
         actions2 = QHBoxLayout()
         for label, slot in (
-            ("📊 Extract Data", self._extract_data),
+            ("📊 Extract", self._extract_data),
             ("🛡️ Audit", self._security_audit),
-            ("📋 Copy Chat", self._copy_chat),
+            ("🔬 Research", lambda: self._mw.open_deep_research(self.input.text().strip())),
+            ("📋 Copy", self._copy_chat),
         ):
             btn = QPushButton(label, body)
             btn.clicked.connect(slot)

@@ -155,3 +155,55 @@ class TestPremiumSearch:
         monkeypatch.delenv("BRAVE_API_KEY", raising=False)
         assert TavilySearch().search("test") == []
         assert BraveSearch().search("test") == []
+
+
+class TestBudgetExhaustion:
+    """A run that hits its budget must finalize best-effort, never crash."""
+
+    def test_researcher_summarize_fallback(self):
+        from features.deep_research.models.mock import MockProvider
+        from features.deep_research.runtime.budget import BudgetExhausted
+        from features.deep_research.schemas import ResearchTask
+        from features.deep_research.workers.researcher import run_one_task
+
+        class TiredMock(MockProvider):
+            def __init__(self):
+                self._texts = 0
+
+            def text(self, *a, **k):
+                self._texts += 1
+                if self._texts > 1:
+                    raise BudgetExhausted("max_seconds")
+                return "follow-up query one\nfollow-up query two"
+
+        task = ResearchTask(id="t1", question="What is X?", focus="overview")
+        res = run_one_task(TiredMock(), task, "wid-1")
+        assert res.stop_reason == "budget_exhausted"
+        assert len(res.evidence) > 0
+        assert "budget" in res.findings.lower()
+
+    def test_swarm_finalizes_on_synthesis_budget_hit(self, monkeypatch):
+        from features.deep_research import graph as gmod
+        from features.deep_research.graph import run_swarm_sync
+        from features.deep_research.runtime.budget import BudgetExhausted
+
+        def _boom(*a, **k):
+            raise BudgetExhausted("max_seconds")
+
+        monkeypatch.setattr(gmod, "run_synthesizer", _boom)
+        md = run_swarm_sync("What is budget testing?", dry_run=True)
+        assert isinstance(md, str) and len(md) > 50
+        assert "Best-effort" in md
+
+    def test_swarm_finalizes_on_critic_verify_budget_hit(self, monkeypatch):
+        from features.deep_research import graph as gmod
+        from features.deep_research.graph import run_swarm_sync
+        from features.deep_research.runtime.budget import BudgetExhausted
+
+        def _boom(*a, **k):
+            raise BudgetExhausted("max_seconds")
+
+        monkeypatch.setattr(gmod, "run_critic", _boom)
+        monkeypatch.setattr(gmod, "run_verify", _boom)
+        md = run_swarm_sync("What is budget testing?", dry_run=True)
+        assert isinstance(md, str) and len(md) > 50

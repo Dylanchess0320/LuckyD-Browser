@@ -143,6 +143,7 @@ class WebView(QWebEngineView):
         # "Your Internet access is blocked" page — retry quietly instead.
         self._load_attempts: dict[str, int] = {}
         self._connecting_for: QUrl | None = None
+        self._retry_timer: QTimer | None = None
         self.loadFinished.connect(self._on_load_finished)
         self.loadStarted.connect(self._on_load_started)
 
@@ -172,12 +173,25 @@ class WebView(QWebEngineView):
             return
         self._connecting_for = url
         self.setHtml(_CONNECTING_HTML.replace("{n}", str(attempts + 1)), url)
-        QTimer.singleShot(_RETRY_DELAYS_MS[attempts - 1], lambda u=url: self._retry(u))
+        # Schedule the retry on a timer OWNED BY THIS VIEW (never a global
+        # QTimer.singleShot): if the tab is closed mid-retry the timer is
+        # destroyed together with the view, so the callback can never fire
+        # on a deleted C++ object. A global timer used to crash here with
+        # "RuntimeError: libshiboken: Internal C++ object (WebView) already
+        # deleted" (see %LOCALAPPDATA%\LuckyDBrowser\crash.log).
+        timer = QTimer(self)
+        timer.setSingleShot(True)
+        timer.timeout.connect(lambda u=url: self._retry(u))
+        self._retry_timer = timer
+        timer.start(_RETRY_DELAYS_MS[attempts - 1])
 
     def _retry(self, url: QUrl) -> None:
-        if self._connecting_for == url or self.url() == url:
-            self._connecting_for = None
-            self.load(url)
+        try:
+            if self._connecting_for == url or self.url() == url:
+                self._connecting_for = None
+                self.load(url)
+        except RuntimeError:
+            pass  # view torn down between scheduling and firing — nothing to do
 
     # ── popups ───────────────────────────────────────────────────────
     # target=_blank / window.open -> open as a new tab in this window.
