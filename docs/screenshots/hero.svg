@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="420" viewBox="0 0 1280 420" role="img" aria-label="LuckyD Browser 3.9 Daily Driver">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#070b16"/>
+      <stop offset="45%" stop-color="#101a32"/>
+      <stop offset="100%" stop-color="#1a1030"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#5b9dff"/>
+      <stop offset="100%" stop-color="#b46bff"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#34d399"/>
+    </linearGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="12" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="1280" height="420" fill="url(#bg)"/>
+  <circle cx="1100" cy="70" r="180" fill="#5b9dff" opacity="0.08"/>
+  <circle cx="180" cy="360" r="160" fill="#b46bff" opacity="0.10"/>
+  <g transform="translate(86,92)" filter="url(#glow)">
+    <rect width="88" height="88" rx="24" fill="url(#gold)"/>
+    <path d="M44 22c6 10 16 16 22 16 0 12-10 22-22 28-12-6-22-16-22-28 6 0 16-6 22-16z" fill="#0b1020"/>
+  </g>
+  <text x="204" y="148" fill="#e8ecf5" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="54" font-weight="700">LuckyD Browser</text>
+  <text x="204" y="196" fill="#9aa1b5" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="22">The AI browser that runs yours. Local. Unlimited. One window.</text>
+  <rect x="204" y="230" rx="16" width="168" height="40" fill="url(#accent)"/>
+  <text x="288" y="257" text-anchor="middle" fill="#ffffff" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="16" font-weight="700">v3.9.0 Daily Driver</text>
+  <text x="392" y="257" fill="#8b93a7" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="15">HTTPS-Only · Workspaces · Memory Saver · Read Aloud</text>
+</svg>

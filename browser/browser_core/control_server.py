@@ -66,6 +66,7 @@ from browser_core.dashboard import (
 )
 from browser_core.extract import build_messages, parse_json_loose
 from browser_core.netmon import NetMonitor, to_har
+from browser_core.research_page import research_html, swarm_manager
 from browser_core.scheduler import INTERVALS, ScheduleStore
 from browser_core.terminal_page import STATIC_DIR, mesh_html, terminal_html
 from browser_core.workflows import (
@@ -132,6 +133,12 @@ _ROUTES = (
     ("POST /network/clear", "clear captured rows"),
     ("GET  /schedules", "workflow schedules with last-run results"),
     ("POST /schedule", '{"name": "…", "every_min": 0|15|30|60|360|1440} — auto-replay a workflow'),
+    ("GET  /research", "Deep Researcher Swarm interactive tool"),
+    ("POST /research/start", '{"query": "…", "depth": "…", "backend": "…", "provider": "…"} — launch swarm'),
+    ("GET  /research/status", "poll status, stages, and events of active swarm"),
+    ("GET  /research/runs", "list historical research reports"),
+    ("GET  /research/run", "load past report markdown and evidence"),
+    ("POST /research/cancel", "cancel the currently active research swarm"),
 )
 
 
@@ -352,7 +359,7 @@ def make_handler(backend, token: str = "", harness=None, settings=None):
         # gated by _origin_ok() (direct navigation never sends a mismatched
         # Origin) and get the token injected into their own JS instead, the
         # same pattern web_server.py uses for its landing page.
-        _NAV_PATHS = ("/", "/help", "/dashboard", "/hq", "/mesh", "/terminal")
+        _NAV_PATHS = ("/", "/help", "/dashboard", "/hq", "/mesh", "/terminal", "/workflows", "/network", "/research")
 
         def do_GET(self):
             if not self._host_ok():
@@ -412,6 +419,16 @@ def make_handler(backend, token: str = "", harness=None, settings=None):
                 if path == "/network/har":
                     har = json.dumps(backend.netmon_har(), indent=1)
                     return self._send_download(har, "luckyd-capture.har", "application/json")
+                if path == "/research":
+                    return self._send_html(research_html(token))
+                if path == "/research/status":
+                    run_id = (query.get("run_id") or [""])[0]
+                    return self._ok(**swarm_manager.get_status(run_id))
+                if path == "/research/runs":
+                    return self._ok(runs=swarm_manager.list_runs())
+                if path == "/research/run":
+                    run_id = (query.get("id") or [""])[0]
+                    return self._ok(**swarm_manager.get_run(run_id))
                 return self._send(404, {"ok": False, "error": f"unknown route {path}"})
             except Exception as exc:
                 return self._fail(500, exc)
@@ -499,6 +516,24 @@ def make_handler(backend, token: str = "", harness=None, settings=None):
                     return self._ok(**backend.netmon_stop())
                 if path == "/network/clear":
                     return self._ok(**backend.netmon_clear())
+                if path == "/research/start":
+                    q = str(body.get("query", "")).strip()
+                    if not q:
+                        return self._send(400, {"ok": False, "error": "query required"})
+                    try:
+                        rid = swarm_manager.start_research(
+                            query=q,
+                            depth=str(body.get("depth", "standard")),
+                            backend=str(body.get("backend", "auto")),
+                            provider=str(body.get("provider", "auto")),
+                            context=str(body.get("context", "")),
+                            dry_run=bool(body.get("dry_run", False)),
+                        )
+                        return self._ok(run_id=rid)
+                    except Exception as err:
+                        return self._send(400, {"ok": False, "error": str(err)})
+                if path == "/research/cancel":
+                    return self._ok(cancelled=swarm_manager.cancel_run())
                 return self._send(404, {"ok": False, "error": f"unknown route {path}"})
             except Exception as exc:
                 return self._fail(500, exc)

@@ -93,6 +93,8 @@ _CSS = r"""  .search { display: flex; background: var(--card); border: 1px solid
   .tile.add span { font-size: 11px; }
   .tile.hq { border-color: rgba(91,157,255,.45); background: rgba(91,157,255,.10); }
   .tile.hq:hover { border-color: var(--accent); background: rgba(91,157,255,.16); }
+  .tile.research { border-color: rgba(56,189,248,.45); background: rgba(56,189,248,.10); }
+  .tile.research:hover { border-color: var(--accent); background: rgba(56,189,248,.18); }
   .section { margin-top: 26px; font-size: 11px; font-weight: 700; letter-spacing: 1.2px;
     text-transform: uppercase; color: var(--muted); }
   #addform { margin-top: 14px; display: none; gap: 8px; }

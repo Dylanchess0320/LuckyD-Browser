@@ -55,7 +55,7 @@ reg add "%UNINSTALL_KEY%" /f /v "UninstallString" /t REG_SZ /d "\"%~dp0uninstall
 reg add "%UNINSTALL_KEY%" /f /v "InstallLocation" /t REG_SZ /d "%~dp0" >nul 2>&1
 reg add "%UNINSTALL_KEY%" /f /v "DisplayIcon" /t REG_SZ /d "%~dp0assets\icon.ico" >nul 2>&1
 reg add "%UNINSTALL_KEY%" /f /v "Publisher" /t REG_SZ /d "LuckyD" >nul 2>&1
-reg add "%UNINSTALL_KEY%" /f /v "DisplayVersion" /t REG_SZ /d "1.0.0" >nul 2>&1
+reg add "%UNINSTALL_KEY%" /f /v "DisplayVersion" /t REG_SZ /d "3.8.0" >nul 2>&1
 reg add "%UNINSTALL_KEY%" /f /v "NoModify" /t REG_DWORD /d 1 >nul 2>&1
 reg add "%UNINSTALL_KEY%" /f /v "NoRepair" /t REG_DWORD /d 1 >nul 2>&1
 echo   + Uninstaller registered

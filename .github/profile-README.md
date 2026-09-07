@@ -1,0 +1,26 @@
+<div align="center">
+
+# LuckyD
+
+**I build LuckyD Browser — a Chromium AI browser that runs *your* models locally, with a coding agent and real terminals in one window.**
+
+[![LuckyD Browser](https://img.shields.io/github/v/release/Dylanchess0320/LuckyD-Browser?label=LuckyD%20Browser&color=7c5cff)](https://github.com/Dylanchess0320/LuckyD-Browser)
+[![YouTube](https://img.shields.io/badge/YouTube-LuckyD-FF0000?logo=youtube&logoColor=white)](https://www.youtube.com/@LuckyDYoutube)
+
+</div>
+
+### Now shipping — [LuckyD Browser v3.9.0 Daily Driver](https://github.com/Dylanchess0320/LuckyD-Browser/releases/tag/v3.9.0)
+
+HTTPS-Only · per-site permissions · workspaces · memory saver · read aloud · summarize this page · local unlimited Ollama · Agent Mesh
+
+**[⬇ Download for Windows](https://github.com/Dylanchess0320/LuckyD-Browser/releases/tag/v3.9.0)** · **[Repo](https://github.com/Dylanchess0320/LuckyD-Browser)** · **[Watch](https://www.youtube.com/watch?v=La6bxaa7icY)**
+
+```
+┌──────────── LuckyD Browser ──────────────────────────────────────┐
+│  Tabs (Chromium)     AI Sidebar        HQ / Terminal / Mesh      │
+│       │                   │                    │                 │
+│       ▼                   ▼                    ▼                 │
+│  Control API        Local Ollama          luckyd-code            │
+│  127.0.0.1:9777     or your cloud keys    70+ tools              │
+└──────────────────────────────────────────────────────────────────┘
+```

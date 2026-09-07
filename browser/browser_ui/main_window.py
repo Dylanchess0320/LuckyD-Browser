@@ -12,6 +12,8 @@ import tempfile
 import threading
 from pathlib import Path
 
+from browser_core import tts as _tts
+from browser_core.permissions import ALLOW, ASK, DENY, feature_key, feature_label, origin_of
 from browser_core.profile import incognito_profile
 from browser_core.session import tab_record, window_record
 from browser_core.updater import ReleaseDownloader, UpdateChecker
@@ -23,6 +25,7 @@ from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWidgets import (
     QDialog,
     QFileDialog,
+    QInputDialog,
     QLabel,
     QLineEdit,
     QMainWindow,
@@ -38,6 +41,7 @@ from .ai_sidebar import AiSidebar
 from .dialogs import (
     BookmarksDialog,
     HistoryDialog,
+    PermissionsDialog,
     ScriptsDialog,
     SettingsDialog,
 )
@@ -239,6 +243,16 @@ class MainWindow(QMainWindow):
         mesh_act.triggered.connect(self.open_agent_mesh)
         bar.addAction(mesh_act)
 
+        summarize_act = QAction("✨", self)
+        summarize_act.setToolTip("Summarize this page (Ctrl+Shift+U)")
+        summarize_act.triggered.connect(self.summarize_page)
+        bar.addAction(summarize_act)
+
+        self.read_act = QAction("🔊", self)
+        self.read_act.setToolTip("Read this page aloud (Ctrl+Shift+L) — click again to stop")
+        self.read_act.triggered.connect(self.read_aloud_page)
+        bar.addAction(self.read_act)
+
         if self.incognito:
             incog_label = QLabel(" 🕶 Incognito", self)
             incog_label.setStyleSheet(
@@ -367,10 +381,12 @@ class MainWindow(QMainWindow):
         self.zoom_label.clicked.connect(self.zoom_reset)
         self.zoom_label.hide()
 
-        self.lock_label = QLabel("", self)
-        self.lock_label.setMinimumWidth(20)
-        self.lock_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lock_label = QPushButton("", self)
+        self.lock_label.setFlat(True)
+        self.lock_label.setMinimumWidth(28)
+        self.lock_label.setCursor(Qt.CursorShape.PointingHandCursor)
         self.lock_label.setStyleSheet("font-size: 14px; padding: 0 4px;")
+        self.lock_label.clicked.connect(self.open_site_permissions)
 
         self.statusBar().addPermanentWidget(self.lock_label)
         self.statusBar().addPermanentWidget(self.zoom_label)
@@ -443,6 +459,8 @@ class MainWindow(QMainWindow):
             self.new_incognito_window,
             "Ctrl+Shift+N",
         )
+        self.workspaces_menu = file_menu.addMenu("Workspaces")
+        self.workspaces_menu.aboutToShow.connect(self._rebuild_workspaces_menu)
         file_menu.addSeparator()
         self._add(file_menu, "Open File…", self.open_file, "Ctrl+O")
         file_menu.addSeparator()
@@ -467,6 +485,7 @@ class MainWindow(QMainWindow):
         self._add(view_menu, "Zoom Out", self.zoom_out, "Ctrl+-")
         self._add(view_menu, "Actual Size", self.zoom_reset, "Ctrl+0")
         self._add(view_menu, "Reader Mode", self.toggle_reader_mode, "Ctrl+Alt+R")
+        self._add(view_menu, "Read Aloud", self.read_aloud_page, "Ctrl+Shift+L")
         view_menu.addSeparator()
         self._add(view_menu, "Find in Page…", self.show_find_bar, "Ctrl+F")
         self._add(view_menu, "View Page Source", self.view_source, "Ctrl+U")
@@ -509,7 +528,9 @@ class MainWindow(QMainWindow):
         self._add(tools_menu, "Workflows…", self.open_workflows)
         self._add(tools_menu, "Network Monitor", self.open_network_monitor)
         self._add(tools_menu, "Organize Tabs with AI", self.organize_tabs_with_ai)
-        self._add(tools_menu, "Deep Research…", self.open_deep_research, "Ctrl+Shift+R")
+        self._add(tools_menu, "Deep Researcher Swarm…", self.open_deep_research, "Ctrl+Shift+R")
+        self._add(tools_menu, "Summarize This Page", self.summarize_page, "Ctrl+Shift+U")
+        self._add(tools_menu, "Site Permissions…", self.open_site_permissions)
         tools_menu.addSeparator()
         self.adblock_act = QAction("Ad-Block Enabled", self, checkable=True)
         self.adblock_act.setChecked(bool(self.settings.get("adblock_enabled", True)))
@@ -618,6 +639,8 @@ class MainWindow(QMainWindow):
             self,
             activated=lambda: self.tabs.reopen_last_closed(),
         )
+        QShortcut(QKeySequence("Ctrl+Shift+L"), self, activated=self.read_aloud_page)
+        QShortcut(QKeySequence("Ctrl+Shift+U"), self, activated=self.summarize_page)
 
     # ── tab / navigation API ─────────────────────────────────────────
 
@@ -721,42 +744,42 @@ class MainWindow(QMainWindow):
                 kind="error",
             )
 
-    def open_deep_research(self) -> None:
-        """Prompt for a research question and run it via the DeepResearch agent tool.
+    def open_deep_research(self, query: str = "") -> None:
+        """Open the dedicated Deep Researcher Swarm tool workspace in a tab.
 
-        The swarm itself runs in the coding-agent backend (HQ / harness), which
-        has the DeepResearch tool registered. Here we collect the question and
-        hand it to the AI sidebar harness with an explicit instruction to use
-        that tool, so the report comes back with citations + artifact paths.
+        Pre-populates current tab URL/title as context and query if provided.
+        Runs the multi-agent swarm: planner -> parallel research workers ->
+        citation synthesizer -> critic & verifier -> final report.
         """
-        from PySide6.QtWidgets import QInputDialog
+        server = getattr(self._app, "control_server", None)
+        if server is None or not server.running:
+            starter = getattr(self._app, "set_browser_api_enabled", None)
+            if callable(starter):
+                starter(True)
+            server = getattr(self._app, "control_server", None)
 
-        query, ok = QInputDialog.getText(
-            self,
-            "Deep Research",
-            "Research question:",
-            text="",
-        )
-        query = (query or "").strip()
-        if not ok or not query:
-            return
-        page_hint = ""
+        from urllib.parse import urlencode
+
+        params = {}
+        if query:
+            params["q"] = query
+
         try:
             view = self.tabs.current_view()
             if view is not None and view.url().scheme() in ("http", "https"):
-                page_hint = (
-                    f"\n\nCurrent browser page for extra context: "
-                    f"{view.title() or ''} — {view.url().toString()}"
-                )
+                params["context_url"] = view.url().toString()
+                params["context_title"] = view.title() or ""
         except Exception:
-            page_hint = ""
-        try:
-            self.ai_sidebar.ask(
-                "Use the DeepResearch tool to research the following question. "
-                "Return the full citation-backed markdown report.\n\n" + query + page_hint
+            pass
+
+        if server is not None and server.running:
+            qs = ("?" + urlencode(params)) if params else ""
+            self.open_in_new_tab(QUrl(server.base_url + "/research" + qs))
+        else:
+            self.toasts.show(
+                "Deep Research Swarm needs the Browser Control API (Tools → Browser Control API)",
+                kind="error",
             )
-        except Exception:
-            self.show_assistant()
 
     # ── side pane (second docked web view) ────────────────────────────
 
@@ -1232,7 +1255,11 @@ class MainWindow(QMainWindow):
             elif url.startswith("https://"):
                 self.lock_label.setText("🔒")
                 self.lock_label.setStyleSheet("color: #34d399; font-size: 14px; padding: 0 4px;")
-                self.lock_label.setToolTip("Connection secure (HTTPS)")
+                self.lock_label.setToolTip("Connection secure (HTTPS) — click for site permissions")
+            elif url.startswith("http://"):
+                self.lock_label.setText("🔓")
+                self.lock_label.setStyleSheet("color: #fbbf24; font-size: 14px; padding: 0 4px;")
+                self.lock_label.setToolTip("Not secure (HTTP) — click for site permissions")
             else:
                 self.lock_label.setText("")
                 self.lock_label.setStyleSheet("font-size: 14px; padding: 0 4px;")
@@ -1448,7 +1475,7 @@ class MainWindow(QMainWindow):
         }
         return window_record(records, current, groups=groups or None)
 
-    def restore_session(self, window_data: dict) -> None:
+    def restore_session(self, window_data: dict, announce: bool = True) -> None:
         """Reopen a saved window's tabs (pinned state + active index too)."""
         if self.incognito:
             return
@@ -1485,7 +1512,8 @@ class MainWindow(QMainWindow):
         if 0 <= current < self.tabs.count():
             self.tabs.setCurrentIndex(current)
         count = len(urls)
-        self.toast(f"Session restored — {count} tab{'s' if count != 1 else ''} back", "ok")
+        if announce:
+            self.toast(f"Session restored — {count} tab{'s' if count != 1 else ''} back", "ok")
 
     def closeEvent(self, event) -> None:  # noqa: N802 (Qt API)
         # The app quits when the last window closes — this is the one moment
@@ -1494,6 +1522,8 @@ class MainWindow(QMainWindow):
         saver = getattr(app, "save_session", None)
         if callable(saver) and not self.incognito:
             saver()
+        with contextlib.suppress(Exception):
+            _tts.stop()
         super().closeEvent(event)
 
     def reopen_previous_session(self) -> None:
@@ -1510,7 +1540,176 @@ class MainWindow(QMainWindow):
         for extra in windows[1:]:
             app.new_window().restore_session(extra)
 
-    # ── settings / about ─────────────────────────────────────────────
+    # ── site permissions / HTTPS-Only / workspaces / read-aloud ──────
+
+    def handle_feature_permission(self, page, origin, feature) -> None:
+        """Prompt once per origin+feature; remember Allow/Block (not incognito)."""
+        url = origin.toString() if hasattr(origin, "toString") else str(origin)
+        key = feature_key(feature)
+        host = origin_of(url)
+        store = getattr(self._app, "permissions", None)
+        persist = not self.incognito
+        decision = store.get(host, key) if store is not None and host else ASK
+        grant, deny_pol = self._permission_policies()
+        if decision == ALLOW:
+            page.setFeaturePermission(origin, feature, grant)
+            return
+        if decision == DENY:
+            page.setFeaturePermission(origin, feature, deny_pol)
+            return
+        label = feature_label(key)
+        box = QMessageBox(self)
+        box.setWindowTitle("Site permission")
+        box.setText(f"{host or url} wants to use your {label.lower()}.")
+        box.setInformativeText("LuckyD will remember this choice for the site.")
+        allow_btn = box.addButton("Allow", QMessageBox.ButtonRole.AcceptRole)
+        box.addButton("Block", QMessageBox.ButtonRole.RejectRole)
+        box.exec()
+        ok = box.clickedButton() is allow_btn
+        page.setFeaturePermission(origin, feature, grant if ok else deny_pol)
+        if store is not None and host:
+            store.set(host, key, ALLOW if ok else DENY, persist=persist)
+
+    @staticmethod
+    def _permission_policies():
+        grant = getattr(
+            getattr(QWebEnginePage, "PermissionPolicy", QWebEnginePage),
+            "PermissionGrantedByUser",
+            1,
+        )
+        deny = getattr(
+            getattr(QWebEnginePage, "PermissionPolicy", QWebEnginePage),
+            "PermissionDeniedByUser",
+            2,
+        )
+        return grant, deny
+
+    def open_site_permissions(self) -> None:
+        store = getattr(self._app, "permissions", None)
+        if store is None:
+            return
+        view = self.tabs.current_view()
+        origin = origin_of(view.url().toString()) if view is not None else ""
+        PermissionsDialog(store, origin=origin, parent=self).exec()
+
+    def summarize_page(self) -> None:
+        self.show_assistant()
+        with contextlib.suppress(Exception):
+            self.ai_sidebar._summarize()
+
+    def read_aloud(self, text: str = "") -> None:
+        if _tts.is_speaking():
+            _tts.stop()
+            self.toast("Stopped reading", "info")
+            return
+        if not (text or "").strip():
+            self.toast("Nothing to read", "info")
+            return
+        if _tts.speak(text):
+            self.toast("Reading aloud…", "ok")
+        else:
+            self.toast("Read Aloud needs Windows Speech (SAPI)", "warn")
+
+    def read_aloud_page(self) -> None:
+        if _tts.is_speaking():
+            self.read_aloud("")
+            return
+        view = self.tabs.current_view()
+        if view is None:
+            return
+        selected = ""
+        with contextlib.suppress(Exception):
+            selected = (view.page().selectedText() or "").strip()
+        if selected:
+            self.read_aloud(selected)
+            return
+        view.page().toPlainText(lambda t: self.read_aloud(t or ""))
+
+    def _workspace_tabs(self) -> tuple[list[dict], int]:
+        snap = self._session_snapshot() or {}
+        tabs = [t for t in (snap.get("tabs") or []) if isinstance(t, dict)]
+        return tabs, int(snap.get("current") or 0)
+
+    def _rebuild_workspaces_menu(self) -> None:
+        menu = self.workspaces_menu
+        menu.clear()
+        self._add(menu, "Save Current as Workspace…", self.save_workspace)
+        store = getattr(self._app, "workspaces", None)
+        items = store.list() if store is not None else []
+        if items:
+            menu.addSeparator()
+            for item in items:
+                mark = "● " if store is not None and item["id"] == store.active_id else ""
+                act = QAction(f"{mark}{item['name']} ({len(item.get('tabs') or [])} tabs)", self)
+                act.triggered.connect(lambda _=False, i=item["id"]: self.switch_workspace(i))
+                menu.addAction(act)
+            menu.addSeparator()
+            self._add(menu, "Rename Active Workspace…", self.rename_active_workspace)
+            self._add(menu, "Delete Active Workspace", self.delete_active_workspace)
+
+    def save_workspace(self) -> None:
+        store = getattr(self._app, "workspaces", None)
+        if store is None or self.incognito:
+            self.toast("Workspaces are unavailable in incognito", "info")
+            return
+        name, ok = QInputDialog.getText(self, "Save Workspace", "Name:")
+        if not ok or not str(name).strip():
+            return
+        tabs, current = self._workspace_tabs()
+        store.create(str(name).strip(), tabs, current)
+        self.toast(f"Saved workspace “{str(name).strip()}”", "ok")
+
+    def switch_workspace(self, ws_id: str) -> None:
+        store = getattr(self._app, "workspaces", None)
+        if store is None or self.incognito:
+            return
+        if store.active_id:
+            tabs, current = self._workspace_tabs()
+            store.update_tabs(store.active_id, tabs, current)
+        item = store.get(ws_id)
+        if item is None:
+            return
+        store.set_active(ws_id)
+        self._load_workspace_tabs(item)
+        self.toast(f"Workspace: {item['name']}", "ok")
+
+    def _load_workspace_tabs(self, item: dict) -> None:
+        while self.tabs.count() > 1:
+            self.tabs.close_tab(self.tabs.count() - 1)
+        first = self.tabs.widget(0)
+        if first is not None:
+            if self.tabs.is_pinned(0):
+                self.tabs.toggle_pin(0)
+            first.setUrl(QUrl("about:blank"))
+        self.restore_session(
+            {"tabs": item.get("tabs") or [], "current": item.get("current") or 0},
+            announce=False,
+        )
+
+    def rename_active_workspace(self) -> None:
+        store = getattr(self._app, "workspaces", None)
+        if store is None or not store.active_id:
+            return
+        item = store.get(store.active_id)
+        if item is None:
+            return
+        name, ok = QInputDialog.getText(self, "Rename Workspace", "Name:", text=item["name"])
+        if ok and str(name).strip():
+            store.rename(item["id"], str(name).strip())
+
+    def delete_active_workspace(self) -> None:
+        store = getattr(self._app, "workspaces", None)
+        if store is None or not store.active_id:
+            return
+        item = store.get(store.active_id)
+        if item is None:
+            return
+        if (
+            QMessageBox.question(self, "Delete workspace", f"Delete “{item['name']}”?")
+            == QMessageBox.StandardButton.Yes
+        ):
+            store.delete(item["id"])
+            self.toast("Workspace deleted", "ok")
 
     def open_settings(self) -> None:
         dialog = SettingsDialog(self.settings, self.profile, self)
@@ -1518,6 +1717,7 @@ class MainWindow(QMainWindow):
             self.adblock_act.setChecked(bool(self.settings.get("adblock_enabled", True)))
             # Settings can also flip the bookmark bar / startup behaviour.
             self.bm_bar_act.setChecked(bool(self.settings.get("bookmark_bar_visible", True)))
+            self._app.apply_adblock(bool(self.settings.get("adblock_enabled", True)))
 
     def open_internal_page(self, name: str) -> None:
         """Handle luckyd:// internal links (dashboard tiles, new-tab footer)."""
@@ -1530,6 +1730,7 @@ class MainWindow(QMainWindow):
             "extensions": self.open_extensions,
             "shortcuts": self.show_shortcuts,
             "hq": self.open_hq,
+            "permissions": self.open_site_permissions,
             "dashboard": lambda: self.open_in_new_tab(self._newtab_url()),
         }
         handler = actions.get(name.strip("/").lower())
@@ -1579,6 +1780,8 @@ class MainWindow(QMainWindow):
         <tr><td><span class='kbd'>Ctrl+Shift+B</span></td><td>Toggle bookmarks bar</td></tr>
         <tr><td><span class='kbd'>Ctrl+Shift+S</span></td><td>Save screenshot</td></tr>
         <tr><td><span class='kbd'>Ctrl+Alt+R</span></td><td>Reader mode</td></tr>
+        <tr><td><span class='kbd'>Ctrl+Shift+L</span></td><td>Read page aloud</td></tr>
+        <tr><td><span class='kbd'>Ctrl+Shift+U</span></td><td>Summarize this page</td></tr>
         <tr><td><span class='kbd'>Ctrl+Shift+F</span></td><td>Focus mode (hide all chrome)</td></tr>
         <tr><td><span class='kbd'>Ctrl+Shift+A</span></td><td>AI assistant</td></tr>
         <tr><td><span class='kbd'>Ctrl+Shift+H</span></td><td>Coding agent</td></tr>

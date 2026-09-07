@@ -3,7 +3,9 @@
 Modernized from the standalone deep-research-swarm:
 - Real Gemini model defaults (gemini-2.5-flash), not fictional 3.8-flash.
 - GOOGLE_API_KEY fallback in addition to GEMINI_API_KEY.
-- DRS_PROVIDER: auto | gemini | luckyd | mock — picks the LLM backend.
+- DRS_PROVIDER: auto | gemini | luckyd | opencode | openrouter | ollama | mock.
+  auto prefers the verified-free OpenCode Zen pool (nemotron-3-ultra-free),
+  then OpenRouter :free, then local Ollama, then Gemini native grounding.
 - DRS_SEARCH_BACKEND: auto | gemini | ddg | none — auto resolves from provider.
 - Runs/cache default under LuckyD DATA_DIR (data/deep_research/...) when
   available, with env overrides (DRS_RUNS_DIR / DRS_CACHE_DIR).
@@ -55,8 +57,27 @@ def _default_model() -> str:
 class Settings:
     api_key: str | None = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or None
 
-    # Provider selection: auto | gemini | luckyd | mock
+    # Provider selection: auto | gemini | luckyd | opencode | openrouter | ollama | mock
+    # auto = verified-free OpenCode Zen pool first, then OpenRouter :free,
+    # then local Ollama, then Gemini native grounding (when the LuckyD stack
+    # resolves to provider=google with a key), else LuckyD multi-provider.
     provider: str = os.getenv("DRS_PROVIDER", "auto").lower()
+
+    # Free-model defaults (verified live 2026-09-06). Per-role overrides via
+    # DRS_MODEL_PLANNER / DRS_MODEL_WORKER / DRS_MODEL_SYNTHESIZER /
+    # DRS_MODEL_CRITIC, backend-scoped via DRS_OPENCODE_MODEL /
+    # DRS_OPENROUTER_MODEL / DRS_OLLAMA_MODEL.
+    opencode_model: str = os.getenv("DRS_OPENCODE_MODEL", "nemotron-3-ultra-free")
+    openrouter_model: str = os.getenv(
+        "DRS_OPENROUTER_MODEL", "nvidia/nemotron-3-ultra-550b-a55b:free"
+    )
+    ollama_model: str = os.getenv("DRS_OLLAMA_MODEL", os.getenv("OLLAMA_MODEL", "llama3.2:3b"))
+    opencode_base_url: str = os.getenv(
+        "DRS_OPENCODE_BASE_URL", "https://opencode.ai/zen/v1"
+    )
+    openrouter_base_url: str = os.getenv(
+        "DRS_OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"
+    )
 
     model_worker: str = os.getenv("DRS_MODEL_WORKER", _default_model())
     model_planner: str = os.getenv(
@@ -118,7 +139,7 @@ class Settings:
             return "gemini"
         if provider_name == "gemini" and self.api_key:
             return "gemini"
-        # LuckyD multi-provider runs use keyless DDG + fetch by default.
+        # Free-model + LuckyD multi-provider runs use keyless DDG + fetch.
         return "ddg"
 
     def refresh(self) -> None:

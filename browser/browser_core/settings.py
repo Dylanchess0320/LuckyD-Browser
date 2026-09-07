@@ -84,6 +84,13 @@ DEFAULTS = {
     # (images included) — powerful but strictly opt-in; the other built-ins
     # (YouTube ad-block, video speed) are safe defaults.
     "userscript_disabled": ["Dark Mode Everywhere"],
+    # HTTPS-Only: upgrade public http:// navigations to https://. Localhost
+    # and private LAN addresses are never rewritten.
+    "https_only": True,
+    # Memory saver: freeze then discard idle background tabs.
+    "memory_saver": True,
+    "memory_saver_freeze_sec": 300,
+    "memory_saver_discard_sec": 900,
 }
 
 

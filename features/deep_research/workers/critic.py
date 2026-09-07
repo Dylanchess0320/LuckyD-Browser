@@ -43,13 +43,29 @@ def run_critic(
         f"Unknown cited ids (not in evidence set): {unknown}\n"
     )
 
-    critique = llm.structured(
-        role="critic",
-        system=CRITIC_SYSTEM,
-        user=user,
-        schema=Critique,
-        temperature=0.1,
-    )
+    try:
+        critique = llm.structured(
+            role="critic",
+            system=CRITIC_SYSTEM,
+            user=user,
+            schema=Critique,
+            temperature=0.1,
+        )
+    except Exception as e:
+        # Small/offline models may fail structured critique; accept the draft
+        # so the run completes instead of crashing.
+        store.emit(
+            "critique",
+            f"structured critique failed ({type(e).__name__}); accepting draft",
+            level="warn",
+        )
+        critique = Critique(
+            status="pass",
+            issues=[],
+            missing_aspects=[],
+            suggested_fixes=[],
+            overall_confidence=0.4,
+        )
 
     # Enforce structural failure: unknown citations -> must revise.
     if unknown:

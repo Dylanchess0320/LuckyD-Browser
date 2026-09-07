@@ -7,6 +7,7 @@ import json
 from urllib.parse import quote
 
 from browser_core import agent as _agent
+from browser_core.https_only import upgrade_url
 from PySide6.QtCore import Qt, QTimer, QUrl
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtWebEngineCore import QWebEnginePage, QWebEngineSettings
@@ -20,12 +21,24 @@ class WebPage(QWebEnginePage):
     def __init__(self, profile, parent, main_window):
         super().__init__(profile, parent)
         self._mw = main_window
+        with contextlib.suppress(Exception):
+            self.featurePermissionRequested.connect(self._on_feature_permission)
 
     def acceptNavigationRequest(self, url, nav_type, is_main_frame):  # noqa: N802
         if url.scheme() == "luckyd":
             self._mw.open_internal_page(url.host() or url.path())
             return False
+        if is_main_frame and bool(self._mw.settings.get("https_only", True)):
+            upgraded = upgrade_url(url.toString())
+            if upgraded and upgraded != url.toString():
+                QTimer.singleShot(0, lambda u=upgraded: self.setUrl(QUrl(u)))
+                return False
         return super().acceptNavigationRequest(url, nav_type, is_main_frame)
+
+    def _on_feature_permission(self, origin, feature) -> None:
+        handler = getattr(self._mw, "handle_feature_permission", None)
+        if callable(handler):
+            handler(self, origin, feature)
 
     # ── JavaScript dialogs (alert / confirm / prompt) ────────────────
     # While an agent session is active, a modal JS dialog would freeze the
@@ -143,6 +156,7 @@ class WebView(QWebEngineView):
         # "Your Internet access is blocked" page — retry quietly instead.
         self._load_attempts: dict[str, int] = {}
         self._connecting_for: QUrl | None = None
+        self._retry_timer: QTimer | None = None
         self.loadFinished.connect(self._on_load_finished)
         self.loadStarted.connect(self._on_load_started)
 
@@ -172,12 +186,25 @@ class WebView(QWebEngineView):
             return
         self._connecting_for = url
         self.setHtml(_CONNECTING_HTML.replace("{n}", str(attempts + 1)), url)
-        QTimer.singleShot(_RETRY_DELAYS_MS[attempts - 1], lambda u=url: self._retry(u))
+        # Schedule the retry on a timer OWNED BY THIS VIEW (never a global
+        # QTimer.singleShot): if the tab is closed mid-retry the timer is
+        # destroyed together with the view, so the callback can never fire
+        # on a deleted C++ object. A global timer used to crash here with
+        # "RuntimeError: libshiboken: Internal C++ object (WebView) already
+        # deleted" (see %LOCALAPPDATA%\LuckyDBrowser\crash.log).
+        timer = QTimer(self)
+        timer.setSingleShot(True)
+        timer.timeout.connect(lambda u=url: self._retry(u))
+        self._retry_timer = timer
+        timer.start(_RETRY_DELAYS_MS[attempts - 1])
 
     def _retry(self, url: QUrl) -> None:
-        if self._connecting_for == url or self.url() == url:
-            self._connecting_for = None
-            self.load(url)
+        try:
+            if self._connecting_for == url or self.url() == url:
+                self._connecting_for = None
+                self.load(url)
+        except RuntimeError:
+            pass  # view torn down between scheduling and firing — nothing to do
 
     # ── popups ───────────────────────────────────────────────────────
     # target=_blank / window.open -> open as a new tab in this window.
@@ -293,6 +320,7 @@ class WebView(QWebEngineView):
                     action_label,
                     lambda i=instruction, s=selected: (self._mw.ai_sidebar.ask_about(i, s)),
                 )
+            menu.addAction("Read Aloud Selection", lambda s=selected: self._mw.read_aloud(s))
             menu.addSeparator()
 
         if media_url.isValid() and not media_url.isEmpty():
@@ -317,6 +345,9 @@ class WebView(QWebEngineView):
                     )
                 ),
             )
+            menu.addAction("Read Aloud Page", self._mw.read_aloud_page)
+            menu.addAction("Summarize This Page", self._mw.summarize_page)
+            menu.addAction("Site Permissions…", self._mw.open_site_permissions)
             menu.addSeparator()
 
         menu.addAction("Inspect Element", self._mw.open_devtools)

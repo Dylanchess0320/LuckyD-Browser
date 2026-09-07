@@ -96,13 +96,14 @@ PROVIDER_DEFAULTS = {
         "default_model": "deepseek/deepseek-chat-v3.1",
     },
     # OpenCode Zen (opencode.ai gateway) — every model on it is $0/free.
-    # Catalog: opencode's open registry (models.dev), 2026-08.
+    # Catalog: opencode's open registry (models.dev), 2026-08; live-probed
+    # 2026-09-06: nemotron-3-ultra-free is the verified flagship (JSON + free).
     "opencode": {
         "env_key": "OPENCODE_API_KEY",
         "env_base": "OPENCODE_BASE_URL",
         "env_model": "OPENCODE_MODEL",
         "default_base": "https://opencode.ai/zen/v1",
-        "default_model": "mimo-v2.5-free",
+        "default_model": "nemotron-3-ultra-free",
     },
     # ClinePass (Cline flat-subscription gateway) — OpenAI-compatible.
     # Key comes from CLINEPASS_API_KEY, else the logged-in Cline CLI session.

@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Watch LuckyD on YouTube
+    url: https://www.youtube.com/@LuckyDYoutube
+    about: Demos, showcases, and walkthroughs
+  - name: Latest release
+    url: https://github.com/Dylanchess0320/LuckyD-Browser/releases/latest
+    about: Download the current Windows installer

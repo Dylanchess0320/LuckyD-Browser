@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.9.0] - 2026-09-06
+
+### Added
+- **HTTPS-Only Mode** — public `http://` main-frame navigations upgrade to `https://`. Localhost, `.local`, and private LAN addresses are never rewritten (Settings toggle, default on).
+- **Per-site permissions** — camera, microphone, location, notifications, pointer lock, and screen capture prompt once and remember Allow/Block per origin. Incognito never persists. Lock icon / Tools / Settings open the manager.
+- **Workspaces** — named tab collections (File → Workspaces, command palette). Switching saves the current window into the active workspace, then loads the target.
+- **Memory saver** — idle background tabs freeze after 5 minutes and discard after 15. Pinned, audible, current, and local platform tabs (dashboard / HQ / terminal) stay awake. Sleeping tabs show a 💤 prefix and wake on click.
+- **Read Aloud** — `Ctrl+Shift+L` (toolbar 🔊, context menu) speaks the selection or the page via Windows SAPI; click again to stop.
+- **Summarize This Page** — `Ctrl+Shift+U` (toolbar ✨) opens the AI sidebar and summarizes the current tab.
+
 ## [3.8.0] - 2026-09-06
 
 ### Added

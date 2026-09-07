@@ -8,12 +8,14 @@ from pathlib import Path
 
 from browser_core.adblock import AdBlockInterceptor
 from browser_core.harness_bridge import HarnessSupervisor
+from browser_core.permissions import PermissionStore
 from browser_core.profile import default_profile
 from browser_core.scheduler import ScheduleStore
 from browser_core.scripts import ScriptEngine
 from browser_core.session import SessionStore
 from browser_core.settings import SettingsStore
 from browser_core.storage import Storage
+from browser_core.workspaces import WorkspaceStore
 from browser_ui.main_window import MainWindow
 from PySide6.QtCore import QObject, QTimer, Signal
 from PySide6.QtGui import QIcon
@@ -46,6 +48,8 @@ class BrowserApp:
         self.settings = SettingsStore()
         self.storage = Storage()
         self.session_store = SessionStore()
+        self.permissions = PermissionStore()
+        self.workspaces = WorkspaceStore()
         # Session autosave: windows call schedule_session_save() on every tab
         # change; one debounced timer snapshots all windows at once.
         self._session_timer = QTimer(self.qapp)
