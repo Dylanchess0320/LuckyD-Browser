@@ -23,6 +23,8 @@ _SHELL_LABELS = {
     "agy": "Antigravity",
     "antigravity": "Antigravity",
     "mesh-hermes": "Hermes",
+    "mesh-grok": "Grok",
+    "grok": "Grok",
 }
 
 
@@ -40,6 +42,7 @@ _MESH_AGENTS = {
     "mesh-dsh": ("DeepSeek", "🐋", "#06b6d4", "DeepSeek harness"),
     "mesh-hermes": ("Hermes", "⚕", "#fb923c", "Nous Research · self-improving"),
     "mesh-pi": ("Pi", "⚪", "#94a3b8", "minimal toolkit"),
+    "mesh-grok": ("Grok", "𝕏", "#f1f5f9", "xAI · builder"),
 }
 
 

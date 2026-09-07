@@ -311,8 +311,10 @@ SHELLS = (
     "mesh-dsh",
     "mesh-hermes",
     "mesh-pi",
+    "mesh-grok",
     "agy",
     "antigravity",
+    "grok",
 )
 
 # Agent Mesh shells: shell name -> executable resolved on PATH.
@@ -331,6 +333,8 @@ MESH_SHELLS = {
     "mesh-dsh": "dsh",
     "mesh-hermes": "hermes",
     "mesh-pi": "pi",
+    "mesh-grok": "grok",
+    "grok": "grok",
 }
 
 # Extra default args per mesh shell (appended after the resolved executable).
@@ -360,6 +364,19 @@ def _find_mesh_exe(exe_name: str) -> str | None:
             Path.home() / "AppData" / "Local" / "agy" / "bin" / f"{exe_name}.exe",
             Path.home() / "AppData" / "Local" / "agy" / "bin" / "agy.exe",
             Path.home() / ".gemini" / "antigravity-cli" / "bin" / "agy.exe",
+        ):
+            if cand.is_file():
+                return str(cand)
+    if exe_name == "grok":
+        # Official Windows installer drops grok.exe (and agent.exe) in
+        # %USERPROFILE%\.grok\bin and adds it to User PATH — but a frozen
+        # browser / stale shell may not see the updated PATH yet, so probe
+        # the well-known location directly (mirrors the agy fallback above).
+        # The npm alt (`npm i -g @xai-official/grok`) IS on PATH via
+        # shutil.which, so only the install.ps1 location needs help here.
+        for cand in (
+            Path.home() / ".grok" / "bin" / "grok.exe",
+            Path.home() / ".grok" / "bin" / "agent.exe",
         ):
             if cand.is_file():
                 return str(cand)
