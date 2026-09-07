@@ -421,7 +421,7 @@ def _find_wsl_exe() -> str | None:
     found = shutil.which("wsl")
     if found:
         return found
-    sys32 = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / "wsl.exe"
+    sys32 = Path(os.environ.get("SYSTEMROOT", r"C:\Windows")) / "System32" / "wsl.exe"
     if sys32.is_file():
         return str(sys32)
     return None
