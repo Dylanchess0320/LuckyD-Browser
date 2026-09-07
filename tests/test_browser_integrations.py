@@ -197,6 +197,84 @@ def test_hermes_shell_boots_chat(monkeypatch, tmp_path: Path) -> None:
     assert cmd[1:] == ["chat"]
 
 
+def test_muse_spark_shell_pins_opencode_model(monkeypatch, tmp_path: Path) -> None:
+    """mesh-muse-spark must spawn opencode pinned to the Muse Spark model.
+
+    muse-spark has no Windows exe — it reuses opencode, so availability
+    follows the opencode install (works today, no WSL needed).
+    """
+    from browser.browser_core.terminal_page import _MESH_AGENTS, _SHELL_LABELS
+    from browser.browser_core.terminal_server import SHELLS, _mesh_shell_command
+
+    assert "mesh-muse-spark" in SHELLS
+    assert "muse-spark" in SHELLS
+    assert "mesh-muse-spark" in _MESH_AGENTS
+    assert _SHELL_LABELS.get("mesh-muse-spark") == "Muse Spark"
+    mock_opencode = tmp_path / "opencode.cmd"
+    mock_opencode.touch()
+    monkeypatch.setattr(
+        "browser.browser_core.terminal_server._find_mesh_exe",
+        lambda exe: str(mock_opencode) if exe == "opencode" else None,
+    )
+    cmd = _mesh_shell_command("mesh-muse-spark")
+    assert cmd[0].lower().endswith("opencode.cmd")
+    assert cmd[1:] == ["--model", "opencode/muse-spark-1.3-contributor-free"]
+
+
+def test_muse_shell_uses_wsl_bridge_without_probing_distro(monkeypatch, tmp_path: Path) -> None:
+    """mesh-muse must spawn via wsl.exe and never invoke the distro to probe.
+
+    Native muse has no Windows build; it lives inside WSL Ubuntu. Probing
+    the distro during availability/command resolution can HANG when WSL is
+    broken, so only wsl.exe presence is checked — a missing inner `muse`
+    prints install steps inside a live bash instead of a dead pane.
+    """
+    from browser.browser_core.terminal_page import _MESH_AGENTS, _SHELL_LABELS
+    from browser.browser_core.terminal_server import (
+        MUSE_WSL_DISTRO,
+        SHELLS,
+        _mesh_shell_command,
+        mesh_shells_available,
+    )
+
+    assert "mesh-muse" in SHELLS
+    assert "muse" in SHELLS
+    assert "mesh-muse" in _MESH_AGENTS
+    assert _SHELL_LABELS.get("mesh-muse") == "Muse Code"
+    mock_wsl = tmp_path / "wsl.exe"
+    mock_wsl.touch()
+    monkeypatch.setattr(
+        "browser.browser_core.terminal_server._find_wsl_exe",
+        lambda: str(mock_wsl),
+    )
+    monkeypatch.setattr(
+        "browser.browser_core.terminal_server._find_mesh_exe",
+        lambda exe: None,
+    )
+    avail = mesh_shells_available()
+    assert avail["mesh-muse"] is True
+    assert avail["muse"] is True
+    cmd = _mesh_shell_command("mesh-muse")
+    assert cmd[0].lower().endswith("wsl.exe")
+    assert cmd[1:4] == ["-d", MUSE_WSL_DISTRO, "--"]
+    assert "muse" in cmd[-1]
+
+
+def test_muse_shell_missing_wsl_raises_helpful_error(monkeypatch) -> None:
+    from browser.browser_core.terminal_server import _mesh_shell_command
+
+    monkeypatch.setattr(
+        "browser.browser_core.terminal_server._find_wsl_exe",
+        lambda: None,
+    )
+    try:
+        _mesh_shell_command("mesh-muse")
+    except FileNotFoundError as exc:
+        assert "wsl" in str(exc).lower()
+    else:
+        raise AssertionError("expected FileNotFoundError when wsl.exe is missing")
+
+
 def test_installer_removes_legacy_desktop_shortcut() -> None:
     installer = (
         Path(__file__).parents[1] / "browser" / "installer" / "LuckyDBrowser.iss"

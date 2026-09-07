@@ -144,17 +144,12 @@ class CommandPalette(QWidget):
         self._items = []
         self._load_items()  # reload fresh data
         self._filter("")
-        # Don't clear + re-add items — _filter does that
         self._position()
         self.show()
         self.raise_()
         self._e.setFocus()
-        for _kw, lbl, ico, act in self._items:
-            it = QListWidgetItem(lbl)
-            it.setData(Qt.ItemDataRole.UserRole, act)
-            if ico:
-                it.setIcon(ico)
-            self._lst.addItem(it)
+        if self._lst.count():
+            self._lst.setCurrentRow(0)
 
     def _position(self) -> None:
         pw, ph = self.width(), self.height()

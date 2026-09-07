@@ -84,7 +84,23 @@ FORBIDDEN_CALLS: frozenset[str] = frozenset(
 
 #: Builtin calls that are blocked in untrusted mode.
 FORBIDDEN_BUILTINS: frozenset[str] = frozenset(
-    {"eval", "exec", "compile", "__import__", "breakpoint"}
+    {"eval", "exec", "compile", "__import__", "breakpoint", "getattr", "globals", "vars"}
+)
+
+#: Object attribute names that untrusted code must never access.
+#: Catches MRO traversal, subclass enumeration, and introspection escapes
+#: like ().__class__.__mro__[1].__subclasses__() or getattr(obj, 'system').
+FORBIDDEN_DUNDER_ATTRS: frozenset[str] = frozenset(
+    {
+        "__class__",
+        "__mro__",
+        "__subclasses__",
+        "__bases__",
+        "__globals__",
+        "__builtins__",
+        "__code__",
+        "__import__",
+    }
 )
 
 
@@ -348,13 +364,20 @@ class CodeExecutionSandbox:
         return "\n".join(lines).rstrip() + "\n"
 
     def profile(self, code: str, timeout: float = 30.0, top_n: int = 15) -> ProfileResult:
-        """Profile *code* in-process with cProfile. Untrusted blocking still applies."""
+        """Profile *code* in-process with cProfile.
+
+        Refuses to run in untrusted mode because exec() runs in the parent
+        process with no subprocess isolation — AST-based forbidden-node
+        checks are bypassable (e.g. getattr(os, 'system')).  Use execute()
+        for untrusted profiling with wall-clock timeout and full process
+        isolation.
+        """
         if not self.trusted:
-            violation = self._find_forbidden(code)
-            if violation:
-                return ProfileResult(
-                    success=False, error=f"Forbidden construct blocked: {violation}"
-                )
+            return ProfileResult(
+                success=False,
+                error="profile() is not available in untrusted mode — "
+                "use execute() for sandboxed profiling",
+            )
         ok, err = self.validate_syntax(code)
         if not ok:
             return ProfileResult(success=False, error=err)
@@ -454,13 +477,19 @@ class CodeExecutionSandbox:
                 if mod in FORBIDDEN_IMPORTS or root in FORBIDDEN_IMPORTS:
                     return f"import from '{mod}' (line {node.lineno})"
 
-            # Forbidden calls: dotted (os.system) or bare builtin (eval)
+            # Forbidden calls: dotted (os.system) or bare builtin (eval/getattr)
             elif isinstance(node, ast.Call):
                 name = _call_name(node.func)
                 if name and name in FORBIDDEN_CALLS:
                     return f"call to '{name}()' (line {node.lineno})"
                 if name and name in FORBIDDEN_BUILTINS:
                     return f"call to builtin '{name}()' (line {node.lineno})"
+
+            # Forbidden dunder attribute access — catches MRO traversal,
+            # subclass enumeration, and introspection escapes like
+            # ().__class__.__mro__[1].__subclasses__()
+            elif isinstance(node, ast.Attribute) and node.attr in FORBIDDEN_DUNDER_ATTRS:
+                return f"access to forbidden attribute '{node.attr}' (line {node.lineno})"
         return None
 
     # ── Lint rules ─────────────────────────────────────────────────────

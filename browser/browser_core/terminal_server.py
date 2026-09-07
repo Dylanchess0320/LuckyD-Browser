@@ -312,9 +312,13 @@ SHELLS = (
     "mesh-hermes",
     "mesh-pi",
     "mesh-grok",
+    "mesh-muse",
+    "mesh-muse-spark",
     "agy",
     "antigravity",
     "grok",
+    "muse",
+    "muse-spark",
 )
 
 # Agent Mesh shells: shell name -> executable resolved on PATH.
@@ -335,6 +339,8 @@ MESH_SHELLS = {
     "mesh-pi": "pi",
     "mesh-grok": "grok",
     "grok": "grok",
+    "mesh-muse-spark": "opencode",
+    "muse-spark": "opencode",
 }
 
 # Extra default args per mesh shell (appended after the resolved executable).
@@ -349,7 +355,30 @@ MESH_SHELLS = {
 MESH_SHELL_ARGS: dict[str, list[str]] = {
     "mesh-dsh": ["--profile", "web", "--no-open"],
     "mesh-hermes": ["chat"],
+    # muse-spark has no Windows exe — reuses opencode pinned to the Muse
+    # Spark model. Availability follows the opencode install (no WSL needed).
+    "mesh-muse-spark": ["--model", "opencode/muse-spark-1.3-contributor-free"],
+    "muse-spark": ["--model", "opencode/muse-spark-1.3-contributor-free"],
 }
+
+# Native Muse Code (`muse`) has no Windows build — Meta ships macOS/Linux
+# only and the installer hard-fails on Windows. The supported route on this
+# machine is WSL2 + Ubuntu: `muse` lives INSIDE Linux at ~/.local/bin/muse,
+# so the Windows side spawns it via wsl.exe. These shells are resolved by
+# _wsl_muse_command(), not MESH_SHELLS (there is no muse.exe on PATH).
+MUSE_WSL_DISTRO = "Ubuntu"
+MESH_WSL_SHELLS = frozenset({"mesh-muse", "muse"})
+# Login shell (`bash -lic`) so ~/.local/bin is on PATH inside Ubuntu, plus a
+# friendly fallback: if muse isn't installed in Linux yet, print the install
+# steps and drop to bash INSTEAD of exiting instantly (dead pane).
+MUSE_WSL_BOOT = (
+    "if command -v muse >/dev/null 2>&1; then exec muse; else "
+    "echo ''; echo 'Muse CLI not found inside Ubuntu.'; "
+    "echo 'Install it INSIDE Ubuntu with:'; "
+    "echo '  curl -fsSL https://dev.meta.ai/install.sh | bash'; "
+    "echo '  exec $SHELL -l'; echo '  muse login   # paste the link into Edge/Chrome'; "
+    "echo ''; exec bash; fi"
+)
 
 
 def _find_mesh_exe(exe_name: str) -> str | None:
@@ -383,9 +412,48 @@ def _find_mesh_exe(exe_name: str) -> str | None:
     return None
 
 
+def _find_wsl_exe() -> str | None:
+    """Locate wsl.exe without ever invoking WSL (invoking it can hang when
+    the subsystem is broken — e.g. REGDB_E_CLASSNOTREG — which would stall
+    the terminal page render that calls mesh_shells_available())."""
+    import shutil
+
+    found = shutil.which("wsl")
+    if found:
+        return found
+    sys32 = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / "wsl.exe"
+    if sys32.is_file():
+        return str(sys32)
+    return None
+
+
 def mesh_shells_available() -> dict[str, bool]:
-    """Which Agent Mesh shells can actually spawn right now (exe on PATH)."""
-    return {name: bool(_find_mesh_exe(exe)) for name, exe in MESH_SHELLS.items()}
+    """Which Agent Mesh shells can actually spawn right now (exe on PATH).
+
+    WSL-backed Muse shells report wsl.exe presence (fast, never invokes a
+    possibly-broken distro). Whether `muse` exists INSIDE Ubuntu is checked
+    at spawn time with a friendly install hint, so a broken/missing distro
+    shows a helpful message instead of a dead pane or a hung page load.
+    """
+    avail = {name: bool(_find_mesh_exe(exe)) for name, exe in MESH_SHELLS.items()}
+    wsl_ok = bool(_find_wsl_exe())
+    for shell in MESH_WSL_SHELLS:
+        avail[shell] = wsl_ok
+    return avail
+
+
+def _wsl_muse_command() -> list[str]:
+    """Spawn command for native Muse Code inside WSL Ubuntu."""
+    raw = _find_wsl_exe()
+    if not raw:
+        raise FileNotFoundError(
+            "Agent Mesh shell 'mesh-muse' needs WSL (missing: wsl.exe). "
+            "Run in admin PowerShell: wsl --install -d Ubuntu"
+        )
+    exe = str(Path(raw).resolve())
+    if not Path(exe).is_file():
+        raise FileNotFoundError(f"WSL resolved to non-file: {exe}")
+    return [exe, "-d", MUSE_WSL_DISTRO, "--", "bash", "-lic", MUSE_WSL_BOOT]
 
 
 def _mesh_shell_command(shell: str) -> list[str]:
@@ -393,8 +461,11 @@ def _mesh_shell_command(shell: str) -> list[str]:
 
     Returns [absolute exe, *default args]. Most agents are interactive CLIs
     that need no args; entries in MESH_SHELL_ARGS append fixed launcher args
-    (e.g. dsh requires `--profile <name>` and dies without it).
+    (e.g. dsh requires `--profile <name>` and dies without it). WSL-backed
+    Muse shells resolve via _wsl_muse_command().
     """
+    if shell in MESH_WSL_SHELLS:
+        return _wsl_muse_command()
     exe_name = MESH_SHELLS[shell]
     raw = _find_mesh_exe(exe_name)
     if not raw:
@@ -418,7 +489,7 @@ def _shell_command(shell: str, cli_path: str = "", cli2_path: str = "") -> list[
         return ["cmd.exe"]
     if shell == "agent2":
         return _agent2_command(cli2_path)
-    if shell in MESH_SHELLS:
+    if shell in MESH_SHELLS or shell in MESH_WSL_SHELLS:
         return _mesh_shell_command(shell)
     return _cli_command(cli_path)
 
