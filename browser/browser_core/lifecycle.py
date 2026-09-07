@@ -47,7 +47,9 @@ def should_protect(
     return is_protected_url(url)
 
 
-def next_state(idle_seconds: float, freeze_after: int = FREEZE_AFTER, discard_after: int = DISCARD_AFTER) -> str:
+def next_state(
+    idle_seconds: float, freeze_after: int = FREEZE_AFTER, discard_after: int = DISCARD_AFTER
+) -> str:
     """Lifecycle state a background tab should move to after `idle_seconds`."""
     idle = max(0.0, float(idle_seconds))
     freeze_after = max(15, int(freeze_after))

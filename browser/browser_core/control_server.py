@@ -134,7 +134,10 @@ _ROUTES = (
     ("GET  /schedules", "workflow schedules with last-run results"),
     ("POST /schedule", '{"name": "…", "every_min": 0|15|30|60|360|1440} — auto-replay a workflow'),
     ("GET  /research", "Deep Researcher Swarm interactive tool"),
-    ("POST /research/start", '{"query": "…", "depth": "…", "backend": "…", "provider": "…"} — launch swarm'),
+    (
+        "POST /research/start",
+        '{"query": "…", "depth": "…", "backend": "…", "provider": "…"} — launch swarm',
+    ),
     ("GET  /research/status", "poll status, stages, and events of active swarm"),
     ("GET  /research/runs", "list historical research reports"),
     ("GET  /research/run", "load past report markdown and evidence"),
@@ -359,7 +362,17 @@ def make_handler(backend, token: str = "", harness=None, settings=None):
         # gated by _origin_ok() (direct navigation never sends a mismatched
         # Origin) and get the token injected into their own JS instead, the
         # same pattern web_server.py uses for its landing page.
-        _NAV_PATHS = ("/", "/help", "/dashboard", "/hq", "/mesh", "/terminal", "/workflows", "/network", "/research")
+        _NAV_PATHS = (
+            "/",
+            "/help",
+            "/dashboard",
+            "/hq",
+            "/mesh",
+            "/terminal",
+            "/workflows",
+            "/network",
+            "/research",
+        )
 
         def do_GET(self):
             if not self._host_ok():

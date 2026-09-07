@@ -15,7 +15,7 @@ for p in (REPO_ROOT, BROWSER_DIR):
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))
 
-from browser_core.research_page import research_html, SwarmManager
+from browser_core.research_page import SwarmManager, research_html
 
 
 class TestBrowserResearchPage:

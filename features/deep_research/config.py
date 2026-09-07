@@ -72,12 +72,8 @@ class Settings:
         "DRS_OPENROUTER_MODEL", "nvidia/nemotron-3-ultra-550b-a55b:free"
     )
     ollama_model: str = os.getenv("DRS_OLLAMA_MODEL", os.getenv("OLLAMA_MODEL", "llama3.2:3b"))
-    opencode_base_url: str = os.getenv(
-        "DRS_OPENCODE_BASE_URL", "https://opencode.ai/zen/v1"
-    )
-    openrouter_base_url: str = os.getenv(
-        "DRS_OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"
-    )
+    opencode_base_url: str = os.getenv("DRS_OPENCODE_BASE_URL", "https://opencode.ai/zen/v1")
+    openrouter_base_url: str = os.getenv("DRS_OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
 
     model_worker: str = os.getenv("DRS_MODEL_WORKER", _default_model())
     model_planner: str = os.getenv(

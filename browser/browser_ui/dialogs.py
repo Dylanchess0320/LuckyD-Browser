@@ -500,7 +500,9 @@ class PermissionsDialog(QDialog):
             return
         for origin, decisions in rows:
             bits = [
-                f"{feature_label(k)}: {v}" for k, v in sorted(decisions.items()) if v in ("allow", "deny")
+                f"{feature_label(k)}: {v}"
+                for k, v in sorted(decisions.items())
+                if v in ("allow", "deny")
             ]
             item = QListWidgetItem(f"{origin}\n" + (", ".join(bits) or "(none)"))
             item.setData(Qt.ItemDataRole.UserRole, origin)

@@ -156,9 +156,12 @@ class OpenAICompatProvider(LLMProvider):
             override = (os.getenv(f"DRS_MODEL_{role.upper()}", "") or "").strip()
         except Exception:
             override = ""
-        if override and self._backend in ("opencode", "openrouter", "ollama"):
-            if override.startswith("gemini-") or override.startswith("gemini/"):
-                override = ""
+        if (
+            override
+            and self._backend in ("opencode", "openrouter", "ollama")
+            and (override.startswith("gemini-") or override.startswith("gemini/"))
+        ):
+            override = ""
         if override:
             return override
         pool = self._pool()
@@ -208,8 +211,7 @@ class OpenAICompatProvider(LLMProvider):
                 pass
         if self._backend == "ollama" and not self._base_override:
             host = (
-                os.getenv("OLLAMA_HOST", "").strip()
-                or os.getenv("DRS_OLLAMA_BASE_URL", "").strip()
+                os.getenv("OLLAMA_HOST", "").strip() or os.getenv("DRS_OLLAMA_BASE_URL", "").strip()
             )
             if host:
                 host = host.rstrip("/")
@@ -315,7 +317,9 @@ class OpenAICompatProvider(LLMProvider):
                 # retry the SAME model without it before rotating.
                 if resp.status_code == 400 and attempt["json"]:
                     continue
-                last_err = RuntimeError(f"{self._backend} {model} HTTP {resp.status_code}: {snippet}")
+                last_err = RuntimeError(
+                    f"{self._backend} {model} HTTP {resp.status_code}: {snippet}"
+                )
                 if _is_rotation_error(resp.status_code, snippet):
                     break  # rotate to next model
                 if resp.status_code in (429, 500, 502, 503, 504):

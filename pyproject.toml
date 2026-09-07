@@ -125,8 +125,8 @@ ignore = [
     "T201",   # print (allowed in CLI app)
         "RUF012", # mutable class defaults
 ]
-# Brand glyph (›) used intentionally as the REPL prompt / chevron
-allowed-confusables = ["›", "＋"]
+# Brand glyphs used intentionally in UI (REPL chevron, fullwidth plus, X logo)
+allowed-confusables = ["›", "＋", "𝕏"]
 
 [tool.ruff.format]
 quote-style = "double"

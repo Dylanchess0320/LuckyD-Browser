@@ -302,9 +302,9 @@ async def run_swarm_sequential(
                 llm, query, state["results"], store, previous_critique=prev
             )
         except Exception as e:
-            from .runtime.budget import BudgetExhausted as _BE
+            from .runtime.budget import BudgetExhausted
 
-            if not isinstance(e, _BE):
+            if not isinstance(e, BudgetExhausted):
                 raise
             # Budget ran out before/during synthesis: best-effort draft from
             # raw worker findings (mirrors synthesize_node in build_graph).
@@ -345,9 +345,9 @@ async def run_swarm_sequential(
         try:
             critique = run_critic(llm, query, report, evidence, store)
         except Exception as e:
-            from .runtime.budget import BudgetExhausted as _BE2
+            from .runtime.budget import BudgetExhausted
 
-            if not isinstance(e, _BE2):
+            if not isinstance(e, BudgetExhausted):
                 raise
             from .schemas import Critique as _Critique
 
@@ -359,15 +359,17 @@ async def run_swarm_sequential(
 
         if critique.status == "pass" or state.get("iterations", 0) >= max_iters:
             if critique.status != "pass":
-                store.emit("critique", "max iterations reached; finalizing best draft", level="warn")
+                store.emit(
+                    "critique", "max iterations reached; finalizing best draft", level="warn"
+                )
             break
         # revise loop continues; verify runs once on the accepted draft
     try:
         audit = run_verify(llm, state["report"], state.get("evidence", []), store)
     except Exception as e:
-        from .runtime.budget import BudgetExhausted as _BE3
+        from .runtime.budget import BudgetExhausted
 
-        if not isinstance(e, _BE3):
+        if not isinstance(e, BudgetExhausted):
             raise
         from .schemas import CitationAudit as _Audit
 

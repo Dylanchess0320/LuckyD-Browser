@@ -9,9 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import html
 import json
-import os
 import sys
 import threading
 import time
@@ -29,7 +27,7 @@ if getattr(sys, "frozen", False):
 from features.deep_research.config import settings as drs_settings
 from features.deep_research.graph import run_swarm
 from features.deep_research.runtime.events import EventEmitter, RunEvent
-from tools.deep_research_tool import DEPTH_PRESETS, _VALID_BACKENDS, _VALID_PROVIDERS
+from tools.deep_research_tool import _VALID_BACKENDS, _VALID_PROVIDERS, DEPTH_PRESETS
 
 
 class SwarmManager:
@@ -111,19 +109,23 @@ class SwarmManager:
                     self._active_run["stage"] = "finalizing"
 
                 self._active_run["elapsed"] = round(time.time() - self._active_run["start_time"], 1)
-                self._active_run["events"].append({
-                    "ts": round(ev.ts, 2),
-                    "node": ev.node,
-                    "message": ev.message,
-                    "level": ev.level,
-                })
+                self._active_run["events"].append(
+                    {
+                        "ts": round(ev.ts, 2),
+                        "node": ev.node,
+                        "message": ev.message,
+                        "level": ev.level,
+                    }
+                )
 
         emitter.subscribe(_on_event)
 
         def _worker() -> None:
             effective_query = query
             if context.strip():
-                effective_query = f"{query}\n\nAdditional browser context:\n{context.strip()[:2500]}"
+                effective_query = (
+                    f"{query}\n\nAdditional browser context:\n{context.strip()[:2500]}"
+                )
 
             # Save previous settings
             saved = (
@@ -171,7 +173,9 @@ class SwarmManager:
                         self._active_run["stage"] = "done"
                         self._active_run["report_markdown"] = report or ""
                         self._active_run["end_time"] = time.time()
-                        self._active_run["elapsed"] = round(time.time() - self._active_run["start_time"], 1)
+                        self._active_run["elapsed"] = round(
+                            time.time() - self._active_run["start_time"], 1
+                        )
 
             except Exception as e:
                 with self._lock:
@@ -180,7 +184,9 @@ class SwarmManager:
                         self._active_run["stage"] = "error"
                         self._active_run["error"] = str(e)
                         self._active_run["end_time"] = time.time()
-                        self._active_run["elapsed"] = round(time.time() - self._active_run["start_time"], 1)
+                        self._active_run["elapsed"] = round(
+                            time.time() - self._active_run["start_time"], 1
+                        )
             finally:
                 # Restore settings
                 with contextlib.suppress(Exception):
@@ -249,7 +255,11 @@ class SwarmManager:
                         pass
                 elif report_file.exists():
                     try:
-                        lines = [ln.strip() for ln in report_file.read_text(encoding="utf-8").splitlines() if ln.strip()]
+                        lines = [
+                            ln.strip()
+                            for ln in report_file.read_text(encoding="utf-8").splitlines()
+                            if ln.strip()
+                        ]
                         if lines:
                             query = lines[0].lstrip("#").strip()
                     except Exception:
@@ -264,14 +274,18 @@ class SwarmManager:
                     except Exception:
                         pass
 
-                results.append({
-                    "id": item.name,
-                    "query": query,
-                    "timestamp": item.stat().st_mtime,
-                    "time_str": time.strftime("%Y-%m-%d %H:%M", time.localtime(item.stat().st_mtime)),
-                    "sources": sources_count,
-                    "has_report": report_file.exists(),
-                })
+                results.append(
+                    {
+                        "id": item.name,
+                        "query": query,
+                        "timestamp": item.stat().st_mtime,
+                        "time_str": time.strftime(
+                            "%Y-%m-%d %H:%M", time.localtime(item.stat().st_mtime)
+                        ),
+                        "sources": sources_count,
+                        "has_report": report_file.exists(),
+                    }
+                )
         except Exception:
             pass
         return results[:50]
@@ -1278,4 +1292,4 @@ function escapeHtml(str) {{
 
 </body>
 </html>
-"""
+"""  # nosec B608 -- HTML/JS templating for the research SPA, not SQL
