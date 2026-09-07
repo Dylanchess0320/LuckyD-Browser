@@ -1,0 +1,17 @@
+name: Feature request
+description: An idea for LuckyD Browser
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: The idea
+      placeholder: What should LuckyD do that it doesn't do today?
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why it matters
+      placeholder: Who is this for? What does it replace?

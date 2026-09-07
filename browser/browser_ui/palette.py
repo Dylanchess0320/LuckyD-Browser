@@ -106,9 +106,24 @@ class CommandPalette(QWidget):
             self._items.append(
                 ("history", t or u, letter_tile(u), lambda uu=u: self._mw.open_in_new_tab(uu))
             )
+        store = getattr(getattr(self._mw, "_app", None), "workspaces", None)
+        if store is not None:
+            for ws in store.list():
+                self._items.append(
+                    (
+                        "workspace",
+                        f"▣ {ws['name']}",
+                        None,
+                        lambda i=ws["id"]: self._mw.switch_workspace(i),
+                    )
+                )
         for label, action in [
             ("New Tab", self._mw.new_tab),
             ("AI Assistant", self._mw.show_assistant),
+            ("Summarize This Page", self._mw.summarize_page),
+            ("Read Aloud", self._mw.read_aloud_page),
+            ("Site Permissions…", self._mw.open_site_permissions),
+            ("Save Current as Workspace…", self._mw.save_workspace),
             ("Deep Researcher Swarm…", self._mw.open_deep_research),
             ("Coding Agent", self._mw.open_hq),
             ("Agent Terminal", self._mw.open_terminal),

@@ -14,7 +14,15 @@ Custom tab bar features:
 from __future__ import annotations
 
 import contextlib
+import time
 
+from browser_core.lifecycle import (
+    ACTIVE,
+    DISCARDED,
+    FROZEN,
+    next_state,
+    should_protect,
+)
 from PySide6.QtCore import QPoint, QRect, Qt, QTimer
 from PySide6.QtGui import QColor, QGuiApplication, QIcon, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
@@ -237,6 +245,13 @@ class BrowserTabWidget(QTabWidget):
         self.tabCloseRequested.connect(self.close_tab)
         self.currentChanged.connect(self._on_current_changed)
 
+        # Memory saver: idle clock per view + 15s policy tick.
+        self._idle_since: dict[int, float] = {}
+        self._sleep = QTimer(self)
+        self._sleep.setInterval(15_000)
+        self._sleep.timeout.connect(self._tick_memory_saver)
+        self._sleep.start()
+
     # ── lifecycle ────────────────────────────────────────────────────
 
     def new_tab(self, url=None, make_current=True) -> WebView:
@@ -259,6 +274,9 @@ class BrowserTabWidget(QTabWidget):
             self._pinned.discard(id(view))
             self._muted.discard(id(view))
             self._tab_group.pop(id(view), None)
+            self._idle_since.pop(id(view), None)
+            with contextlib.suppress(Exception):
+                view._ld_sleep = None
         self._loading.discard(index)
         self.removeTab(index)
         self._loading = {i for i in self._loading if i < self.count()}
@@ -552,6 +570,9 @@ class BrowserTabWidget(QTabWidget):
                         prefix = "🔇 " if id(view) in self._muted else "🔊 "
                 except AttributeError:
                     pass
+                sleep = getattr(view, "_ld_sleep", None)
+                if sleep in (FROZEN, DISCARDED) and not prefix:
+                    prefix = "💤 "
                 self.setTabText(index, prefix + short[:40])
             tip = title or ""
             if group:
@@ -572,5 +593,81 @@ class BrowserTabWidget(QTabWidget):
     def _on_current_changed(self, _index: int) -> None:
         view = self.currentWidget()
         if view is not None:
+            self._wake_view(view)
             self._mw.on_tab_switched(view)
+        self._mark_idle_clocks()
         self._mw.on_tabs_changed()  # active index is part of the session
+
+    def _mark_idle_clocks(self) -> None:
+        now = time.monotonic()
+        current = self.currentWidget()
+        for i in range(self.count()):
+            view = self.widget(i)
+            if view is None:
+                continue
+            vid = id(view)
+            if view is current:
+                self._idle_since.pop(vid, None)
+            else:
+                self._idle_since.setdefault(vid, now)
+            with contextlib.suppress(Exception):
+                view.page().setVisible(view is current)
+
+    def _wake_view(self, view: WebView) -> None:
+        """Bring a frozen/discarded tab back to Active."""
+        self._idle_since.pop(id(view), None)
+        view._ld_sleep = None
+        page = view.page()
+        with contextlib.suppress(Exception):
+            page.setVisible(True)
+            state = getattr(page, "LifecycleState", None)
+            if state is not None:
+                page.setLifecycleState(state.Active)
+        self._retitle(view, view.title())
+
+    def _tick_memory_saver(self) -> None:
+        settings = getattr(self._mw, "settings", None)
+        if settings is None or not bool(settings.get("memory_saver", True)):
+            return
+        freeze_after = int(settings.get("memory_saver_freeze_sec", 300) or 300)
+        discard_after = int(settings.get("memory_saver_discard_sec", 900) or 900)
+        now = time.monotonic()
+        current = self.currentWidget()
+        for i in range(self.count()):
+            view = self.widget(i)
+            if view is None:
+                continue
+            audible = False
+            with contextlib.suppress(Exception):
+                audible = bool(view.page().recentlyAudible())
+            if should_protect(
+                url=view.url().toString(),
+                is_current=view is current,
+                pinned=self.is_pinned(i),
+                audible=audible,
+            ):
+                continue
+            idle = now - self._idle_since.setdefault(id(view), now)
+            wanted = next_state(idle, freeze_after, discard_after)
+            self._apply_sleep(view, wanted)
+
+    def _apply_sleep(self, view: WebView, wanted: str) -> None:
+        current = getattr(view, "_ld_sleep", None) or ACTIVE
+        if wanted in (current, ACTIVE):
+            return
+        page = view.page()
+        state = getattr(page, "LifecycleState", None)
+        if state is None:
+            return
+        try:
+            page.setVisible(False)
+            if wanted == DISCARDED:
+                page.setLifecycleState(state.Discarded)
+            elif wanted == FROZEN:
+                page.setLifecycleState(state.Frozen)
+            else:
+                return
+        except Exception:
+            return
+        view._ld_sleep = wanted
+        self._retitle(view, view.title())

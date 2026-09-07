@@ -182,6 +182,39 @@ check(
     and zoom_for({"https://a.com": 1.5}, "https://b.com", 1.0) == 1.0,
 )
 
+# v3.9.0 — HTTPS-Only, site permissions, workspaces, memory saver
+from browser_core.https_only import upgrade_url
+from browser_core.lifecycle import DISCARDED, FROZEN, next_state, should_protect
+from browser_core.permissions import ASK, PermissionStore, origin_of
+from browser_core.workspaces import WorkspaceStore
+
+check(
+    "https-only upgrades public http",
+    upgrade_url("http://example.com/a") == "https://example.com/a",
+)
+check(
+    "https-only skips localhost",
+    upgrade_url("http://127.0.0.1:9777/dashboard") is None,
+)
+_perm = PermissionStore(Path(tempfile.mkdtemp(prefix="ld-perm-")) / "permissions.json")
+_origin = origin_of("https://meet.example.com/room")
+check("permission origin", _origin == "https://meet.example.com")
+check("permission default ask", _perm.get(_origin, "camera") == ASK)
+_perm.set(_origin, "camera", "allow")
+check("permission persist", PermissionStore(_perm._path).get(_origin, "camera") == "allow")
+check(
+    "memory saver sleeps background",
+    not should_protect(url="https://a.com", is_current=False, pinned=False, audible=False)
+    and next_state(15 * 60) == DISCARDED
+    and next_state(5 * 60) == FROZEN,
+)
+_ws = WorkspaceStore(Path(tempfile.mkdtemp(prefix="ld-ws-")) / "workspaces.json")
+_created = _ws.create("Research", [{"url": "https://example.com", "title": "Ex"}], 0)
+check(
+    "workspace round-trip",
+    _ws.get(_created["id"])["name"] == "Research" and _ws.active_id == _created["id"],
+)
+
 from browser_core.screenshot import suggested_name
 
 _name = suggested_name("https://example.com/docs")

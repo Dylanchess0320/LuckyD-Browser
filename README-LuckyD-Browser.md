@@ -55,13 +55,13 @@ Prefer a cloud model instead? The sidebar supports 9 more providers — see
 
 ## 📦 Download & install
 
-**[⬇ Download v3.8.0](https://github.com/Dylanchess0320/LuckyD-Browser/releases/tag/v3.8.0)** (`LuckyDBrowserSetup-3.8.0.exe`)
+**[⬇ Download v3.9.0](https://github.com/Dylanchess0320/LuckyD-Browser/releases/tag/v3.9.0)** (`LuckyDBrowserSetup-3.9.0.exe`)
 
 - Windows 10/11 x64 · per-user install · **no admin rights needed**
 - Installs to `%LOCALAPPDATA%\Programs\LuckyDBrowser`
 - Start Menu shortcut, optional desktop icon, **Settings > Apps** uninstall entry
 - Everything is bundled (Chromium runtime + coding-agent backend) — nothing else required
-- Silent install for scripting: `LuckyDBrowserSetup-3.8.0.exe /VERYSILENT /NORESTART`
+- Silent install for scripting: `LuckyDBrowserSetup-3.9.0.exe /VERYSILENT /NORESTART`
 
 ---
 
@@ -87,7 +87,7 @@ your **live, visible tabs** through the Control API — exe brain, browser hands
 
 ## 🌐 It's also just a really good browser
 
-**Session restore** (continue where you left off — windows, tabs, pinned state) · **tab groups**
+**HTTPS-Only Mode** · **per-site camera/mic/location permissions** · **named Workspaces** · **Memory Saver** (sleeps idle tabs) · **Read Aloud** (`Ctrl+Shift+L`) · **Summarize This Page** (`Ctrl+Shift+U`) · **Session restore** (continue where you left off — windows, tabs, pinned state) · **tab groups**
 (colors, collapse, restored with your session) with an **AI organizer** that sorts them for you ·
 **Reader Mode** · tabs (pin, drag, hover previews, recently-closed) · omnibox with history completion · bookmarks (import/export
 Chrome/Edge HTML) with a **toggleable bookmarks bar** (`Ctrl+Shift+B`) · searchable history ·

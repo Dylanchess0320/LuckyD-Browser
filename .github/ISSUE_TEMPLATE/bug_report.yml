@@ -1,0 +1,37 @@
+name: Bug report
+description: Something in LuckyD Browser is broken
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for helping make LuckyD better. Please fill in as much as you can.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      placeholder: "3.9.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How did you install it?
+      options:
+        - LuckyDBrowserSetup-*.exe
+        - Portable dist\\LuckyDBrowser
+        - From source
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      placeholder: Steps to reproduce, expected vs actual.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / screenshots
+      placeholder: "%LOCALAPPDATA%\\LuckyDBrowser  — paste crash.log or a screenshot."

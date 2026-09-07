@@ -226,6 +226,22 @@ class SettingsDialog(QDialog):
         self.adblock.setChecked(bool(settings.get("adblock_enabled", True)))
         form.addRow(self.adblock)
 
+        self.https_only = QCheckBox("HTTPS-Only Mode (upgrade public http:// sites)", self)
+        self.https_only.setToolTip(
+            "Main-frame http:// navigations on the public internet become https://.\n"
+            "Localhost and private LAN addresses are never rewritten."
+        )
+        self.https_only.setChecked(bool(settings.get("https_only", True)))
+        form.addRow(self.https_only)
+
+        self.memory_saver = QCheckBox("Memory saver (sleep idle background tabs)", self)
+        self.memory_saver.setToolTip(
+            "Freeze background tabs after 5 minutes, then discard them after 15.\n"
+            "Pinned, audible, and local platform tabs stay awake."
+        )
+        self.memory_saver.setChecked(bool(settings.get("memory_saver", True)))
+        form.addRow(self.memory_saver)
+
         self.autostart = QCheckBox(
             "Start the coding-agent backend (luckyd-code.exe) on launch", self
         )
@@ -304,8 +320,11 @@ class SettingsDialog(QDialog):
         cache_btn.clicked.connect(self._clear_cache)
         cookies_btn = QPushButton("Clear Cookies", self)
         cookies_btn.clicked.connect(self._clear_cookies)
+        perm_btn = QPushButton("Site permissions…", self)
+        perm_btn.clicked.connect(self._open_permissions)
         privacy.addWidget(cache_btn)
         privacy.addWidget(cookies_btn)
+        privacy.addWidget(perm_btn)
         privacy.addStretch(1)
         layout.addLayout(privacy)
 
@@ -316,6 +335,11 @@ class SettingsDialog(QDialog):
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
+
+    def _open_permissions(self) -> None:
+        opener = getattr(self.parent(), "open_site_permissions", None)
+        if callable(opener):
+            opener()
 
     def _browse_dir(self) -> None:
         path = QFileDialog.getExistingDirectory(self, "Choose Download Folder")
@@ -335,6 +359,8 @@ class SettingsDialog(QDialog):
         self._settings.set("startup_mode", self.startup_box.currentData() or "restore")
         self._settings.set("search_engine", self.engine.currentText())
         self._settings.set("adblock_enabled", self.adblock.isChecked())
+        self._settings.set("https_only", self.https_only.isChecked())
+        self._settings.set("memory_saver", self.memory_saver.isChecked())
         self._settings.set("harness_autostart", self.autostart.isChecked())
         self._settings.set("dashboard_newtab", self.dash.isChecked())
         self._settings.set("assistant_visible_startup", self.assistant_startup.isChecked())
@@ -418,3 +444,79 @@ class ScriptsDialog(QDialog):
 
         self._engine.rescan()  # ensures the folder exists
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(self._engine.user_dir())))
+
+
+class PermissionsDialog(QDialog):
+    """List remembered camera / mic / location / notification decisions."""
+
+    def __init__(self, store, origin: str = "", parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Site permissions")
+        self.resize(560, 420)
+        self._store = store
+        self._focus = origin or ""
+
+        layout = QVBoxLayout(self)
+        hint = QLabel(
+            "LuckyD remembers Allow/Block for camera, microphone, location, "
+            "and notifications. Reset a site to be asked again next time.",
+            self,
+        )
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color: gray;")
+        layout.addWidget(hint)
+        if self._focus:
+            layout.addWidget(QLabel(f"Current site: {self._focus}", self))
+        self.list = QListWidget(self)
+        layout.addWidget(self.list)
+
+        row = QHBoxLayout()
+        reset = QPushButton("Reset selected", self)
+        reset.clicked.connect(self._reset_selected)
+        reset_all = QPushButton("Reset all", self)
+        reset_all.clicked.connect(self._reset_all)
+        close_btn = QPushButton("Close", self)
+        close_btn.clicked.connect(self.accept)
+        row.addWidget(reset)
+        row.addWidget(reset_all)
+        row.addStretch(1)
+        row.addWidget(close_btn)
+        layout.addLayout(row)
+        self._reload()
+
+    def _reload(self) -> None:
+        from browser_core.permissions import feature_label
+
+        self.list.clear()
+        rows = self._store.sites()
+        if self._focus:
+            focused = [(o, d) for o, d in rows if o == self._focus]
+            others = [(o, d) for o, d in rows if o != self._focus]
+            rows = focused + others
+        if not rows:
+            item = QListWidgetItem("No remembered site permissions yet.")
+            item.setFlags(Qt.ItemFlag.NoItemFlags)
+            self.list.addItem(item)
+            return
+        for origin, decisions in rows:
+            bits = [
+                f"{feature_label(k)}: {v}" for k, v in sorted(decisions.items()) if v in ("allow", "deny")
+            ]
+            item = QListWidgetItem(f"{origin}\n" + (", ".join(bits) or "(none)"))
+            item.setData(Qt.ItemDataRole.UserRole, origin)
+            self.list.addItem(item)
+
+    def _reset_selected(self) -> None:
+        for item in self.list.selectedItems():
+            origin = item.data(Qt.ItemDataRole.UserRole)
+            if origin:
+                self._store.clear_origin(origin)
+        self._reload()
+
+    def _reset_all(self) -> None:
+        if (
+            QMessageBox.question(self, "Reset permissions", "Forget every saved site permission?")
+            == QMessageBox.StandardButton.Yes
+        ):
+            self._store.clear_all()
+            self._reload()
