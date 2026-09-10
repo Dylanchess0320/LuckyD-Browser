@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import sys
-import time
 from pathlib import Path
 
 import pytest
@@ -50,16 +49,12 @@ class TestBrowserResearchPage:
         run_id = mgr.start_research("What is quantum computing?", provider="mock", dry_run=True)
         assert run_id.startswith("run-")
 
-        # Wait for completion (mock should be < 5s)
-        completed = False
-        for _ in range(20):
-            st = mgr.get_status(run_id)
-            if st.get("status") == "completed":
-                completed = True
-                break
-            time.sleep(0.3)
-
-        assert completed, f"Swarm did not complete in time, status: {st}"
+        # Wait for the background worker to finish. Event-driven (no
+        # wall-clock polling): the timeout is generous because CI runners
+        # (notably Windows) can be slow to spin up the graph machinery.
+        assert mgr.wait_for_completion(timeout=120), "Swarm did not complete in time"
+        st = mgr.get_status(run_id)
+        assert st["status"] == "completed", f"Swarm failed: {st.get('error')}"
         assert st["stage"] == "done"
         assert len(st["report_markdown"]) > 50
         assert len(st["events"]) > 0

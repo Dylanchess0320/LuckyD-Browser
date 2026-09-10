@@ -45,6 +45,10 @@ class SwarmManager:
         self._active_run: dict[str, Any] | None = None
         self._cancel_requested = False
         self._thread: threading.Thread | None = None
+        # Set when the background worker finishes (completed or failed), so
+        # callers can wait deterministically instead of polling on a timer.
+        self._done = threading.Event()
+        self._done.set()  # no run active at construction
 
     def start_research(
         self,
@@ -66,6 +70,7 @@ class SwarmManager:
 
             run_id = f"run-{time.strftime('%Y%m%d-%H%M%S')}"
             self._cancel_requested = False
+            self._done.clear()  # a new run is starting
             self._active_run = {
                 "id": run_id,
                 "query": query,
@@ -207,6 +212,8 @@ class SwarmManager:
                         drs_settings.search_backend,
                         drs_settings.provider,
                     ) = saved
+                # Wake any waiter: the run reached a terminal state.
+                self._done.set()
 
         self._thread = threading.Thread(target=_worker, daemon=True)
         self._thread.start()
@@ -222,6 +229,14 @@ class SwarmManager:
             self._active_run["end_time"] = time.time()
             self._active_run["elapsed"] = round(time.time() - self._active_run["start_time"], 1)
             return True
+
+    def wait_for_completion(self, timeout: float = 120.0) -> bool:
+        """Block until the active run finishes (completed/failed/cancelled).
+
+        Returns True if the worker signalled completion within `timeout`,
+        False on timeout. Prefer this over polling get_status() in tests.
+        """
+        return self._done.wait(timeout)
 
     def get_status(self, run_id: str | None = None) -> dict[str, Any]:
         with self._lock:
