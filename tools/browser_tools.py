@@ -123,7 +123,9 @@ class BrowserNavigateTool(ToolBase):
                 sel = (
                     f"#{el['id']}"
                     if el["id"]
-                    else f".{el['cls'].split()[0]}" if el["cls"] else el["tag"]
+                    else f".{el['cls'].split()[0]}"
+                    if el["cls"]
+                    else el["tag"]
                 )
                 summary += f"  [{el['tag']}] {el['txt'][:50]}  {sel}\n"
                 if el.get("href"):

@@ -636,7 +636,7 @@ if __name__ == "__main__":
             encoding="utf-8",
         )
         (pkg / "db.py").write_text(
-            "# database helpers\n\n\n" "def get_user(name):\n" "    return {'name': name}\n",
+            "# database helpers\n\n\ndef get_user(name):\n    return {'name': name}\n",
             encoding="utf-8",
         )
         (Path(tmp) / "README.md").write_text(

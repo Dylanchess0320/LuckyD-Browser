@@ -318,7 +318,7 @@ class WebView(QWebEngineView):
             ):
                 ai_menu.addAction(
                     action_label,
-                    lambda i=instruction, s=selected: (self._mw.ai_sidebar.ask_about(i, s)),
+                    lambda i=instruction, s=selected: self._mw.ai_sidebar.ask_about(i, s),
                 )
             menu.addAction("Read Aloud Selection", lambda s=selected: self._mw.read_aloud(s))
             menu.addSeparator()

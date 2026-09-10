@@ -31,7 +31,6 @@ def response(text="", tool_calls=None):
 
 
 class TestInit:
-
     def test_defaults(self):
         import agent as agent_mod
         from project.types import ProjectInfo
@@ -76,7 +75,6 @@ class TestInit:
 
 
 class TestRun:
-
     @pytest.mark.asyncio
     async def test_simple_reply(self, agent):
         agent.llm_client = AsyncMock()
@@ -94,7 +92,6 @@ class TestRun:
 
 
 class TestReset:
-
     def test_reset_clears_state(self, agent):
         agent.reset()
         assert agent.conversation_id.startswith("conv_")

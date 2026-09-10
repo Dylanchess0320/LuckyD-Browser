@@ -56,7 +56,7 @@ class GeminiProvider(LLMProvider):
             from google import genai
         except Exception as e:
             raise RuntimeError(
-                "google-genai is not installed. Run: pip install google-genai>=1.0.0 " f"({e})"
+                f"google-genai is not installed. Run: pip install google-genai>=1.0.0 ({e})"
             ) from e
         self._client = genai.Client(api_key=key)
         self._call_counts: dict[str, int] = {}

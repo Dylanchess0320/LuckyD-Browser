@@ -69,7 +69,7 @@ class BriefTool(ToolBase):
                 f"  Files: {len(files)}\n{file_list if files else '  (none)'}"
             )
             if len(files) > 30:
-                summary += f"\n  ... and {len(files)-30} more files"
+                summary += f"\n  ... and {len(files) - 30} more files"
             return ToolOutput(
                 text=summary,
                 title=f"Brief: {p.name}",
@@ -107,7 +107,7 @@ class BriefTool(ToolBase):
                 f"  Classes: {len(classes)}\n"
                 f"  Functions: {len(functions)}\n\n"
                 f"--- Preview (first 10 lines) ---\n"
-                + "\n".join(f"  {i+1}: {line[:100]}" for i, line in enumerate(lines[:10]))
+                + "\n".join(f"  {i + 1}: {line[:100]}" for i, line in enumerate(lines[:10]))
             )
             return ToolOutput(
                 text=summary,

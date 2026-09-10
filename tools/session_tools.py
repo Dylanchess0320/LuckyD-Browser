@@ -177,7 +177,7 @@ class ShellHistoryTool(ToolBase):
             status = "X" if e.get("exit_code", 0) != 0 else "OK"
             cmd = e["command"][:120]
             ts = e.get("timestamp", "")[:19]
-            lines.append(f"  {status} [{i+1}] {cmd}")
+            lines.append(f"  {status} [{i + 1}] {cmd}")
             lines.append(f"      {ts}")
             if show_output and e.get("output_preview"):
                 lines.append(f"      -> {e['output_preview'][:200]}")

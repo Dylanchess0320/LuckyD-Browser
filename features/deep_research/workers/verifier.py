@@ -193,7 +193,7 @@ def run_verify(
     level = "ok" if audit.verdict == "pass" else "warn"
     store.emit(
         "verifier",
-        f"{audit.verdict}: {audit.unsupported_count} unsupported " f"of {len(audit.claims)} claims",
+        f"{audit.verdict}: {audit.unsupported_count} unsupported of {len(audit.claims)} claims",
         level=level,
     )
     return audit

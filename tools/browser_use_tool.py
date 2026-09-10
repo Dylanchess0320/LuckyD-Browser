@@ -158,7 +158,7 @@ class BrowserUseTool(ToolBase):
                         if isinstance(step, dict):
                             result_text = step.get("result", "")
                             if result_text:
-                                steps.append(f"Step {i+1}: {result_text}")
+                                steps.append(f"Step {i + 1}: {result_text}")
                     final_text = "\n".join(steps[-10:]) if steps else str(dump)[:4000]
 
             if not final_text:

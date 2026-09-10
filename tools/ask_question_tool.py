@@ -56,13 +56,13 @@ class AskUserQuestionTool(ToolBase):
     async def execute(self, questions: list) -> ToolOutput:
         lines = []
         for i, q in enumerate(questions):
-            header = q.get("header", f"Q{i+1}")
+            header = q.get("header", f"Q{i + 1}")
             multi = " [multi-select]" if q.get("multi_select") else ""
-            lines.append(f"\n{'='*50}")
+            lines.append(f"\n{'=' * 50}")
             lines.append(f"  {header}{multi}: {q['question']}")
-            lines.append(f"{'='*50}")
+            lines.append(f"{'=' * 50}")
             for j, opt in enumerate(q.get("options", [])):
-                lines.append(f"  [{j+1}] {opt['label']} — {opt['description']}")
+                lines.append(f"  [{j + 1}] {opt['label']} — {opt['description']}")
             lines.append("  [0] Custom answer")
 
         lines.append("\nReply with your choices (e.g. '1,3' or 'all' or custom text).")

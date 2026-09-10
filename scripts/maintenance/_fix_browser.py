@@ -1,4 +1,4 @@
-﻿import re
+import re
 
 with open("tools/browser_tools.py", newline="") as f:
     content = f.read()

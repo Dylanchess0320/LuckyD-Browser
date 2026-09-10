@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 MODEL_ID = "all-MiniLM-L6-v2"
 MODEL_FILENAME = "all-MiniLM-L6-v2.onnx"
 MODEL_URL = (
-    "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main/" "onnx/model.onnx"
+    "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx"
 )
 EXPECTED_HASH = None  # Optional: verify with hashlib.sha256
 DIM = 384  # Embedding vector length for this model

@@ -417,7 +417,7 @@ async def run_research(
     sem = asyncio.Semaphore(max(1, settings.max_parallel))
 
     async def bound(t: ResearchTask, i: int) -> WorkerResult:
-        wid = f"researcher-{i+1}"
+        wid = f"researcher-{i + 1}"
         async with sem:
             store.emit(
                 "researcher",

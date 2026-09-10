@@ -99,8 +99,7 @@ cp .env.example .env
   ```python
   @pytest.mark.slow
   @pytest.mark.integration
-  async def test_agent_run():
-      ...
+  async def test_agent_run(): ...
   ```
 
 ### Commit Messages
