@@ -1,0 +1,62 @@
+# ── LuckyD Browser Windows installer ────────────────────────────────────
+# Builds LuckyDBrowserSetup-<version>.exe on a real Windows runner and
+# attaches it to the GitHub Release. Run manually from the Actions tab
+# (workflow_dispatch) or automatically on version tags (v*).
+#
+# One-command equivalent on your own PC:
+#   powershell -NoProfile -ExecutionPolicy Bypass -File browser\installer\build_installer.ps1
+
+name: Windows Installer
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to attach the installer to (e.g. v4.0.0)"
+        required: true
+        default: "v4.0.0"
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r browser/requirements.txt
+          pip install pyinstaller
+
+      - name: Install Inno Setup 6
+        run: choco install innosetup --no-progress -y
+
+      - name: Build installer
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File browser\installer\build_installer.ps1
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LuckyDBrowserSetup
+          path: browser/installer/output/LuckyDBrowserSetup-*.exe
+          retention-days: 30
+
+      - name: Attach to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag || github.ref_name }}
+          files: browser/installer/output/LuckyDBrowserSetup-*.exe
+          fail_on_unmatched_files: true
