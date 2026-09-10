@@ -1104,7 +1104,7 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
             ui.warn("MCP not configured or no servers connected")
 
     elif cmd == "version":
-        agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v4.0.0")
+        agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v5.0.0")
         agent_name = os.environ.get("LUCKYD_AGENT_NAME", "Agent 1")
         ui.info(f"LuckyD Code {agent_version} ({agent_name})")
 
@@ -1503,10 +1503,10 @@ def main():
             else:
                 os.environ["LUCKYD_AGENT_SLOT"] = "1"
                 os.environ["LUCKYD_AGENT_NAME"] = "Agent 1"
-                os.environ["LUCKYD_AGENT_VERSION"] = "v4.0.0"
+                os.environ["LUCKYD_AGENT_VERSION"] = "v5.0.0"
             i += 2
         elif args[i] in ("-v", "--version"):
-            agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v4.0.0")
+            agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v5.0.0")
             agent_name = os.environ.get("LUCKYD_AGENT_NAME", "")
             label = f"LuckyD Code {agent_version}" + (f" ({agent_name})" if agent_name else "")
             print(label)
@@ -1517,7 +1517,7 @@ def main():
 LuckyD Code — AI Coding Agent
 
 Usage:
-  lucky-code                       Interactive REPL (Agent 1 · v4.0.0)
+  lucky-code                       Interactive REPL (Agent 1 · v5.0.0)
   lucky-code --agent 2             Interactive REPL (Agent 2 · v2.2.0)
   lucky-code "your query"          One-shot mode
   lucky-code -c                    Continue last session

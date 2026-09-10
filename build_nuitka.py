@@ -51,7 +51,7 @@ def build_nuitka(onefile: bool = True) -> int:
 
     print(f"Running command: {' '.join(cmd)}")
     env = os.environ.copy()
-    env["LUCKYD_AGENT_VERSION"] = "v4.0.0"
+    env["LUCKYD_AGENT_VERSION"] = "v5.0.0"
     env["LUCKYD_AGENT_NAME"] = "Agent 1"
 
     result = subprocess.run(cmd, cwd=str(REPO_ROOT), env=env)

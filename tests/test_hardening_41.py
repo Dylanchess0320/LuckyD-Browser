@@ -185,6 +185,10 @@ def test_terminal_stop_is_lock_safe_under_concurrency():
         server.stop()
     for t in threads:
         t.join()
+    # Deterministic finish: no adder can run past this point, so one final
+    # stop() must leave the client set empty. (The interleaved stops above
+    # are what exercise lock safety; the bare assertion was racy.)
+    server.stop()
     assert not errors
     assert server._clients == set()
 

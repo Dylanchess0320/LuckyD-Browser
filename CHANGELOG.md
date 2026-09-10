@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.0.0] - 2026-09-10
+
+The final, maxed-out release. Everything in 4.0, polished to a shine:
+
+### Added
+- **Official Windows installer** — `LuckyDBrowserSetup-5.0.0.exe`, built on a real Windows runner with Inno Setup 6. Per-user install, no admin needed, silent-install flags supported. Ships from the [releases page](https://github.com/Dylanchess0320/LuckyD-Browser/releases).
+
+### Changed
+- **Version unified to 5.0.0** across the package, installers, user-agent strings, and docs (guarded by the version-unification regression test).
+- **Entire tree Ruff-formatted** — 33 files normalized, `ruff check` and `ruff format --check` clean, CI green.
+
 ## [4.0.0] - 2026-09-10
 
 ### Security

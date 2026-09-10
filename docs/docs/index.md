@@ -5,9 +5,9 @@
 <p class="tagline">The AI browser that runs <em>your</em> models — local, unlimited, offline — plus a full coding agent and real terminals in one window.</p>
 
 <div class="cta-row" markdown>
-[⬇ Download v4.0.0](https://github.com/Dylanchess0320/LuckyD-Browser/releases/tag/v4.0.0){ .luckyd-btn }
+[⬇ Download v5.0.0](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v5.0.0/LuckyDBrowserSetup-5.0.0.exe){ .luckyd-btn }
 [Getting started](getting-started.md){ .luckyd-btn-ghost }
-[What's new in 4.0](release-notes.md){ .luckyd-btn-ghost }
+[What's new in 5.0](release-notes.md){ .luckyd-btn-ghost }
 </div>
 
 <div class="luckyd-badges" markdown>
@@ -76,18 +76,18 @@
 
 ## Install in 10 seconds
 
-1. Get [**LuckyDBrowserSetup-4.0.0.exe**](https://github.com/Dylanchess0320/LuckyD-Browser/releases/tag/v4.0.0)
+1. Get [**LuckyDBrowserSetup-5.0.0.exe**](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v5.0.0/LuckyDBrowserSetup-5.0.0.exe)
 2. Run it — per-user, **no admin**, installs to `%LOCALAPPDATA%\Programs\LuckyDBrowser`
 3. Leave **"Set up free unlimited local AI"** checked → Ollama + `llama3.2:3b` (~2 GB, one time)
 4. `Ctrl+Shift+A` → chat offline. Or bring your own keys (Gemini, Groq, DeepSeek, OpenAI, Anthropic, Z.ai, OpenRouter, Cline, OpenCode)
 
-Windows 10/11 x64 only. Silent install: `LuckyDBrowserSetup-4.0.0.exe /VERYSILENT /NORESTART`
+Windows 10/11 x64 only. Silent install: `LuckyDBrowserSetup-5.0.0.exe /VERYSILENT /NORESTART`
 
 ## Why LuckyD
 
 Most "AI browsers" rent you a chatbot behind an account. LuckyD is a **real Chromium daily driver** with a **local assistant**, a **coding-agent HQ**, and **ConPTY terminals** living in your tabs.
 
-|  | LuckyD 4.0 | Comet / Dia | Edge Copilot | Chrome Gemini |
+|  | LuckyD 5.0 | Comet / Dia | Edge Copilot | Chrome Gemini |
 |---|:---:|:---:|:---:|:---:|
 | Free AI with **no account / no key** | ✅ local Ollama | ❌ | ❌ | ❌ |
 | Works **fully offline** | ✅ | ❌ | ❌ | ❌ |
@@ -98,19 +98,32 @@ Most "AI browsers" rent you a chatbot behind an account. LuckyD is a **real Chro
 
 > The others rent you their AI. **LuckyD runs yours.**
 
-## New in 4.0.0 — Frontier
+## New in 5.0.0 — Final
 
-A hardened foundation: every local service now authenticates with HttpOnly session cookies — no tokens in URLs or page source, ever. [Read the release notes →](release-notes.md)
+The maxed-out release: everything from 4.0, shipped like a finished product. [Read the release notes →](release-notes.md)
+
+- **Official Windows installer** — `LuckyDBrowserSetup-5.0.0.exe`, built on a real Windows runner with Inno Setup 6
+- **Version unified to 5.0.0** — package, installers, user-agent — guarded by a regression test
+- **Fully formatted & linted** — entire tree `ruff`-clean, CI green
+
+*Verified: 189 tests passed, `ruff` clean.*
+
+<details>
+<summary>New in 4.0.0 — Frontier</summary>
+
+A hardened foundation: every local service now authenticates with HttpOnly session cookies — no tokens in URLs or page source, ever.
 
 - **Cookie-based auth** for the Control API, Coding Agent HQ, and terminal WebSocket
 - **Deep Research XSS hardening** — escaped markdown, allowlisted link schemes
 - **Cline bridge auth** — bearer token required, fails closed
 - **Reliability fixes** — checkpoint undo can't loop forever, IPv6 loopback handled, updater exits cleanly off-Windows
 
+</details>
+
 ---
 
 <p align="center">
   <b>MIT © LuckyD</b> · Chromium · Ollama · Qt · xterm.js · pywinpty · PyInstaller · Inno Setup<br>
-  <a href="https://github.com/Dylanchess0320/LuckyD-Browser/releases/tag/v4.0.0">Download v4.0.0</a>
+  <a href="https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v5.0.0/LuckyDBrowserSetup-5.0.0.exe">Download v5.0.0</a>
   · <a href="https://www.youtube.com/@LuckyDYoutube">YouTube</a>
 </p>

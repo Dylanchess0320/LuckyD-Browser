@@ -637,7 +637,7 @@ class AIBridge:
             )
         )
         body["model"] = model
-        headers = {"User-Agent": "LuckyDBrowser/4.0"}
+        headers = {"User-Agent": "LuckyDBrowser/5.0"}
 
         if kind == "gemini":
             url = f"{base_url}/models/{model}:streamGenerateContent?key={api_key}&alt=sse"

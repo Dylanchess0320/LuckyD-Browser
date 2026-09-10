@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/screenshots/hero.svg" alt="LuckyD Browser 4.0.0 — Frontier" width="100%">
+<img src="docs/screenshots/hero.svg" alt="LuckyD Browser 5.0.0" width="100%">
 
 # LuckyD Browser
 
@@ -13,7 +13,7 @@
 [![Windows](https://img.shields.io/badge/Windows-10%2F11%20x64-0078D4?logo=windows&logoColor=white)](https://github.com/Dylanchess0320/LuckyD-Browser/releases/latest)
 [![Python](https://img.shields.io/badge/python-3.10--3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/downloads/)
 
-**[⬇ Download v4.0.0](https://github.com/Dylanchess0320/LuckyD-Browser/releases/tag/v4.0.0)**
+**[⬇ Download v5.0.0](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v5.0.0/LuckyDBrowserSetup-5.0.0.exe)**
 &nbsp;·&nbsp;
 **[Browser guide](README-LuckyD-Browser.md)**
 &nbsp;·&nbsp;
@@ -46,7 +46,20 @@ Most “AI browsers” rent you a chatbot behind an account. LuckyD is a **real 
 
 ---
 
-## New in 4.0.0 — Frontier
+## New in 5.0.0 — Final
+
+The maxed-out release: everything from 4.0, shipped like a finished product.
+
+| | |
+|---|---|
+| **Official Windows installer** | `LuckyDBrowserSetup-5.0.0.exe` — built on a real Windows runner with Inno Setup 6. Per-user, no admin, silent-install flags. |
+| **Version unified** | 5.0.0 everywhere — package, installers, user-agent — guarded by a regression test so it can't drift. |
+| **Fully formatted & linted** | Entire tree `ruff`-clean, CI green. |
+
+*Verified: 189 tests passed, `ruff` clean.*
+
+<details>
+<summary>New in 4.0.0 — Frontier</summary>
 
 A hardened foundation: every local service now authenticates with HttpOnly session cookies — no tokens in URLs or page source, ever.
 
@@ -60,6 +73,8 @@ A hardened foundation: every local service now authenticates with HttpOnly sessi
 | **Reliability fixes** | Checkpoint undo can't loop forever on deleted files; IPv6 loopback (`[::1]`) handled; Windows updater exits cleanly off-Windows; race-safe terminal server; session saves survive concurrent windows; tile processes reaped on shutdown. |
 
 *Verified: 189 tests passed, `ruff` clean.*
+
+</details>
 
 <details>
 <summary>New in 3.9.0 — Daily Driver</summary>
@@ -96,12 +111,12 @@ Also in this lineage: Deep Research swarm (`Ctrl+Shift+R`), Agent Mesh, self-hea
 
 ## Install in 10 seconds
 
-1. Get **[LuckyDBrowserSetup-4.0.0.exe](https://github.com/Dylanchess0320/LuckyD-Browser/releases/tag/v4.0.0)**
+1. Get **[LuckyDBrowserSetup-5.0.0.exe](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v5.0.0/LuckyDBrowserSetup-5.0.0.exe)**
 2. Run it — per-user, **no admin**, installs to `%LOCALAPPDATA%\Programs\LuckyDBrowser`
 3. Leave **“Set up free unlimited local AI”** checked → Ollama + `llama3.2:3b` (~2 GB, one time)
 4. `Ctrl+Shift+A` → chat offline. Or bring your own keys (Gemini, Groq, DeepSeek, OpenAI, Anthropic, Z.ai, OpenRouter, Cline, OpenCode)
 
-Silent: `LuckyDBrowserSetup-4.0.0.exe /VERYSILENT /NORESTART`
+Silent: `LuckyDBrowserSetup-5.0.0.exe /VERYSILENT /NORESTART`
 
 Windows 10/11 x64 only.
 
@@ -142,7 +157,7 @@ browser\run_browser.bat
 
 # Shareable installer (needs Inno Setup 6)
 powershell -NoProfile -ExecutionPolicy Bypass -File browser\installer\build_installer.ps1
-# → browser\installer\output\LuckyDBrowserSetup-4.0.0.exe
+# → browser\installer\output\LuckyDBrowserSetup-5.0.0.exe
 ```
 
 ---
@@ -160,6 +175,6 @@ tests/     headless pytest (Qt mocked on Linux CI)
 
 <p align="center">
   <b>MIT © LuckyD</b> · Chromium · Ollama · Qt · xterm.js · pywinpty · PyInstaller · Inno Setup<br>
-  <a href="https://github.com/Dylanchess0320/LuckyD-Browser/releases/tag/v4.0.0">Download v4.0.0</a>
+  <a href="https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v5.0.0/LuckyDBrowserSetup-5.0.0.exe">Download v5.0.0</a>
   · <a href="https://www.youtube.com/watch?v=La6bxaa7icY">Watch the showcase</a>
 </p>

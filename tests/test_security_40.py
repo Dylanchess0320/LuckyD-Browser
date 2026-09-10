@@ -366,28 +366,28 @@ class TestCheckpointNoInfiniteLoop:
 
 
 class TestVersionUnification:
-    """4.0 unified every version reference; this guards against drift."""
+    """Version references are unified; this guards against drift."""
 
-    def test_versions_unified_at_4_0_0(self):
+    def test_versions_unified_at_current(self):
         import tomllib
 
         import browser
 
-        assert browser.__version__ == "4.0.0"
+        assert browser.__version__ == "5.0.0"
 
         with open(_REPO_ROOT / "pyproject.toml", "rb") as f:
-            assert tomllib.load(f)["project"]["version"] == "4.0.0"
+            assert tomllib.load(f)["project"]["version"] == "5.0.0"
 
         ai_bridge = (_BROWSER_DIR / "browser_core" / "ai_bridge.py").read_text(encoding="utf-8")
-        assert "LuckyDBrowser/4.0" in ai_bridge
+        assert "LuckyDBrowser/5.0" in ai_bridge
         assert "LuckyDBrowser/1.0" not in ai_bridge
 
         version_info = (_BROWSER_DIR / "version_info.txt").read_text(encoding="utf-8")
-        assert "4.0.0.0" in version_info
+        assert "5.0.0.0" in version_info
         assert "3.9.0" not in version_info
 
         iss = (_BROWSER_DIR / "installer" / "LuckyDBrowser.iss").read_text(encoding="utf-8")
-        assert '#define AppVersion   "4.0.0"' in iss
+        assert '#define AppVersion   "5.0.0"' in iss
 
 
 # ── cline_bridge: inbound bearer auth ───────────────────────────────────────

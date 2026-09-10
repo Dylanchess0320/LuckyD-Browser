@@ -20,12 +20,12 @@ VSVersionInfo(
         '040904B0',
         [StringStruct('CompanyName', 'LuckyD'),
         StringStruct('FileDescription', 'LuckyD Browser'),
-        StringStruct('FileVersion', '4.0.0.0'),
+        StringStruct('FileVersion', '5.0.0.0'),
         StringStruct('InternalName', 'LuckyDBrowser'),
         StringStruct('LegalCopyright', 'Copyright (C) LuckyD'),
         StringStruct('OriginalFilename', 'LuckyDBrowser.exe'),
         StringStruct('ProductName', 'LuckyD Browser'),
-        StringStruct('ProductVersion', '4.0.0.0')])
+        StringStruct('ProductVersion', '5.0.0.0')])
       ]),
     VarFileInfo([VarStruct('Translation', [1033, 1200])])
   ]

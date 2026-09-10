@@ -1,6 +1,6 @@
 # LuckyD Browser v5.0.0 — Release Notes
 
-**[⬇ Download `LuckyDBrowserSetup-5.0.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases)** — Windows 10/11 x64 · per-user install · no admin needed
+**[⬇ Download `LuckyDBrowserSetup-5.0.0.exe`](../releases)** — Windows 10/11 x64 · per-user install · no admin needed
 
 v5.0.0 is the final, maxed-out release of LuckyD Browser. It takes everything
 that made 4.0 "Frontier" — the security hardening, the reliability fixes —
@@ -50,4 +50,4 @@ bookmarks, and settings are preserved.
 
 ---
 
-*Full changelog: [CHANGELOG.md](changelog.md)*
+*Full changelog: [CHANGELOG.md](../CHANGELOG.md)*
