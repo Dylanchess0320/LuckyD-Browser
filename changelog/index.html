@@ -1,0 +1,3193 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="The AI browser that runs your models — local, unlimited, offline. Chromium daily driver with an AI sidebar, coding-agent HQ, and real terminals in one window.">
+      
+      
+        <meta name="author" content="LuckyD">
+      
+      
+        <link rel="canonical" href="https://dylanchess0320.github.io/LuckyD-Browser/changelog/">
+      
+      
+        <link rel="prev" href="../faq/">
+      
+      
+        <link rel="next" href="../release-notes/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Changelog - LuckyD Browser</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/css/extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="amber">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#changelog" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="LuckyD Browser" class="md-header__button md-logo" aria-label="LuckyD Browser" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M16.36 14c.08-.66.14-1.32.14-2s-.06-1.34-.14-2h3.38c.16.64.26 1.31.26 2s-.1 1.36-.26 2m-5.15 5.56c.6-1.11 1.06-2.31 1.38-3.56h2.95a8.03 8.03 0 0 1-4.33 3.56M14.34 14H9.66c-.1-.66-.16-1.32-.16-2s.06-1.35.16-2h4.68c.09.65.16 1.32.16 2s-.07 1.34-.16 2M12 19.96c-.83-1.2-1.5-2.53-1.91-3.96h3.82c-.41 1.43-1.08 2.76-1.91 3.96M8 8H5.08A7.92 7.92 0 0 1 9.4 4.44C8.8 5.55 8.35 6.75 8 8m-2.92 8H8c.35 1.25.8 2.45 1.4 3.56A8 8 0 0 1 5.08 16m-.82-2C4.1 13.36 4 12.69 4 12s.1-1.36.26-2h3.38c-.08.66-.14 1.32-.14 2s.06 1.34.14 2M12 4.03c.83 1.2 1.5 2.54 1.91 3.97h-3.82c.41-1.43 1.08-2.77 1.91-3.97M18.92 8h-2.95a15.7 15.7 0 0 0-1.38-3.56c1.84.63 3.37 1.9 4.33 3.56M12 2C6.47 2 2 6.5 2 12a10 10 0 0 0 10 10 10 10 0 0 0 10-10A10 10 0 0 0 12 2"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            LuckyD Browser
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Changelog
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="amber"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/Dylanchess0320/LuckyD-Browser" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Dylanchess0320/LuckyD-Browser
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../getting-started/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Getting Started
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../features/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Features
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../ai-agents/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  AI & Agents
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../terminal/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Terminal
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../security/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Security
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../faq/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  FAQ
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Changelog
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../release-notes/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Release Notes
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="LuckyD Browser" class="md-nav__button md-logo" aria-label="LuckyD Browser" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M16.36 14c.08-.66.14-1.32.14-2s-.06-1.34-.14-2h3.38c.16.64.26 1.31.26 2s-.1 1.36-.26 2m-5.15 5.56c.6-1.11 1.06-2.31 1.38-3.56h2.95a8.03 8.03 0 0 1-4.33 3.56M14.34 14H9.66c-.1-.66-.16-1.32-.16-2s.06-1.35.16-2h4.68c.09.65.16 1.32.16 2s-.07 1.34-.16 2M12 19.96c-.83-1.2-1.5-2.53-1.91-3.96h3.82c-.41 1.43-1.08 2.76-1.91 3.96M8 8H5.08A7.92 7.92 0 0 1 9.4 4.44C8.8 5.55 8.35 6.75 8 8m-2.92 8H8c.35 1.25.8 2.45 1.4 3.56A8 8 0 0 1 5.08 16m-.82-2C4.1 13.36 4 12.69 4 12s.1-1.36.26-2h3.38c-.08.66-.14 1.32-.14 2s.06 1.34.14 2M12 4.03c.83 1.2 1.5 2.54 1.91 3.97h-3.82c.41-1.43 1.08-2.77 1.91-3.97M18.92 8h-2.95a15.7 15.7 0 0 0-1.38-3.56c1.84.63 3.37 1.9 4.33 3.56M12 2C6.47 2 2 6.5 2 12a10 10 0 0 0 10 10 10 10 0 0 0 10-10A10 10 0 0 0 12 2"/></svg>
+
+    </a>
+    LuckyD Browser
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/Dylanchess0320/LuckyD-Browser" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Dylanchess0320/LuckyD-Browser
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ai-agents/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI & Agents
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../terminal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Terminal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#400-2026-09-10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [4.0.0] - 2026-09-10
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[4.0.0] - 2026-09-10">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#security" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#390-2026-09-06" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [3.9.0] - 2026-09-06
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[3.9.0] - 2026-09-06">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#380-2026-09-06" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [3.8.0] - 2026-09-06
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[3.8.0] - 2026-09-06">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#370-2026-09-03" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [3.7.0] - 2026-09-03
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[3.7.0] - 2026-09-03">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#360-2026-08-27" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [3.6.0] - 2026-08-27
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[3.6.0] - 2026-08-27">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2511-2026-08-27" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [2.5.11] - 2026-08-27
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[2.5.11] - 2026-08-27">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2510-2026-08-25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [2.5.10] - 2026-08-25
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[2.5.10] - 2026-08-25">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fixed_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#259-2026-08-25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [2.5.9] - 2026-08-25
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[2.5.9] - 2026-08-25">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fixed_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#320-2026-08-12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [3.2.0] - 2026-08-12
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[3.2.0] - 2026-08-12">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#310-2026-08-08" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [3.1.0] - 2026-08-08
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[3.1.0] - 2026-08-08">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fixed_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#added_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#300-2026-08-08" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [3.0.0] - 2026-08-08
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[3.0.0] - 2026-08-08">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fixed_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#added_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#280-2026-08-08" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [2.8.0] - 2026-08-08
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[2.8.0] - 2026-08-08">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#270-2026-08-08" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [2.7.0] - 2026-08-08
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[2.7.0] - 2026-08-08">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#260-2026-08-08" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [2.6.0] - 2026-08-08
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[2.6.0] - 2026-08-08">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#250-2026-08-08" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [2.5.0] - 2026-08-08
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[2.5.0] - 2026-08-08">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#240-2026-08-07" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [2.4.0] - 2026-08-07
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[2.4.0] - 2026-08-07">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#230-2026-08-07" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [2.3.0] - 2026-08-07
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[2.3.0] - 2026-08-07">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#220-2026-07-27" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [2.2.0] - 2026-07-27
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[2.2.0] - 2026-07-27">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#210-2026-07-22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [2.1.0] - 2026-07-22
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[2.1.0] - 2026-07-22">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#security_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#200-2026-07-22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [2.0.0] - 2026-07-22
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[2.0.0] - 2026-07-22">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_16" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#security_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#136-2026-07-xx" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [1.3.6] - 2026-07-XX
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[1.3.6] - 2026-07-XX">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_17" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#400-2026-09-10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [4.0.0] - 2026-09-10
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[4.0.0] - 2026-09-10">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#security" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#390-2026-09-06" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [3.9.0] - 2026-09-06
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[3.9.0] - 2026-09-06">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#380-2026-09-06" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [3.8.0] - 2026-09-06
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[3.8.0] - 2026-09-06">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#370-2026-09-03" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [3.7.0] - 2026-09-03
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[3.7.0] - 2026-09-03">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#360-2026-08-27" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [3.6.0] - 2026-08-27
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[3.6.0] - 2026-08-27">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2511-2026-08-27" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [2.5.11] - 2026-08-27
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[2.5.11] - 2026-08-27">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2510-2026-08-25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [2.5.10] - 2026-08-25
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[2.5.10] - 2026-08-25">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fixed_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#259-2026-08-25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [2.5.9] - 2026-08-25
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[2.5.9] - 2026-08-25">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fixed_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#320-2026-08-12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [3.2.0] - 2026-08-12
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[3.2.0] - 2026-08-12">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#310-2026-08-08" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [3.1.0] - 2026-08-08
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[3.1.0] - 2026-08-08">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fixed_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#added_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#300-2026-08-08" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [3.0.0] - 2026-08-08
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[3.0.0] - 2026-08-08">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fixed_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#added_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#280-2026-08-08" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [2.8.0] - 2026-08-08
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[2.8.0] - 2026-08-08">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#270-2026-08-08" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [2.7.0] - 2026-08-08
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[2.7.0] - 2026-08-08">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#260-2026-08-08" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [2.6.0] - 2026-08-08
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[2.6.0] - 2026-08-08">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#250-2026-08-08" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [2.5.0] - 2026-08-08
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[2.5.0] - 2026-08-08">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#240-2026-08-07" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [2.4.0] - 2026-08-07
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[2.4.0] - 2026-08-07">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#230-2026-08-07" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [2.3.0] - 2026-08-07
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[2.3.0] - 2026-08-07">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#220-2026-07-27" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [2.2.0] - 2026-07-27
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[2.2.0] - 2026-07-27">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#210-2026-07-22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [2.1.0] - 2026-07-22
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[2.1.0] - 2026-07-22">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#security_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#200-2026-07-22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [2.0.0] - 2026-07-22
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[2.0.0] - 2026-07-22">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_16" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#security_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#136-2026-07-xx" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [1.3.6] - 2026-07-XX
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[1.3.6] - 2026-07-XX">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_17" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="changelog">Changelog<a class="headerlink" href="#changelog" title="Permanent link">&para;</a></h1>
+<p>All notable changes to this project will be documented in this file.</p>
+<p>The format is based on <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a>,
+and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
+<h2 id="400-2026-09-10">[4.0.0] - 2026-09-10<a class="headerlink" href="#400-2026-09-10" title="Permanent link">&para;</a></h2>
+<h3 id="security">Security<a class="headerlink" href="#security" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Cookie-based auth for all local services</strong> — the Control API (<code>:9777</code>), Coding Agent HQ (<code>:8000</code>), and terminal WebSocket (<code>:9881</code>) now authenticate via HttpOnly session cookies (<code>luckyd_ctl</code>, <code>luckyd_hq</code>, <code>luckyd_term</code>) instead of bearer tokens in URLs or page source. No credential is ever embedded in served HTML again.</li>
+<li><strong>Deep Research XSS hardening</strong> — report markdown is HTML-escaped before formatting, and link URLs are allowlisted to <code>http:</code>, <code>https:</code>, and <code>mailto:</code> (with <code>rel="noopener"</code>).</li>
+<li><strong>Cline bridge authentication</strong> — <code>/v1/models</code> and <code>/v1/chat/completions</code> now require a bearer token (<code>CLINE_BRIDGE_TOKEN</code>, falling back to <code>CODING_AGENT_API_KEY</code>) and fail closed when none is configured.</li>
+<li><strong>Nav pages require auth</strong> — <code>/dashboard</code>, <code>/research</code>, <code>/mesh</code>, and <code>/terminal</code> return 401 without the session cookie, closing the "any local page can drive the browser" gap.</li>
+<li><strong>Loopback-only origin enforcement</strong> on the Control API, with bracketed IPv6 (<code>[::1]</code>) handled correctly.</li>
+<li>Minimal <code>Content-Security-Policy</code> headers on local HTML surfaces.</li>
+</ul>
+<h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>CheckpointManager.undo_to()</code> could loop forever when a checkpoint's target file was deleted; it now terminates.</li>
+<li><code>undo_last()</code> no longer retries a checkpoint whose file is already gone.</li>
+<li>Windows updater exits cleanly on non-Windows systems; <code>CREATE_NO_WINDOW</code> is guarded.</li>
+</ul>
+<h2 id="390-2026-09-06">[3.9.0] - 2026-09-06<a class="headerlink" href="#390-2026-09-06" title="Permanent link">&para;</a></h2>
+<h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>HTTPS-Only Mode</strong> — public <code>http://</code> main-frame navigations upgrade to <code>https://</code>. Localhost, <code>.local</code>, and private LAN addresses are never rewritten (Settings toggle, default on).</li>
+<li><strong>Per-site permissions</strong> — camera, microphone, location, notifications, pointer lock, and screen capture prompt once and remember Allow/Block per origin. Incognito never persists. Lock icon / Tools / Settings open the manager.</li>
+<li><strong>Workspaces</strong> — named tab collections (File → Workspaces, command palette). Switching saves the current window into the active workspace, then loads the target.</li>
+<li><strong>Memory saver</strong> — idle background tabs freeze after 5 minutes and discard after 15. Pinned, audible, current, and local platform tabs (dashboard / HQ / terminal) stay awake. Sleeping tabs show a 💤 prefix and wake on click.</li>
+<li><strong>Read Aloud</strong> — <code>Ctrl+Shift+L</code> (toolbar 🔊, context menu) speaks the selection or the page via Windows SAPI; click again to stop.</li>
+<li><strong>Summarize This Page</strong> — <code>Ctrl+Shift+U</code> (toolbar ✨) opens the AI sidebar and summarizes the current tab.</li>
+</ul>
+<h2 id="380-2026-09-06">[3.8.0] - 2026-09-06<a class="headerlink" href="#380-2026-09-06" title="Permanent link">&para;</a></h2>
+<h3 id="added_1">Added<a class="headerlink" href="#added_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Deep Research swarm as a native tool</strong> — New <code>DeepResearch</code> agent tool (<code>tools/deep_research_tool.py</code>, vendored engine in <code>features/deep_research/</code>): planner -&gt; parallel grounded workers -&gt; citation-grounded synthesizer -&gt; critic -&gt; claim-level verifier -&gt; finalizer, returning citation-backed markdown plus <code>data/deep_research/runs/</code> artifacts.</li>
+<li><strong>Multi-provider research backends</strong> — Gemini native grounding, LuckyD stack (Ollama local free, DeepSeek, OpenAI, OpenRouter, ...), keyless DDG (+ frozen-safe HTML fallback), Tavily/Brave premium search (<code>TAVILY_API_KEY</code>/<code>BRAVE_API_KEY</code>), and an offline mock for tests.</li>
+<li><strong>Depth presets + context</strong> — <code>depth=quick|standard|deep|max</code>, <code>context</code> injection (browser passes the current tab), <code>max_sources</code>, per-run budgets, SQLite cache.</li>
+<li><strong>Browser hooks</strong> — Tools menu <code>Deep Research…</code> (<code>Ctrl+Shift+R</code>) and command-palette entry; frozen builds bundle the swarm (features datas + hiddenimports in all 3 PyInstaller specs).</li>
+</ul>
+<h2 id="370-2026-09-03">[3.7.0] - 2026-09-03<a class="headerlink" href="#370-2026-09-03" title="Permanent link">&para;</a></h2>
+<h3 id="added_2">Added<a class="headerlink" href="#added_2" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Hermes agent in the Agent Mesh terminal dock</strong> — New Hermes chip (<code>mesh-hermes</code> shell) spawns <code>hermes chat</code> on its own ConPTY; a bare <code>hermes</code> exits instantly on closed stdin, so the shell pins the explicit <code>chat</code> subcommand (same bug class as the <code>mesh-dsh</code> web-profile fix). Availability is probed via PATH, like every other mesh chip.</li>
+<li><strong>Hermes regression test</strong> — <code>test_hermes_shell_boots_chat</code> asserts the dock chip, shell label, and <code>hermes chat</code> spawn command.</li>
+</ul>
+<h3 id="fixed_1">Fixed<a class="headerlink" href="#fixed_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>DeepSeek harness mesh wiring</strong> — Agent Mesh <code>doctor</code> now validates the <code>DEEPSEEK_API_KEY</code> against the live API instead of reporting a false OK when the key is revoked, and <code>mesh launch dsh</code> prints the LuckyD Browser tab workflow with port/auth pre-flight checks.</li>
+</ul>
+<h2 id="360-2026-08-27">[3.6.0] - 2026-08-27<a class="headerlink" href="#360-2026-08-27" title="Permanent link">&para;</a></h2>
+<h3 id="added_3">Added<a class="headerlink" href="#added_3" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>LuckyD Code v3.6 &amp; Browser Upgrade</strong> — Unified v3.6.0 release across LuckyD Browser, LuckyD Code CLI, AI Sidebar Assistant, Terminal PTY server, and Coding Agent Workspace.</li>
+<li><strong>Audited Free AI Models Catalog</strong> — Curated zero-cost ($0) AI models across OpenCode Zen, OpenRouter :free, Ollama, Groq, Z.ai, and Google; pruned unsupported/deprecated free models (such as <code>nemotron-3-super-free</code>).</li>
+<li><strong>Resilient Multi-Model Auto-Fallback</strong> — Autonomous agent loop automatically detects free-tier rate limits or transient errors and hot-swaps to top-tier free fallback models (<code>nemotron-3-ultra-free</code>, <code>hy3-free</code>, <code>laguna-s-2.1-free</code>, <code>nemotron-3.5-lightning-free</code>, <code>deepseek-v4-flash-free</code>, <code>mimo-v2.5-free</code>, <code>muse-spark-1.2-contributor-free</code>, <code>big-pickle</code>).</li>
+</ul>
+<h3 id="fixed_2">Fixed<a class="headerlink" href="#fixed_2" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>CI/CD Quality &amp; Formatting</strong> — Fixed Black and Ruff linting/formatting issues across Python modules, tests, and CI workflows.</li>
+</ul>
+<h2 id="2511-2026-08-27">[2.5.11] - 2026-08-27<a class="headerlink" href="#2511-2026-08-27" title="Permanent link">&para;</a></h2>
+<h3 id="added_4">Added<a class="headerlink" href="#added_4" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Free Model Picker &amp; Multi-Provider Hub</strong> — Interactive <code>/model free</code> command, numeric selection (<code>model 12</code>), fuzzy search (<code>model nemotron</code>), and direct provider routing (<code>model opencode &lt;name&gt;</code>).</li>
+<li><strong>Terminal &amp; Agent Enhancements</strong> — Hardened multi-agent terminal integration, enhanced Agent Mesh CLIs, and improved session reliability.</li>
+</ul>
+<h2 id="2510-2026-08-25">[2.5.10] - 2026-08-25<a class="headerlink" href="#2510-2026-08-25" title="Permanent link">&para;</a></h2>
+<h3 id="fixed_3">Fixed<a class="headerlink" href="#fixed_3" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Hardened platform</strong> — <code>settings.py</code> now uses <code>copy.deepcopy(DEFAULTS)</code> (fixes shared <code>zoom_levels</code> mutation), atomic <code>tmp+replace</code> saves with corrupt-file backup, and expanded <code>terminal_cli</code> migration; <code>session.py</code> atomic save with proper <code>prev</code> backup and corrupt handling; <code>terminal_server.py</code> NUL-sanitizes env block, validates mesh exe, 520-char Desktop buffer, max WS frame 1 MB, and generic spawn error; <code>control_server.py</code> now uses <code>hmac.compare_digest</code> (constant-time), 1 MB body limit, and DNS-rebinding <code>Host</code> check.</li>
+<li><strong>Build hygiene</strong> — <code>browser/version_info.txt</code> now tracked via <code>!.gitignore</code> negation (fresh clones build), large local dirs (<code>LuckyD App/</code>, <code>youtube/</code>, <code>archive/*</code>) ignored.</li>
+</ul>
+<h2 id="259-2026-08-25">[2.5.9] - 2026-08-25<a class="headerlink" href="#259-2026-08-25" title="Permanent link">&para;</a></h2>
+<h3 id="fixed_4">Fixed<a class="headerlink" href="#fixed_4" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Terminal completely broken (every shell)</strong> — <code>browser_core/terminal_server.py:_spawn_pty()</code> passed the environment as a <code>dict</code> to <code>pywinpty.PTY.spawn()</code>, which expects a NUL-joined block string (<code>"k=v\0..."</code>). <code>cffi</code> raised <code>argument env: 'dict' object is not an instance of str</code> and the bridge replied <code>[terminal failed to start: ...]</code> on every WS connection, so Agent 1, Agent 2, PowerShell, CMD, and all nine Agent Mesh CLIs were dead. Now builds <code>env_block = "\0".join(f"{k}={v}" …) + "\0"</code> matching <code>winpty/ptyprocess.py</code>. Bumped <code>browser/__init__.py</code>, <code>version_info.txt</code>, <code>installer/LuckyDBrowser.iss</code> to 2.5.9.</li>
+</ul>
+<h2 id="320-2026-08-12">[3.2.0] - 2026-08-12<a class="headerlink" href="#320-2026-08-12" title="Permanent link">&para;</a></h2>
+<h3 id="added_5">Added<a class="headerlink" href="#added_5" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>ClinePass provider</strong> — sign in with Cline as the agent's AI provider. The
+  token resolves from the live Cline CLI session (<code>~/.cline</code>) and refreshes via
+  WorkOS on expiry, so it never goes stale; <code>CLINEPASS_API_KEY</code> overrides.</li>
+<li><strong>Skills system</strong> — <code>skills/*.md</code> with YAML frontmatter (name, description,
+  version, author, tags) are auto-discovered; ships with <code>top-picks</code>,
+  <code>ai-news-brief</code>, and <code>movie-picker</code>. <code>LUCKYD.md</code> defines intent patterns that
+  auto-trigger the matching skill.</li>
+<li><strong>Project rules loader</strong> — <code>LUCKYD.md</code> (plus AGENTS.md, .clinerules,
+  .goosehints, et al.) is injected into the system prompt with per-file and
+  total size caps.</li>
+<li><strong>Cline bridge + launcher</strong> — <code>cline_bridge.py</code> and <code>Start-LuckyD-Cline.bat</code>
+  wire the Cline CLI straight into the agent.</li>
+<li><strong>Codec self-check utility</strong> — <code>tests/codec_check.py</code> reports which media
+  codecs the QtWebEngine build supports (offscreen, no window).</li>
+</ul>
+<h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Browser version bumped to 2.2.0</strong>; installer/version info updated.</li>
+<li>Browser Control API, dashboard, profile, and settings polish; terminal bridge
+  and second-agent plumbing refined.</li>
+<li>Agent loop, background-process tool, file tools, logging setup, sandbox, CLI
+  (<code>ui.py</code>), and web server improvements.</li>
+</ul>
+<h3 id="fixed_5">Fixed<a class="headerlink" href="#fixed_5" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>CI pipeline green and hardened</strong> — secret scanning (gitleaks), dependency
+  auditing, and SAST are now blocking gates (no <code>continue-on-error</code>); Safety
+  replaced with pip-audit (Safety 3.x requires an interactive login that can
+  never succeed in CI); all bandit medium+ findings remediated; black + ruff
+  clean; the rules-loader test no longer picks up the repo's own <code>LUCKYD.md</code>.</li>
+</ul>
+<h2 id="310-2026-08-08">[3.1.0] - 2026-08-08<a class="headerlink" href="#310-2026-08-08" title="Permanent link">&para;</a></h2>
+<h3 id="fixed_6">Fixed<a class="headerlink" href="#fixed_6" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Fullscreen video was completely dead</strong> — Qt WebEngine ships with the
+  HTML5 Fullscreen API opt-in and OFF, so every player's fullscreen button
+  threw "Fullscreen is not supported". Both profiles now enable
+  <code>FullScreenSupportEnabled</code>, and the window honors the request properly:
+  <strong>all chrome (menu, tabs, omnibox, bookmarks, status bar, docks) hides</strong>
+  so the video gets the whole screen, then restores exactly on exit
+  (including the maximized state). F11 during a video exits through the page
+  so state stays consistent.</li>
+<li><strong>YouTube Shorts stalled/glitched</strong> — the ad-blocker's <code>ctier</code> URL pattern
+  matched YouTube's content-tier parameter on ordinary <code>videoplayback</code>
+  fetches, so Shorts' video data was blocked outright. Pattern removed, with
+  regression tests proving real stream URLs pass while ad URLs stay blocked.</li>
+<li><strong>YouTube ads playing again (server-side insertion)</strong> — ads now ride in on
+  googlevideo.com like content, invisible to domain blocking, and were
+  scheduled by <code>/youtubei/v1/player</code> API calls nobody scrubbed. The userscript
+  now runs at document-start and hooks fetch + XHR, <strong>stripping ad placements
+  from every player response before the player parses it</strong> — ads never
+  schedule. Short-circuit skip, cosmetic removal, and popup dismissal remain
+  as fallback layers.</li>
+<li><strong>Control API <code>/snapshot</code> flake</strong> — its page JS could lose the race against
+  startup work (harness spawn, update check); the selftest now retries before
+  failing.</li>
+</ul>
+<h3 id="added_6">Added<a class="headerlink" href="#added_6" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Second terminal agent ("Agent 2")</strong> — the terminal tab's shell bar gains
+  an Agent 2 button next to Agent/PowerShell/CMD: it spawns the standalone
+  coding-agent checkout (the Desktop shortcut's <code>run.bat</code> project) as an
+  interactive REPL on its own ConPTY, booting in that project as its
+  workspace. New <code>terminal_cli2</code> setting + <code>LUCKYD_CLI2</code> env override
+  (accepts an exe, <code>main.py</code>, or <code>run.bat</code> via <code>cmd.exe /c</code>), plus a
+  Tools → Agent 2 Terminal menu item.</li>
+</ul>
+<h3 id="changed_1">Changed<a class="headerlink" href="#changed_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Browser version bumped to 2.1.0</strong>; installer/version info updated.</li>
+<li><code>browser/selftest.py</code> grew to 111 checks (fullscreen API enabled, chrome
+  hide/restore, snapshot retry, 2nd-agent terminal wiring).</li>
+<li>Agent terminal overrides now boot in the override file's own folder, so a
+  custom <code>terminal_cli</code> script acts on its own project as workspace.</li>
+</ul>
+<h2 id="300-2026-08-08">[3.0.0] - 2026-08-08<a class="headerlink" href="#300-2026-08-08" title="Permanent link">&para;</a></h2>
+<h3 id="fixed_7">Fixed<a class="headerlink" href="#fixed_7" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>YouTube videos resuming mid-content after a blocked ad</strong> — ads share the
+  <code>&lt;video&gt;</code> element with the content, so the short-circuit skip polluted the
+  playback position. The userscript now captures the content position when an
+  ad starts (via the player's content-time API with the element as fallback)
+  and restores it when the ad ends: <strong>0s for pre-rolls, the resume point for
+  mid-rolls</strong> — and it restores your pre-ad mute state too.</li>
+</ul>
+<h3 id="added_7">Added<a class="headerlink" href="#added_7" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Spell check everywhere</strong> — both profiles now enable the OS spellchecker
+  (en-US default), and the right-click menu shows top-4 suggestions that
+  replace the misspelling in place.</li>
+<li><strong>Translate Page…</strong> — right-click any page to open it in Google Translate
+  (auto → English) in a new tab.</li>
+<li><strong>Read Later queue</strong> (<code>Ctrl+Alt+S</code> or Bookmarks menu) — parks the page in
+  a dedicated <code>readlater</code> list with its own 📖 submenu; kept out of the
+  bookmarks bar and the main bookmark list.</li>
+</ul>
+<h3 id="changed_2">Changed<a class="headerlink" href="#changed_2" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Browser version bumped to 2.0.0</strong>; installer/version info updated.</li>
+<li><code>browser/selftest.py</code> grew to 103 checks (read-later queue separation,
+  spellcheck profile flag, YouTube fix shipped in the userscript).</li>
+</ul>
+<h2 id="280-2026-08-08">[2.8.0] - 2026-08-08<a class="headerlink" href="#280-2026-08-08" title="Permanent link">&para;</a></h2>
+<h3 id="added_8">Added<a class="headerlink" href="#added_8" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Scheduled workflows (autopilot)</strong> — every saved workflow gets an
+  interval picker on the Workflows page (Off / 15m / 30m / hourly / 6h /
+  daily). A 30-second app tick replays whatever is due via the Control API
+  backend, toasts the result, and records it (<code>last: 2/2 steps · 09:41</code>)
+  in the row. Routes: <code>GET /schedules</code>, <code>POST /schedule</code>.</li>
+<li><strong>Full-page screenshots</strong> (File → Save Full-Page Screenshot…) — CDP
+  <code>Page.getLayoutMetrics</code> + <code>captureBeyondViewport</code> captures the entire
+  scrollable document, not just the viewport (capped at 16384px).</li>
+<li><strong>Ad-blocker stats</strong> — the dashboard gained a 🛡 pill showing live
+  blocked-request counts, fed by <code>ads_blocked</code> in <code>GET /status</code>.</li>
+<li><strong>"What's New" toast</strong> — the first launch after an update greets you
+  with the release highlights (<code>browser.WHATS_NEW</code>), closing the
+  auto-update loop.</li>
+</ul>
+<h3 id="changed_3">Changed<a class="headerlink" href="#changed_3" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Browser version bumped to 1.9.0; installer/version info updated.</li>
+<li><code>browser/selftest.py</code> hit <strong>100 checks</strong> (schedules API round-trip,
+  schedules UI, full-page capture entry point).</li>
+<li><code>browser/test_browser_core.py</code> grew to 55 headless checks (schedule
+  math, due detection, store round-trips).</li>
+</ul>
+<h2 id="270-2026-08-08">[2.7.0] - 2026-08-08<a class="headerlink" href="#270-2026-08-08" title="Permanent link">&para;</a></h2>
+<h3 id="added_9">Added<a class="headerlink" href="#added_9" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Side Pane</strong> — right-click any link → "Open in Side Pane": a docked
+  second web view (shares the profile — cookies, adblock) sized to a third
+  of the window for reference reading without spending a tab.</li>
+<li><strong>Dashboard letter-tile favicons</strong> — speed-dial tiles are now minted
+  locally from the hostname (same hue hash as the app's <code>icons.py</code>):
+  <strong>the Google favicon service call is gone</strong>, so your shortcuts never
+  leave the machine. New one-tap tiles for Terminal, Workflows, Network.</li>
+<li><strong>Downloads: live speed + ETA + pause/resume</strong> — per-download controls
+  gained a pause/resume button, and in-progress rows show throughput and
+  time remaining.</li>
+<li><strong>Close Duplicate Tabs</strong> (tab context menu) — one click closes every
+  URL that already has an open sibling (pinned tabs are never touched).</li>
+</ul>
+<h3 id="changed_4">Changed<a class="headerlink" href="#changed_4" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Browser version bumped to 1.8.0; installer/version info updated.</li>
+<li>The shortcuts reference (<code>Ctrl+/</code>) now lists Reader Mode, Focus Mode,
+  the terminals, the <code>?</code> omnibox prefix, and everything since 1.4.</li>
+<li><code>browser/selftest.py</code> grew to 95 checks (dashboard tiles, side pane,
+  duplicate closing).</li>
+</ul>
+<h2 id="260-2026-08-08">[2.6.0] - 2026-08-08<a class="headerlink" href="#260-2026-08-08" title="Permanent link">&para;</a></h2>
+<h3 id="added_10">Added<a class="headerlink" href="#added_10" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Vertical tabs</strong> (<code>browser_ui/vertical_tabs.py</code>) — an Arc-style left dock
+  with readable rows: site tiles, group-color text, click to switch,
+  middle-click to close, drag to reorder, the full tab context menu. Toggle
+  in View → Vertical Tabs (persisted); the top bar hides while it's on.</li>
+<li><strong>Network monitor</strong> (<code>browser_core/netmon.py</code>, Tools → Network Monitor) —
+  a live request log of the active tab over raw CDP (Network domain):
+  method/status/type/size/time rows streaming into a themed page at
+  <code>127.0.0.1:9777/network</code>, with a text filter, in-place row updates, and
+  one-click <strong>HAR 1.2 export</strong> (<code>GET /network/har</code>). Control API routes:
+  <code>GET /network</code>, <code>GET /network/events?since=N</code>, <code>POST /network/start|stop|clear</code>.</li>
+<li><strong>Focus mode</strong> (<code>Ctrl+Shift+F</code>) — one key strips every chrome surface
+  (menu bar, nav bar, bookmark bar, status bar, docks) for pure content;
+  pressing it again restores exactly what was open.</li>
+<li><strong>Omnibox AI ask</strong> — start a query with <code>?</code> in the address bar to send it
+  straight to the AI sidebar (<code>? explain quantum computing</code>).</li>
+</ul>
+<h3 id="changed_5">Changed<a class="headerlink" href="#changed_5" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Browser version bumped to 1.7.0; Control API bumped to 1.4.0.</li>
+<li><code>browser/selftest.py</code> grew to 91 checks (netmon page + capture lifecycle +
+  HAR export, vertical-tabs toggle, focus mode hide/restore, sidebar ask).</li>
+<li><code>browser/test_browser_core.py</code> grew to 52 headless checks (netmon reducer,
+  row cap, HAR builder).</li>
+</ul>
+<h2 id="250-2026-08-08">[2.5.0] - 2026-08-08<a class="headerlink" href="#250-2026-08-08" title="Permanent link">&para;</a></h2>
+<h3 id="added_11">Added<a class="headerlink" href="#added_11" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Tab groups</strong> — right-click any tab → Tab Group: create named, colored
+  groups (6-color rotation, color strip under grouped tabs, group tooltips).
+  Groups <strong>collapse</strong> to a single chip tab (<code>▸ name · n</code>) that keeps its
+  pages alive, and they're <strong>persisted through session restore</strong> (names,
+  colors, collapsed state all survive a restart).</li>
+<li><strong>AI Tab Organizer</strong> (Tools → Organize Tabs with AI) — the configured AI
+  provider clusters your open tabs by topic and builds the groups for you,
+  with JSON-loose parsing of the model's reply and full bounds-checking.</li>
+<li><strong>Reader Mode</strong> (<code>Ctrl+Alt+R</code>, View menu) — a readability-lite extractor
+  (text-density scoring, link-density penalty) distills articles into a
+  clean serif view tinted with the active theme; F5 or the shortcut exits.</li>
+<li><strong>Copy Link to Highlighted Text</strong> — right-click a selection to copy a
+  <code>#:~:text=</code> fragment link that deep-scrolls to the quote in Chromium.</li>
+<li><strong>Reopen Previous Session</strong> (File menu) — the session store now rotates
+  one backup generation (<code>session.prev.json</code>) on every save.</li>
+</ul>
+<h3 id="changed_6">Changed<a class="headerlink" href="#changed_6" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Browser version bumped to 1.6.0; installer/version info updated.</li>
+<li><code>browser/selftest.py</code> grew to 83 checks (tab-group lifecycle: assign,
+  collapse chip, session round-trip, AI-group application, empty dissolve).</li>
+<li><code>browser/test_browser_core.py</code> grew to 48 headless checks (session group
+  fields, prev rotation, reader template).</li>
+</ul>
+<h2 id="240-2026-08-07">[2.4.0] - 2026-08-07<a class="headerlink" href="#240-2026-08-07" title="Permanent link">&para;</a></h2>
+<h3 id="added_12">Added<a class="headerlink" href="#added_12" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Multi-terminal tabs ("second terminal", all built in)</strong> — the in-browser
+  terminal now spawns one independent ConPTY session per tab and per shell:
+  the LuckyD Code <strong>agent CLI</strong> (Ctrl+<code>), a plain **PowerShell** console
+  (Ctrl+Shift+</code>), or <strong>CMD</strong>. A shell bar in the terminal page switches
+  shells live (reconnect = fresh session); tabs are titled per shell.
+  Shell names are allowlisted server-side (<code>browser_core/terminal_server.py</code>)
+  — the WS query can never inject a command line.</li>
+<li><strong>Workflow recorder &amp; replayer</strong> (<code>browser/browser_core/workflows.py</code>) —
+  record Control-API traffic (<code>/navigate</code> + <code>/act</code>) into named JSON
+  workflows, replay them later against the live tab. Indexed steps store an
+  element <em>fingerprint</em> (tag/text/id/name/aria/href) at record time; replay
+  re-snapshots the page and scores candidates so steps land on the right
+  element even after re-renders (<strong>self-healing</strong>, Stagehand/browser-use
+  style), with the recorded index as fallback. Failed actions are never
+  recorded; replay stops at the first broken element step instead of
+  clicking blind. Manager page at <code>http://127.0.0.1:9777/workflows</code>
+  (Tools → Workflows…) with live recorder status and a per-step replay log.</li>
+<li><strong><code>POST /extract</code></strong> (<code>browser/browser_core/extract.py</code>) — Stagehand-style
+  structured extraction: an instruction plus an optional JSON schema turns
+  the active page's visible text into parsed JSON via the configured AI
+  provider. Lenient parser tolerates fences, surrounding prose, and trailing
+  commas (small-model habits).</li>
+<li>Control API bumped to 1.3.0 — new routes: <code>GET /workflows</code>,
+  <code>GET /workflows/list</code>, <code>POST /workflow/record|stop|replay|delete</code>,
+  <code>POST /extract</code>.</li>
+<li><strong>Site letter-tile icons</strong> (<code>browser_ui/icons.py</code>) — offline favicon
+  stand-ins: rounded gradient tiles minted from each site's initial with
+  hues derived from the hostname (stable identity, zero network). Used by
+  the bookmarks bar, the command palette, and tab hover previews.</li>
+<li><strong>Bookmark bar restyle</strong> — per-site tiles, pill hover states, themed QSS,
+  proper text-beside-icon rendering.</li>
+<li><strong>Clickable zoom pill</strong> — the status-bar zoom indicator is now a themed
+  button: click resets to 100%; accent highlight while zoomed.</li>
+<li><strong>Command palette upgrades</strong> — theme-synced styling (re-applied on every
+  open), tab entries now <em>switch</em> to the open tab instead of duplicating it,
+  site tiles on bookmark/history rows, and new actions: Agent Terminal,
+  PowerShell Terminal, Workflows, Save Screenshot, Toggle Bookmarks Bar.</li>
+<li><strong>Synthwave Sunset theme</strong> — the secret fifth theme (hot pink × cyan on
+  deep purple). Unlock with the Konami code (↑↑↓↓←→←→BA) on the new-tab
+  page, or just pick it in Settings. New <code>POST /theme</code> Control API route
+  switches themes live on every window.</li>
+<li><strong>Offline arcade</strong> — the connection-error page is now a playable canvas
+  endless-runner (Space/click to hop, best score tracked) while you wait
+  for the network.</li>
+<li><strong>Dashboard personality</strong> — time-aware greeting with rotating LuckyD
+  taglines; flawless workflow replays fire a confetti burst on the manager
+  page.</li>
+</ul>
+<h3 id="fixed_8">Fixed<a class="headerlink" href="#fixed_8" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Userscript engine was silently dead</strong> — <code>_glob_to_regex</code> never escaped
+  <code>/</code>, so the generated guard wrapper's regex literal terminated early and
+  every built-in userscript threw <code>Uncaught SyntaxError</code> on every page.
+  Fixed and regression-tested; browser console is now completely clean on
+  startup. "Dark Mode Everywhere" (invert-everything) is now opt-in by
+  default via <code>userscript_disabled</code>; YouTube Ad-Block and Video Speed
+  Controller actually run for the first time.</li>
+<li><strong>Auto-update was broken end-to-end</strong> — <code>UpdateChecker</code> was constructed
+  with a version string as its update source and connected to a nonexistent
+  <code>noUpdate</code> signal, so every check died silently; the payload is a dict,
+  not a <code>ReleaseInfo</code>; and <code>_apply_update</code> would have moved the <em>installer</em>
+  over the running exe. Now correctly wired, the prompt previews the release
+  notes, and the apply step runs the Inno installer (<code>/VERYSILENT
+  /NORESTART</code>) from a self-deleting .bat that relaunches the browser —
+  session restore brings your tabs back after the update.</li>
+<li><strong>Selftest GUI deadlock</strong> — <code>finish()</code> joined the API thread on the GUI
+  thread while API calls still needed the event loop; it now polls with
+  QTimer, making the API check section deterministic.</li>
+<li><strong>Frozen build on Python 3.10.0</strong> — <code>pygame</code>/<code>werkzeug</code>/<code>flask</code> pulled in
+  transitively crashed modulegraph's bytecode scan (<code>dis</code> tuple-index bug),
+  failing the PyInstaller build; excluded like PIL before them. Packaged
+  builds also gained a <code>crash.log</code> excepthook (windowed apps have no console,
+  so startup tracebacks used to vanish into a bare error dialog).</li>
+</ul>
+<h3 id="changed_7">Changed<a class="headerlink" href="#changed_7" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Browser version bumped to 1.5.0; installer/version info updated.</li>
+<li><code>browser/selftest.py</code> grew to 78 checks (terminal shell injection +
+  sanitizing, workflows page, userscript wrapper validity, live theme
+  switching, and a full live workflow record→save→list→replay→delete cycle
+  through the Control API).</li>
+<li><code>browser/test_browser_core.py</code> grew to 44 headless checks (shell
+  allowlist, WS query parsing, workflow matching/storage, JSON-loose
+  parsing, glob-to-regex escaping, site-tile helpers, updater version math,
+  theme completeness).</li>
+</ul>
+<h2 id="230-2026-08-07">[2.3.0] - 2026-08-07<a class="headerlink" href="#230-2026-08-07" title="Permanent link">&para;</a></h2>
+<h3 id="added_13">Added<a class="headerlink" href="#added_13" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Session restore</strong> (<code>browser/browser_core/session.py</code>) — "continue where you
+  left off": every normal window snapshots its tabs (URL, title, pinned state,
+  active index) to <code>session.json</code> via a debounced autosave plus a guaranteed
+  save on window close; startup reopens all windows when the new
+  <code>startup_mode</code> setting is <code>restore</code> (the default). Atomic tmp-file writes,
+  corrupt/incompatible files fall back to a clean start, safety caps
+  (5 windows × 50 tabs), incognito windows are never saved or restored, and
+  <code>LUCKYD_SESSION_PATH</code> redirects the file for tests/portable runs.</li>
+<li><strong>Bookmarks bar</strong> — toggleable strip under the navigation toolbar
+  (<code>Ctrl+Shift+B</code>, View menu, or Settings). Click opens in the current tab;
+  right-click offers Open in New Tab / Copy URL / Remove Bookmark. Refreshes
+  live on add/remove/import; empty state shows a hint. Persisted via the new
+  <code>bookmark_bar_visible</code> setting.</li>
+<li><strong>Save Screenshot</strong> (<code>Ctrl+Shift+S</code>, File menu) — captures the visible page
+  through the CDP page target (GPU-safe; <code>QWidget.grab()</code> returns blank on Qt
+  WebEngine), saves via the download folder with a timestamped
+  <code>screenshot-&lt;host&gt;-&lt;stamp&gt;.jpg</code> name (PNG transcode supported), toast
+  confirmation. <code>browser_core.screenshot.suggested_name()</code> generates the names.</li>
+<li><strong>Per-site zoom memory</strong> (<code>browser/browser_core/zoom.py</code>) — zooming a page
+  (now also with <strong>Ctrl+Scroll</strong>) is remembered per origin in <code>zoom_levels</code>
+  and re-applied on the next visit; resetting to 100% forgets the site.
+  Global <strong>default zoom</strong> picker (50–200%) in Settings (<code>zoom_factor</code>,
+  previously unused, is now wired up); both gated by the <code>zoom_remember</code>
+  setting.</li>
+<li><code>browser/test_browser_core.py</code> — 20 headless pytest checks for session,
+  zoom and screenshot helpers (no Qt needed).</li>
+</ul>
+<h3 id="fixed_9">Fixed<a class="headerlink" href="#fixed_9" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Terminal shortcut collision</strong> — <code>Ctrl+Shift+T</code> was double-bound (Reopen
+  Closed Tab <em>and</em> Tools → Terminal), making both unreliable. Terminal moves
+  to <code>Ctrl+`</code> (VS Code-style); Reopen Closed Tab keeps the
+  browser-standard <code>Ctrl+Shift+T</code>.</li>
+<li><strong>Pin Tab crashed</strong> — <code>BrowserTabWidget</code> called <code>setTabButton</code>/<code>tabButton</code>
+  on itself, an API PySide6 no longer forwards; rerouted through
+  <code>QTabBar</code>, which also completes the pinned-tab half of session restore.</li>
+</ul>
+<h3 id="changed_8">Changed<a class="headerlink" href="#changed_8" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Browser version bumped to 1.4.0; installer/version info updated.</li>
+<li><code>browser/selftest.py</code> grew from 44 to 64 checks (session, zoom, bookmark
+  bar, pinned tabs, screenshot naming; session storage isolated via
+  <code>LUCKYD_SESSION_PATH</code> so dev sessions can't skew the run).</li>
+</ul>
+<h2 id="220-2026-07-27">[2.2.0] - 2026-07-27<a class="headerlink" href="#220-2026-07-27" title="Permanent link">&para;</a></h2>
+<h3 id="added_14">Added<a class="headerlink" href="#added_14" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Browser Control API</strong> (<code>browser/browser_core/control_server.py</code>) — localhost
+  HTTP control of the live LuckyD Browser (<code>127.0.0.1:9777</code>): status, tabs,
+  navigate, page snapshots (same element indexing the AI agent uses),
+  click/type/press/select/scroll actions, CDP screenshots, raw JS eval, and
+  page-grounded AI answers. Optional bearer-token auth; Tools-menu toggle.
+  Lets the <code>luckyd-code.exe</code> harness, the terminal agent, and scripts drive
+  real tabs — "exe brain, browser hands".</li>
+<li><strong>Harness mode for the browser AI sidebar</strong> — agent tasks can now run on the
+  <code>luckyd-code.exe</code> backend (98 tools, memory graph, orchestration) via a new
+  checkbox. The exe auto-starts when missing, runs via <code>/api/background/*</code>
+  with live progress, and tasks auto-include Browser Control API instructions.</li>
+<li><code>browser/test_control_server.py</code> — 23 checks for the Control API HTTP layer
+  (fake backend, no Qt needed).</li>
+<li><strong>Harness mode is now the DEFAULT agent path</strong> — no button to press;
+  the checkbox (persisted via the <code>harness_mode</code> setting) is now an opt-out.</li>
+<li><strong>Vision steps are automatic</strong> — <code>AIBridge.supports_vision()</code> detects
+  image-capable models by family (gpt-4o/4.1, gemini, claude-3/4, gemma3,
+  qwen-vl, llava, pixtral, …); the sidebar auto-enables per-step
+  screenshots for them and hard-gates image payloads away from
+  text-only models.</li>
+<li><code>browser/selftest.py</code> grew from 15 to 22 checks (Control API module + live
+  end-to-end API calls against the running browser).</li>
+</ul>
+<h3 id="fixed_10">Fixed<a class="headerlink" href="#fixed_10" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>PyInstaller build</strong> — excluded <code>PIL</code> from <code>LuckyDBrowser.spec</code>: Pillow
+  12.3's <code>Image.py</code> crashes Python 3.10.0's <code>dis</code> during modulegraph scanning
+  (<code>IndexError: tuple index out of range</code>); the browser never imports PIL at
+  runtime. <code>websockets</code> pinned as a hidden import.</li>
+<li>Harness-mode checkbox was dead code — <code>_start_agent</code> never routed to it.</li>
+<li>Harness worker emitted <code>None</code> on a <code>Signal(str)</code>, dropped the orchestrate
+  result on the floor, and stopped via <code>terminate()</code> — replaced with a
+  cooperative-cancel worker that renders results in chat.</li>
+<li><code>default_provider()</code> always preferred <code>cline-usage</code> (registered even with no
+  credentials), so keyless local providers could never be the default —
+  restored the documented local-first order, Cline providers only when
+  authed.</li>
+<li>Control API <code>close_tab</code> read a closure variable before assignment
+  (would crash when closing the current tab).</li>
+<li><code>main_window.py</code> duplicate <code>show_downloads</code> definition removed.</li>
+<li><code>_body_gemini</code> / <code>_body_anthropic</code> now forward image parts
+  (<code>inlineData</code> / base64 image blocks) — vision previously only worked
+  on OpenAI-compatible endpoints; images were silently dropped.</li>
+</ul>
+<h3 id="changed_9">Changed<a class="headerlink" href="#changed_9" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Browser version bumped to 1.2.0; <code>browser_api_enabled</code> (default on),
+  <code>browser_api_port</code>, <code>browser_api_token</code>, <code>harness_mode</code> (default on)
+  settings added.</li>
+</ul>
+<h2 id="210-2026-07-22">[2.1.0] - 2026-07-22<a class="headerlink" href="#210-2026-07-22" title="Permanent link">&para;</a></h2>
+<h3 id="added_15">Added<a class="headerlink" href="#added_15" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>MCP (Model Context Protocol) support</strong> — connect to any MCP server via
+  <code>mcp_config.json</code> (claude-desktop / goose / cline compatible). Discovered
+  tools auto-register in the tool registry as <code>mcp__&lt;server&gt;__&lt;tool&gt;</code>.</li>
+<li><strong>Z.ai (GLM) provider</strong> — <code>ZAI_API_KEY</code> / <code>glm-4.5</code> (OpenAI-compatible endpoint).</li>
+<li><strong>OpenRouter provider</strong> — <code>OPENROUTER_API_KEY</code> with 200+ models.</li>
+<li><strong>AGENTS.md / project rules</strong> — auto-loads <code>AGENTS.md</code>, <code>.clinerules</code>,
+  <code>.goosehints</code>, <code>CLAUDE.md</code> from the workspace into the system prompt.</li>
+<li><strong>Session persistence</strong> — every run is auto-saved to <code>data/sessions/</code>.
+  Resume with <code>--continue</code>, <code>--resume &lt;id&gt;</code>, or <code>/sessions</code> + <code>/resume</code>.</li>
+<li><strong>Tool approval system</strong> — interactive y/n/a prompts in the REPL, <code>--yes</code>
+  to auto-approve (non-interactive / CI mode). Permission levels per tool.</li>
+<li><strong>Token &amp; cost tracking</strong> — <code>/cost</code> command and cost summary in goodbye.</li>
+<li><strong>New slash commands</strong> — <code>/cost</code>, <code>/undo</code>, <code>/sessions</code>, <code>/resume</code>, <code>/mcp</code>,
+  <code>/version</code>.</li>
+<li><strong>CLI flags</strong> — <code>--yes/-y</code>, <code>--max-turns</code>, <code>--continue/-c</code>, <code>--resume</code>,
+  <code>--provider</code>, <code>--version/-v</code>.</li>
+<li><code>mcp_config.example.json</code> — example MCP server configuration.</li>
+<li><code>core/session_store.py</code> — file-backed session persistence (save/load/list).</li>
+<li><code>core/rules_loader.py</code> — multi-format project rules loader.</li>
+<li><code>core/mcp_client.py</code> — MCP stdio transport + manager.</li>
+<li><code>tools/mcp_tools.py</code> — MCP tool adapter + <code>MCPList</code> management tool.</li>
+</ul>
+<h3 id="fixed_11">Fixed<a class="headerlink" href="#fixed_11" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>switch_provider()</code> now rebuilds <code>llm_client</code> with new credentials (was
+  only updating the router, so runtime provider switching was broken).</li>
+<li>Streaming now captures token usage (<code>include_usage</code>) for cost tracking.</li>
+<li><code>conftest.py</code> mocks for new providers (zai, openrouter).</li>
+</ul>
+<h3 id="changed_10">Changed<a class="headerlink" href="#changed_10" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>MessageBuilder.build_system()</code> accepts <code>project_rules</code> parameter.</li>
+<li>Version bumped to 2.1.0.</li>
+<li><code>test_tools.py</code> — file tools, bash tool, registry tests</li>
+<li><code>agent.py</code> rewritten as backward-compatibility shim re-exporting <code>core.agent_loop.CodingAgent</code></li>
+<li><code>LLMResult</code> now has <code>get()</code> and <code>to_dict()</code> for dict-like interface compatibility</li>
+<li><code>MemoryGraph.summarize()</code> implemented (was missing)</li>
+<li><code>core/agent_loop.py</code> — fixed parameter names (<code>on_token</code>/<code>on_think</code>), added <code>_emit_event()</code>, added <code>try/except</code> around <code>chat_stream</code></li>
+</ul>
+<h3 id="fixed_12">Fixed<a class="headerlink" href="#fixed_12" title="Permanent link">&para;</a></h3>
+<ul>
+<li>SyntaxError: stray <code>]</code> in <code>logging_setup.py</code></li>
+<li><code>ProjectDetector().detect()</code> throwing <code>AttributeError</code> (missing <code>_detect_package_manager</code>)</li>
+<li><code>toml</code> hard dependency in <code>config.py</code> — now falls back to JSON if <code>pyproject.toml</code> missing</li>
+<li>All Python files now parse cleanly (verified with <code>ast.parse</code> sweep)</li>
+</ul>
+<h3 id="security_1">Security<a class="headerlink" href="#security_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li>No real API keys or network calls in test suite (all mocked)</li>
+<li>Sensitive keys redacted in logs</li>
+</ul>
+<hr />
+<h2 id="200-2026-07-22">[2.0.0] - 2026-07-22<a class="headerlink" href="#200-2026-07-22" title="Permanent link">&para;</a></h2>
+<h3 id="added_16">Added<a class="headerlink" href="#added_16" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Complete project infrastructure overhaul</li>
+<li><code>pyproject.toml</code> with Ruff, Black, Mypy, pytest config</li>
+<li><code>setup.py</code> for pip-installable package</li>
+<li><code>requirements.txt</code> and <code>requirements-dev.txt</code> with pinned dependencies</li>
+<li><code>Makefile</code> with 30+ commands (test, lint, format, security, docker, etc.)</li>
+<li><code>.pre-commit-config.yaml</code> with 15+ automated checks</li>
+<li><code>.editorconfig</code> for consistent editor settings</li>
+<li><code>.github/workflows/ci.yml</code> — full CI/CD pipeline with 5 job stages</li>
+<li><code>Dockerfile</code> — multi-stage build (builder → slim runtime)</li>
+<li><code>docker-compose.yml</code> with optional Ollama and Redis services</li>
+<li><code>logging_setup.py</code> — structured JSON logging with redaction and timing</li>
+<li><code>CHANGELOG.md</code>, <code>CONTRIBUTING.md</code>, <code>SECURITY.md</code>, <code>CODE_OF_CONDUCT.md</code></li>
+<li><code>docs/</code> directory — MkDocs-based documentation site</li>
+<li>Test directory structure with conftest.py and async fixtures</li>
+<li><code>.env.example</code> template with all providers documented</li>
+<li><code>.dockerignore</code> for lean images</li>
+</ul>
+<h3 id="changed_11">Changed<a class="headerlink" href="#changed_11" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Enhanced <code>.gitignore</code> to cover all build artifacts and secrets</li>
+<li>Project version bumped from 1.3.6 → 2.0.0</li>
+</ul>
+<h3 id="fixed_13">Fixed<a class="headerlink" href="#fixed_13" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[List fixed issues]</li>
+</ul>
+<h3 id="security_2">Security<a class="headerlink" href="#security_2" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Added dependency scanning (Safety) to CI</li>
+<li>Bandit security scanning in CI pipeline</li>
+<li>Sensitive data redaction in logging</li>
+<li>Pre-commit hooks for detecting private keys</li>
+</ul>
+<h2 id="136-2026-07-xx">[1.3.6] - 2026-07-XX<a class="headerlink" href="#136-2026-07-xx" title="Permanent link">&para;</a></h2>
+<h3 id="added_17">Added<a class="headerlink" href="#added_17" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Initial public release</li>
+<li>Multi-provider LLM support (DeepSeek, OpenAI, Anthropic, Google, Ollama)</li>
+<li>20+ coding tools</li>
+<li>Memory graph with BM25 search and ONNX embeddings</li>
+<li>VS Code extension integration</li>
+<li>Web chat interface</li>
+<li>Project intelligence engine</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2026 LuckyD · MIT License
+    </div>
+  
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/Dylanchess0320/LuckyD-Browser" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://www.youtube.com/@LuckyDYoutube" target="_blank" rel="noopener" title="www.youtube.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M549.7 124.1c-6.2-23.7-24.8-42.3-48.3-48.6C458.9 64 288.1 64 288.1 64S117.3 64 74.7 75.5c-23.5 6.3-42 24.9-48.3 48.6C15 167 15 256.4 15 256.4s0 89.4 11.4 132.3c6.3 23.6 24.8 41.5 48.3 47.8C117.3 448 288.1 448 288.1 448s170.8 0 213.4-11.5c23.5-6.3 42-24.2 48.3-47.8 11.4-42.9 11.4-132.3 11.4-132.3s0-89.4-11.4-132.3zM232.2 337.6V175.2l142.7 81.2z"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate", "content.tabs.link"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
