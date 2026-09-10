@@ -834,7 +834,7 @@ def research_html() -> str:
 <header>
   <div class="brand">
     <span>🔬</span> LuckyD Deep Research
-    <span class="brand-badge">SWARM v5.0</span>
+    <span class="brand-badge">SWARM v6.0</span>
   </div>
   <span id="status-pill" class="pill">idle</span>
   <span class="sp"></span>

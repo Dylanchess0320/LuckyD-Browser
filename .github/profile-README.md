@@ -9,11 +9,11 @@
 
 </div>
 
-### Now shipping — [LuckyD Browser v5.0.0](https://github.com/Dylanchess0320/LuckyD-Browser/releases/tag/v5.0.0)
+### Now shipping — [LuckyD Browser v6.0.0](https://github.com/Dylanchess0320/LuckyD-Browser/releases/tag/v6.0.0)
 
-HTTPS-Only · per-site permissions · workspaces · memory saver · read aloud · summarize this page · local unlimited Ollama · Agent Mesh
+Trust dashboard · WebMCP site tools · scheduled agents · skills marketplace · agent circuit breaker
 
-**[⬇ Download for Windows](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v5.0.0/LuckyDBrowserSetup-5.0.0.exe)** · **[Repo](https://github.com/Dylanchess0320/LuckyD-Browser)** · **[Watch](https://www.youtube.com/watch?v=La6bxaa7icY)**
+**[⬇ Download for Windows](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v6.0.0/LuckyDBrowserSetup-6.0.0.exe)** · **[Repo](https://github.com/Dylanchess0320/LuckyD-Browser)** · **[Watch](https://www.youtube.com/watch?v=La6bxaa7icY)**
 
 ```
 ┌──────────── LuckyD Browser ──────────────────────────────────────┐

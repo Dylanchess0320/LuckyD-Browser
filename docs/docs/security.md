@@ -1,6 +1,6 @@
 # Security
 
-LuckyD is local-first: your browsing, your models, your agents — on your machine. Here's how 5.0 protects that.
+LuckyD is local-first: your browsing, your models, your agents — on your machine. Here's how 6.0 protects that.
 
 ## Cookie-based auth for local services (4.0)
 
