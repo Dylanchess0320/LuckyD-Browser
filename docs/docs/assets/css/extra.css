@@ -1,0 +1,81 @@
+/* LuckyD Browser docs — brand layer (deep blue/violet + gold) */
+
+:root {
+  --luckyd-gold: #ffc107;
+  --luckyd-violet: #7c5cff;
+  --luckyd-blue: #3b5bff;
+}
+
+/* Hero --------------------------------------------------------------- */
+.luckyd-hero {
+  background: linear-gradient(135deg, #1a1440 0%, #2b1a6e 45%, #101c5e 100%);
+  border-radius: 1rem;
+  padding: 3rem 2.5rem;
+  color: #fff;
+  margin: 1.5rem 0 2rem;
+  position: relative;
+  overflow: hidden;
+}
+.luckyd-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(600px 200px at 85% 10%, rgba(255, 193, 7, 0.18), transparent),
+              radial-gradient(500px 260px at 10% 90%, rgba(124, 92, 255, 0.35), transparent);
+  pointer-events: none;
+}
+.luckyd-hero h1 {
+  color: #fff;
+  font-size: 2.6rem;
+  margin: 0 0 0.4rem;
+  position: relative;
+  z-index: 1;
+}
+.luckyd-hero .tagline {
+  font-size: 1.15rem;
+  opacity: 0.92;
+  margin: 0 0 1.2rem;
+  position: relative;
+  z-index: 1;
+}
+.luckyd-hero .tagline em { color: var(--luckyd-gold); font-style: normal; font-weight: 700; }
+.luckyd-hero .cta-row { position: relative; z-index: 1; display: flex; gap: 0.8rem; flex-wrap: wrap; }
+.luckyd-btn {
+  display: inline-block;
+  background: var(--luckyd-gold);
+  color: #1a1440 !important;
+  font-weight: 700;
+  padding: 0.7rem 1.6rem;
+  border-radius: 0.5rem;
+  text-decoration: none;
+}
+.luckyd-btn:hover { filter: brightness(1.08); }
+.luckyd-btn-ghost {
+  display: inline-block;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  color: #fff !important;
+  font-weight: 600;
+  padding: 0.65rem 1.4rem;
+  border-radius: 0.5rem;
+  text-decoration: none;
+}
+.luckyd-btn-ghost:hover { border-color: #fff; }
+.luckyd-badges { position: relative; z-index: 1; margin-top: 1.2rem; display: flex; gap: 0.4rem; flex-wrap: wrap; }
+
+/* Feature cards ------------------------------------------------------ */
+.grid.cards .card-title {
+  font-weight: 700;
+}
+.grid.cards .card-kbd {
+  float: right;
+  font-size: 0.72rem;
+  background: rgba(124, 92, 255, 0.12);
+  border-radius: 0.3rem;
+  padding: 0.1rem 0.45rem;
+}
+
+/* Keyboard shortcut tables ------------------------------------------- */
+.md-typeset table td code { white-space: nowrap; }
+
+/* Gold accent for admonition titles on the landing page */
+.luckyd-gold { color: var(--luckyd-gold); }

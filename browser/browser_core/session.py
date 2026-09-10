@@ -113,9 +113,17 @@ class SessionStore:
             "saved_at": time.time(),
             "windows": windows[:MAX_WINDOWS],
         }
+        tmp = None
         try:
             self._path.parent.mkdir(parents=True, exist_ok=True)
-            tmp = self._path.with_name(self._path.name + ".tmp")
+            # Unique tmp name per process: two browser windows saving at once
+            # must not clobber each other's staging file (last-writer-wins on
+            # the final replace is fine; a torn tmp file is not).
+            import secrets
+
+            tmp = self._path.with_name(
+                f"{self._path.name}.{os.getpid()}.{secrets.token_hex(4)}.tmp"
+            )
             tmp.write_text(json.dumps(payload, indent=1), encoding="utf-8")
             # Preserve previous generation before overwriting — copy old file
             # to .prev so "Reopen Previous Session" works, then atomically
@@ -127,6 +135,11 @@ class SessionStore:
             tmp.replace(self._path)
         except Exception:
             return False
+        finally:
+            # Don't leak staging files after a failed save.
+            if tmp is not None:
+                with contextlib.suppress(Exception):
+                    tmp.unlink()
         return True
 
     def _prev_path(self) -> Path:

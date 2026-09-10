@@ -163,15 +163,19 @@ class SettingsStore:
                 changed = True
         return changed
 
-    def save(self) -> None:
+    def save(self) -> bool:
+        """Persist settings atomically. Returns True on success; logs and
+        returns False on failure instead of silently dropping the write."""
         try:
             self._path.parent.mkdir(parents=True, exist_ok=True)
             tmp = self._path.with_suffix(".tmp")
             tmp.write_text(json.dumps(self._data, indent=2), encoding="utf-8")
             # Atomic replace — power loss or AV lock can't leave a truncated file.
             tmp.replace(self._path)
-        except Exception:
-            pass
+        except Exception as exc:
+            print(f"[settings] save failed for {self._path}: {exc}")
+            return False
+        return True
 
     def get(self, key: str, default=None):
         return self._data.get(key, default)

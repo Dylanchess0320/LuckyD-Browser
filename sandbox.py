@@ -14,19 +14,23 @@ from typing import NamedTuple
 from config import COMMAND_TIMEOUT_SEC, MAX_OUTPUT_CHARS, PROJECT_DIR
 
 # ── Safety: Blocklist ──────────────────────────────────────────────────
-# Any command containing these patterns is blocked (case-insensitive)
-# NOTE: kept in sync with tools/bash_tool.py's BLOCKED_PATTERNS — these are
-# two independent implementations (one gates the Bash tool the agent calls,
-# this one gates the sandbox module directly), so a pattern added to one
-# without the other reopens exactly the kind of gap that let bash-only
+# Any command containing these patterns is blocked (case-insensitive).
+#
+# SINGLE SOURCE OF TRUTH: every command gate in the repo (the Bash tool,
+# the background Process tool, and this module's execute()) checks this
+# list via is_safe(). Do not fork a second copy — a pattern added to only
+# one of two lists reopens exactly the kind of gap that let bash-only
 # patterns miss every PowerShell-native destructive cmdlet.
 BLOCKLIST = [
     # Destructive filesystem ops
     r"rm\s+-rf\s+/",
     r"rd\s+/s\s+/q\s+c:\\",
     r"format\s",
+    r"format\s+[c-z]:",
     r"del\s+/f\s+/s",
+    r"del\s+/[fsq].*\\windows",
     r"deltree",
+    r"mkfs",
     # PowerShell-native destructive cmdlets
     r"remove-item\s+.*-recurse\s+.*-force",
     r"remove-item\s+.*-force\s+.*-recurse",
@@ -37,12 +41,12 @@ BLOCKLIST = [
     r"remove-partition",
     # Dangerous system ops
     r"shutdown",
+    r"\breboot\b",
     r"restart-computer",
     r"stop-computer",
     r"bcdedit",
     r">\s*/dev/sda",
     r"dd\s+if=",
-    r"mkfs",
     # Fork bombs / resource exhaustion
     r":\(\)\s*\{",
     r"while\s*\(\s*1\s*\)",

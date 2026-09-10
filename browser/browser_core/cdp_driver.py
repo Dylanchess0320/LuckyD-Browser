@@ -72,22 +72,33 @@ class CdpPage:
         self._mid += 1
         await self._ws.send(json.dumps({"id": self._mid, "method": method, "params": params or {}}))
         while True:
-            msg = json.loads(await self._ws.recv())
+            raw = await self._ws.recv()
+            try:
+                msg = json.loads(raw)
+            except (json.JSONDecodeError, TypeError):
+                continue  # malformed frame — ignore, keep waiting for our reply
+            if not isinstance(msg, dict):
+                continue  # not a CDP message object — ignore
             if msg.get("id") == self._mid:
                 if "error" in msg:
                     raise RuntimeError(f"{method}: {msg['error']}")
-                return msg.get("result", {})
+                result = msg.get("result")
+                return result if isinstance(result, dict) else {}
 
     async def evaluate(self, expression: str):
         result = await self.cmd(
             "Runtime.evaluate",
             {"expression": expression, "returnByValue": True},
         )
-        return result.get("result", {}).get("value")
+        inner = result.get("result")
+        if not isinstance(inner, dict):
+            return None
+        return inner.get("value")
 
     async def screenshot_b64(self, quality: int = 60) -> str:
         result = await self.cmd("Page.captureScreenshot", {"format": "jpeg", "quality": quality})
-        return result["data"]
+        data = result.get("data")
+        return data if isinstance(data, str) else ""
 
     async def click_at(self, x: float, y: float) -> None:
         await self.cmd("Input.dispatchMouseEvent", {"type": "mouseMoved", "x": x, "y": y})
@@ -181,7 +192,7 @@ class CdpDriver:
                 return "element not found"
             await self._page.click_at(coords["x"], coords["y"])  # focus
             await self._page.evaluate(
-                "const a = document.activeElement;" " if (a && a.select) a.select();"
+                "const a = document.activeElement; if (a && a.select) a.select();"
             )
             await self._page.insert_text(text)  # replaces selected content
             await asyncio.sleep(0.2)
@@ -232,9 +243,16 @@ class CdpDriver:
         if not raw:
             return None
         try:
-            return json.loads(raw)
+            data = json.loads(raw)
         except (json.JSONDecodeError, TypeError):
             return None
+        if not isinstance(data, dict):
+            return None
+        try:
+            x, y = float(data["x"]), float(data["y"])
+        except (KeyError, TypeError, ValueError):
+            return None
+        return {"x": x, "y": y}
 
     async def _wait_loaded(self, timeout: float, initial: float) -> None:
         loop = asyncio.get_running_loop()

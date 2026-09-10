@@ -19,10 +19,12 @@ import tools.ask_question_tool
 import tools.bash_tool
 import tools.brief_tool
 import tools.browser_tools
+import tools.browser_use_tool
 import tools.config_tool
 import tools.data_tools
 import tools.datetime_tools
 import tools.deep_research_tool
+import tools.desktop_tools
 
 # Auto-register built-in tools (populates the tool registry)
 import tools.file_tools
@@ -30,6 +32,7 @@ import tools.git_tools
 import tools.graphify_tool
 import tools.harness_tool
 import tools.lsp_tools
+import tools.mcp_tools
 import tools.memory_tools
 import tools.plan_tools
 import tools.session_tools

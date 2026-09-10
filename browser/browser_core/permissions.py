@@ -102,15 +102,19 @@ class PermissionStore:
         sites = raw.get("sites") if isinstance(raw, dict) else None
         self._data = sites if isinstance(sites, dict) else {}
 
-    def save(self) -> None:
+    def save(self) -> bool:
+        """Persist permissions atomically. Returns True on success; logs and
+        returns False on failure instead of silently dropping the write."""
         try:
             self._path.parent.mkdir(parents=True, exist_ok=True)
             payload = {"version": 1, "saved_at": time.time(), "sites": self._data}
             tmp = self._path.with_suffix(".tmp")
             tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
             tmp.replace(self._path)
-        except Exception:
-            pass
+        except Exception as exc:
+            print(f"[permissions] save failed for {self._path}: {exc}")
+            return False
+        return True
 
     def get(self, origin: str, key: str) -> str:
         """Return allow, deny, or ask."""

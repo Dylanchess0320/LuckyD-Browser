@@ -681,9 +681,12 @@ class TerminalServer:
         try:
             # WebSocket → PTY. JSON control frames handle resize; everything
             # else is raw keystroke input written straight to the console.
+            # A message is only treated as a control frame when it parses as
+            # JSON *and* carries a known control type — a pasted JSON snippet
+            # or keystroke burst starting with "{" must reach the shell.
             for message in ws:
                 text = message.decode("utf-8", "replace") if isinstance(message, bytes) else message
-                if text.startswith('{"type":'):
+                if text.lstrip().startswith("{"):
                     obj = None
                     with contextlib.suppress(ValueError):
                         obj = json.loads(text)
@@ -733,7 +736,9 @@ class TerminalServer:
         with contextlib.suppress(Exception):
             if self._server is not None:
                 self._server.shutdown()
-        for ws in list(self._clients):
+        with self._lock:
+            clients = list(self._clients)
+            self._clients.clear()
+        for ws in clients:
             with contextlib.suppress(Exception):
                 ws.close()
-        self._clients.clear()

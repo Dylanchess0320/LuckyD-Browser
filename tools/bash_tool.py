@@ -15,52 +15,16 @@ from .registry import register_tool
 from .session_tools import record_shell_command
 
 # Blocked patterns for safety.
-# Merged with sandbox.py's blocklist (which had a larger pattern set — registry
-# deletion, privilege escalation) so the two independent checks stop diverging,
-# and extended with PowerShell-native destructive cmdlets: the previous list
-# was written for bash syntax (rm -rf, dd if=) but the shell actually being
-# driven on Windows is PowerShell, where the equivalent destructive commands
-# (Remove-Item -Recurse -Force, Clear-Disk, etc.) used different names
-# entirely and weren't covered by either blocklist.
-BLOCKED_PATTERNS = [
-    # Destructive filesystem ops
-    r"rm\s+-rf\s+/",
-    r"rd\s+/s\s+/q\s+c:\\",
-    r"format\s+[c-zC-Z]:",
-    r"del\s+/[fsq].*\\Windows",
-    r"deltree",
-    r"mkfs\.",
-    r"dd\s+if=",
-    r">\s*/dev/",
-    # PowerShell-native destructive cmdlets (bash-style patterns above don't
-    # match these at all)
-    r"remove-item\s+.*-recurse\s+.*-force",
-    r"remove-item\s+.*-force\s+.*-recurse",
-    r"clear-disk",
-    r"clear-recyclebin\s+.*-force",
-    r"initialize-disk",
-    r"format-volume",
-    r"remove-partition",
-    # Dangerous system ops
-    r"shutdown",
-    r"reboot",
-    r"restart-computer",
-    r"stop-computer",
-    r"bcdedit",
-    # Fork bombs / resource exhaustion
-    r":\(\)\s*\{\s*:\|:&\s*\};:",  # fork bomb
-    r"%0\|%0",
-    # Privilege escalation
-    r"sudo\s",
-    r"runas\s+/user:",
-    # Network havoc
-    r"netsh\s+.*delete",
-    r"ipconfig\s+/release",
-    r"wmic\s+.*delete",
-    # Registry destruction
-    r"reg\s+delete\s+hklm",
-    r"reg\s+delete\s+/f",
-]
+#
+# SINGLE SOURCE OF TRUTH lives in sandbox.py (BLOCKLIST / is_safe) — this
+# module delegates to it so the two can never diverge again. BLOCKED_PATTERNS
+# is kept as an alias for backward compatibility.
+try:
+    from sandbox import BLOCKLIST as BLOCKED_PATTERNS
+    from sandbox import is_safe as _sandbox_is_safe
+except ImportError:  # sandbox not importable (embedded/minimal layouts)
+    BLOCKED_PATTERNS = []
+    _sandbox_is_safe = None
 
 # Allowlist for common dev commands
 ALLOWED_PREFIXES = [
@@ -183,11 +147,15 @@ class BashTool(ToolBase):
     }
 
     def _is_safe(self, cmd: str) -> tuple[bool, str]:
-        cmd.strip().lower()
-
-        for pattern in BLOCKED_PATTERNS:
-            if re.search(pattern, cmd, re.IGNORECASE):
-                return False, f"Blocked dangerous pattern: {pattern}"
+        # Single-source blocklist + path-escape checks live in sandbox.py.
+        if _sandbox_is_safe is not None:
+            safe, reason = _sandbox_is_safe(cmd)
+            if not safe:
+                return False, reason
+        else:  # fallback when sandbox is unavailable: local pattern scan
+            for pattern in BLOCKED_PATTERNS:
+                if re.search(pattern, cmd, re.IGNORECASE):
+                    return False, f"Blocked dangerous pattern: {pattern}"
 
         # Check allowlist — the first-word check alone only validated the
         # FIRST command in a chain. `<allowed> && rm -rf /` passed because

@@ -5,7 +5,10 @@ HTTP request tool, web fetch, and web search integration.
 from __future__ import annotations
 
 import asyncio
+import http.client
+import ipaddress
 import json
+import socket
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -13,9 +16,115 @@ import urllib.request
 from .base import ToolBase, ToolOutput
 from .registry import register_tool
 
+# ── SSRF protection ──────────────────────────────────────────────────────
+# The agent fetches agent-chosen URLs, so every outbound request must prove
+# its destination is a public internet host. We (1) reject non-http(s)
+# schemes, (2) resolve the hostname and reject any non-public IP
+# (private/loopback/link-local/multicast/reserved/unspecified, including
+# IPv4-mapped IPv6 like ::ffff:127.0.0.1), (3) re-validate on every redirect,
+# and (4) PIN the validated IP for the actual connection so a DNS-rebinding
+# race between check and connect can't swap in an internal address.
+
+
+def _assert_public_url(url: str) -> list[str]:
+    """Validate `url` and return its resolved public IPs. Raises ValueError."""
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme.lower() not in ("http", "https"):
+        raise ValueError(f"Unsupported URL scheme {parsed.scheme!r}: only http/https are allowed")
+    host = parsed.hostname or ""
+    if not host:
+        raise ValueError(f"URL has no hostname: {url!r}")
+    try:
+        infos = socket.getaddrinfo(host, None, type=socket.SOCK_STREAM)
+    except socket.gaierror as e:
+        raise ValueError(f"DNS resolution failed for {host!r}: {e}") from e
+    ips: list[str] = []
+    for info in infos:
+        ip_str = info[4][0]
+        try:
+            ip = ipaddress.ip_address(ip_str)
+        except ValueError:
+            continue
+        addrs = [ip]
+        if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+            addrs.append(ip.ipv4_mapped)  # ::ffff:10.0.0.1 must not smuggle private v4
+        for addr in addrs:
+            if (
+                addr.is_private
+                or addr.is_loopback
+                or addr.is_link_local
+                or addr.is_multicast
+                or addr.is_reserved
+                or addr.is_unspecified
+            ):
+                raise ValueError(f"Blocked SSRF target: {host!r} resolves to {ip_str}")
+        ips.append(ip_str)
+    if not ips:
+        raise ValueError(f"Could not resolve {host!r} to a public IP")
+    return ips
+
+
+class _PinnedHTTPConnection(http.client.HTTPConnection):
+    """Dials a pre-validated IP while keeping the hostname for Host/SNI."""
+
+    def __init__(self, host, pinned_ip, *args, **kwargs):
+        super().__init__(host, *args, **kwargs)
+        self._pinned_ip = pinned_ip
+
+    def connect(self):
+        self.sock = socket.create_connection(
+            (self._pinned_ip, self.port), self.timeout, self.source_address
+        )
+
+
+class _PinnedHTTPSConnection(http.client.HTTPSConnection):
+    """TLS variant: pinned IP for TCP, real hostname for SNI + cert check."""
+
+    def __init__(self, host, pinned_ip, *args, **kwargs):
+        super().__init__(host, *args, **kwargs)
+        self._pinned_ip = pinned_ip
+
+    def connect(self):
+        self.sock = socket.create_connection(
+            (self._pinned_ip, self.port), self.timeout, self.source_address
+        )
+        self.sock = self._context.wrap_socket(self.sock, server_hostname=self.host)
+
+
+class _SSRFHTTPHandler(urllib.request.HTTPHandler):
+    def http_open(self, req):
+        pinned = _assert_public_url(req.full_url)[0]
+        return self.do_open(_PinnedHTTPConnection, req, pinned_ip=pinned)
+
+
+class _SSRFHTTPSHandler(urllib.request.HTTPSHandler):
+    def https_open(self, req):
+        pinned = _assert_public_url(req.full_url)[0]
+        return self.do_open(_PinnedHTTPSConnection, req, pinned_ip=pinned)
+
+
+class _SSRFRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        _assert_public_url(newurl)  # raises before we follow a redirect to 169.254.x.x
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+def _safe_opener() -> urllib.request.OpenerDirector:
+    # Explicit empty ProxyHandler: env proxies must not bypass the IP checks.
+    return urllib.request.build_opener(
+        urllib.request.ProxyHandler({}),
+        _SSRFHTTPHandler,
+        _SSRFHTTPSHandler,
+        _SSRFRedirectHandler,
+    )
+
 
 def _require_http_scheme(url: str) -> None:
-    """Reject non-HTTP(S) URLs so urlopen can't reach file:/ or custom schemes."""
+    """Reject non-HTTP(S) URLs so urlopen can't reach file:/ or custom schemes.
+
+    Scheme-only fast path; the safe opener performs the full SSRF
+    (DNS + IP + redirect) validation when the request is actually sent.
+    """
     scheme = urllib.parse.urlparse(url).scheme.lower()
     if scheme not in ("http", "https"):
         raise ValueError(f"Unsupported URL scheme {scheme!r}: only http/https are allowed")
@@ -72,6 +181,12 @@ class HttpTool(ToolBase):
         timeout: int,
     ) -> ToolOutput:
         try:
+            scheme = urllib.parse.urlparse(url).scheme.lower()
+            if bearer_token and scheme != "https":
+                return ToolOutput(
+                    text="Refused: bearer tokens are only sent over HTTPS",
+                    error=True,
+                )
             req_headers = headers or {}
             if bearer_token:
                 req_headers["Authorization"] = f"Bearer {bearer_token}"
@@ -86,7 +201,7 @@ class HttpTool(ToolBase):
             for k, v in req_headers.items():
                 req.add_header(k, v)
 
-            with urllib.request.urlopen(req, timeout=timeout) as resp:  # nosec B310
+            with _safe_opener().open(req, timeout=timeout) as resp:
                 body = resp.read().decode("utf-8", errors="replace")
                 status = resp.status
 
@@ -143,7 +258,7 @@ class WebFetchTool(ToolBase):
         try:
             _require_http_scheme(url)
             req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 CodingAgent/2.0"})
-            with urllib.request.urlopen(req, timeout=30) as resp:  # nosec B310
+            with _safe_opener().open(req, timeout=30) as resp:
                 html = resp.read().decode("utf-8", errors="replace")
 
             # Simple HTML text extraction
@@ -208,7 +323,7 @@ class WebSearchTool(ToolBase):
                     title = r.get("title", "").strip()
                     href = r.get("href", "")
                     body = r.get("body", "").strip()
-                    results.append(f"  [{i+1}] {title}\n      {href}\n      {body}")
+                    results.append(f"  [{i + 1}] {title}\n      {href}\n      {body}")
             return results
 
         try:
@@ -246,7 +361,7 @@ class WebSearchTool(ToolBase):
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
                 },
             )
-            with urllib.request.urlopen(req, timeout=15) as resp:  # nosec B310
+            with _safe_opener().open(req, timeout=15) as resp:
                 html_text = resp.read().decode("utf-8", errors="replace")
 
             # Extract results via HTML scraping
@@ -270,7 +385,7 @@ class WebSearchTool(ToolBase):
                 if i < len(snippets):
                     snippet = re.sub(r"<[^>]+>", "", snippets[i]).strip()
                     snippet = html_mod.unescape(snippet)
-                results.append(f"  [{i+1}] {title}\n      {href}\n      {snippet}")
+                results.append(f"  [{i + 1}] {title}\n      {href}\n      {snippet}")
 
             return results
 

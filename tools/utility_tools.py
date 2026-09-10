@@ -14,6 +14,11 @@ from pathlib import Path
 from .base import ToolBase, ToolOutput
 from .registry import register_tool
 
+try:
+    from sandbox import is_safe as _sandbox_is_safe
+except ImportError:
+    _sandbox_is_safe = None
+
 # ── Diff Tool ──
 
 
@@ -141,10 +146,18 @@ class ProcessTool(ToolBase):
             elif op == "start":
                 pid = str(uuid.uuid4())[:8]
                 work_dir = cwd or os.getcwd()
-                # shell=True is the point: run the background command exactly as typed.
+                # Gate through the single-source sandbox blocklist — shell=True
+                # runs the command exactly as typed, so validate first.
+                if _sandbox_is_safe is not None:
+                    safe, reason = _sandbox_is_safe(command, work_dir)
+                    if not safe:
+                        return ToolOutput(
+                            text=f"Refused to start background process: {reason}",
+                            error=True,
+                        )
                 proc = subprocess.Popen(
                     command,
-                    shell=True,  # nosec B602
+                    shell=True,  # nosec B602 — pre-validated by sandbox.is_safe above
                     cwd=work_dir,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,

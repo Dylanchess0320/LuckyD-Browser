@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.0] - 2026-09-10
+
+### Security
+- **Cookie-based auth for all local services** — the Control API (`:9777`), Coding Agent HQ (`:8000`), and terminal WebSocket (`:9881`) now authenticate via HttpOnly session cookies (`luckyd_ctl`, `luckyd_hq`, `luckyd_term`) instead of bearer tokens in URLs or page source. No credential is ever embedded in served HTML again.
+- **Deep Research XSS hardening** — report markdown is HTML-escaped before formatting, and link URLs are allowlisted to `http:`, `https:`, and `mailto:` (with `rel="noopener"`).
+- **Cline bridge authentication** — `/v1/models` and `/v1/chat/completions` now require a bearer token (`CLINE_BRIDGE_TOKEN`, falling back to `CODING_AGENT_API_KEY`) and fail closed when none is configured.
+- **Nav pages require auth** — `/dashboard`, `/research`, `/mesh`, and `/terminal` return 401 without the session cookie, closing the "any local page can drive the browser" gap.
+- **Loopback-only origin enforcement** on the Control API, with bracketed IPv6 (`[::1]`) handled correctly.
+- Minimal `Content-Security-Policy` headers on local HTML surfaces.
+
+### Fixed
+- `CheckpointManager.undo_to()` could loop forever when a checkpoint's target file was deleted; it now terminates.
+- `undo_last()` no longer retries a checkpoint whose file is already gone.
+- Windows updater exits cleanly on non-Windows systems; `CREATE_NO_WINDOW` is guarded.
+
+## [3.9.0] - 2026-09-06
+
+### Added
+- **HTTPS-Only Mode** — public `http://` main-frame navigations upgrade to `https://`. Localhost, `.local`, and private LAN addresses are never rewritten (Settings toggle, default on).
+- **Per-site permissions** — camera, microphone, location, notifications, pointer lock, and screen capture prompt once and remember Allow/Block per origin. Incognito never persists. Lock icon / Tools / Settings open the manager.
+- **Workspaces** — named tab collections (File → Workspaces, command palette). Switching saves the current window into the active workspace, then loads the target.
+- **Memory saver** — idle background tabs freeze after 5 minutes and discard after 15. Pinned, audible, current, and local platform tabs (dashboard / HQ / terminal) stay awake. Sleeping tabs show a 💤 prefix and wake on click.
+- **Read Aloud** — `Ctrl+Shift+L` (toolbar 🔊, context menu) speaks the selection or the page via Windows SAPI; click again to stop.
+- **Summarize This Page** — `Ctrl+Shift+U` (toolbar ✨) opens the AI sidebar and summarizes the current tab.
+
+## [3.8.0] - 2026-09-06
+
+### Added
+- **Deep Research swarm as a native tool** — New `DeepResearch` agent tool (`tools/deep_research_tool.py`, vendored engine in `features/deep_research/`): planner -> parallel grounded workers -> citation-grounded synthesizer -> critic -> claim-level verifier -> finalizer, returning citation-backed markdown plus `data/deep_research/runs/` artifacts.
+- **Multi-provider research backends** — Gemini native grounding, LuckyD stack (Ollama local free, DeepSeek, OpenAI, OpenRouter, ...), keyless DDG (+ frozen-safe HTML fallback), Tavily/Brave premium search (`TAVILY_API_KEY`/`BRAVE_API_KEY`), and an offline mock for tests.
+- **Depth presets + context** — `depth=quick|standard|deep|max`, `context` injection (browser passes the current tab), `max_sources`, per-run budgets, SQLite cache.
+- **Browser hooks** — Tools menu `Deep Research…` (`Ctrl+Shift+R`) and command-palette entry; frozen builds bundle the swarm (features datas + hiddenimports in all 3 PyInstaller specs).
+
 ## [3.7.0] - 2026-09-03
 
 ### Added

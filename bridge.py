@@ -25,6 +25,9 @@ from config import get_config
 from memory.store import get_memory
 from model_resolver import resolve_model
 
+# Overridden by vscode-bridge.py (thin shim) to identify itself on the wire.
+READY_MESSAGE = "LuckyD Code bridge ready"
+
 
 async def run_agent(prompt: str, *, model: str = "auto", thinking: bool = False) -> dict:
     """Run the agent with the given prompt and return a result dict."""
@@ -129,7 +132,7 @@ async def handle_request(request: dict) -> dict:
 
 async def main():
     """Main loop: read JSON requests from stdin, write JSON responses to stdout."""
-    print(json.dumps({"type": "ready", "content": "LuckyD Code bridge ready"}), flush=True)
+    print(json.dumps({"type": "ready", "content": READY_MESSAGE}), flush=True)
 
     for line in sys.stdin:
         line = line.strip()

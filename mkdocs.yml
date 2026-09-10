@@ -2,27 +2,29 @@
 # Build: mkdocs build
 # Serve: mkdocs serve
 
-site_name: LuckyD Code
-site_description: AI-powered coding agent with multi-LLM support, memory graph, and VS Code integration
+site_name: LuckyD Browser
+site_description: The AI browser that runs your models — local, unlimited, offline. Chromium daily driver with an AI sidebar, coding-agent HQ, and real terminals in one window.
 site_author: LuckyD
-site_url: https://luckyd.github.io/coding-agent/
-repo_name: luckyd/coding-agent
-repo_url: https://github.com/luckyd/coding-agent
+site_url: https://dylanchess0320.github.io/LuckyD-Browser/
+repo_name: Dylanchess0320/LuckyD-Browser
+repo_url: https://github.com/Dylanchess0320/LuckyD-Browser
 docs_dir: docs/docs
 edit_uri: edit/main/docs/docs/
 
 theme:
   name: material
   palette:
+    # Light mode — deep blue primary, gold accent
     - scheme: default
       primary: indigo
-      accent: teal
+      accent: amber
       toggle:
         icon: material/weather-night
         name: Switch to dark mode
+    # Dark mode — violet primary, gold accent
     - scheme: slate
-      primary: indigo
-      accent: teal
+      primary: deep purple
+      accent: amber
       toggle:
         icon: material/weather-sunny
         name: Switch to light mode
@@ -40,17 +42,20 @@ theme:
     - content.tabs.link
   icon:
     repo: fontawesome/brands/github
-    logo: material/robot
+    logo: material/web
 
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/luckyd/coding-agent
-    - icon: fontawesome/brands/python
-      link: https://pypi.org/project/luckyd-code/
+      link: https://github.com/Dylanchess0320/LuckyD-Browser
+    - icon: fontawesome/brands/youtube
+      link: https://www.youtube.com/@LuckyDYoutube
   generator: false
 
-copyright: Copyright &copy; 2026 LuckyD
+extra_css:
+  - assets/css/extra.css
+
+copyright: Copyright &copy; 2026 LuckyD · MIT License
 
 markdown_extensions:
   - admonition
@@ -72,37 +77,14 @@ markdown_extensions:
 
 plugins:
   - search
-  - mkdocstrings:
-      handlers:
-        python:
-          paths: [".."]
-          options:
-            show_source: true
-            show_root_heading: true
-            show_category_heading: true
-            docstring_style: google
-  - git-revision-date-localized:
-      enabled: !ENV [CI, false]
-  - minify:
-      minify_html: true
 
 nav:
   - Home: index.md
-  - Guide:
-      - Getting Started: guide/getting-started.md
-      - Installation: guide/installation.md
-      - Configuration: guide/configuration.md
-      - Usage: guide/usage.md
-      - Tools: guide/tools.md
-      - Memory System: guide/memory.md
-      - Providers: guide/providers.md
-      - Docker: guide/docker.md
-  - Reference:
-      - API: reference/api.md
-      - CLI: reference/cli.md
-      - Configuration: reference/configuration.md
-  - Development:
-      - Contributing: development/contributing.md
-      - Changelog: development/changelog.md
-      - Security: development/security.md
-      - Code of Conduct: development/code-of-conduct.md
+  - Getting Started: getting-started.md
+  - Features: features.md
+  - AI & Agents: ai-agents.md
+  - Terminal: terminal.md
+  - Security: security.md
+  - FAQ: faq.md
+  - Changelog: changelog.md
+  - Release Notes: release-notes.md

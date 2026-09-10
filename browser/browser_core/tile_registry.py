@@ -19,10 +19,14 @@ is a JSON edit, not a code change.
 
 from __future__ import annotations
 
+import atexit
+import contextlib
+import html
 import json
 import os
 import subprocess
 import sys
+import threading
 import time
 import urllib.request
 from dataclasses import dataclass, field
@@ -171,6 +175,43 @@ def probe_all(tiles: list[Tile] | None = None) -> dict[str, dict]:
 # ── autostart ──────────────────────────────────────────────────────────
 _last_attempt: dict[str, float] = {}
 _launched: dict[str, subprocess.Popen] = {}
+# ensure_autostart runs on the Control API's request threads — guard the
+# shared launch tables so two /status polls can't double-spawn a tile.
+_registry_lock = threading.Lock()
+
+
+def _reap_finished() -> None:
+    """Drop dead children from the launch table (reaps zombies on POSIX)."""
+    for tid, proc in list(_launched.items()):
+        if proc.poll() is not None:
+            with contextlib.suppress(Exception):
+                proc.wait(timeout=0)
+            del _launched[tid]
+
+
+def shutdown_autostart() -> None:
+    """Terminate every tile process we launched. Best-effort; never raises."""
+    with _registry_lock:
+        procs = list(_launched.values())
+        _launched.clear()
+    for proc in procs:
+        with contextlib.suppress(Exception):
+            proc.terminate()
+    # Give them a beat, then force-kill stragglers so the browser can exit.
+    deadline = time.monotonic() + 3.0
+    for proc in procs:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            break
+        with contextlib.suppress(Exception):
+            proc.wait(timeout=remaining)
+    for proc in procs:
+        with contextlib.suppress(Exception):
+            if proc.poll() is None:
+                proc.kill()
+
+
+atexit.register(shutdown_autostart)
 
 
 def ensure_autostart(tiles: list[Tile] | None = None) -> None:
@@ -183,43 +224,52 @@ def ensure_autostart(tiles: list[Tile] | None = None) -> None:
     tiles = tiles if tiles is not None else load_tiles()
     _debug_log(f"ensure_autostart: {len(tiles)} tile(s) {[t.id for t in tiles]}")
     now = time.monotonic()
-    for t in tiles:
-        if not (t.autostart and t.command):
-            continue
-        if now - _last_attempt.get(t.id, 0.0) < AUTOSTART_RETRY_SEC:
-            continue
-        _last_attempt[t.id] = now
-        prev = _launched.get(t.id)
-        if prev is not None and prev.poll() is None:
-            continue  # our own child is still running
-        if probe_tile(t)["up"]:
-            continue  # something else already serves it
-        try:
-            kwargs: dict = {"cwd": t.cwd or None}
-            if os.name == "nt":
-                kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-            _launched[t.id] = subprocess.Popen(  # nosec B603 — config-owned argv
-                list(t.command), **kwargs
-            )
-            _debug_log(f"launched {t.id}: cmd={list(t.command)} cwd={t.cwd!r}")
-        except Exception as exc:
-            _debug_log(f"launch FAILED {t.id}: {exc!r}")
+    with _registry_lock:
+        _reap_finished()  # don't accumulate dead children between polls
+        for t in tiles:
+            if not (t.autostart and t.command):
+                continue
+            if now - _last_attempt.get(t.id, 0.0) < AUTOSTART_RETRY_SEC:
+                continue
+            _last_attempt[t.id] = now
+            prev = _launched.get(t.id)
+            if prev is not None and prev.poll() is None:
+                continue  # our own child is still running
+            if probe_tile(t)["up"]:
+                continue  # something else already serves it
+            try:
+                kwargs: dict = {"cwd": t.cwd or None}
+                if os.name == "nt":
+                    kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+                _launched[t.id] = subprocess.Popen(  # nosec B603 — config-owned argv
+                    list(t.command), **kwargs
+                )
+                _debug_log(f"launched {t.id}: cmd={list(t.command)} cwd={t.cwd!r}")
+            except Exception as exc:
+                _debug_log(f"launch FAILED {t.id}: {exc!r}")
 
 
 def tile_anchor(tile: Tile, status: dict | None = None) -> str:
     """Render one <a class="tile"> matching dashboard.py's existing CSS
-    (.tile / .ico / .hq), so no stylesheet changes are needed."""
+    (.tile / .ico / .hq), so no stylesheet changes are needed.
+
+    Config-sourced strings are HTML-escaped: the JSON is local, but a
+    hand-edited config must not be able to inject markup into the dashboard.
+    """
     up = bool(status and status.get("up"))
     classes = "tile"
     if tile.extra_class:
-        classes += f" {tile.extra_class}"
-    title = f'{tile.name} — {"running" if up else "not responding"}'
+        classes += f" {html.escape(tile.extra_class, quote=True)}"
+    name = html.escape(tile.name, quote=True)
+    url = html.escape(tile.url, quote=True)
+    icon = html.escape(tile.icon, quote=True)
+    title = html.escape(f"{tile.name} — {'running' if up else 'not responding'}", quote=True)
     dot_color = "#34d399" if up else "#9aa1b5"
     return (
-        f'<a class="{classes}" href="{tile.url}" title="{title}">'
-        f'<span class="ico">{tile.icon}</span>'
+        f'<a class="{classes}" href="{url}" title="{title}">'
+        f'<span class="ico">{icon}</span>'
         f'<span style="display:flex;align-items:center;gap:5px;">'
-        f'{tile.name}<span style="width:7px;height:7px;border-radius:50%;'
+        f'{name}<span style="width:7px;height:7px;border-radius:50%;'
         f'background:{dot_color};"></span></span></a>'
     )
 
