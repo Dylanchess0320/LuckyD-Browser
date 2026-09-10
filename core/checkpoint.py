@@ -70,6 +70,10 @@ class CheckpointManager:
         cp = self.checkpoints[-1]
         path = Path(cp.file_path)
         if not path.exists():
+            # Nothing to restore — but still consume the checkpoint, so
+            # callers like undo_to() can't spin on it forever.
+            self.checkpoints.pop()
+            self._current_index = len(self.checkpoints) - 1
             return None
         current = path.read_text(encoding="utf-8", errors="replace")
         if cp.content_before is not None:
@@ -88,9 +92,15 @@ class CheckpointManager:
             return []
         diffs = []
         while len(self.checkpoints) > idx + 1:
+            before = len(self.checkpoints)
             d = self.undo_last()
             if d:
                 diffs.append(d)
+            if len(self.checkpoints) >= before:
+                # undo_last() made no progress — drop the stuck checkpoint
+                # instead of looping forever.
+                self.checkpoints.pop()
+                self._current_index = len(self.checkpoints) - 1
         return diffs
 
     def get_diff(self, checkpoint_id: str | None = None) -> CheckpointDiff | None:

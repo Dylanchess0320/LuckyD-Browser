@@ -145,6 +145,26 @@ _ROUTES = (
 )
 
 
+# Name of the HttpOnly session cookie the browser sets on its own profile.
+# In-browser tabs authenticate with this cookie; the bearer token is never
+# injected into served HTML, so unauthenticated local processes (curl, other
+# apps) can no longer scrape a credential out of a nav page. (4.0)
+CTL_COOKIE = "luckyd_ctl"
+
+
+def _unauthorized_html() -> str:
+    """Friendly 401 page for browser tabs that arrive without the session cookie."""
+    return """<!DOCTYPE html><html><head><meta charset="utf-8"><title>Unauthorized — LuckyD</title>
+<style>body{background:#0f1622;color:#dbe4f0;font-family:Segoe UI,system-ui,sans-serif;
+display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
+.card{max-width:460px;padding:32px;border:1px solid #2a3450;border-radius:12px;
+background:#16202f;text-align:center}h1{color:#7c5cff;margin:0 0 12px}p{color:#9fb0c9}</style>
+</head><body><div class="card"><h1>🔒 Unauthorized</h1>
+<p>This LuckyD page needs the browser's session cookie. Open it from inside
+LuckyD Browser (dashboard, terminal, research…) instead of pasting the URL
+elsewhere.</p></div></body></html>"""
+
+
 # ── HTTP routing layer (Qt-free — unit-testable with a fake backend) ──────
 
 
@@ -166,6 +186,17 @@ def make_handler(backend, token: str = "", harness=None, settings=None):
         protocol_version = "HTTP/1.1"
 
         # ── helpers ───────────────────────────────────────────────────
+        def _cookie_token(self) -> str:
+            """Extract our session cookie value without logging it."""
+            try:
+                for part in self.headers.get("Cookie", "").split(";"):
+                    name, _, value = part.partition("=")
+                    if name.strip() == CTL_COOKIE:
+                        return value.strip().strip('"')
+            except Exception:
+                pass
+            return ""
+
         def _authorized(self) -> bool:
             # token is now always non-empty by the time it reaches here (see
             # BrowserControlServer.__init__ / browser_app.py) — this endpoint
@@ -176,16 +207,25 @@ def make_handler(backend, token: str = "", harness=None, settings=None):
             # 127.0.0.1:9777 with a normal cross-origin fetch().
             if not token:
                 return True  # only true if a caller explicitly disabled it
-            return hmac.compare_digest(self.headers.get("Authorization", ""), f"Bearer {token}")
+            if hmac.compare_digest(self.headers.get("Authorization", ""), f"Bearer {token}"):
+                return True
+            # In-browser tabs carry the HttpOnly session cookie the browser
+            # set on its own profile (browser_app.install_local_auth_cookies).
+            # Same-origin fetch() sends it automatically; JS can never read it.
+            presented = self._cookie_token()
+            return bool(presented) and hmac.compare_digest(presented, token)
 
         def _host_ok(self) -> bool:
             """DNS rebinding defense: Host must be loopback if present."""
             host = self.headers.get("Host", "")
             if not host:
                 return True
-            # Allow 127.0.0.1[:port], localhost[:port], ::1
-            h = host.split(":")[0].lower()
-            return h in ("127.0.0.1", "localhost", "::1")
+            # Allow 127.0.0.1[:port], localhost[:port], ::1 (bracketed or not).
+            h = host.lower()
+            h = (
+                h.split("]", 1)[0] + "]" if h.startswith("[") else h.split(":")[0]
+            )  # e.g. [::1]:9777
+            return h in ("127.0.0.1", "localhost", "::1", "[::1]")
 
         def _origin_ok(self) -> bool:
             """Reject cross-origin browser fetches outright (defense in depth).
@@ -217,6 +257,10 @@ def make_handler(backend, token: str = "", harness=None, settings=None):
             try:
                 self.send_response(code)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
+                # Defense in depth for served pages: no plugin objects, and
+                # the page may not be framed by a foreign origin. Inline
+                # scripts/styles stay allowed (the pages rely on them).
+                self.send_header("Content-Security-Policy", "object-src 'none'; base-uri 'self'")
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
                 self.wfile.write(body)
@@ -285,7 +329,7 @@ def make_handler(backend, token: str = "", harness=None, settings=None):
                     hq_splash_html(
                         "",
                         "error",
-                        "No harness supervisor is wired " "into this Control API instance.",
+                        "No harness supervisor is wired into this Control API instance.",
                         settings=settings,
                     )
                 )
@@ -358,10 +402,11 @@ def make_handler(backend, token: str = "", harness=None, settings=None):
 
         # Routes reachable by direct browser navigation (new-tab URL, iframe
         # src, <script>/<link> tags) can never carry an Authorization header
-        # — only same-origin fetch() calls from a page's own JS can. These stay
-        # gated by _origin_ok() (direct navigation never sends a mismatched
-        # Origin) and get the token injected into their own JS instead, the
-        # same pattern web_server.py uses for its landing page.
+        # — only same-origin fetch() calls from a page's own JS can. Since
+        # 4.0 these pages authenticate with the HttpOnly session cookie the
+        # browser sets on its own profile (see CTL_COOKIE above), so nav
+        # paths require auth exactly like API paths. No bearer token is ever
+        # injected into served HTML anymore.
         _NAV_PATHS = (
             "/",
             "/help",
@@ -382,7 +427,10 @@ def make_handler(backend, token: str = "", harness=None, settings=None):
             parsed = urlparse(self.path)
             path, query = parsed.path, parse_qs(parsed.query)
             is_nav = path in self._NAV_PATHS or path.startswith("/static/terminal/")
-            if not is_nav and not self._authorized():
+            if not self._authorized():
+                # Browser tabs get a friendly page; API clients get JSON.
+                if is_nav:
+                    return self._send_html(_unauthorized_html(), 401)
                 return self._send(401, {"ok": False, "error": "unauthorized"})
             try:
                 if path in ("/", "/help"):
@@ -392,11 +440,11 @@ def make_handler(backend, token: str = "", harness=None, settings=None):
                         routes=[{"route": r, "about": a} for r, a in _ROUTES],
                     )
                 if path == "/dashboard":
-                    return self._send_html(dashboard_html(settings, token))
+                    return self._send_html(dashboard_html(settings))
                 if path == "/hq":
                     return self._hq(query)
                 if path == "/mesh":
-                    return self._send_html(mesh_html(token))
+                    return self._send_html(mesh_html())
                 if path == "/terminal":
                     shell = (query.get("shell") or ["agent"])[0]
                     # B604 false positive: `shell` is an allowlisted terminal profile name.
@@ -433,7 +481,7 @@ def make_handler(backend, token: str = "", harness=None, settings=None):
                     har = json.dumps(backend.netmon_har(), indent=1)
                     return self._send_download(har, "luckyd-capture.har", "application/json")
                 if path == "/research":
-                    return self._send_html(research_html(token))
+                    return self._send_html(research_html())
                 if path == "/research/status":
                     run_id = (query.get("run_id") or [""])[0]
                     return self._ok(**swarm_manager.get_status(run_id))
@@ -594,6 +642,7 @@ class BrowserControlServer:
         # Resolve the real bound address (matters when port=0 → OS-assigned).
         self.host, self.port = self._httpd.server_address[:2]
         self.base_url = f"http://{self.host}:{self.port}"
+        self.token = token  # exposed so the app can seed the session cookie
         self._thread: threading.Thread | None = None
 
     @property

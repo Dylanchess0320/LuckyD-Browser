@@ -69,8 +69,8 @@ DEFAULTS = {
     # Port of the WebSocket↔PTY bridge the /terminal tab connects to.
     "terminal_port": 9881,
     # Auto-generated on first run if empty, same rationale as browser_api_token
-    # — required as a ?token= query param since the browser WebSocket API
-    # can't set an Authorization header.
+    # — carried in the HttpOnly luckyd_term session cookie since the browser
+    # WebSocket API can't set an Authorization header (4.0).
     "terminal_token": "",
     # Full-agent mode is on for new profiles; users can still opt out in the
     # sidebar, and that choice is persisted separately from auto-start.

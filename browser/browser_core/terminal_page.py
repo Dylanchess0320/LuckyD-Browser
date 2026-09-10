@@ -115,12 +115,9 @@ def terminal_html(settings=None, shell: str = "agent") -> str:
     gets its own independent ConPTY session, so terminals multiply freely.
     """
     port = _WS_PORT
-    token = ""
     if settings is not None:
         with contextlib.suppress(TypeError, ValueError, AttributeError):
             port = int(settings.get("terminal_port", _WS_PORT) or _WS_PORT)
-        with contextlib.suppress(AttributeError):
-            token = str(settings.get("terminal_token", "") or "")
     shell = (shell or "agent").strip().lower()
     labels = dict(_SHELL_LABELS)
     labels.update({name: meta[0] for name, meta in _MESH_AGENTS.items()})
@@ -128,7 +125,6 @@ def terminal_html(settings=None, shell: str = "agent") -> str:
         shell = "agent"
     return (
         _HTML.replace("__WS_URL__", f"ws://{_WS_HOST}:{port}")
-        .replace("__WS_TOKEN__", json.dumps(token))
         .replace("__SHELL__", shell)
         .replace("__MESH_CSS__", _mesh_dock_css())
         .replace("__MESH_DOCK__", _mesh_dock_html())
@@ -136,15 +132,18 @@ def terminal_html(settings=None, shell: str = "agent") -> str:
     )
 
 
-def mesh_html(token: str = "") -> str:
+def mesh_html() -> str:
     """Four live, independent terminal sessions in one Agent Mesh workspace.
 
     Each pane is the same authenticated terminal page used by a normal
     terminal tab, so every session receives its own WebSocket and ConPTY.
     Keeping the renderer in an iframe avoids a fragile second xterm bridge
     and means the one-terminal and mesh experiences stay feature-identical.
+
+    Authentication uses the HttpOnly session cookie (4.0) — no token is
+    embedded in the page.
     """
-    return _MESH_HTML.replace("__MESH_TOKEN__", json.dumps(token))
+    return _MESH_HTML
 
 
 _HTML = """<!doctype html>
@@ -201,7 +200,6 @@ __MESH_DOCK__
 <script src="/static/terminal/xterm-addon-fit.js"></script>
 <script>
 const WS_URL = "__WS_URL__";
-const WS_TOKEN = __WS_TOKEN__;
 let SHELL = "__SHELL__";
 const S_CORE = {agent:'Agent 1 (v3.6)', agent2:'Agent 2 (v2.2)', powershell:'PowerShell', cmd:'CMD'};
 const MESH_META = __MESH_META__;
@@ -267,8 +265,9 @@ function connect(){
   setState('', 'connecting…');
   // Advertise our real dimensions so the bridge spawns the PTY at the right
   // size — a birth-size mismatch makes fullscreen CLIs wrap off-screen.
-  ws = new WebSocket(WS_URL + '?token=' + encodeURIComponent(WS_TOKEN) +
-    '&cols=' + term.cols + '&rows=' + term.rows + '&shell=' + SHELL);
+  // Auth rides the HttpOnly session cookie (4.0) — the browser sends it
+  // automatically on the WebSocket handshake, so no token in the URL.
+  ws = new WebSocket(WS_URL + '?cols=' + term.cols + '&rows=' + term.rows + '&shell=' + SHELL);
   ws.onopen = () => { retry = 0; setState('on', 'connected'); refit(); term.focus(); };
   ws.onmessage = (ev) => {
     if (typeof ev.data === 'string') term.write(ev.data);
@@ -415,11 +414,10 @@ _MESH_HTML = """<!doctype html>
     <a class="open" href="/terminal?shell=cmd" target="_blank" rel="noopener">Open tab ↗</a></div>
     <iframe src="/terminal?shell=cmd" title="Command Prompt terminal"></iframe></section>
 </main><script>
-const MESH_TOKEN = __MESH_TOKEN__;
 async function refreshMeshStatus(){
   const status = document.getElementById('mesh-status');
   try {
-    const r = await fetch('/status', {headers: MESH_TOKEN ? {'Authorization': 'Bearer ' + MESH_TOKEN} : {}});
+    const r = await fetch('/status');
     const s = await r.json();
     const tools = Number(s.harness_tools || 0);
     status.textContent = s.harness

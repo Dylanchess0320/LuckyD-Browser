@@ -30,6 +30,12 @@ from urllib.parse import parse_qs, urlparse
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 9881
 
+# Name of the HttpOnly session cookie the browser sets on its own profile.
+# The terminal credential travels in this cookie (sent automatically on the
+# WebSocket handshake) — never in the URL, where it would leak into logs,
+# history, and Referer headers. (4.0)
+TERM_COOKIE = "luckyd_term"
+
 # Repo root: browser/browser_core/terminal_server.py → ../../..
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -518,12 +524,24 @@ def _client_options(ws) -> tuple[int, int, str]:
 
 
 def _client_token(ws) -> str:
-    """Extract the browser-only WebSocket credential without logging it."""
+    """Extract the browser-only WebSocket credential without logging it.
+
+    4.0: the credential arrives as the HttpOnly ``luckyd_term`` session
+    cookie, which the browser sends automatically on the WS handshake. The
+    old ``?token=`` query-param transport is gone — tokens in URLs leak into
+    logs, history, and Referer headers.
+    """
     try:
-        path = getattr(getattr(ws, "request", None), "path", "") or ""
-        return str(parse_qs(urlparse(path).query).get("token", [""])[0])
-    except (TypeError, ValueError, IndexError):
-        return ""
+        headers = getattr(getattr(ws, "request", None), "headers", None) or {}
+        get = getattr(headers, "get", None)
+        cookie_header = get("Cookie", "") if callable(get) else ""
+        for part in str(cookie_header).split(";"):
+            name, _, value = part.partition("=")
+            if name.strip() == TERM_COOKIE:
+                return value.strip().strip('"')
+    except Exception:
+        pass
+    return ""
 
 
 def _spawn_pty(
@@ -552,7 +570,7 @@ def _spawn_pty(
     if shell == "agent":
         env["LUCKYD_AGENT_SLOT"] = "1"
         env["LUCKYD_AGENT_NAME"] = "Agent 1"
-        env["LUCKYD_AGENT_VERSION"] = "v3.6.0"
+        env["LUCKYD_AGENT_VERSION"] = "v4.0.0"
     elif shell == "agent2":
         env["LUCKYD_AGENT_SLOT"] = "2"
         env["LUCKYD_AGENT_NAME"] = "Agent 2"

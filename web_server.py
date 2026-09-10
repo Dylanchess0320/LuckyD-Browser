@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hmac
 import json
 import secrets
 import threading
@@ -45,6 +46,10 @@ load_env()  # load .env before any agent/LLM construction
 # in any browser on the machine could drive it. A random per-install token is
 # generated once and persisted under .luckyd-code/ (already gitignored).
 _TOKEN_PATH = PROJECT_DIR / ".luckyd-code" / "hq_token"
+
+# Name of the HttpOnly session cookie the browser sets on its own profile so
+# the in-browser HQ tab authenticates without a JS-visible token (4.0).
+HQ_COOKIE = "luckyd_hq"
 
 
 def _load_or_create_token() -> str:
@@ -146,21 +151,37 @@ class HQHandler(BaseHTTPRequestHandler):
             body = html.encode("utf-8")
             self.send_response(code)
             self.send_header("Content-Type", "text/html; charset=utf-8")
+            # The HQ page runs the full agent; keep plugins/foreign framing out.
+            self.send_header("Content-Security-Policy", "object-src 'none'; base-uri 'self'")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
         except (ConnectionError, OSError):
             pass
 
-    def _authorized(self) -> bool:
-        """Require the per-install bearer token on every API call.
+    def _cookie_token(self) -> str:
+        """Extract our session cookie value without logging it."""
+        try:
+            for part in self.headers.get("Cookie", "").split(";"):
+                name, _, value = part.partition("=")
+                if name.strip() == HQ_COOKIE:
+                    return value.strip().strip('"')
+        except Exception:
+            return ""
+        return ""
 
-        The inline HQ page (served from '/') gets the token injected into its
-        own JS so its same-origin fetches keep working without prompting the
-        user for anything.
+    def _authorized(self) -> bool:
+        """Require the per-install credential on every call.
+
+        Accepts the ``Authorization: Bearer`` header (external clients, the
+        harness supervisor) or the HttpOnly ``luckyd_hq`` session cookie the
+        browser sets on its own profile for the in-browser HQ tab (4.0).
+        Compared in constant time.
         """
-        auth = self.headers.get("Authorization", "")
-        return auth == f"Bearer {_TOKEN}"
+        if hmac.compare_digest(self.headers.get("Authorization", ""), f"Bearer {_TOKEN}"):
+            return True
+        presented = self._cookie_token()
+        return bool(presented) and hmac.compare_digest(presented, _TOKEN)
 
     _DENY_NAMES = {".env", ".git"}
 
@@ -222,13 +243,13 @@ class HQHandler(BaseHTTPRequestHandler):
         try:
             if path == "/health":
                 return self._send_json({"status": "healthy"})
-            if path in ("/", "/index.html"):
-                # The landing page itself doesn't need the token (it's just
-                # static HTML+JS); its own fetch() calls carry the token so
-                # they pass the check below like any other client.
-                return self._send_html(_HQ_HTML.replace("__HQ_TOKEN__", _TOKEN))
             if not self._authorized():
                 return self._send_json({"error": "unauthorized"}, code=401)
+            if path in ("/", "/index.html"):
+                # Served only after auth (4.0): the page's own fetch() calls
+                # authenticate via the HttpOnly session cookie, so no token
+                # is injected into the HTML anymore.
+                return self._send_html(_HQ_HTML)
             if path == "/api/tools":
                 return self._send_json(
                     {"tools": registry.list_with_descriptions(), "count": registry.count}
@@ -403,12 +424,12 @@ const chat=document.getElementById('chat'),inp=document.getElementById('in'),
 btn=document.getElementById('send');
 function add(cls,text){const d=document.createElement('div');d.className='msg '+cls;
 d.textContent=text;chat.appendChild(d);chat.scrollTop=chat.scrollHeight;return d;}
-const HQ_TOKEN='__HQ_TOKEN__';
+// Auth: HttpOnly luckyd_hq session cookie, sent automatically (4.0).
 document.getElementById('bar').addEventListener('submit',async e=>{e.preventDefault();
 const t=inp.value.trim();if(!t)return;inp.value='';add('user',t);btn.disabled=true;
 const thinking=add('agent','\\u2026');thinking.classList.add('thinking');
 try{const r=await fetch('/api/chat',{method:'POST',
-headers:{'Content-Type':'application/json','Authorization':'Bearer '+HQ_TOKEN},body:JSON.stringify({task:t})});
+headers:{'Content-Type':'application/json'},body:JSON.stringify({task:t})});
 const d=await r.json();thinking.classList.remove('thinking');thinking.textContent=d.result||d.response||d.error||'(no reply)';}
 catch(err){thinking.classList.remove('thinking');thinking.textContent='Error: '+err.message;}finally{btn.disabled=false;inp.focus();}});
 </script></body></html>"""

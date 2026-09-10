@@ -21,10 +21,12 @@ from browser_core.research_page import SwarmManager, research_html
 class TestBrowserResearchPage:
     def test_research_html_structure(self):
         token = "test-auth-token-12345"
-        html = research_html(token)
+        html = research_html()
         assert "LuckyD Deep Research" in html
-        assert "SWARM v3.8" in html
-        assert token in html
+        assert "SWARM v4.0" in html
+        # 4.0: no credential may be embedded in served HTML.
+        assert token not in html
+        assert "const TOKEN" not in html
         assert "st-plan" in html
         assert "st-res" in html
         assert "st-syn" in html

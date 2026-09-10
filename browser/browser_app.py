@@ -83,6 +83,9 @@ class BrowserApp:
         # Started with the Control API; the /terminal tab connects to it.
         self.terminal_server = None
         self.start_terminal_server()
+        # Session cookies so our own tabs authenticate to the loopback
+        # servers without JS-visible tokens (4.0).
+        self.install_local_auth_cookies(self.profile)
         self.qapp.aboutToQuit.connect(self.stop_control_server)
         self.qapp.aboutToQuit.connect(self.stop_terminal_server)
 
@@ -204,6 +207,54 @@ class BrowserApp:
         if self.terminal_server is not None:
             self.terminal_server.stop()
             self.terminal_server = None
+
+    def install_local_auth_cookies(self, profile) -> None:
+        """Seed the HttpOnly session cookies for our own loopback servers (4.0).
+
+        Called for every WebEngine profile (the default window and each
+        incognito window). The in-browser dashboard/terminal/research/mesh/HQ
+        tabs authenticate to the local servers with these cookies, so no
+        bearer token is ever injected into served HTML or the WebSocket URL.
+        Safe to call when a server isn't running yet — that cookie is simply
+        skipped.
+        """
+        try:
+            from PySide6.QtNetwork import QNetworkCookie
+        except Exception:
+            return
+        store = profile.cookieStore()
+
+        def _set(name: str, value: str) -> None:
+            if not value:
+                return
+            cookie = QNetworkCookie(name.encode("utf-8"), value.encode("utf-8"))
+            cookie.setDomain("127.0.0.1")
+            cookie.setPath("/")
+            cookie.setHttpOnly(True)
+            # Plain-HTTP loopback: Secure would stop the cookie from sending.
+            cookie.setSecure(False)
+            store.setCookie(cookie)
+
+        try:
+            from browser_core.control_server import CTL_COOKIE
+
+            _set(CTL_COOKIE, getattr(self.control_server, "token", "") or "")
+        except Exception:
+            pass
+        try:
+            from browser_core.terminal_server import TERM_COOKIE
+
+            _set(TERM_COOKIE, str(self.settings.get("terminal_token", "") or ""))
+        except Exception:
+            pass
+        try:
+            from browser_core.harness_bridge import _hq_token
+
+            # Must match web_server.HQ_COOKIE (repo-root module; the literal
+            # keeps this importable in the frozen browser too).
+            _set("luckyd_hq", _hq_token() or "")
+        except Exception:
+            pass
 
     def set_browser_api_enabled(self, enabled: bool) -> None:
         """Tools-menu toggle: persist + start/stop the Control API."""

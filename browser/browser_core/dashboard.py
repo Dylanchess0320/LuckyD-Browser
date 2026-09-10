@@ -277,7 +277,7 @@ function setPill(id, cls, text) {
 }
 async function refreshStatus() {
   try {
-    const r = await fetch('/status', { headers: DASH_TOKEN ? { 'Authorization': 'Bearer ' + DASH_TOKEN } : {} });
+    const r = await fetch('/status');
     const s = await r.json();
     if (s.harness) {
       const tools = Number(s.harness_tools || 0);
@@ -380,8 +380,7 @@ async function askAI(query) {
     const res = await fetch('/ask', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        ...(DASH_TOKEN ? { 'Authorization': 'Bearer ' + DASH_TOKEN } : {})
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({ question: query })
     });
@@ -442,13 +441,13 @@ renderApps(); render();
 DASHBOARD_HTML = _HEAD + _CSS + _BODY + _JS + _JS2
 
 
-def dashboard_html(settings=None, token: str = "") -> str:
+def dashboard_html(settings=None) -> str:
     """The dashboard with the active theme's design tokens injected, so the
     new-tab hub matches the Qt chrome, sidebar and HQ splash exactly.
 
-    ``token`` (the Control API's auth token) is injected as a JS constant so
-    the dashboard's own same-origin fetch('/status') call can authenticate —
-    /status is otherwise gated behind the same token as every other route.
+    Authentication uses the HttpOnly session cookie the browser sets on its
+    own profile (4.0) — no token is injected into the page, and the
+    dashboard's same-origin fetch() calls authenticate automatically.
     """
     from browser_core.brand import css_vars
 
@@ -464,11 +463,7 @@ def dashboard_html(settings=None, token: str = "") -> str:
         extra = [[t.icon, t.name, t.url] for t in load_tiles()]
     except Exception:
         extra = []  # a broken config must never take the dashboard down
-    html = html.replace("__PLATFORM_TILES__", json.dumps(extra))
-    return html.replace(
-        "<script>\nconst ENGINES",
-        f"<script>\nconst DASH_TOKEN = {json.dumps(token)};\nconst ENGINES",
-    )
+    return html.replace("__PLATFORM_TILES__", json.dumps(extra))
 
 
 def hq_splash_html(harness_url: str, state: str, detail: str = "", settings=None) -> str:

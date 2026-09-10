@@ -59,6 +59,19 @@ def test_harness_bridge_authenticates_protected_api_calls(monkeypatch) -> None:
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     monkeypatch.setenv("LUCKYD_HQ_TOKEN", _AuthenticatedToolsHandler.token)
+    # httpx honors proxy env vars; neutralize them so loopback stays direct
+    # (some sandboxes export bracketed-IPv6 no_proxy entries httpx can't parse).
+    for var in (
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "http_proxy",
+        "https_proxy",
+        "ALL_PROXY",
+        "all_proxy",
+        "NO_PROXY",
+        "no_proxy",
+    ):
+        monkeypatch.delenv(var, raising=False)
     try:
         bridge = HarnessBridge(host="127.0.0.1", port=server.server_port)
         assert asyncio.run(bridge.list_tools()) == [{"name": "AgentHandoff"}]
@@ -104,27 +117,34 @@ def test_local_control_secrets_are_created_and_terminal_requires_one(tmp_path: P
 
     assert len(api_token) >= 32
     assert len(terminal_token) >= 32
-    assert f'const WS_TOKEN = "{terminal_token}";' in terminal_html(settings)
+    page = terminal_html(settings)
+    # 4.0: the terminal secret travels in the HttpOnly luckyd_term cookie —
+    # it must never appear in served HTML or the WebSocket URL.
+    assert terminal_token not in page
+    assert "WS_TOKEN" not in page
+    assert "?token=" not in page
 
     class Request:
-        def __init__(self, path: str):
-            self.path = path
+        def __init__(self, cookie: str):
+            self.path = "/"
+            self.headers = {"Cookie": cookie}
 
     class Socket:
-        def __init__(self, path: str):
-            self.request = Request(path)
+        def __init__(self, cookie: str):
+            self.request = Request(cookie)
 
     server = TerminalServer(token=terminal_token)
-    assert server._authorized(Socket(f"/?token={terminal_token}"))
-    assert not server._authorized(Socket("/?token=wrong"))
-    assert not TerminalServer()._authorized(Socket(f"/?token={terminal_token}"))
+    assert server._authorized(Socket(f"luckyd_term={terminal_token}"))
+    assert not server._authorized(Socket("luckyd_term=wrong"))
+    assert not TerminalServer()._authorized(Socket(f"luckyd_term={terminal_token}"))
 
 
 def test_agent_mesh_keeps_all_four_sessions_visible() -> None:
-    page = mesh_html("mesh-test-token")
+    page = mesh_html()
     assert page.count("<iframe") == 4
     assert all(f"shell={shell}" in page for shell in ("agent", "agent2", "powershell", "cmd"))
-    assert 'const MESH_TOKEN = "mesh-test-token"' in page
+    # 4.0: no credential may be embedded in the mesh page.
+    assert "MESH_TOKEN" not in page
 
 
 def test_agent_workspace_uses_no_lightning_icon() -> None:

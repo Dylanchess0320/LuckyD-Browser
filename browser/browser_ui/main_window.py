@@ -85,6 +85,11 @@ class MainWindow(QMainWindow):
         else:
             self.profile = app.profile
 
+        # Loopback session cookies for this profile's tabs (4.0) — incognito
+        # windows get their own profile, so they need their own cookies.
+        with contextlib.suppress(Exception):
+            app.install_local_auth_cookies(self.profile)
+
         self.resize(1280, 800)
         self._dev_window = None
         self._dev_view = None
@@ -848,7 +853,7 @@ class MainWindow(QMainWindow):
                     "At most 6 groups; every tab index exactly once; skip nothing."
                 )
                 user = "Tabs:\n" + "\n".join(
-                    f'{t["i"]}: {t["title"]} ({t["host"]})' for t in entries
+                    f"{t['i']}: {t['title']} ({t['host']})" for t in entries
                 )
                 text, _used = asyncio.run(
                     bridge.chat(
@@ -1870,7 +1875,7 @@ class MainWindow(QMainWindow):
                 QMessageBox.information(
                     self,
                     "Updates",
-                    "You're running from source.\n\n" "Update with:\n  git pull",
+                    "You're running from source.\n\nUpdate with:\n  git pull",
                 )
             return
 
@@ -1915,7 +1920,7 @@ class MainWindow(QMainWindow):
             QMessageBox.information(
                 self,
                 "No Updates",
-                f"You're running the latest version " f"(v{self._current_version()}).",
+                f"You're running the latest version (v{self._current_version()}).",
             )
 
     def _on_update_failed(self, message: str, silent: bool) -> None:
@@ -1953,8 +1958,7 @@ class MainWindow(QMainWindow):
             if len(notes) > 600:
                 snippet += "…"
             notes_html = (
-                f"<div style='color:#8b93a7; font-size:11px; max-height:140px;'>"
-                f"{snippet}</div><br>"
+                f"<div style='color:#8b93a7; font-size:11px; max-height:140px;'>{snippet}</div><br>"
             )
 
         box = QMessageBox(self)
@@ -2053,6 +2057,13 @@ class MainWindow(QMainWindow):
         """
         from PySide6.QtWidgets import QMessageBox
 
+        if sys.platform != "win32":
+            # The Inno/.bat install flow is Windows-only — on other platforms
+            # there is no installer to run. (This also avoids AttributeError:
+            # subprocess.CREATE_NO_WINDOW only exists on Windows.)
+            self.toast("Automatic updates are only supported on Windows.", "info")
+            return
+
         current_exe = Path(sys.executable).resolve()
         installer = Path(installer_path).resolve()
         with tempfile.NamedTemporaryFile(
@@ -2083,7 +2094,9 @@ class MainWindow(QMainWindow):
             return  # "Later" — the installer stays in %TEMP% for a manual run
         subprocess.Popen(
             ["cmd", "/c", script.name],
-            creationflags=subprocess.CREATE_NO_WINDOW,
+            # CREATE_NO_WINDOW is Windows-only; getattr keeps this from
+            # raising AttributeError if the flow ever runs elsewhere.
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
             close_fds=True,
         )
         self.close()

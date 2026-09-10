@@ -29,12 +29,19 @@ Run
 
 Then point the host app at it:
   set CODING_AGENT_BASE_URL=http://127.0.0.1:8317/v1
-  set CODING_AGENT_API_KEY=local          (any non-empty value; not checked)
+  set CODING_AGENT_API_KEY=<your chosen bridge token>
+  set CLINE_BRIDGE_TOKEN=%CODING_AGENT_API_KEY%
   set CODING_AGENT_MODEL=cline-pass/kimi-k3
+
+Auth (4.0): inbound calls must send ``Authorization: Bearer <token>`` where
+<token> is ``CLINE_BRIDGE_TOKEN`` (or ``CODING_AGENT_API_KEY`` as fallback).
+Requests without a valid bearer get 401; with neither variable set the
+bridge refuses all non-health requests (fail closed).
 """
 
 from __future__ import annotations
 
+import hmac
 import json
 import os
 import sys
@@ -69,6 +76,38 @@ KNOWN_MODELS = [
 app = FastAPI(title="ClinePass local bridge", version="1.0.0")
 
 
+# ── Inbound auth (4.0) ───────────────────────────────────────────────────
+# The bridge forwards the user's live Cline session credential upstream, so
+# inbound calls must prove they are the configured client. The expected
+# bearer is CLINE_BRIDGE_TOKEN, falling back to CODING_AGENT_API_KEY (the
+# value the documented setup asks the user to configure). When neither is
+# set the bridge refuses every non-health request — fail closed, because an
+# open bridge burns the user's quota.
+_UNAUTHORIZED = JSONResponse(
+    {
+        "error": {
+            "message": (
+                "unauthorized: send 'Authorization: Bearer <token>' with "
+                "CLINE_BRIDGE_TOKEN (or CODING_AGENT_API_KEY) set in the "
+                "bridge's environment"
+            )
+        }
+    },
+    status_code=401,
+)
+
+
+def _expected_bearer() -> str:
+    return os.environ.get("CLINE_BRIDGE_TOKEN", "") or os.environ.get("CODING_AGENT_API_KEY", "")
+
+
+def _inbound_authorized(request: Request) -> bool:
+    expected = _expected_bearer()
+    if not expected:
+        return False
+    return hmac.compare_digest(request.headers.get("authorization", ""), f"Bearer {expected}")
+
+
 def _unwrap(payload: Any) -> Any:
     """Unwrap the cline.bot {"data": {...}, "success": true} envelope."""
     if isinstance(payload, dict) and "data" in payload and "choices" not in payload:
@@ -88,7 +127,9 @@ async def health() -> JSONResponse:
 
 
 @app.get("/v1/models")
-async def models() -> JSONResponse:
+async def models(request: Request) -> JSONResponse:
+    if not _inbound_authorized(request):
+        return _UNAUTHORIZED
     return JSONResponse(
         {
             "object": "list",
@@ -110,6 +151,8 @@ def _forward_headers() -> dict[str, str]:
 
 @app.post("/v1/chat/completions")
 async def chat_completions(request: Request):
+    if not _inbound_authorized(request):
+        return _UNAUTHORIZED
     try:
         body = await request.json()
     except Exception:

@@ -332,8 +332,15 @@ class SwarmManager:
 swarm_manager = SwarmManager()
 
 
-def research_html(token: str = "") -> str:
-    """Return the single-page application HTML for the Deep Research Swarm Tool."""
+def research_html() -> str:
+    """Return the single-page application HTML for the Deep Research Swarm Tool.
+
+    Authentication uses the HttpOnly session cookie the browser sets on its
+    own profile (4.0) — no token is embedded in the page.
+    """
+    # NOTE: the f-prefix below is load-bearing — the page's JS is written with
+    # doubled braces ({{ }}) that the f-string collapses to single braces
+    # (F541 is a false positive here; silenced via per-file-ignores).
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -827,7 +834,7 @@ def research_html(token: str = "") -> str:
 <header>
   <div class="brand">
     <span>🔬</span> LuckyD Deep Research
-    <span class="brand-badge">SWARM v3.8</span>
+    <span class="brand-badge">SWARM v4.0</span>
   </div>
   <span id="status-pill" class="pill">idle</span>
   <span class="sp"></span>
@@ -963,17 +970,16 @@ def research_html(token: str = "") -> str:
 
 <script>
 const $ = id => document.getElementById(id);
-const TOKEN = "{token}";
 let activeRunId = null;
 let pollTimer = null;
 let pageContextData = "";
 let currentMarkdown = "";
 let currentEvidence = [];
 
-// API helper with Authorization header
+// API helper — auth rides the HttpOnly session cookie (4.0); same-origin
+// fetch() sends it automatically, so no Authorization header is needed.
 async function api(path, opts = {{}}) {{
   const headers = Object.assign({{'Content-Type': 'application/json'}}, opts.headers || {{}});
-  if (TOKEN) headers['Authorization'] = 'Bearer ' + TOKEN;
   const res = await fetch(path, Object.assign({{}}, opts, {{headers}}));
   if (!res.ok) {{
     const err = await res.json().catch(() => ({{error: 'HTTP ' + res.status}}));
@@ -1197,13 +1203,19 @@ function switchTab(tab) {{
   }});
 }}
 
-// Lightweight markdown-to-HTML parser for reports
+// Lightweight markdown-to-HTML parser for reports.
+//
+// SECURITY (4.0): report markdown comes from the research swarm (LLM output)
+// and may carry injected HTML/JS via indirect prompt injection. Escape the
+// entire input FIRST, then apply markdown transforms — captures are already
+// escaped, so the inserted tags are the only live markup. Link URLs are
+// scheme-allowlisted (javascript:/data: URLs become '#').
 function parseMarkdown(md) {{
   if (!md) return '';
-  let html = md;
-  // Fenced code blocks
+  let html = escapeHtml(md);
+  // Fenced code blocks (content already escaped above)
   html = html.replace(/```([a-z]*)\\n([\\s\\S]*?)```/g, (m, lang, code) => {{
-    return `<pre><code>${{escapeHtml(code.trim())}}</code></pre>`;
+    return `<pre><code>${{code.trim()}}</code></pre>`;
   }});
   // Headings
   html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
@@ -1214,8 +1226,12 @@ function parseMarkdown(md) {{
   // Bold & Italics
   html = html.replace(/\\*\\*(.*?)\\*\\*/g, '<b>$1</b>');
   html = html.replace(/\\*(.*?)\\*/g, '<i>$1</i>');
-  // Links
-  html = html.replace(/\\[(.*?)\\]\\((.*?)\\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  // Links — scheme allowlist blocks javascript:/data: URLs
+  html = html.replace(/\\[(.*?)\\]\\((.*?)\\)/g, (m, text, url) => {{
+    const u = url.trim();
+    const safe = /^(https?:|mailto:)/i.test(u) ? u : '#';
+    return `<a href="${{safe}}" target="_blank" rel="noopener">${{text}}</a>`;
+  }});
   // Lists
   html = html.replace(/^\\s*[-*]\\s+(.*$)/gim, '<li>$1</li>');
   html = html.replace(/(<li>.*<\\/li>)/s, '<ul>$1</ul>');
