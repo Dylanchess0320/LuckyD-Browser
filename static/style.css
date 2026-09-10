@@ -1,4 +1,4 @@
-/* LuckyD Code — Web GUI theme (brand colors mirror ui.py BRAND) */
+/* LuckyD Code — Web GUI theme (primary mirrors browser_core.brand --ld-accent) */
 :root {
   --bg: #0b0e14;
   --panel: #11161f;
@@ -7,8 +7,8 @@
   --text: #e6ebf5;
   --dim: #8b98b0;
   --muted: #64748b;
-  --primary: #00e5ff;
-  --primary-dim: #4dd0e1;
+  --primary: #5b9dff;
+  --primary-dim: #8fb8ff;
   --success: #34d399;
   --error: #f87171;
   --warn: #fbbf24;
@@ -45,7 +45,7 @@ body {
 .brand { font-weight: 700; color: var(--primary); white-space: nowrap; }
 .brand .ver { color: var(--muted); font-weight: 500; font-size: 12px; }
 .brand .pill {
-  font-size: 10px; font-weight: 600; color: #062a30;
+  font-size: 10px; font-weight: 600; color: #0a1830;
   background: var(--primary); border-radius: 99px; padding: 1px 7px;
   vertical-align: 2px; margin-left: 2px;
 }
@@ -87,9 +87,9 @@ button.ghost:hover { color: var(--primary); border-color: var(--primary); }
 }
 .msg.user {
   align-self: flex-end;
-  background: #0e3a44;
-  border: 1px solid #155e6e;
-  color: #d9fbff;
+  background: #14243f;
+  border: 1px solid #2b4a7f;
+  color: #dce8ff;
   border-bottom-right-radius: 4px;
   white-space: pre-wrap;
 }
@@ -121,7 +121,7 @@ button.ghost:hover { color: var(--primary); border-color: var(--primary); }
 .msg.agent h2 { font-size: 1.15em; }
 .msg.agent h3 { font-size: 1.05em; color: var(--primary-dim); }
 .msg.agent code {
-  background: #0a2e38; color: var(--primary-dim);
+  background: #101a30; color: var(--primary-dim);
   border-radius: 5px; padding: 1px 6px; font-size: 0.92em;
   font-family: var(--font-mono);
 }
@@ -220,7 +220,7 @@ details.tool-card .tool-result-preview { border-left: 2px solid var(--muted); }
 #input:focus { outline: none; border-color: var(--primary); }
 #input::placeholder { color: var(--muted); }
 #send {
-  background: var(--primary); color: #062a30; border: 0;
+  background: var(--primary); color: #0a1830; border: 0;
   border-radius: 10px; padding: 0 18px; height: 42px;
   font-size: 16px; font-weight: 700; cursor: pointer;
 }
@@ -242,7 +242,7 @@ details.tool-card .tool-result-preview { border-left: 2px solid var(--muted); }
   padding: 6px 10px; border-radius: 7px; cursor: pointer;
 }
 #slash-popup .slash-row:hover, #slash-popup .slash-row.active {
-  background: #16303c;
+  background: #182a4d;
 }
 #slash-popup .slash-cmd { color: var(--primary); font-weight: 600;
   font-family: Consolas, monospace; font-size: 12.5px; white-space: nowrap; }
@@ -270,7 +270,7 @@ details.tool-card .tool-result-preview { border-left: 2px solid var(--muted); }
   background: none; border: 0; border-radius: 8px;
   padding: 7px 10px; cursor: pointer; text-align: left;
 }
-.cmd-row:hover { background: #16303c; }
+.cmd-row:hover { background: #182a4d; }
 .cmd-name { color: var(--primary); font-weight: 600; font-family: Consolas, monospace; font-size: 12.5px; }
 .cmd-desc { color: var(--dim); font-size: 11.5px; }
 
@@ -290,13 +290,13 @@ details.tool-card .tool-result-preview { border-left: 2px solid var(--muted); }
   color: var(--primary-dim); font-family: Consolas, monospace; font-size: 12px;
   padding: 4px 10px; cursor: pointer;
 }
-.model-row:hover { background: #16303c; color: var(--primary); }
-.model-row.current { background: #0e3a44; color: var(--primary); font-weight: 700; }
+.model-row:hover { background: #182a4d; color: var(--primary); }
+.model-row.current { background: #14243f; color: var(--primary); font-weight: 700; }
 .model-row.current::after { content: " ◀ current"; color: var(--muted); font-size: 10px; }
 
 /* tools tab */
 .tool-row { padding: 5px 10px; border-radius: 7px; }
-.tool-row:hover { background: #16303c; }
+.tool-row:hover { background: #182a4d; }
 .tool-row .t-name { color: var(--primary-dim); font-family: Consolas, monospace; font-size: 12px; }
 .tool-row .t-desc { color: var(--muted); font-size: 11px; }
 
@@ -328,7 +328,7 @@ details.tool-card .tool-result-preview { border-left: 2px solid var(--muted); }
 }
 .btn-ok { background: var(--success); color: #052e1c; }
 .btn-no { background: var(--error); color: #3d0a0a; }
-.btn-always { background: var(--primary); color: #062a30; }
+.btn-always { background: var(--primary); color: #0a1830; }
 .modal-actions button:hover { filter: brightness(1.12); }
 .modal-hint { color: var(--muted); font-size: 11px; margin-top: 10px; text-align: center; }
 

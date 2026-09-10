@@ -24,6 +24,13 @@ if getattr(sys, "frozen", False):
     if _internal.exists() and str(_internal) not in sys.path:
         sys.path.insert(0, str(_internal))
 
+try:
+    from browser_core.brand import css_vars
+    from browser_core.page_shell import VARS_PLACEHOLDER
+except ImportError:  # imported as browser.browser_core.research_page
+    from browser.browser_core.brand import css_vars
+    from browser.browser_core.page_shell import VARS_PLACEHOLDER
+
 from features.deep_research.config import settings as drs_settings
 from features.deep_research.graph import run_swarm
 from features.deep_research.runtime.events import EventEmitter, RunEvent
@@ -341,26 +348,29 @@ def research_html() -> str:
     # NOTE: the f-prefix below is load-bearing — the page's JS is written with
     # doubled braces ({{ }}) that the f-string collapses to single braces
     # (F541 is a false positive here; silenced via per-file-ignores).
-    return f"""<!DOCTYPE html>
+    # The /* __BRAND_VARS__ */ marker is replaced with the active theme's
+    # tokens from brand.css_vars() (same pattern as the dashboard).
+    html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LuckyD Deep Research Swarm</title>
 <style>
+  /* __BRAND_VARS__ */
   :root {{
-    --bg: #090d16;
-    --surface: #0f172a;
-    --surface2: #1e293b;
-    --border: #334155;
-    --accent: #38bdf8;
-    --accent2: #818cf8;
-    --accent-glow: rgba(56, 189, 248, 0.25);
-    --success: #34d399;
-    --warning: #fbbf24;
-    --danger: #f87171;
-    --text: #f1f5f9;
-    --muted: #94a3b8;
+    --bg: var(--ld-window);
+    --surface: var(--ld-panel);
+    --surface2: var(--ld-card);
+    --border: var(--ld-border);
+    --accent: var(--ld-accent);
+    --accent2: var(--ld-accent2);
+    --accent-glow: color-mix(in srgb, var(--ld-accent) 25%, transparent);
+    --success: var(--ld-ok);
+    --warning: var(--ld-warn);
+    --danger: var(--ld-danger);
+    --text: var(--ld-text);
+    --muted: var(--ld-muted);
   }}
   * {{ box-sizing: border-box; margin: 0; padding: 0; }}
   body {{
@@ -391,8 +401,8 @@ def research_html() -> str:
     color: #fff;
   }}
   .brand-badge {{
-    background: linear-gradient(135deg, var(--accent), var(--accent2));
-    color: #000;
+    background: var(--accent);
+    color: var(--ld-window);
     font-size: 11px;
     font-weight: 800;
     padding: 2px 7px;
@@ -412,18 +422,18 @@ def research_html() -> str:
     border: 1px solid var(--border);
   }}
   .pill.running {{
-    background: rgba(56, 189, 248, 0.15);
+    background: color-mix(in srgb, var(--accent) 15%, transparent);
     color: var(--accent);
     border-color: var(--accent);
     animation: pulse 2s infinite;
   }}
   .pill.completed {{
-    background: rgba(52, 211, 153, 0.15);
+    background: color-mix(in srgb, var(--success) 15%, transparent);
     color: var(--success);
     border-color: var(--success);
   }}
   .pill.error {{
-    background: rgba(248, 113, 113, 0.15);
+    background: color-mix(in srgb, var(--danger) 15%, transparent);
     color: var(--danger);
     border-color: var(--danger);
   }}
@@ -446,28 +456,28 @@ def research_html() -> str:
     transition: all 0.15s ease;
   }}
   .btn:hover {{
-    background: #27354f;
+    background: color-mix(in srgb, var(--text) 8%, var(--surface2));
     border-color: var(--accent);
     color: #fff;
   }}
   .btn-primary {{
-    background: linear-gradient(135deg, #0284c7, #4f46e5);
+    background: var(--accent);
     border: none;
-    color: #fff;
+    color: var(--ld-window);
     box-shadow: 0 0 16px var(--accent-glow);
   }}
   .btn-primary:hover {{
-    filter: brightness(1.15);
+    filter: brightness(1.12);
     transform: translateY(-1px);
   }}
   .btn-danger {{
-    background: rgba(248, 113, 113, 0.15);
+    background: color-mix(in srgb, var(--danger) 15%, transparent);
     border-color: var(--danger);
     color: var(--danger);
   }}
   .btn-danger:hover {{
     background: var(--danger);
-    color: #000;
+    color: var(--ld-window);
   }}
 
   /* Main layout */
@@ -594,13 +604,13 @@ def research_html() -> str:
     transition: all 0.2s ease;
   }}
   .stage-step.active {{
-    background: rgba(56, 189, 248, 0.2);
+    background: color-mix(in srgb, var(--accent) 20%, transparent);
     border-color: var(--accent);
     color: #fff;
     box-shadow: 0 0 10px var(--accent-glow);
   }}
   .stage-step.done {{
-    background: rgba(52, 211, 153, 0.15);
+    background: color-mix(in srgb, var(--success) 15%, transparent);
     border-color: var(--success);
     color: var(--success);
   }}
@@ -700,7 +710,7 @@ def research_html() -> str:
   }}
   .report-box blockquote {{
     border-left: 3px solid var(--accent);
-    background: rgba(56, 189, 248, 0.06);
+    background: color-mix(in srgb, var(--accent) 6%, transparent);
     padding: 12px 18px;
     margin: 16px 0;
     border-radius: 0 8px 8px 0;
@@ -1309,3 +1319,4 @@ function escapeHtml(str) {{
 </body>
 </html>
 """  # nosec B608 -- HTML/JS templating for the research SPA, not SQL
+    return html.replace(VARS_PLACEHOLDER, css_vars(), 1)

@@ -4,14 +4,30 @@
 <meta charset="utf-8">
 <title>New Tab</title>
 <style>
-  :root { --card: rgba(255,255,255,.06); --border: rgba(255,255,255,.10); --text: #e8eaf2; --muted: #9aa1b5; }
+  /* LuckyD brand tokens (Neon Night default) — mirrors browser_core.brand.css_vars().
+     A static file can't call brand.py at serve time, so the default theme's vars are
+     inlined here and every hardcoded color below resolves through them. */
+  :root {
+    --ld-window:#0b0f1a; --ld-panel:#10151f; --ld-panel2:#141a28; --ld-card:#1a2132;
+    --ld-border:#232c42; --ld-text:#e8ecf5; --ld-muted:#8b93a7;
+    --ld-accent:#5b9dff; --ld-accent2:#b46bff; --ld-ok:#34d399; --ld-danger:#ff5b6e;
+    --ld-grad:linear-gradient(135deg,#0b0f1a 0%,#141a28 60%,#10151f 100%);
+    --ld-grad-accent:linear-gradient(135deg,#5b9dff 0%,#b46bff 100%);
+    --ld-focus-ring:0 0 0 3px rgba(91,157,255,0.35);
+    --ld-success:#34d399; --ld-warn:#fbbf24; --ld-error:#ff5b6e;
+    --ld-faint:rgba(139,147,167,0.6); --ld-disabled:rgba(139,147,167,0.55);
+    --ld-r-sm:6px; --ld-r-md:10px; --ld-r-lg:14px; --ld-r-full:999px;
+    --ld-sh-2:0 4px 16px rgba(0,0,0,.35);
+  }
+  :root { --card: rgba(255,255,255,.06); --border: var(--ld-border);
+    --text: var(--ld-text); --muted: var(--ld-muted); }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   input, select, button { font: inherit; }
   body {
     font-family: 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
     font-weight: 600;
     color: var(--text); min-height: 100vh; overflow-x: hidden;
-    background: linear-gradient(135deg, #0b1020 0%, #101a30 45%, #1a1030 100%);
+    background: var(--ld-grad);
     background-size: 200% 200%; animation: drift 24s ease-in-out infinite;
   }
   @keyframes drift { 0%,100% { background-position: 0% 0%; } 50% { background-position: 100% 100%; } }
@@ -23,21 +39,24 @@
   .search { display: flex; background: var(--card); border: 1px solid var(--border);
     border-radius: 16px; backdrop-filter: blur(14px); overflow: hidden;
     transition: border-color .15s, box-shadow .15s; }
-  .search:focus-within { border-color: #4f9cf9; box-shadow: 0 8px 32px rgba(79,156,249,.18); }
+  .search:focus-within { border-color: var(--ld-accent);
+    box-shadow: 0 8px 32px color-mix(in srgb, var(--ld-accent) 18%, transparent); }
   .search select { background: transparent; color: var(--muted); border: none; outline: none;
     padding: 0 10px 0 16px; font-size: 14px; cursor: pointer; }
-  .search select option { background: #141a2e; }
+  .search select option { background: var(--ld-panel2); }
   .search input { flex: 1; background: transparent; border: none; outline: none;
     color: var(--text); font-size: 16px; padding: 16px 8px; }
-  .search button { background: #4f9cf9; border: none; color: #fff; font-size: 15px;
+  .search button { background: var(--ld-accent); border: none; color: #fff; font-size: 15px;
     padding: 0 26px; cursor: pointer; }
-  .search button:hover { background: #6aa8fa; }
+  .search button:hover { filter: brightness(1.12); }
   .grid { margin-top: 40px; display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
   .tile { display: flex; flex-direction: column; align-items: center; gap: 9px;
     padding: 15px 4px 12px; background: var(--card); border: 1px solid var(--border);
     border-radius: 14px; text-decoration: none; color: var(--text); font-size: 12px;
     position: relative; transition: transform .12s, border-color .12s, background .12s; }
-  .tile:hover { transform: translateY(-2px); border-color: rgba(120,170,255,.5); background: rgba(255,255,255,.09); }
+  .tile:hover { transform: translateY(-2px);
+    border-color: color-mix(in srgb, var(--ld-accent) 50%, transparent);
+    background: rgba(255,255,255,.09); }
   .tile img { width: 26px; height: 26px; border-radius: 6px; }
   .tile .del { position: absolute; top: 3px; right: 6px; color: var(--muted); font-size: 13px;
     opacity: 0; cursor: pointer; }
@@ -47,7 +66,7 @@
   #addform { margin-top: 14px; display: none; gap: 8px; }
   #addform input { flex: 1; background: var(--card); border: 1px solid var(--border);
     border-radius: 10px; color: var(--text); padding: 10px 12px; font-size: 13px; outline: none; }
-  #addform button { background: #4f9cf9; border: none; color: #fff; border-radius: 10px;
+  #addform button { background: var(--ld-accent); border: none; color: #fff; border-radius: 10px;
     padding: 0 16px; cursor: pointer; }
   footer { display: none; }
 </style>

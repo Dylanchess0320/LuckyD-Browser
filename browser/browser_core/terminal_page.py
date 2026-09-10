@@ -6,6 +6,11 @@ import contextlib
 import json
 from pathlib import Path
 
+try:
+    from browser_core.page_shell import page_head
+except ImportError:  # imported as browser.browser_core.terminal_page
+    from browser.browser_core.page_shell import page_head
+
 # Vendored xterm assets: browser/browser_core/terminal_page.py → ../assets/terminal
 STATIC_DIR = Path(__file__).resolve().parent.parent / "assets" / "terminal"
 
@@ -86,21 +91,21 @@ def _mesh_dock_html() -> str:
 def _mesh_dock_css() -> str:
     return (
         "#meshdock{position:fixed;top:37px;left:0;right:0;z-index:50;"
-        "background:linear-gradient(180deg,#0d1320,#0b0f16);"
-        "border-bottom:1px solid #1e293b;padding:10px 14px 12px}"
+        "background:var(--ld-panel);"
+        "border-bottom:1px solid var(--ld-border);padding:10px 14px 12px}"
         "#meshhead{display:flex;align-items:baseline;gap:10px;margin-bottom:9px}"
-        "#meshhead .mh-t{color:#e2e8f0;letter-spacing:.14em;font-size:12px;font-weight:800}"
-        "#meshhead .mh-s{color:#475569;font-size:11px;font-weight:500}"
+        "#meshhead .mh-t{color:var(--ld-text);letter-spacing:.14em;font-size:12px;font-weight:800}"
+        "#meshhead .mh-s{color:var(--ld-faint);font-size:11px;font-weight:500}"
         "#meshchips{display:flex;flex-wrap:wrap;gap:8px}"
         ".chip{display:flex;align-items:center;gap:7px;padding:6px 12px;border-radius:999px;"
-        "border:1px solid #1e293b;background:#0f1622;color:#cbd5e1;cursor:pointer;"
+        "border:1px solid var(--ld-border);background:var(--ld-panel);color:var(--ld-text);cursor:pointer;"
         "font:600 12px/1 system-ui,Segoe UI,Arial;transition:all .15s ease}"
         ".chip .ce{font-size:13px}"
         ".chip:hover{border-color:var(--ac);transform:translateY(-1px);"
         "box-shadow:0 4px 14px rgba(0,0,0,.4)}"
         ".chip.on{border-color:color-mix(in srgb,var(--ac) 55%,transparent)}"
         ".chip.sel,.chip.on:active{border-color:var(--ac);color:#fff;"
-        "background:color-mix(in srgb,var(--ac) 18%,#0f1622);"
+        "background:color-mix(in srgb,var(--ac) 18%,var(--ld-panel));"
         "box-shadow:0 0 12px color-mix(in srgb,var(--ac) 35%,transparent)}"
         ".chip.off{opacity:.42}.chip.off:hover{opacity:.75}"
     )
@@ -146,40 +151,47 @@ def mesh_html() -> str:
     return _MESH_HTML
 
 
-_HTML = """<!doctype html>
-<html><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Terminal</title>
-<link rel="stylesheet" href="/static/terminal/xterm.css">
-<style>
-  html,body{margin:0;height:100%;background:#0b0f16;overflow:hidden}
+# Shortcuts the terminal page itself documents (the hint bar and the
+# right-click menu) — only existing shortcuts are listed.
+_TERM_SHORTCUTS = [
+    ("Ctrl+Shift+C", "Copy the terminal selection"),
+    ("Ctrl+Shift+V", "Paste from the clipboard"),
+    ("Ctrl+Insert / Shift+Insert", "Copy / paste"),
+    ("Right-click", "Open the context menu"),
+    ("Esc", "Close the context menu"),
+]
+
+_TERM_CSS = r"""  html,body{margin:0;height:100%;background:var(--ld-window);overflow:hidden}
   #bar{display:flex;align-items:center;gap:10px;padding:8px 14px;
-       background:#0f1622;border-bottom:1px solid #1e293b;
-       font:600 13px/1 system-ui,Segoe UI,Arial;color:#cbd5e1}
-  #bar .dot{width:9px;height:9px;border-radius:50%;background:#64748b;flex:0 0 auto}
-  #bar .dot.on{background:#34d399}
-  #bar .dot.off{background:#f87171}
-  #status{color:#64748b;font-weight:500;font-size:12px}
-  #hint{margin-left:auto;color:#475569;font-weight:500;font-size:11px}
+       background:var(--ld-panel);border-bottom:1px solid var(--ld-border);
+       font:600 13px/1 system-ui,Segoe UI,Arial;color:var(--ld-text)}
+  #bar .dot{width:9px;height:9px;border-radius:50%;background:var(--ld-muted);flex:0 0 auto}
+  #bar .dot.on{background:var(--ld-ok)}
+  #bar .dot.off{background:var(--ld-danger)}
+  #status{color:var(--ld-muted);font-weight:500;font-size:12px}
+  #hint{margin-left:auto;color:var(--ld-faint);font-weight:500;font-size:11px}
   #wrap{position:absolute;top:37px;left:0;right:0;bottom:0;padding:6px 4px}
   body.has-mesh #wrap{top:calc(37px + var(--dockh,110px))}
   #term{height:100%}
-  #menu{position:fixed;z-index:99;min-width:200px;background:#0f1622;
-        border:1px solid #1e293b;border-radius:8px;padding:4px;display:none;
-        box-shadow:0 8px 24px rgba(0,0,0,.55);
-        font:500 13px/1.4 system-ui,Segoe UI,Arial;color:#cbd5e1}
+  #menu{position:fixed;z-index:99;min-width:200px;background:var(--ld-panel);
+        border:1px solid var(--ld-border);border-radius:var(--ld-r-sm);padding:4px;display:none;
+        box-shadow:var(--ld-sh-2);
+        font:500 13px/1.4 system-ui,Segoe UI,Arial;color:var(--ld-text)}
   #menu .mi{display:flex;justify-content:space-between;gap:18px;padding:6px 10px;
         border-radius:5px;cursor:default;white-space:nowrap}
-  #menu .mi:hover{background:#1e293b}
+  #menu .mi:hover{background:var(--ld-border)}
   #menu .mi.off{opacity:.38;pointer-events:none}
-  #menu .mi span{color:#64748b;font-size:11px}
-  #menu .sep{height:1px;background:#1e293b;margin:4px 6px}
-  .sh{border:1px solid #1e293b;background:transparent;color:#64748b;
+  #menu .mi span{color:var(--ld-muted);font-size:11px}
+  #menu .sep{height:1px;background:var(--ld-border);margin:4px 6px}
+  .sh{border:1px solid var(--ld-border);background:transparent;color:var(--ld-muted);
       font:600 11px/1 system-ui;padding:4px 10px;border-radius:6px;cursor:pointer}
-  .sh:hover{color:#cbd5e1;border-color:#334155}
-  .sh.on{color:#34d399;border-color:#34d399;background:rgba(52,211,153,.08)}
+  .sh:hover{color:var(--ld-text);border-color:color-mix(in srgb, var(--ld-border) 55%, var(--ld-text))}
+  .sh.on{color:var(--ld-ok);border-color:var(--ld-ok);
+      background:color-mix(in srgb, var(--ld-ok) 8%, transparent)}
   __MESH_CSS__
-</style></head><body>
+"""
+
+_TERM_BODY = """<body>
 <div id="bar"><span id="dot" class="dot"></span><b id="title">&#9000; Terminal</b>
   <button class="sh" data-sh="agent" title="LuckyD Code v3.6 Nuitka Agent CLI (Agent 1)">Agent 1 (v3.6)</button>
   <button class="sh" data-sh="agent2" title="LuckyD Code v2.2 Standalone Agent CLI (Agent 2)">Agent 2 (v2.2)</button>
@@ -372,32 +384,44 @@ connect();
 setTimeout(refit, 60);
 </script></body></html>"""
 
+_HTML = (
+    page_head(
+        "Terminal",
+        _TERM_CSS,
+        extra_head='<link rel="stylesheet" href="/static/terminal/xterm.css">\n',
+        shortcuts=_TERM_SHORTCUTS,
+    )
+    + _TERM_BODY
+)
 
-_MESH_HTML = """<!doctype html>
-<html><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Agent Mesh — LuckyD Browser</title>
-<style>
-  :root{color-scheme:dark}html,body{margin:0;height:100%;background:#070b12;color:#e2e8f0;
+
+_MESH_CSS = """  :root{color-scheme:dark}
+  html,body{margin:0;height:100%;background:var(--ld-window);color:var(--ld-text);
     font:13px/1.35 system-ui,-apple-system,"Segoe UI",sans-serif;overflow:hidden}
   header{height:54px;box-sizing:border-box;display:flex;align-items:center;gap:12px;padding:0 18px;
-    border-bottom:1px solid #243044;background:linear-gradient(110deg,#101927,#0b111d)}
-  h1{font-size:15px;margin:0;color:#f8fafc;letter-spacing:.01em}h1 span{color:#42d9ff}
-  .sub{color:#8492a8;font-size:12px}.key{margin-left:auto;color:#9fb4cb;font-size:11px}
+    border-bottom:1px solid var(--ld-border);background:var(--ld-panel)}
+  h1{font-size:15px;margin:0;color:var(--ld-text);letter-spacing:.01em}h1 span{color:var(--ld-accent)}
+  .sub{color:var(--ld-muted);font-size:12px}.key{margin-left:auto;color:var(--ld-muted);font-size:11px}
   main{height:calc(100% - 54px);box-sizing:border-box;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
     grid-template-rows:repeat(2,minmax(0,1fr));gap:8px;padding:8px}
-  section{min-width:0;min-height:0;border:1px solid #223047;border-radius:9px;overflow:hidden;background:#0b1019;
-    display:flex;flex-direction:column;box-shadow:0 8px 24px rgba(0,0,0,.2)}
+  section{min-width:0;min-height:0;border:1px solid var(--ld-border);border-radius:var(--ld-r-sm);
+    overflow:hidden;background:var(--ld-card);display:flex;flex-direction:column;box-shadow:var(--ld-sh-1)}
   .pane-head{height:31px;box-sizing:border-box;display:flex;align-items:center;gap:8px;padding:0 10px;
-    background:#111a29;border-bottom:1px solid #202d42;color:#d7e3f3;font-weight:650}
-  .dot{width:8px;height:8px;border-radius:50%;background:#34d399;box-shadow:0 0 10px rgba(52,211,153,.6)}
-  .role{color:#8190a8;font-weight:500;font-size:11px}.open{margin-left:auto;color:#72d9ff;text-decoration:none;
-    font-weight:600;font-size:11px}.open:hover{color:#e1f7ff;text-decoration:underline}
-  iframe{border:0;display:block;flex:1;min-height:0;width:100%;background:#0b0f16}
+    background:var(--ld-panel);border-bottom:1px solid var(--ld-border);color:var(--ld-text);font-weight:650}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--ld-ok);
+    box-shadow:0 0 10px color-mix(in srgb,var(--ld-ok) 60%,transparent)}
+  .role{color:var(--ld-muted);font-weight:500;font-size:11px}
+  .open{margin-left:auto;color:var(--ld-accent);text-decoration:none;font-weight:600;font-size:11px}
+  .open:hover{color:var(--ld-text);text-decoration:underline}
+  iframe{border:0;display:block;flex:1;min-height:0;width:100%;background:var(--ld-window)}
   @media(max-width:760px){header{height:48px;padding:0 11px}.sub,.key{display:none}
     main{height:calc(100% - 48px);grid-template-columns:1fr;grid-template-rows:repeat(4,minmax(220px,1fr));
       overflow:auto}.pane-head{position:sticky;top:0;z-index:1}}
-</style></head><body>
+"""
+
+_MESH_HTML = (
+    page_head("Agent Mesh — LuckyD Browser", _MESH_CSS)
+    + """<body>
 <header><h1><span>🕸</span> Agent Mesh</h1><span class="sub">Four independent sessions, one workspace</span>
 <span class="key" id="mesh-status">Loading harness status…</span></header>
 <main>
@@ -427,3 +451,4 @@ async function refreshMeshStatus(){
 }
 refreshMeshStatus(); setInterval(refreshMeshStatus, 5000);
 </script></body></html>"""
+)

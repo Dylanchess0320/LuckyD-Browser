@@ -17,15 +17,14 @@ from __future__ import annotations
 
 import json
 
-_HEAD = r"""<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>New Tab</title>
-<style>
-  /* __BRAND_VARS__ — the active theme's --ld-* tokens are injected here. */
-  :root {
+try:
+    from browser_core.page_shell import VARS_PLACEHOLDER, page_head
+except ImportError:  # imported as browser.browser_core.dashboard
+    from browser.browser_core.page_shell import VARS_PLACEHOLDER, page_head
+
+# Dashboard-specific CSS — the shared head (doctype, token injection, base body
+# styles, toast helper, "?" shortcut overlay) comes from page_shell.
+_DASH_CSS = r"""  :root {
     --card: rgba(255,255,255,.06); --border: var(--ld-border, rgba(255,255,255,.10));
     --text: var(--ld-text, #e8eaf2); --muted: var(--ld-muted, #9aa1b5);
     --accent: var(--ld-accent, #5b9dff); --accent2: var(--ld-accent2, #b46bff);
@@ -129,9 +128,22 @@ _CSS = r"""  .search { display: flex; background: var(--card); border: 1px solid
     border-radius: 8px; font-size: 11.5px; padding: 4px 10px; cursor: pointer; transition: all .12s; }
   .ai-btn:hover { color: var(--text); border-color: var(--accent); }
   #ai-card-body { font-size: 13.5px; line-height: 1.65; color: var(--text); white-space: pre-wrap; word-break: break-word; }
-</style>
-</head>
 """
+
+# Shortcuts the dashboard itself documents (taglines in the JS below) — only
+# existing shortcuts are listed; nothing new is invented here.
+_DASH_SHORTCUTS = [
+    ("Ctrl+K", "Command palette — fuzzy search over tabs, bookmarks, history, actions"),
+    ("Ctrl+`", "Open an agent terminal tab"),
+    ("Ctrl+Shift+S", "Save a screenshot of the visible page"),
+]
+
+_HEAD = page_head(
+    "New Tab",
+    _DASH_CSS,
+    css_vars_text=VARS_PLACEHOLDER,
+    shortcuts=_DASH_SHORTCUTS,
+)
 _BODY = r"""<body>
 <header>
   <div id="pills">
@@ -438,7 +450,7 @@ renderApps(); render();
 </body>
 </html>
 """
-DASHBOARD_HTML = _HEAD + _CSS + _BODY + _JS + _JS2
+DASHBOARD_HTML = _HEAD + _BODY + _JS + _JS2
 
 
 def dashboard_html(settings=None) -> str:
@@ -452,8 +464,8 @@ def dashboard_html(settings=None) -> str:
     from browser_core.brand import css_vars
 
     block = "  " + css_vars(settings) + "\n"
-    if "/* __BRAND_VARS__ */" in DASHBOARD_HTML:
-        html = DASHBOARD_HTML.replace("  /* __BRAND_VARS__ */\n", block, 1)
+    if VARS_PLACEHOLDER in DASHBOARD_HTML:
+        html = DASHBOARD_HTML.replace("  " + VARS_PLACEHOLDER + "\n", block, 1)
     else:
         html = "<style>" + css_vars(settings) + "</style>" + DASHBOARD_HTML
     # Platform tiles: registry-driven extras appended to the built-in Apps.
@@ -466,21 +478,35 @@ def dashboard_html(settings=None) -> str:
     return html.replace("__PLATFORM_TILES__", json.dumps(extra))
 
 
+_SPLASH_CSS = r"""
+  body { display: flex; min-height: 100vh; align-items: center; justify-content: center;
+    margin: 0; text-align: center; font-weight: 600; background: var(--ld-grad); }
+  .spin { font-size: 44px; animation: pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: .55; transform: scale(.96); } 50% { opacity: 1; transform: scale(1.05); } }
+  h2 { font-size: 20px; margin: 14px 0 8px; }
+  .dim { color: var(--ld-muted); font-size: 13px; max-width: 420px; margin: 6px auto; line-height: 1.5; }
+  code { background: rgba(255,255,255,.08); border-radius: 6px; padding: 2px 8px; }
+  a { color: var(--ld-accent); text-decoration: none; }
+  .ld-err-card { background: var(--ld-card); border: 1px solid var(--ld-danger);
+    border-radius: var(--ld-r-lg); padding: 28px 36px; box-shadow: var(--ld-sh-2); }
+"""
+
+
 def hq_splash_html(harness_url: str, state: str, detail: str = "", settings=None) -> str:
     """Auto-refreshing splash for /hq while the exe boots (or its error page).
 
     Uses the active theme's tokens so the loading state matches the rest of
-    the product instead of falling back to a hard-coded gradient."""
-    from browser_core.brand import tokens
-
-    t = tokens(settings)
+    the product instead of falling back to a hard-coded gradient. The error
+    state renders as a proper error card; the starting state keeps its
+    3-second auto-refresh."""
     if state == "error":
         body = (
-            "<div class='spin'>⚠️</div><h2>Coding agent backend unavailable</h2>"
+            "<div class='ld-err-card'><div class='spin'>⚠️</div>"
+            "<h2>Coding agent backend unavailable</h2>"
             f"<p class='dim'>{detail}</p>"
             "<p class='dim'>Start it manually, then reload:<br>"
             "<code>luckyd-code.exe --web --port 8000</code></p>"
-            "<p><a href='/hq'>↻ Retry</a> · <a href='/dashboard'>Dashboard</a></p>"
+            "<p><a href='/hq'>↻ Retry</a> · <a href='/dashboard'>Dashboard</a></p></div>"
         )
         refresh = ""
     else:
@@ -490,20 +516,8 @@ def hq_splash_html(harness_url: str, state: str, detail: str = "", settings=None
         )
         refresh = "<meta http-equiv='refresh' content='3'>"
     return (
-        "<!DOCTYPE html><html><head><meta charset='utf-8'>"
-        "<title>Coding Agent</title>" + refresh + "<style>"
-        f"body{{background:linear-gradient(135deg,{t['window']},{t['panel2']});"
-        f"color:{t['text']};font:600 15px 'Segoe UI Variable','Segoe UI',"
-        "system-ui,sans-serif;display:flex;"
-        "height:100vh;align-items:center;justify-content:center;margin:0;"
-        "text-align:center}"
-        ".spin{font-size:44px;animation:pulse 1.6s ease-in-out infinite}"
-        "@keyframes pulse{0%,100%{opacity:.55;transform:scale(.96)}50%{opacity:1;transform:scale(1.05)}}"
-        f"h2{{font-size:20px;margin:14px 0 8px}}.dim{{color:{t['muted']};"
-        "font-size:13px;max-width:420px;margin:6px auto;line-height:1.5}"
-        "code{background:rgba(255,255,255,.08);border-radius:6px;padding:2px 8px}"
-        f"a{{color:{t['accent']};text-decoration:none}}</style></head>"
-        f"<body><div>{body}</div></body></html>"
+        page_head("Coding Agent", _SPLASH_CSS, settings=settings, extra_head=refresh)
+        + f"<body><div>{body}</div></body></html>"
     )
 
 
@@ -595,53 +609,53 @@ def hq_shell_html(harness_url: str, settings=None) -> str:
     )
 
 
-_WORKFLOWS_HTML = r"""<!DOCTYPE html>
-<html lang="en"><head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Workflows</title>
-<style>
-  :root { color-scheme: dark; }
+_WORKFLOWS_CSS = r"""  :root { color-scheme: dark; }
   * { box-sizing: border-box; }
-  body { margin: 0; min-height: 100vh; background: #0b0f16; color: #e2e8f0;
+  body { margin: 0; min-height: 100vh; background: var(--ld-window); color: var(--ld-text);
          font: 14px/1.5 system-ui, "Segoe UI", sans-serif; padding: 28px 20px; }
   main { max-width: 760px; margin: 0 auto; }
   h1 { font-size: 22px; margin: 0 0 4px; }
-  .sub { color: #64748b; font-size: 12.5px; margin-bottom: 20px; }
-  .card { background: #0f1622; border: 1px solid #1e293b; border-radius: 12px;
+  .sub { color: var(--ld-muted); font-size: 12.5px; margin-bottom: 20px; }
+  .card { background: var(--ld-panel); border: 1px solid var(--ld-border); border-radius: var(--ld-r-lg);
           padding: 16px; margin-bottom: 14px; }
   .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
   .row .sp { flex: 1; }
-  input[type=text] { flex: 1; min-width: 180px; background: #1a2132;
-      border: 1px solid #232c42; border-radius: 8px; padding: 9px 12px;
-      color: #e2e8f0; font: inherit; }
-  button { border: 1px solid #1e293b; background: #1a2132; color: #cbd5e1;
-      border-radius: 8px; padding: 9px 14px; font: 600 13px system-ui;
+  input[type=text] { flex: 1; min-width: 180px; background: var(--ld-card);
+      border: 1px solid var(--ld-border); border-radius: var(--ld-r-sm); padding: 9px 12px;
+      color: var(--ld-text); font: inherit; }
+  input[type=text]:focus { outline: none; border-color: var(--ld-accent); box-shadow: var(--ld-focus-ring); }
+  button { border: 1px solid var(--ld-border); background: var(--ld-card); color: var(--ld-text);
+      border-radius: var(--ld-r-sm); padding: 9px 14px; font: 600 13px system-ui;
       cursor: pointer; }
-  button:hover { border-color: #334155; }
-  button.rec { background: #7f1d1d; border-color: #991b1b; color: #fecaca; }
-  button.play { color: #34d399; }
-  button.del { color: #f87171; }
+  button:hover { border-color: color-mix(in srgb, var(--ld-border) 55%, var(--ld-text)); }
+  button.rec { background: color-mix(in srgb, var(--ld-danger) 22%, transparent);
+      border-color: var(--ld-danger); color: var(--ld-danger); }
+  button.play { color: var(--ld-ok); }
+  button.del { color: var(--ld-danger); }
   button:disabled { opacity: .45; cursor: default; }
-  .pill { font: 600 11.5px system-ui; padding: 4px 10px; border-radius: 999px;
-      background: #1a2132; border: 1px solid #232c42; color: #64748b; }
-  .pill.on { color: #f87171; border-color: #7f1d1d; }
+  .pill { font: 600 11.5px system-ui; padding: 4px 10px; border-radius: var(--ld-r-full);
+      background: var(--ld-card); border: 1px solid var(--ld-border); color: var(--ld-muted); }
+  .pill.on { color: var(--ld-danger); border-color: var(--ld-danger); }
   .wf { display: flex; align-items: center; gap: 10px; padding: 10px 4px;
-        border-top: 1px solid #1e293b; }
+        border-top: 1px solid var(--ld-border); }
   .wf:first-of-type { border-top: none; }
   .wf .name { font-weight: 600; }
-  .wf .meta { color: #64748b; font-size: 12px; }
+  .wf .meta { color: var(--ld-muted); font-size: 12px; }
   .wf .sp { flex: 1; }
-  .wf .last { color: #475569; font-size: 11px; width: 100%; padding-left: 2px; }
-  select.sched { background: #1a2132; border: 1px solid #232c42; border-radius: 8px;
-    color: #cbd5e1; padding: 6px 8px; font: 600 12px system-ui; }
-  select.sched.on { color: #fbbf24; border-color: #92400e; }
+  .wf .last { color: var(--ld-faint); font-size: 11px; width: 100%; padding-left: 2px; }
+  select.sched { background: var(--ld-card); border: 1px solid var(--ld-border); border-radius: var(--ld-r-sm);
+    color: var(--ld-text); padding: 6px 8px; font: 600 12px system-ui; }
+  select.sched.on { color: var(--ld-warn); border-color: var(--ld-warn); }
   #log { font: 12px/1.6 ui-monospace, "Cascadia Mono", Consolas, monospace;
-      white-space: pre-wrap; color: #94a3b8; max-height: 260px; overflow: auto; }
-  #log .ok { color: #34d399; } #log .bad { color: #f87171; }
-  #log .heal { color: #fbbf24; }
-  .empty { color: #475569; text-align: center; padding: 18px 0; }
-</style></head><body>
+      white-space: pre-wrap; color: var(--ld-muted); max-height: 260px; overflow: auto; }
+  #log .ok { color: var(--ld-ok); } #log .bad { color: var(--ld-danger); }
+  #log .heal { color: var(--ld-warn); }
+  .empty { color: var(--ld-faint); text-align: center; padding: 18px 0; }
+"""
+
+_WORKFLOWS_HTML = (
+    page_head("Workflows", _WORKFLOWS_CSS)
+    + r"""<body>
 <main>
   <h1>🎬 Workflows</h1>
   <div class="sub">Record Control-API actions (agent runs, scripts) into named
@@ -804,6 +818,7 @@ setInterval(refresh, 2500);
 </script>
 </body></html>
 """
+)
 
 
 def workflows_html() -> str:
@@ -815,41 +830,40 @@ def workflows_html() -> str:
     return _WORKFLOWS_HTML
 
 
-_NETMON_HTML = r"""<!DOCTYPE html>
-<html lang="en"><head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Network Monitor</title>
-<style>
-  :root { color-scheme: dark; }
+_NETMON_CSS = r"""  :root { color-scheme: dark; }
   * { box-sizing: border-box; }
-  body { margin: 0; background: #0b0f16; color: #e2e8f0;
+  body { margin: 0; background: var(--ld-window); color: var(--ld-text);
          font: 13px/1.45 system-ui, "Segoe UI", sans-serif; }
   header { display: flex; gap: 10px; align-items: center; padding: 12px 16px;
-      background: #0f1622; border-bottom: 1px solid #1e293b; flex-wrap: wrap; }
+      background: var(--ld-panel); border-bottom: 1px solid var(--ld-border); flex-wrap: wrap; }
   h1 { font-size: 16px; margin: 0; }
-  .target { color: #64748b; font-size: 12px; overflow: hidden;
+  .target { color: var(--ld-muted); font-size: 12px; overflow: hidden;
       text-overflow: ellipsis; white-space: nowrap; max-width: 40ch; }
   .sp { flex: 1; }
-  button { border: 1px solid #1e293b; background: #1a2132; color: #cbd5e1;
-      border-radius: 8px; padding: 7px 12px; font: 600 12px system-ui; cursor: pointer; }
-  button:hover { border-color: #334155; }
-  button.on { color: #f87171; border-color: #7f1d1d; }
-  input { background: #1a2132; border: 1px solid #232c42; border-radius: 8px;
-      padding: 7px 10px; color: #e2e8f0; font: inherit; width: 170px; }
+  button { border: 1px solid var(--ld-border); background: var(--ld-card); color: var(--ld-text);
+      border-radius: var(--ld-r-sm); padding: 7px 12px; font: 600 12px system-ui; cursor: pointer; }
+  button:hover { border-color: color-mix(in srgb, var(--ld-border) 55%, var(--ld-text)); }
+  button.on { color: var(--ld-danger); border-color: var(--ld-danger); }
+  input { background: var(--ld-card); border: 1px solid var(--ld-border); border-radius: var(--ld-r-sm);
+      padding: 7px 10px; color: var(--ld-text); font: inherit; width: 170px; }
+  input:focus { outline: none; border-color: var(--ld-accent); box-shadow: var(--ld-focus-ring); }
   table { width: 100%; border-collapse: collapse; }
-  th { position: sticky; top: 0; background: #0f1622; text-align: left;
-      padding: 8px 10px; font-size: 11px; letter-spacing: 1px; color: #64748b;
-      text-transform: uppercase; border-bottom: 1px solid #1e293b; }
-  td { padding: 5px 10px; border-bottom: 1px solid #131a26; font-size: 12px;
+  th { position: sticky; top: 0; background: var(--ld-panel); text-align: left;
+      padding: 8px 10px; font-size: 11px; letter-spacing: 1px; color: var(--ld-muted);
+      text-transform: uppercase; border-bottom: 1px solid var(--ld-border); }
+  td { padding: 5px 10px; border-bottom: 1px solid var(--ld-border); font-size: 12px;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 0; }
-  tr:hover td { background: #101827; }
+  tr:hover td { background: var(--ld-panel); }
   td.u { width: 100%; }
-  .m { font-weight: 700; color: #7dd3fc; }
-  .s2 { color: #34d399; } .s3 { color: #7dd3fc; } .s4 { color: #fbbf24; }
-  .s5, .serr { color: #f87171; } .s0 { color: #64748b; }
-  .empty { text-align: center; color: #475569; padding: 40px 0; }
-</style></head><body>
+  .m { font-weight: 700; color: var(--ld-accent); }
+  .s2 { color: var(--ld-ok); } .s3 { color: var(--ld-accent); } .s4 { color: var(--ld-warn); }
+  .s5, .serr { color: var(--ld-danger); } .s0 { color: var(--ld-muted); }
+  .empty { text-align: center; color: var(--ld-faint); padding: 40px 0; }
+"""
+
+_NETMON_HTML = (
+    page_head("Network Monitor", _NETMON_CSS)
+    + r"""<body>
 <header>
   <h1>📡 Network</h1>
   <span class="target" id="target">not capturing</span>
@@ -891,6 +905,7 @@ function matches(row, f) {
     (row.type || '').toLowerCase().includes(f) || row.method.toLowerCase().includes(f);
 }
 """
+)
 
 _NETMON_HTML2 = r"""function paint(row) {
   const f = $('filter').value.trim().toLowerCase();

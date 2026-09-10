@@ -104,6 +104,15 @@ PALETTES: dict[str, dict[str, str]] = {
 DEFAULT_THEME = "neon"
 
 
+def _rgba(hex_color: str, alpha: float) -> str:
+    """``#rrggbb`` → ``rgba(r,g,b,a)`` for theme-derived translucent tokens."""
+    h = hex_color.lstrip("#")
+    if len(h) == 3:
+        h = "".join(c * 2 for c in h)
+    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+    return f"rgba({r},{g},{b},{alpha})"
+
+
 def active_name(settings=None) -> str:
     """The configured theme key, validated against the known palettes.
 
@@ -141,5 +150,38 @@ def css_vars(settings=None) -> str:
         f"--ld-ok:{t['ok']}",
         f"--ld-danger:{t['danger']}",
         f"--ld-grad:linear-gradient(135deg,{grad_a} 0%,{grad_b} 60%,{t['panel']} 100%)",
+        # ── unified design-system tokens (spacing, radius, elevation, accent
+        # gradient, focus ring, muted/disabled, status colors) ──
+        # spacing scale
+        "--ld-sp-1:4px",
+        "--ld-sp-2:8px",
+        "--ld-sp-3:12px",
+        "--ld-sp-4:16px",
+        "--ld-sp-5:20px",
+        "--ld-sp-6:24px",
+        "--ld-sp-8:32px",
+        "--ld-sp-10:40px",
+        "--ld-sp-12:48px",
+        "--ld-sp-16:64px",
+        # radius scale
+        "--ld-r-sm:6px",
+        "--ld-r-md:10px",
+        "--ld-r-lg:14px",
+        "--ld-r-xl:20px",
+        "--ld-r-full:999px",
+        # elevation
+        "--ld-sh-1:0 1px 2px rgba(0,0,0,.28)",
+        "--ld-sh-2:0 4px 16px rgba(0,0,0,.35)",
+        "--ld-sh-3:0 12px 40px rgba(0,0,0,.5)",
+        # accent gradient + focus ring, derived from the theme accent
+        f"--ld-grad-accent:linear-gradient(135deg,{t['accent']} 0%,{t['accent2']} 100%)",
+        f"--ld-focus-ring:0 0 0 3px {_rgba(t['accent'], 0.35)}",
+        # status colors (success/error alias the theme's ok/danger)
+        f"--ld-success:{t['ok']}",
+        "--ld-warn:#fbbf24",
+        f"--ld-error:{t['danger']}",
+        # muted / disabled text
+        f"--ld-faint:{_rgba(t['muted'], 0.6)}",
+        f"--ld-disabled:{_rgba(t['muted'], 0.55)}",
     ]
     return ":root{" + ";".join(lines) + "}"
