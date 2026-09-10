@@ -46,9 +46,14 @@ _MAX_TEXT_LEN = 2000
 
 
 # ── Tab/origin binding registry ─────────────────────────────────────────
-# Keyed by origin (scheme://host[:port]). LuckyD's browser currently drives
-# a single tab, so the origin alone identifies the binding; if multi-tab
-# support lands, this key becomes (tab_id, origin).
+# Keyed by (tab_id, origin). LuckyD's browser currently drives a single tab,
+# so current_tab_id() always returns "default" — but every lookup goes
+# through it, so multi-tab support only has to start returning the real
+# active tab id here: bindings are already isolated per tab, one tab's
+# navigation can never purge or steal another tab's registrations, and a
+# binding token discovered in tab A is refused in tab B.
+
+_DEFAULT_TAB_ID = "default"
 
 
 @dataclass
@@ -60,8 +65,31 @@ class _OriginBinding:
     tools: dict[str, dict] = field(default_factory=dict)  # tool name -> parameters schema
 
 
-_BINDINGS: dict[str, _OriginBinding] = {}
-_last_origin: str | None = None
+_BINDINGS: dict[tuple[str, str], _OriginBinding] = {}
+_last_origin: dict[str, str] = {}
+_current_tab_id: str = _DEFAULT_TAB_ID
+
+
+def current_tab_id() -> str:
+    """Identifier of the tab the agent is currently driving.
+
+    Single-tab today: always "default". When the browser gains tabs this
+    becomes the hook where the real active-tab id (e.g. from browser_tools'
+    page handle) is returned; all binding lookups key on (tab_id, origin)
+    already, so no call-site changes will be needed.
+    """
+    return _current_tab_id
+
+
+def set_current_tab_id(tab_id: str) -> None:
+    """Override the active tab id. Test/support hook; the future multi-tab
+    browser core will drive this instead."""
+    global _current_tab_id
+    _current_tab_id = tab_id or _DEFAULT_TAB_ID
+
+
+def _tab_key(tab_id: str, origin_key: str) -> tuple[str, str]:
+    return (tab_id, origin_key)
 
 
 def _origin_of_url(url: str | None) -> str:
@@ -88,29 +116,31 @@ def _binding_key(page_url: str | None) -> str:
 
 
 def reset_webmcp_bindings() -> None:
-    """Drop all WebMCP origin bindings. Test/support hook."""
+    """Drop all WebMCP tab/origin bindings. Test/support hook."""
     _BINDINGS.clear()
-    global _last_origin
-    _last_origin = None
+    _last_origin.clear()
+    global _current_tab_id
+    _current_tab_id = _DEFAULT_TAB_ID
 
 
-def _sync_origin_binding(page_url: str | None) -> None:
-    """Purge stale registrations when the tab navigates cross-origin.
+def _sync_origin_binding(tab_id: str, page_url: str | None) -> None:
+    """Purge stale registrations when a tab navigates cross-origin.
 
     Called before every discover/call so a binding can never outlive the
-    page whose origin registered it.
+    page whose origin registered it. Per-tab: one tab's navigation never
+    touches another tab's bindings.
     """
-    global _last_origin
     key = _binding_key(page_url)
-    if _last_origin and key != _last_origin:
-        _BINDINGS.pop(_last_origin, None)
-    _last_origin = key
+    prev = _last_origin.get(tab_id)
+    if prev is not None and key != prev:
+        _BINDINGS.pop(_tab_key(tab_id, prev), None)
+    _last_origin[tab_id] = key
 
 
-def _register_discovery(key: str, tools: list[dict]) -> str:
+def _register_discovery(tab_id: str, key: str, tools: list[dict]) -> str:
     """Record a discovery result; returns a fresh opaque binding token."""
     token = secrets.token_urlsafe(24)
-    _BINDINGS[key] = _OriginBinding(
+    _BINDINGS[_tab_key(tab_id, key)] = _OriginBinding(
         origin=key,
         binding_token=token,
         tools={t["name"]: t["parameters"] for t in tools},
@@ -121,9 +151,13 @@ def _register_discovery(key: str, tools: list[dict]) -> str:
 def _check_binding(key: str, tool: str, binding_token: str) -> tuple[_OriginBinding | None, str]:
     """Verify a call is bound to the tab+origin that registered the tool.
 
+    The tab is the agent's currently-driven tab (current_tab_id()); in the
+    single-tab browser this is always "default", so the signature stays
+    origin-keyed for callers.
+
     Returns (binding, "") on success, (None, reason) on refusal.
     """
-    binding = _BINDINGS.get(key)
+    binding = _BINDINGS.get(_tab_key(current_tab_id(), key))
     if binding is None:
         return None, (
             "No WebMCP tools have been discovered on this page's origin. "
@@ -328,16 +362,17 @@ _CALL_JS = """async ([name, args]) => {
 
 
 async def _discover_on_page(page) -> tuple[dict, str, str]:
-    """Run discovery on a page, bind the result to its origin.
+    """Run discovery on a page, bind the result to the (tab, origin).
 
     Returns (sanitized_result, binding_token, binding_key).
     """
+    tab_id = current_tab_id()
     page_url = getattr(page, "url", "") or ""
-    _sync_origin_binding(page_url)
+    _sync_origin_binding(tab_id, page_url)
     key = _binding_key(page_url)
     raw = await page.evaluate(_DISCOVERY_JS, timeout=_EVALUATE_TIMEOUT_MS)
     result = _coerce_discovery(raw)
-    token = _register_discovery(key, result["tools"])
+    token = _register_discovery(tab_id, key, result["tools"])
     return result, token, key
 
 
@@ -418,7 +453,8 @@ class WebMCPCallTool(ToolBase):
         try:
             page = await _get_page()
             page_url = getattr(page, "url", "") or ""
-            _sync_origin_binding(page_url)
+            tab_id = current_tab_id()
+            _sync_origin_binding(tab_id, page_url)
             key = _binding_key(page_url)
             binding, refusal = _check_binding(key, tool, binding_token or "")
             if binding is None:

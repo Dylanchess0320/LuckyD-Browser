@@ -113,20 +113,20 @@ class TestDiscoveryBinding:
         token = out.metadata["binding_token"]
         assert token and len(token) >= 16
         assert out.metadata["origin"] == ORIGIN_A
-        assert ORIGIN_A in _BINDINGS
-        assert "search" in _BINDINGS[ORIGIN_A].tools
+        assert ("default", ORIGIN_A) in _BINDINGS
+        assert "search" in _BINDINGS[("default", ORIGIN_A)].tools
         assert "Binding token" in out.text
 
     async def test_discover_scopes_to_calling_tab_origin(self, monkeypatch):
         page = _FakePage(ORIGIN_A + "/", _discovery_payload(_tool("search")))
         out_a = await _discover(monkeypatch, page)
-        assert _BINDINGS[ORIGIN_A].tools.keys() == {"search"}
+        assert _BINDINGS[("default", ORIGIN_A)].tools.keys() == {"search"}
         page.url = ORIGIN_B + "/"
         page._discovery = _discovery_payload(_tool("steal"))
         out_b = await _discover(monkeypatch, page)
         # Navigating cross-origin purged origin A's stale registration.
-        assert ORIGIN_A not in _BINDINGS
-        assert _BINDINGS[ORIGIN_B].tools.keys() == {"steal"}
+        assert ("default", ORIGIN_A) not in _BINDINGS
+        assert _BINDINGS[("default", ORIGIN_B)].tools.keys() == {"steal"}
         assert out_a.metadata["binding_token"] != out_b.metadata["binding_token"]
 
     async def test_token_rotates_on_rediscovery(self, monkeypatch):
@@ -259,11 +259,11 @@ class TestStaleCleanup:
         page = _FakePage(ORIGIN_A + "/", _discovery_payload(_tool("search")))
         out = await _discover(monkeypatch, page)
         token = out.metadata["binding_token"]
-        assert ORIGIN_A in _BINDINGS
+        assert ("default", ORIGIN_A) in _BINDINGS
         page.url = ORIGIN_B + "/"
         page._discovery = _discovery_payload()
         await _discover(monkeypatch, page)  # any follow-up op syncs the binding
-        assert ORIGIN_A not in _BINDINGS
+        assert ("default", ORIGIN_A) not in _BINDINGS
         # The old token is dead even if the tab navigates back.
         page.url = ORIGIN_A + "/"
         _, refusal = _check_binding(ORIGIN_A, "search", token)

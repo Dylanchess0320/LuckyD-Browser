@@ -95,6 +95,13 @@ class CodingAgent:
         self._no_tool_call_turns: int = 0
         self._max_no_tool_call_turns: int = 5  # Auto-continue retries before giving up
 
+        # Circuit breaker: stop early when every tool call keeps failing turn
+        # after turn, instead of spinning (and billing) all the way to max_turns.
+        self._consecutive_failed_tool_turns: int = 0
+        self._max_consecutive_failed_tool_turns: int = int(
+            os.environ.get("CODING_AGENT_MAX_FAILED_TOOL_TURNS", "4")
+        )
+
         # Cost tracking (for /cost, goodbye)
         self._cost_tracker = CostTracker()
 
@@ -301,17 +308,19 @@ class CodingAgent:
             return {
                 "role": "tool",
                 "tool_call_id": call_id,
-                "content": f"Tool execution timed out after {tool_timeout:.0f}s.",
+                "content": f"Error: Tool execution timed out after {tool_timeout:.0f}s.",
             }
         except TypeError as e:
-            result_text = f"Tool argument error: {e}\nExpected: {json.dumps(tool.parameters)}"
+            result_text = (
+                f"Error: Tool argument error: {e}\nExpected: {json.dumps(tool.parameters)}"
+            )
             return {"role": "tool", "tool_call_id": call_id, "content": result_text}
         except Exception as e:
             traceback.print_exc()
             return {
                 "role": "tool",
                 "tool_call_id": call_id,
-                "content": f"Tool execution error: {e}",
+                "content": f"Error: Tool execution error: {e}",
             }
 
         content = result.text
@@ -456,6 +465,21 @@ class CodingAgent:
             return choice.get("message", {})
         except Exception:
             return None
+
+    def _api_unreachable_message(self, exc: Exception | None = None) -> str:
+        """Actionable message for a dead LLM endpoint.
+
+        The old text ("[ERR] API connection failed after 3 retries.") left
+        users with no idea what to check; name the provider/model and the
+        three things that actually fix this.
+        """
+        detail = f": {exc}" if exc is not None else ""
+        return (
+            f"[ERR] Could not reach the {self.provider_name} API ({self.model}) "
+            f"after 3 attempts{detail}\n"
+            "Check: 1) your API key is set (Settings), 2) your network connection, "
+            "3) the base URL if you customized it. Use /model to switch providers."
+        )
 
     def _should_continue(self, assistant_msg: dict) -> str | None:
         """Return a continuation prompt if the agent stopped prematurely, else None.
@@ -649,13 +673,13 @@ class CodingAgent:
                 print(f"\n  [ERR] LLM call failed ({type(e).__name__}): {e}")
                 if consecutive_errors >= 3:
                     self._emit_event(AgentEventType.ERROR, {"error": str(e)})
-                    return final_text or "[ERR] API connection failed after 3 retries."
+                    return final_text or self._api_unreachable_message(e)
                 continue
             if assistant_msg is None:
                 consecutive_errors += 1
                 if consecutive_errors >= 3:
                     self._emit_event(AgentEventType.ERROR, {"error": "API failed after 3 retries"})
-                    return final_text or "[ERR] API connection failed after 3 retries."
+                    return final_text or self._api_unreachable_message()
                 continue
 
             # If the response returned an API error on a free-tier model, attempt transparent fallback
@@ -746,6 +770,7 @@ class CodingAgent:
 
                 # Genuine final answer
                 self._no_tool_call_turns = 0
+                self._consecutive_failed_tool_turns = 0
                 final_text = content
                 self._emit_event(AgentEventType.TURN_END, {"final": True})
                 break
@@ -754,7 +779,6 @@ class CodingAgent:
             self._no_tool_call_turns = 0
 
             tool_results = []
-            hint_messages = []
             for tc in tool_calls:
                 func = tc.get("function", {})
                 tool_name = func.get("name", "")
@@ -776,20 +800,50 @@ class CodingAgent:
                     {"tool": tool_name, "elapsed": elapsed, "error": is_err},
                 )
                 tool_results.append(result_msg)
-                if is_err and turn >= 1:
-                    for m in self.messages[-3:]:
-                        if m.get("role") == "tool" and m.get("content", "").startswith("Error"):
-                            hint_messages.append(
-                                {
-                                    "role": "system",
-                                    "content": "HINT: The previous call to this tool failed. Try a different approach.",
-                                }
-                            )
-                            break
+
+            # Nudge the model toward a different approach when failures repeat,
+            # but only once per turn: several failing tool calls in one turn
+            # must not stack identical hints.
+            turn_had_error = any(r.get("content", "").startswith("Error") for r in tool_results)
+            hint_messages = []
+            if turn_had_error and turn >= 1:
+                for m in self.messages[-3:]:
+                    if m.get("role") == "tool" and m.get("content", "").startswith("Error"):
+                        hint_messages.append(
+                            {
+                                "role": "system",
+                                "content": "HINT: The previous call to this tool failed. Try a different approach.",
+                            }
+                        )
+                        break
 
             self.messages.extend(tool_results)
             if hint_messages:
                 self.messages.extend(hint_messages)
+
+            # Circuit breaker: every tool call failed again this turn. Stop
+            # early with an actionable explanation instead of burning the
+            # remaining turns (and budget) on a stuck loop.
+            if turn_had_error:
+                self._consecutive_failed_tool_turns += 1
+                if self._consecutive_failed_tool_turns >= self._max_consecutive_failed_tool_turns:
+                    last_err = (tool_results[0].get("content") or "")[:300]
+                    final_text = (
+                        f"[ERR] Stopped after {self._consecutive_failed_tool_turns} "
+                        "consecutive turns in which every tool call failed. "
+                        f"Last error: {last_err}\n"
+                        "The tools kept failing, so I stopped instead of using up "
+                        "the remaining turns. Try rephrasing the request, double-"
+                        "check the tool arguments, or use /clear to start fresh."
+                    )
+                    self._emit_event(
+                        AgentEventType.ERROR,
+                        {"error": final_text, "stuck_loop": True},
+                    )
+                    break
+            else:
+                self._consecutive_failed_tool_turns = 0
+
             self._emit_event(AgentEventType.TURN_END, {"final": False})
 
         else:
@@ -871,6 +925,8 @@ class CodingAgent:
         """Reset conversation state."""
         self.messages = []
         self.turn_count = 0
+        self._no_tool_call_turns = 0
+        self._consecutive_failed_tool_turns = 0
         self._last_extraction_msg_count = 0
         self._last_memory_refresh_turn = 0
         self._memory_context = ""
