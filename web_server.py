@@ -41,6 +41,39 @@ from core.types import HookContext
 from memory.store import get_memory
 from tools.registry import registry
 
+# ── Shared brand tokens (one dark token set for every served page) ────────
+# `/`, `/trust`, and `/schedules` all read the --ld-* tokens from
+# browser.browser_core.brand — the same tokens the Qt chrome and the new-tab
+# dashboard use — so the whole web dashboard reads as one product. The
+# `:root` block is injected per request by _send_html via the
+# `/* __BRAND_VARS__ */` marker inside each page's <style> (same pattern as
+# browser_core.dashboard.dashboard_html).
+try:
+    from browser.browser_core.brand import css_vars as _brand_css_vars
+except Exception:  # a moved tree must never take the pages down
+    _brand_css_vars = None
+
+# Neon Night tokens, inlined so the pages keep their theme when the import
+# above fails. Mirrors browser_core.brand.PALETTES["neon"].
+_BRAND_CSS_FALLBACK = (
+    ":root{--ld-window:#0b0f1a;--ld-panel:#10151f;--ld-panel2:#141a28;"
+    "--ld-card:#1a2132;--ld-border:#232c42;--ld-text:#e8ecf5;--ld-muted:#8b93a7;"
+    "--ld-accent:#5b9dff;--ld-accent2:#b46bff;--ld-ok:#34d399;"
+    "--ld-danger:#ff5b6e;"
+    "--ld-grad:linear-gradient(135deg,#0b0f1a 0%,#141a28 60%,#10151f 100%)}"
+)
+
+
+def _brand_css() -> str:
+    """The active theme's `:root{--ld-*}` block (falls back to Neon Night)."""
+    if _brand_css_vars is not None:
+        try:
+            return _brand_css_vars()
+        except Exception:
+            pass
+    return _BRAND_CSS_FALLBACK
+
+
 # The ApprovalHook instance wired in main() — used by the Trust dashboard's
 # pending-approval endpoints. Resolved lazily so import order never matters.
 _APPROVAL_HOOK: ApprovalHook | None = None
@@ -192,7 +225,10 @@ class HQHandler(BaseHTTPRequestHandler):
 
     def _send_html(self, html: str, code: int = 200) -> None:
         try:
-            body = html.encode("utf-8")
+            # Inject the active theme's --ld-* tokens into the page's <style>
+            # (CSS-only; markup and JS behaviour are untouched). Same marker
+            # pattern as browser_core.dashboard.dashboard_html.
+            body = html.replace("/* __BRAND_VARS__ */", _brand_css()).encode("utf-8")
             self.send_response(code)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             # The HQ page runs the full agent; keep plugins/foreign framing out.
@@ -666,42 +702,54 @@ _TRUST_HTML = """<!doctype html>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>LuckyD Trust Center</title>
 <style>
-:root{--bg:#0b0e14;--panel:#141a26;--border:#243049;--text:#e6ebf5;--dim:#8b98b0;
---acc:#4f8cff;--ok:#3fb950;--warn:#d29922;--bad:#f85149}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);
-font:14px/1.5 system-ui,Segoe UI,Roboto,sans-serif;padding:0 0 60px}
-header{padding:14px 22px;background:var(--panel);border-bottom:1px solid var(--border);
-display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:5}
-header b{color:var(--acc);font-size:17px}.pill{font-size:11px;padding:2px 10px;border-radius:99px;
-background:#0e2417;color:var(--ok);border:1px solid #1d3a26}
-main{max-width:1100px;margin:0 auto;padding:20px}
-section{background:var(--panel);border:1px solid var(--border);border-radius:12px;
-padding:18px;margin-bottom:18px}
-h2{margin:0 0 4px;font-size:16px}.sub{color:var(--dim);font-size:12.5px;margin:0 0 14px}
-table{width:100%;border-collapse:collapse;font-size:13px}
-th{text-align:left;color:var(--dim);font-weight:600;padding:8px;border-bottom:1px solid var(--border)}
-td{padding:8px;border-bottom:1px solid var(--border);vertical-align:top}
-select,input{background:var(--bg);border:1px solid var(--border);color:var(--text);
-border-radius:8px;padding:7px 10px;font:inherit}
-button{background:var(--acc);color:#fff;border:0;border-radius:8px;padding:8px 16px;
-font:inherit;cursor:pointer;margin-right:8px}
-button.deny{background:var(--bad)}button.ghost{background:transparent;border:1px solid var(--border)}
-button:disabled{opacity:.5}
-.risk{font-size:11px;padding:2px 8px;border-radius:99px;border:1px solid}
-.risk.high{color:var(--bad);border-color:var(--bad)}
-.risk.medium{color:var(--warn);border-color:var(--warn)}
-.risk.low{color:var(--ok);border-color:var(--ok)}
-.dec{font-size:11px;padding:2px 8px;border-radius:99px;background:var(--bg);border:1px solid var(--border)}
-.dec.denied,.dec.blocked{color:var(--bad);border-color:var(--bad)}
-.dec.approved,.dec.executed,.dec.auto{color:var(--ok)}
-.mono{font-family:ui-monospace,Consolas,monospace;font-size:12px;color:var(--dim);
-word-break:break-all;max-width:420px}
-.appr{border:1px solid var(--warn);border-radius:10px;padding:14px;margin-bottom:12px;background:#141207}
-.appr h3{margin:0 0 6px;font-size:14px}
-.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.empty{color:var(--dim);font-style:italic}
-#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--panel);
-border:1px solid var(--border);padding:10px 18px;border-radius:10px;display:none}
+  /* __BRAND_VARS__ */
+  /* --warn is the one semantic token brand doesn't carry (risk levels). */
+  :root{--warn:#d29922}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ld-window);color:var(--ld-text);
+  font:14px/1.5 system-ui,Segoe UI,Roboto,sans-serif;padding:0 0 60px}
+  header{padding:14px 22px;background:var(--ld-panel);border-bottom:1px solid var(--ld-border);
+  display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:5;flex-wrap:wrap}
+  header b{color:var(--ld-accent);font-size:17px}
+  .pill{font-size:11px;padding:2px 10px;border-radius:99px;
+  background:var(--ld-panel2);color:var(--ld-ok);border:1px solid var(--ld-ok)}
+  main{max-width:1100px;margin:0 auto;padding:20px}
+  section{background:var(--ld-panel);border:1px solid var(--ld-border);border-radius:12px;
+  padding:18px;margin-bottom:18px}
+  h2{margin:0 0 4px;font-size:16px}
+  .sub{color:var(--ld-muted);font-size:12.5px;margin:0 0 14px}
+  .tablewrap{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:13px;min-width:520px}
+  th{text-align:left;color:var(--ld-muted);font-weight:600;padding:8px;border-bottom:1px solid var(--ld-border)}
+  td{padding:8px;border-bottom:1px solid var(--ld-border);vertical-align:top}
+  select,input{background:var(--ld-window);border:1px solid var(--ld-border);color:var(--ld-text);
+  border-radius:8px;padding:7px 10px;font:inherit}
+  button{background:var(--ld-accent);color:#fff;border:0;border-radius:8px;padding:8px 16px;
+  font:inherit;cursor:pointer;margin-right:8px}
+  button:hover{filter:brightness(1.08)}
+  button.deny{background:var(--ld-danger)}
+  button.ghost{background:transparent;border:1px solid var(--ld-border);color:var(--ld-text)}
+  button:disabled{opacity:.5}
+  .risk{font-size:11px;padding:2px 8px;border-radius:99px;border:1px solid}
+  .risk.high{color:var(--ld-danger);border-color:var(--ld-danger)}
+  .risk.medium{color:var(--warn);border-color:var(--warn)}
+  .risk.low{color:var(--ld-ok);border-color:var(--ld-ok)}
+  .dec{font-size:11px;padding:2px 8px;border-radius:99px;background:var(--ld-window);border:1px solid var(--ld-border)}
+  .dec.denied,.dec.blocked{color:var(--ld-danger);border-color:var(--ld-danger)}
+  .dec.approved,.dec.executed,.dec.auto{color:var(--ld-ok)}
+  .mono{font-family:ui-monospace,Consolas,monospace;font-size:12px;color:var(--ld-muted);
+  word-break:break-all;max-width:420px}
+  .appr{border:1px solid var(--warn);border-radius:10px;padding:14px;margin-bottom:12px;background:var(--ld-panel2)}
+  .appr h3{margin:0 0 6px;font-size:14px}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .empty{color:var(--ld-muted);font-style:italic}
+  .empty-card{background:var(--ld-panel2);border:1px dashed var(--ld-border);border-radius:12px;
+  padding:26px 18px;text-align:center;color:var(--ld-muted);font-size:13.5px;line-height:1.6}
+  .empty-card .big{font-size:26px;display:block;margin-bottom:6px}
+  #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ld-panel);
+  border:1px solid var(--ld-border);padding:10px 18px;border-radius:10px;display:none}
+  @media (max-width:560px){
+  main{padding:14px}section{padding:14px}header{padding:12px 14px}}
 </style></head><body>
 <header><b>&#9670; LuckyD Trust Center</b><span class="pill">agentic with receipts</span>
 <span style="flex:1"></span>
@@ -715,8 +763,8 @@ border:1px solid var(--border);padding:10px 18px;border-radius:10px;display:none
 <div id="pending"><p class="empty">Loading&hellip;</p></div></section>
 <section><h2>&#128274; What the agent can touch</h2>
 <p class="sub">Permission scopes. "Ask" pauses for your approval, "Allow" runs freely, "Deny" blocks outright.</p>
-<table><thead><tr><th>Scope</th><th>Tools</th><th>Policy</th></tr></thead>
-<tbody id="scopes"><tr><td colspan="3" class="empty">Loading&hellip;</td></tr></tbody></table></section>
+<div class="tablewrap"><table><thead><tr><th>Scope</th><th>Tools</th><th>Policy</th></tr></thead>
+<tbody id="scopes"><tr><td colspan="3" class="empty">Loading&hellip;</td></tr></tbody></table></div></section>
 <section><h2>&#127760; Site rules</h2>
 <p class="sub">Browser-control rules per website. "Allow" = the agent can drive this site without asking.</p>
 <div id="sites"></div>
@@ -731,8 +779,8 @@ border:1px solid var(--border);padding:10px 18px;border-radius:10px;display:none
 <option>approved</option><option>denied</option><option>blocked</option>
 <option>executed</option><option>auto</option></select></label>
 <button class="ghost" onclick="loadAudit()">Refresh</button></div>
-<table><thead><tr><th>Time</th><th>Tool</th><th>Scope</th><th>Risk</th><th>Decision</th><th>Detail</th></tr></thead>
-<tbody id="audit"><tr><td colspan="6" class="empty">Loading&hellip;</td></tr></tbody></table></section>
+<div class="tablewrap"><table><thead><tr><th>Time</th><th>Tool</th><th>Scope</th><th>Risk</th><th>Decision</th><th>Detail</th></tr></thead>
+<tbody id="audit"><tr><td colspan="6" class="empty">Loading&hellip;</td></tr></tbody></table></div></section>
 </main><div id="toast"></div>
 <script>
 const $=id=>document.getElementById(id);
@@ -744,7 +792,7 @@ return r.json();}
 function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 async function loadPending(){const d=await api('/api/approvals/pending');
 const box=$('pending');
-if(!d.pending.length){box.innerHTML='<p class="empty">Nothing waiting. The agent will pause here when it needs you.</p>';return;}
+if(!d.pending.length){box.innerHTML='<div class="empty-card"><span class="big">🛋️</span>Nothing waiting.<br>The agent will pause here when it needs you.</div>';return;}
 box.innerHTML=d.pending.map(p=>`<div class="appr"><h3>${esc(p.tool)} <span class="risk ${p.risk}">${p.risk}</span>
 <span class="dec">${esc(p.scope)}</span></h3><div class="mono">${esc(p.summary)}</div>
 <div class="row" style="margin-top:10px"><select id="rm-${p.call_id}">
@@ -770,7 +818,7 @@ fs.innerHTML='<option value="">all</option>'+d.scopes.map(s=>`<option value="${s
 fs.value=cur;
 $('sites').innerHTML=Object.entries(d.sites).map(([h,p])=>
 `<span class="dec">${esc(h)}: ${esc(p)}</span> <button class="ghost" onclick="delSite('${esc(h)}')">remove</button> `).join('')
-||'<p class="empty">No site rules yet.</p>';}
+||'<div class="empty-card"><span class="big">🌐</span>No site rules yet.<br>Add an allow rule above to let the agent drive a site freely.</div>';}
 async function setMode(m){const r=await api('/api/trust/policy',{action:'set_mode',mode:m});
 toast(r.ok?'Mode updated':'Error: '+(r.error||'?'));}
 async function setScope(s,p){const r=await api('/api/trust/policy',{action:'set_scope',scope:s,policy:p});
@@ -788,7 +836,7 @@ $('audit').innerHTML=r.events.map(e=>`<tr><td class="mono">${esc(e.ts.slice(11,1
 <td><span class="risk ${e.risk}">${esc(e.risk)}</span></td>
 <td><span class="dec ${esc(e.decision)}">${esc(e.decision)}</span></td>
 <td class="mono">${esc(e.summary||JSON.stringify(e.args).slice(0,120))}</td></tr>`).join('')
-||'<tr><td colspan="6" class="empty">No events yet.</td></tr>';}
+||'<tr><td colspan="6"><div class="empty-card"><span class="big">🧾</span>No events yet.<br>Audit entries appear here as the agent works.</div></td></tr>';}
 loadPending();loadScopes();loadAudit();setInterval(loadPending,2000);
 </script></body></html>"""
 
@@ -799,21 +847,53 @@ _SCHEDULES_HTML = """<!doctype html>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>LuckyD — Scheduled Agents</title>
 <style>
-body{font-family:system-ui,sans-serif;max-width:960px;margin:0 auto;padding:20px;color:#222}
-h1{font-size:22px}h2{font-size:17px;margin-top:28px}
-.card{border:1px solid #ddd;border-radius:10px;padding:14px;margin:10px 0;background:#fafafa}
-table{width:100%;border-collapse:collapse;font-size:14px}
-th,td{text-align:left;padding:8px;border-bottom:1px solid #eee;vertical-align:top}
-button{border:1px solid #ccc;background:#fff;border-radius:6px;padding:5px 10px;cursor:pointer;margin:2px}
-button:hover{background:#f0f0f0}.danger{color:#a00}
-input,select,textarea{border:1px solid #ccc;border-radius:6px;padding:6px;margin:3px 0;width:100%;box-sizing:border-box}
-textarea{height:70px}.row{display:flex;gap:8px}.row>div{flex:1}
-.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:12px}
-.ok{background:#e6f4ea}.bad{background:#fdecea}.run{background:#e8f0fe}.idle{background:#eee}
-#digest{display:none;border-left:4px solid #f9ab00;background:#fff8e1}
-.muted{color:#666;font-size:13px}
-</style></head><body>
-<h1>⏰ Scheduled Agents</h1>
+  /* __BRAND_VARS__ */
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ld-window);color:var(--ld-text);
+  font:14px/1.5 system-ui,Segoe UI,Roboto,sans-serif;padding:24px 16px 60px}
+  .wrap{max-width:960px;margin:0 auto}
+  h1{font-size:22px;margin:0 0 6px}
+  h1 .tick{color:var(--ld-accent)}
+  h2{font-size:16px;margin:26px 0 10px}
+  .card{background:var(--ld-panel);border:1px solid var(--ld-border);border-radius:12px;
+  padding:16px;margin:10px 0}
+  .muted{color:var(--ld-muted);font-size:13px}
+  .tablewrap{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;min-width:620px}
+  th{text-align:left;color:var(--ld-muted);font-weight:600;padding:8px;border-bottom:1px solid var(--ld-border)}
+  td{padding:10px 8px;border-bottom:1px solid var(--ld-border);vertical-align:top}
+  button{background:var(--ld-panel2);color:var(--ld-text);border:1px solid var(--ld-border);
+  border-radius:8px;padding:7px 14px;font:inherit;cursor:pointer;margin:2px}
+  button:hover{border-color:var(--ld-accent)}
+  button.primary{background:var(--ld-accent);border-color:var(--ld-accent);color:#fff}
+  button.primary:hover{filter:brightness(1.08)}
+  button.danger{background:transparent;border:1px solid var(--ld-danger);color:var(--ld-danger)}
+  button:disabled{opacity:.5;cursor:default}
+  input,select,textarea{background:var(--ld-window);border:1px solid var(--ld-border);
+  color:var(--ld-text);border-radius:8px;padding:7px 10px;margin:3px 0;width:100%;font:inherit}
+  textarea{height:70px;resize:vertical}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--ld-accent)}
+  label{display:block;font-size:12.5px;color:var(--ld-muted);margin-bottom:4px}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  .row>div{flex:1;min-width:140px}
+  .badge{display:inline-block;padding:2px 10px;border-radius:99px;font-size:12px;
+  border:1px solid var(--ld-border);background:var(--ld-panel2);color:var(--ld-muted)}
+  .badge.ok{color:var(--ld-ok);border-color:var(--ld-ok)}
+  .badge.bad{color:var(--ld-danger);border-color:var(--ld-danger)}
+  .badge.run{color:var(--ld-accent);border-color:var(--ld-accent)}
+  #digest{display:none;border-left:4px solid var(--ld-accent2);background:var(--ld-panel2)}
+  #digest .ok{color:var(--ld-ok);font-weight:700}
+  #digest .warn{color:var(--ld-danger);font-weight:700}
+  code{font-family:ui-monospace,Consolas,monospace;color:var(--ld-accent2);font-size:12.5px}
+  .empty-card{background:var(--ld-panel2);border:1px dashed var(--ld-border);border-radius:12px;
+  padding:26px 18px;text-align:center;color:var(--ld-muted);font-size:13.5px;line-height:1.6}
+  .empty-card .big{font-size:26px;display:block;margin-bottom:6px}
+  @media (max-width:560px){
+  body{padding:16px 10px 48px}.card{padding:14px}.row>div{min-width:0;flex:1 1 100%}}
+</style>
+</head><body>
+<div class="wrap">
+<h1><span class="tick">⏰</span> Scheduled Agents</h1>
 <p class="muted">Background agents that work while you rest. Unattended runs can never use shell, desktop, or system tools — every run is audit-logged.</p>
 <div id="digest" class="card"></div>
 <h2>New schedule</h2>
@@ -826,7 +906,7 @@ textarea{height:70px}.row{display:flex;gap:8px}.row>div{flex:1}
 <div><label>Max turns<input id="f_turns" type="number" value="25"></label></div>
 <div><label>Max minutes<input id="f_mins" type="number" value="10"></label></div>
 <div><label>Retries<input id="f_retries" type="number" value="1"></label></div></div>
-<button onclick="createSched()">Create schedule</button>
+<button class="primary" onclick="createSched()">Create schedule</button>
 <span id="createMsg" class="muted"></span>
 <p class="muted">daily at → HH:MM (24h) · cron → 5 fields like <code>0 7 * * *</code> · every N min → number ≥ 5</p>
 </div>
@@ -834,23 +914,24 @@ textarea{height:70px}.row{display:flex;gap:8px}.row>div{flex:1}
 <div id="scheds"></div>
 <h2>Recent runs</h2>
 <div id="runs" class="card muted">loading…</div>
+</div>
 <script>
 async function api(p,o={}){const r=await fetch(p,{headers:{'Content-Type':'application/json'},...o});return r.json();}
 function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 async function loadDigest(){const d=await api('/api/schedules/digest');const el=document.getElementById('digest');
 if(d.runs&&d.runs.length){el.style.display='block';const bad=d.runs.filter(r=>r.status!=='ok').length;
-el.innerHTML='<b>☀️ Morning digest:</b> '+d.runs.length+' run(s) since you last checked'+(bad?' — <b>'+bad+' need attention</b>.':' — all good.')+
+el.innerHTML='<b>☀️ Morning digest:</b> '+d.runs.length+' run(s) since you last checked'+(bad?' — <b class="warn">'+bad+' need attention</b>.':' — <b class="ok">all good</b>.')+
 d.runs.map(r=>'<div>'+(r.status==='ok'?'✅':'⚠️')+' <b>'+esc(r.schedule_name)+'</b> — '+esc(r.status)+': '+esc((r.summary||r.error||'').slice(0,160))+'</div>').join('')+
-'<button onclick="seenDigest()">Mark as read</button>';}else{el.style.display='none';}}
+'<button class="primary" onclick="seenDigest()">Mark as read</button>';}else{el.style.display='none';}}
 async function seenDigest(){await api('/api/schedules/digest/seen',{method:'POST'});loadDigest();}
 async function loadScheds(){const d=await api('/api/schedules');const el=document.getElementById('scheds');
-if(!d.schedules.length){el.innerHTML='<p class="muted">No schedules yet.</p>';return;}
-el.innerHTML='<table><tr><th>Name</th><th>When</th><th>Next run</th><th>Scopes</th><th>Last</th><th></th></tr>'+
+if(!d.schedules.length){el.innerHTML='<div class="empty-card"><span class="big">😴</span>No schedules yet.<br>Create one above — your agents will work while you rest.</div>';return;}
+el.innerHTML='<div class="tablewrap"><table><tr><th>Name</th><th>When</th><th>Next run</th><th>Scopes</th><th>Last</th><th></th></tr>'+
 d.schedules.map(s=>{const when=s.kind==='cron'?('cron '+esc(s.cron)):s.kind==='every'?('every '+s.every_minutes+'m'):('daily '+esc(s.daily_at));
 return '<tr><td><b>'+esc(s.name)+'</b><br><span class="muted">'+esc(s.id)+'</span></td><td>'+when+'</td><td>'+esc(s.next_run_at||'—')+'</td><td class="muted">'+esc(s.allow_scopes.join(','))+'</td><td><span class="badge '+(s.last_status==='ok'?'ok':s.last_status?'bad':'idle')+'">'+esc(s.last_status||'never')+'</span> '+(s.enabled?'':'⏸️')+'</td><td>'+
 (s.enabled?'<button onclick="act(\\''+s.id+'\\',\\'disable\\')">Pause</button>':'<button onclick="act(\\''+s.id+'\\',\\'enable\\')">Enable</button>')+
 '<button onclick="act(\\''+s.id+'\\',\\'run\\')">Run now</button>'+
-'<button class="danger" onclick="act(\\''+s.id+'\\',\\'delete\\')">Delete</button></td></tr>';}).join('')+'</table>';}
+'<button class="danger" onclick="act(\\''+s.id+'\\',\\'delete\\')">Delete</button></td></tr>';}).join('')+'</table></div>';}
 async function act(id,a){if(a==='delete'&&!confirm('Delete this schedule and its history?'))return;await api('/api/schedules/'+id+'/'+a,{method:'POST'});loadScheds();}
 async function createSched(){const kind=document.getElementById('f_kind').value,when=document.getElementById('f_when').value.trim();
 const body={name:document.getElementById('f_name').value,prompt:document.getElementById('f_prompt').value,kind,
@@ -862,7 +943,7 @@ const r=await api('/api/schedules',{method:'POST',body:JSON.stringify(body)});
 document.getElementById('createMsg').textContent=r.error?('Error: '+r.error):'Created!';
 if(!r.error)loadScheds();}
 async function loadRuns(){const d=await api('/api/schedules/runs?limit=15');const el=document.getElementById('runs');
-el.innerHTML=d.runs.length?d.runs.map(r=>'<div><span class="badge '+(r.status==='ok'?'ok':r.status==='running'?'run':'bad')+'">'+esc(r.status)+'</span> <b>'+esc(r.schedule_name)+'</b> <span class="muted">'+esc(r.started_at||'')+' · '+Math.round(r.duration_sec||0)+'s · attempt '+r.attempt+'</span><br>'+esc((r.summary||r.error||'').slice(0,220))+'</div>').join(''):'No runs yet.';}
+el.innerHTML=d.runs.length?d.runs.map(r=>'<div><span class="badge '+(r.status==='ok'?'ok':r.status==='running'?'run':'bad')+'">'+esc(r.status)+'</span> <b>'+esc(r.schedule_name)+'</b> <span class="muted">'+esc(r.started_at||'')+' · '+Math.round(r.duration_sec||0)+'s · attempt '+r.attempt+'</span><br>'+esc((r.summary||r.error||'').slice(0,220))+'</div>').join(''):'<div class="empty-card"><span class="big">🌙</span>No runs yet.<br>Finished runs show up here with their summaries.</div>';}
 loadDigest();loadScheds();loadRuns();setInterval(()=>{loadScheds();loadRuns();},15000);
 </script></body></html>"""
 
@@ -871,29 +952,32 @@ loadDigest();loadScheds();loadRuns();setInterval(()=>{loadScheds();loadRuns();},
 _HQ_HTML = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Coding Agent</title>
+<title>LuckyD HQ</title>
 <style>
-:root{--bg:#0b0e14;--panel:#141a26;--border:#243049;--text:#e6ebf5;--dim:#8b98b0;--acc:#4f8cff;}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);
-font:600 14px/1.5 system-ui,Segoe UI,Roboto,sans-serif;display:flex;flex-direction:column;height:100vh}
-header{padding:12px 18px;background:var(--panel);border-bottom:1px solid var(--border);
-display:flex;align-items:center;gap:10px}
-header b{color:var(--acc)}.pill{font-size:11px;padding:2px 8px;border-radius:99px;
-background:#0e2417;color:#3fb950;border:1px solid #1d3a26}
-#chat{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:12px}
-.msg{max-width:80%;padding:10px 14px;border-radius:12px;white-space:pre-wrap;word-wrap:break-word}
-.user{align-self:flex-end;background:var(--acc);color:#fff;border-bottom-right-radius:4px}
-.agent{align-self:flex-start;background:var(--panel);border:1px solid var(--border);border-bottom-left-radius:4px}
-.agent.thinking{color:#6CB6FF;font-style:italic}
-#bar{display:flex;gap:10px;padding:14px;background:var(--panel);border-top:1px solid var(--border)}
-#in{flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);
-border-radius:8px;padding:11px 13px;font:inherit;resize:none}
-#in:focus{outline:none;border-color:var(--acc)}
-button{background:var(--acc);color:#fff;border:0;border-radius:8px;padding:0 20px;
-font:inherit;cursor:pointer}button:disabled{opacity:.5;cursor:default}
-.dim{color:var(--dim);font-size:12px}
+  /* __BRAND_VARS__ */
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ld-window);color:var(--ld-text);
+  font:600 14px/1.5 system-ui,Segoe UI,Roboto,sans-serif;display:flex;flex-direction:column;height:100vh}
+  header{padding:12px 18px;background:var(--ld-panel);border-bottom:1px solid var(--ld-border);
+  display:flex;align-items:center;gap:10px}
+  header b{color:var(--ld-accent)}
+  .pill{font-size:11px;padding:2px 8px;border-radius:99px;
+  background:var(--ld-panel2);color:var(--ld-ok);border:1px solid var(--ld-ok)}
+  #chat{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:12px}
+  .msg{max-width:80%;padding:10px 14px;border-radius:12px;white-space:pre-wrap;word-wrap:break-word}
+  .user{align-self:flex-end;background:var(--ld-accent);color:#fff;border-bottom-right-radius:4px}
+  .agent{align-self:flex-start;background:var(--ld-panel);border:1px solid var(--ld-border);border-bottom-left-radius:4px}
+  .agent.thinking{color:var(--ld-muted);font-style:italic}
+  #bar{display:flex;gap:10px;padding:14px;background:var(--ld-panel);border-top:1px solid var(--ld-border)}
+  #in{flex:1;background:var(--ld-window);border:1px solid var(--ld-border);color:var(--ld-text);
+  border-radius:8px;padding:11px 13px;font:inherit;resize:none}
+  #in:focus{outline:none;border-color:var(--ld-accent)}
+  button{background:var(--ld-accent);color:#fff;border:0;border-radius:8px;padding:0 20px;
+  font:inherit;cursor:pointer}button:disabled{opacity:.5;cursor:default}
+  .dim{color:var(--ld-muted);font-size:12px}
+  @media (max-width:560px){.msg{max-width:94%}#chat{padding:12px}#bar{padding:10px}}
 </style></head><body>
-<header><b>&#9670; Coding Agent</b><span class="pill">live source</span></header>
+<header><b>&#9670; LuckyD HQ</b><span class="pill">live source</span></header>
 <div id="chat"><div class="msg agent">Online &mdash; ready to help. Ask me to
 build, fix, or explore.</div></div>
 <form id="bar"><textarea id="in" rows="1" placeholder="Message&hellip;"></textarea>
