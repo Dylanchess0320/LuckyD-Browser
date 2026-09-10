@@ -42,17 +42,21 @@ HEAL_THRESHOLD = 0.55
 
 # Fingerprint of ONE tagged element (record time). Uses the data-ld-agent
 # attribute the snapshot JS assigns, so indices always line up.
+# NOTE: literal JS braces are doubled — this string goes through
+# str.format(i=...) and single braces would raise ValueError (the
+# fingerprint call in act() suppresses it, so recordings silently lost
+# every target and self-healing replay never engaged).
 _FINGERPRINT_JS = (
-    "(() => { const e = document.querySelector('[data-ld-agent=\"{i}\"]');"
+    "(() => {{ const e = document.querySelector('[data-ld-agent=\"{i}\"]');"
     " if (!e) return '';"
-    " return JSON.stringify({"
+    " return JSON.stringify({{"
     "  tag: e.tagName.toLowerCase(),"
     "  text: ((e.innerText || e.value || e.placeholder ||"
     "    e.getAttribute('aria-label') || e.name || '')"
     "    .replace(/\\s+/g, ' ').trim().slice(0, 80)),"
     "  el_id: e.id || '', name: e.getAttribute('name') || '',"
     "  aria: e.getAttribute('aria-label') || '',"
-    "  href: e.href || '' }); })()"
+    "  href: e.href || '' }}); }})()"
 )
 
 # Fingerprints of ALL tagged elements (replay time), each with its index.
@@ -85,6 +89,20 @@ def slugify(name: str) -> str:
     return slug[:60] or "workflow"
 
 
+def action_index(action: dict) -> int:
+    """Element index for an indexed action.
+
+    Index 0 is valid (the first tagged element) — only a missing or blank
+    index maps to -1 ("none given"). The old ``int(x or -1)`` idiom treated
+    0 as missing, so clicks/types on the first element of every snapshot
+    were silently dropped from recordings.
+    """
+    raw = action.get("index", -1)
+    if raw is None or raw == "":
+        return -1
+    return int(raw)
+
+
 def step_record(action: dict, fingerprint: dict | None = None) -> dict | None:
     """Normalize one recorded action into a workflow step (None = skip)."""
     kind = str(action.get("action", "")).strip().lower()
@@ -92,7 +110,7 @@ def step_record(action: dict, fingerprint: dict | None = None) -> dict | None:
         return None
     step: dict = {"action": kind}
     if kind in INDEXED_ACTIONS:
-        index = int(action.get("index", -1) or -1)
+        index = action_index(action)
         if index < 0:
             return None
         step["index"] = index

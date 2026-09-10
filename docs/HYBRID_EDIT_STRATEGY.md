@@ -1,6 +1,7 @@
 # Hybrid Edit Strategy — Aider + Plandex + Goose
 
-Synthesis of three production-grade coding-agent edit pipelines in `external/`,
+Synthesis of three production-grade coding-agent edit pipelines (Aider, Plandex,
+and Goose — the upstream open-source projects, not vendored code),
 written as a concrete design for LuckyD Code. The goal is **not** to copy any
 one of them, but to take the strongest piece of each and combine them into a
 single, layered edit engine.
@@ -221,11 +222,11 @@ weeks 3–4 are pure UX wins.
 
 ---
 
-## 7. Files referenced
+## 7. Source files (paths inside the upstream projects, not this repo)
 
-- `external/aider/aider/coders/editblock_coder.py` — parser + apply loop
-- `external/aider/aider/coders/editblock_prompts.py` — system prompt contract
-- `external/plandex/app/server/model/plan/build_structured_edits.go` — orchestrator
-- `external/plandex/app/server/syntax/structured_edits_generic.go` — anchor map
-- `external/goose/crates/goose/src/agents/extension.rs` — tool-boundary design
-- `external/goose/crates/goose/src/agents/mcp_client.rs` — tool execution
+- `aider/coders/editblock_coder.py` (Aider) — parser + apply loop
+- `aider/coders/editblock_prompts.py` (Aider) — system prompt contract
+- `app/server/model/plan/build_structured_edits.go` (Plandex) — orchestrator
+- `app/server/syntax/structured_edits_generic.go` (Plandex) — anchor map
+- `crates/goose/src/agents/extension.rs` (Goose) — tool-boundary design
+- `crates/goose/src/agents/mcp_client.rs` (Goose) — tool execution

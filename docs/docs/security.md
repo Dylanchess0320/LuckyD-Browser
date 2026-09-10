@@ -1,6 +1,6 @@
 # Security
 
-LuckyD is local-first: your browsing, your models, your agents — on your machine. Here's how 4.0 protects that.
+LuckyD is local-first: your browsing, your models, your agents — on your machine. Here's how 5.0 protects that.
 
 ## Cookie-based auth for local services (4.0)
 
@@ -45,7 +45,8 @@ Please **do not** open a public issue for security problems. Instead, open a [pr
 
 ```powershell
 # A bare request to the Control API is rejected — only the session cookie gets in:
-curl http://127.0.0.1:9777/dashboard -s -o NUL -w "%{http_code}`n"   # 401
+# (curl.exe, not the `curl` alias — on Windows PowerShell `curl` is Invoke-WebRequest)
+curl.exe http://127.0.0.1:9777/dashboard -s -o NUL -w "%{http_code}`n"   # 401
 ```
 
 Next: [FAQ →](faq.md)

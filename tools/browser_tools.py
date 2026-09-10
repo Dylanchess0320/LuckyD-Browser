@@ -20,9 +20,28 @@ from .registry import register_tool
 _browser = None
 _page = None
 _playwright = None
+# The async_playwright() context manager entered in _get_page(). Must be
+# __aexit__ed on restart/close or the Playwright driver (node) process leaks.
+_pw_manager = None
 _headless = True
 _device_config: dict | None = None
 _intercepts: list[dict] = []
+# Path to a saved storage_state file (.browser_state.json); passed to
+# new_context() so cookies AND localStorage are restored on load.
+_storage_state_path: str | None = None
+
+
+def _make_fulfill_handler(status: int):
+    """Build an async route handler that fulfills with the given status.
+
+    Must be a coroutine function: Playwright awaits the handler, and a sync
+    callable returning an un-awaited coroutine leaves the request hanging.
+    """
+
+    async def _handler(route):
+        await route.fulfill(status=status)
+
+    return _handler
 
 
 async def _get_playwright():
@@ -40,31 +59,45 @@ async def _get_playwright():
 
 
 async def _get_page():
-    global _browser, _page
+    global _browser, _page, _pw_manager
     if _page is None:
         pw = await _get_playwright()
-        p = await pw().__aenter__()
+        # __aenter__ lives on the context MANAGER, not the entered Playwright
+        # object — keep the manager so restart/close can __aexit__ it and stop
+        # the driver process.
+        manager = pw()
+        p = await manager.__aenter__()
+        _pw_manager = manager
         context_opts = {}
         if _device_config:
-            context_opts = _device_config
+            context_opts = dict(_device_config)
+        if _storage_state_path:
+            context_opts["storage_state"] = _storage_state_path
         _browser = await p.chromium.launch(headless=_headless)
         ctx = await _browser.new_context(**context_opts)
         _page = await ctx.new_page()
         # Apply pending intercepts
         for ic in _intercepts:
-            await _page.route(ic["pattern"], ic["handler"])
+            await _page.route(ic["pattern"], _make_fulfill_handler(ic.get("status", 200)))
     return _page
 
 
 async def _restart_browser():
     """Close and reopen the browser (needed for mode/viewport changes)."""
-    global _browser, _page
+    global _browser, _page, _pw_manager
     if _page:
         with contextlib.suppress(Exception):
             await _page.close()
     if _browser:
         with contextlib.suppress(Exception):
             await _browser.close()
+    if _pw_manager is not None:
+        # Exit the async_playwright() context manager — this stops the
+        # Playwright driver process. Skipping it leaked one driver per
+        # restart.
+        with contextlib.suppress(Exception):
+            await _pw_manager.__aexit__(None, None, None)
+        _pw_manager = None
     _page = None
     _browser = None
 
@@ -288,12 +321,16 @@ class BrowserCloseTool(ToolBase):
     parameters = {}
 
     async def execute(self) -> ToolOutput:
-        global _browser, _page
+        global _browser, _page, _pw_manager
         try:
             if _page:
                 await _page.close()
             if _browser:
                 await _browser.close()
+            if _pw_manager is not None:
+                with contextlib.suppress(Exception):
+                    await _pw_manager.__aexit__(None, None, None)
+                _pw_manager = None
             _page = None
             _browser = None
             return ToolOutput(text="Browser closed.", title="Browser Closed")
@@ -346,7 +383,7 @@ class BrowserStateTool(ToolBase):
     }
 
     async def execute(self, action: str) -> ToolOutput:
-        global _page
+        global _page, _storage_state_path
         state_path = Path(os.getcwd()) / ".browser_state.json"
         try:
             if action == "save":
@@ -366,13 +403,23 @@ class BrowserStateTool(ToolBase):
                         error=True,
                     )
                 data = json.loads(state_path.read_text())
-                # Recreate context with the saved state
+                if not isinstance(data, dict):
+                    return ToolOutput(
+                        text="Saved state is corrupted (not a JSON object).",
+                        title="State Load",
+                        error=True,
+                    )
+                # Pass storage_state at context creation so Playwright restores
+                # BOTH cookies and localStorage. (The old code only called
+                # add_cookies and the "origins" loop was a no-op.)
+                _storage_state_path = str(state_path)
                 await _restart_browser()
-                page = await _get_page()
-                await page.context.add_cookies(data.get("cookies", []))
-                # Apply origins
-                for _origin_data in data.get("origins", []):
-                    pass  # Playwright handles origins via storage_state
+                try:
+                    await _get_page()
+                except Exception:
+                    # A corrupt state file must not poison every future page.
+                    _storage_state_path = None
+                    raise
                 return ToolOutput(
                     text="Browser state loaded.",
                     title="State Loaded",
@@ -380,6 +427,7 @@ class BrowserStateTool(ToolBase):
             elif action == "clear":
                 if state_path.exists():
                     state_path.unlink()
+                _storage_state_path = None
                 try:
                     page = await _get_page()
                     await page.context.clear_cookies()
@@ -502,9 +550,7 @@ class BrowserInterceptTool(ToolBase):
                         title="Network Intercepts",
                         metadata={"intercepts": []},
                     )
-                lines = "\n".join(
-                    f"  {i['url_pattern']} → {i.get('status', 200)}" for i in _intercepts
-                )
+                lines = "\n".join(f"  {i['pattern']} → {i.get('status', 200)}" for i in _intercepts)
                 return ToolOutput(
                     text=f"Active intercepts:\n{lines}",
                     title="Network Intercepts",
@@ -513,13 +559,10 @@ class BrowserInterceptTool(ToolBase):
             elif action == "mock":
                 if not url_pattern:
                     return ToolOutput(text="url_pattern is required for 'mock' action.", error=True)
-                _intercepts.append({"url_pattern": url_pattern, "status": status})
+                _intercepts.append({"pattern": url_pattern, "status": status})
                 # Apply to current page if active
                 page = await _get_page()
-                await page.route(
-                    url_pattern,
-                    lambda route, s=status: route.fulfill(status=s),
-                )
+                await page.route(url_pattern, _make_fulfill_handler(status))
                 return ToolOutput(
                     text=f"Intercepting {url_pattern} → HTTP {status}",
                     title="Intercept Set",

@@ -9,6 +9,8 @@ import contextlib
 import os
 import platform
 import re
+import signal
+import subprocess
 
 from .base import ToolBase, ToolOutput
 from .registry import register_tool
@@ -128,6 +130,34 @@ ALLOWED_PREFIXES = [
 IS_WINDOWS = platform.system() == "Windows"
 
 
+async def _kill_process_tree(proc: asyncio.subprocess.Process) -> None:
+    """Best-effort kill of a subprocess and all of its descendants.
+
+    proc.kill() alone only kills the direct child, leaving backgrounded
+    grandchildren reparented and running. Kill the whole tree instead.
+    """
+    killed = False
+    if not IS_WINDOWS:
+        # The child runs in its own session (start_new_session=True), so it
+        # leads its process group — killpg takes the whole tree with it.
+        with contextlib.suppress(Exception):
+            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            killed = True
+    else:
+        # taskkill /T terminates the process tree on Windows.
+        with contextlib.suppress(Exception):
+            await asyncio.to_thread(
+                subprocess.run,
+                ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+                capture_output=True,
+                timeout=10,
+            )
+            killed = True
+    if not killed:
+        with contextlib.suppress(Exception):
+            proc.kill()
+
+
 class BashTool(ToolBase):
     name = "Bash"
     description = "Execute a shell command and return its output. Use for dev tasks, file ops, package installs, git, etc."
@@ -203,6 +233,12 @@ class BashTool(ToolBase):
                     cwd=work_dir,
                 )
             else:
+                # start_new_session makes the child a process-group leader so
+                # the timeout path can kill the whole tree (no leaked
+                # grandchildren). POSIX-only; Windows uses taskkill /T.
+                _popen_kwargs: dict = {}
+                if not IS_WINDOWS:
+                    _popen_kwargs["start_new_session"] = True
                 proc = await asyncio.create_subprocess_exec(
                     "bash",
                     "-c",
@@ -211,13 +247,14 @@ class BashTool(ToolBase):
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                     cwd=work_dir,
+                    **_popen_kwargs,
                 )
 
             stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout_sec)
         except asyncio.TimeoutError:
-            # Kill the runaway process so it does not leak
+            # Kill the whole process tree so nothing leaks
             with contextlib.suppress(Exception):
-                proc.kill()
+                await _kill_process_tree(proc)
                 await asyncio.wait_for(proc.wait(), timeout=5)
             return ToolOutput(
                 text=f"Command timed out after {timeout_sec:.0f}s",
@@ -243,7 +280,7 @@ class BashTool(ToolBase):
         output = "\n".join(text_parts).strip() or "(no output)"
 
         exit_code = proc.returncode
-        record_shell_command(command, exit_code, output)
+        record_shell_command(command, exit_code, output, shell="bash")
 
         return ToolOutput(
             text=output,
@@ -290,11 +327,15 @@ class PowerShellTool(ToolBase):
             )
             stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout_sec)
         except asyncio.TimeoutError:
-            # Kill the runaway process so it does not leak
+            # Kill the whole process tree so nothing leaks
             with contextlib.suppress(Exception):
-                proc.kill()
+                await _kill_process_tree(proc)
                 await asyncio.wait_for(proc.wait(), timeout=5)
             return ToolOutput(text="PowerShell command timed out", error=True)
+        except Exception as e:
+            # Startup failures (e.g. powershell.exe not installed) must come
+            # back as an error result, not a raised exception.
+            return ToolOutput(text=f"Error executing PowerShell command: {e}", error=True)
 
         out = stdout.decode("utf-8", errors="replace")[:12000]
         err = stderr.decode("utf-8", errors="replace")[:4000]
@@ -304,7 +345,7 @@ class PowerShellTool(ToolBase):
             parts.append(f"\n[stderr]\n{err}")
         output = "\n".join(parts).strip() or "(no output)"
         exit_code = proc.returncode
-        record_shell_command(command, exit_code, output)
+        record_shell_command(command, exit_code, output, shell="powershell")
 
         return ToolOutput(
             text=output,

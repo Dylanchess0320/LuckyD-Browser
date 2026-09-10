@@ -54,15 +54,29 @@ class AskUserQuestionTool(ToolBase):
     }
 
     async def execute(self, questions: list) -> ToolOutput:
+        # Malformed question objects must not crash with KeyError — validate
+        # defensively and degrade gracefully.
+        if not questions:
+            return ToolOutput(
+                text="Provide at least one question to ask.",
+                error=True,
+            )
         lines = []
         for i, q in enumerate(questions):
+            if not isinstance(q, dict):
+                return ToolOutput(
+                    text=f"Question {i + 1} is malformed (expected an object).",
+                    error=True,
+                )
             header = q.get("header", f"Q{i + 1}")
             multi = " [multi-select]" if q.get("multi_select") else ""
             lines.append(f"\n{'=' * 50}")
-            lines.append(f"  {header}{multi}: {q['question']}")
+            lines.append(f"  {header}{multi}: {q.get('question', '')}")
             lines.append(f"{'=' * 50}")
-            for j, opt in enumerate(q.get("options", [])):
-                lines.append(f"  [{j + 1}] {opt['label']} — {opt['description']}")
+            for j, opt in enumerate(q.get("options", []) or []):
+                if not isinstance(opt, dict):
+                    continue
+                lines.append(f"  [{j + 1}] {opt.get('label', '')} — {opt.get('description', '')}")
             lines.append("  [0] Custom answer")
 
         lines.append("\nReply with your choices (e.g. '1,3' or 'all' or custom text).")

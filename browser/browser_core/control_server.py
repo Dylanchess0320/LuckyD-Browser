@@ -73,6 +73,7 @@ from browser_core.workflows import (
     INDEXED_ACTIONS,
     WorkflowRecorder,
     WorkflowStore,
+    action_index,
     elements_js,
     fingerprint_js,
     resolve_index,
@@ -918,7 +919,7 @@ class QtBrowserBackend:
         """Record (when active) + execute one agent-style action."""
         fingerprint = None
         kind = str(action.get("action", "")).strip().lower()
-        index = int(action.get("index", -1) or -1)
+        index = action_index(action)
         if self._recorder.active and not self._replaying and kind in INDEXED_ACTIONS and index >= 0:
             # Fingerprint BEFORE acting: a click may destroy/navigate the node.
             with contextlib.suppress(Exception):
@@ -936,7 +937,7 @@ class QtBrowserBackend:
     def _perform_act(self, action: dict) -> str:
         """One agent-style action (click/type/press/select/scroll/navigate/…)."""
         kind = str(action.get("action", ""))
-        index = int(action.get("index", -1) or -1)
+        index = action_index(action)
         text = str(action.get("text", "") or "")
         url = str(action.get("url", "") or "")
 

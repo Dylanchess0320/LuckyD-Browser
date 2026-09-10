@@ -54,15 +54,10 @@ def _send_message(to: str, from_agent: str, message: str, message_type: str = "t
             }
         )
         return True
-    _message_inboxes[to] = [
-        {
-            "from": from_agent,
-            "message": message,
-            "type": message_type,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        }
-    ]
-    return True
+    # Unknown recipient: fail instead of silently creating an inbox nobody
+    # will ever read (the old code returned True here, so the sender thought
+    # the message was delivered).
+    return False
 
 
 class AgentHandoffTool(ToolBase):
@@ -244,9 +239,10 @@ class SendMessageTool(ToolBase):
     async def execute(self, to: str, message: str, message_type: str = "text") -> ToolOutput:
         sent = _send_message(to, "main_agent", message, message_type)
         return ToolOutput(
-            text=f"Message sent to {to}" if sent else f"Failed to send to {to}",
+            text=f"Message sent to {to}" if sent else f"Failed to send to {to}: unknown agent",
             title=f"Message → {to}",
             metadata={"to": to, "type": message_type},
+            error=not sent,
         )
 
 

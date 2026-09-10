@@ -393,7 +393,10 @@ class WatchTool(ToolBase):
             elif op == "wait":
                 if watch_id not in _watches:
                     return ToolOutput(text=f"Watch not found: {watch_id}", error=True)
-                deadline = time.time() + min(timeout_sec, 300)
+                # Cap the wait at 300s and never report a negative/absurd
+                # value: the actual wait is min(timeout_sec, 300).
+                wait_limit = max(0.0, min(float(timeout_sec), 300.0))
+                deadline = time.time() + wait_limit
                 while time.time() < deadline:
                     fired = False
                     w = _watches[watch_id]
@@ -423,7 +426,7 @@ class WatchTool(ToolBase):
                     await asyncio.sleep(1.0)
 
                 return ToolOutput(
-                    text=f"Watch [{watch_id}] timed out after {timeout_sec}s",
+                    text=f"Watch [{watch_id}] timed out after {wait_limit:g}s",
                     title=f"⏰ Watch {watch_id} Timeout",
                     error=True,
                 )

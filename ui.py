@@ -179,6 +179,9 @@ class TerminalUI:
         # token arrives, and again during tool-call pauses mid-stream.
         self._spinner_status = None  # rich Status or None
         self._spinner_label = ""
+        # True while the plain ANSI fallback line (no Rich) is on screen.
+        # stop_spinner() must clear it even though _spinner_status is None.
+        self._spinner_ansi = False
         self._spinner_style = "processing_wheel"  # rich spinner name (dots, line, clock…)
 
     # ── Helpers ────────────────────────────────────────────────────
@@ -304,7 +307,7 @@ class TerminalUI:
         so a spinner glitch degrades to the plain ANSI line instead of taking
         down the whole REPL loop.
         """
-        if self._spinner_status is not None:
+        if self._spinner_status is not None or self._spinner_ansi:
             return  # already spinning
         self._spinner_label = label
         if self.rich:
@@ -324,20 +327,21 @@ class TerminalUI:
                 # fall through to the plain ANSI line below
         sys.stdout.write(f"  {ANSI['gray']}… {label}{ANSI['reset']}\r")
         sys.stdout.flush()
+        self._spinner_ansi = True
 
     def stop_spinner(self) -> None:
         """Stop the spinner if it is running."""
-        if self._spinner_status is None:
+        if self._spinner_status is None and not self._spinner_ansi:
             return
-        if self.rich:
+        if self._spinner_status is not None:
             with contextlib.suppress(Exception):
                 self._spinner_status.stop()
             self._spinner_status = None
-        else:
-            # Clear the spinner line
+        if self._spinner_ansi:
+            # Clear the ANSI fallback line written by start_spinner()
             sys.stdout.write("\r" + " " * (len(self._spinner_label) + 8) + "\r")
             sys.stdout.flush()
-            self._spinner_status = None
+            self._spinner_ansi = False
 
     def update_spinner(self, label: str) -> None:
         """Change the spinner label without restarting it."""
@@ -345,7 +349,7 @@ class TerminalUI:
         if self._spinner_status is not None and self.rich:
             with contextlib.suppress(Exception):
                 self._spinner_status.update(f"  {label}")
-        elif self._spinner_status is not None:
+        elif self._spinner_ansi:
             sys.stdout.write(f"\r  {ANSI['gray']}… {label}{ANSI['reset']}\r")
             sys.stdout.flush()
 
@@ -631,6 +635,9 @@ class TerminalUI:
         idx = 0
 
         def _provider_key(label: str) -> str:
+            # An empty/whitespace label would IndexError on split()[0].
+            if not label or not label.split():
+                return "opencode"
             low = label.lower()
             if "opencode" in low:
                 return "opencode"

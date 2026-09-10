@@ -61,18 +61,21 @@ class BudgetTracker:
     def record_llm(self, n: int = 1) -> None:
         # Check BEFORE incrementing so a limit of N allows exactly N calls;
         # the (N+1)th call raises. _exhausted is then sticky for all later ops.
-        self.check()
+        # Check and increment are atomic under the lock: researchers run in
+        # threads (asyncio.to_thread), and a check-outside/increment-inside
+        # split lets two threads both pass at N-1 and overshoot the limit.
         with self._lock:
+            self.check()
             self._llm_calls += n
 
     def record_search(self, n: int = 1) -> None:
-        self.check()
         with self._lock:
+            self.check()
             self._search_calls += n
 
     def record_fetch(self, n: int = 1) -> None:
-        self.check()
         with self._lock:
+            self.check()
             self._fetched_urls += n
 
     def usage(self) -> BudgetUsage:

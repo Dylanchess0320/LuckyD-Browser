@@ -19,7 +19,10 @@ class RunStore:
         emitter: EventEmitter | None = None,
         runs_dir: str | None = None,
     ) -> None:
-        self.ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-%f")[:18]
+        # Full microsecond precision: an earlier [:18] truncation kept only 2
+        # microsecond digits, so two runs started within the same 10 ms landed
+        # in the same directory and overwrote each other's artifacts.
+        self.ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-%f")
         base = Path(runs_dir or settings.runs_dir)
         self.dir = base / self.ts
         self.dir.mkdir(parents=True, exist_ok=True)

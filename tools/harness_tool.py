@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+from urllib.parse import quote as _url_quote
 
 import httpx
 
@@ -224,7 +225,10 @@ class HarnessTool(ToolBase):
     async def _brain_search(self, query="", **kw):
         if not query:
             return ToolOutput(text="Error: query required", error=True)
-        data, err = await _get(f"/api/brain/search?q={query}", timeout=15.0)
+        # Unreserved characters are left as-is; everything else (spaces, &,
+        # ?, non-ASCII...) is percent-encoded so the query cannot break out
+        # of the q parameter.
+        data, err = await _get(f"/api/brain/search?q={_url_quote(query, safe='')}", timeout=15.0)
         if err:
             data, err = await _post("/api/brain/search", {"query": query}, timeout=15.0)
         if err:

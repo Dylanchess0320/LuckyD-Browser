@@ -66,6 +66,10 @@ class MemoryForget(ToolBase):
     }
 
     async def execute(self, memory_id: str) -> ToolOutput:
+        # An empty id matches every stored id via str.startswith("") — reject
+        # it instead of deleting the first memory in the list.
+        if not memory_id or not memory_id.strip():
+            return ToolOutput(text="memory_id must not be empty.", error=True)
         mem = get_memory()
         # Allow partial ID match
         target = None

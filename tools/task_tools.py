@@ -31,7 +31,11 @@ def _load_tasks() -> list[dict]:
 
 
 def _save_tasks(tasks: list[dict]):
-    _tasks_file().write_text(json.dumps(tasks, indent=2, default=str))
+    path = _tasks_file()
+    # TASKS_DIR may not exist yet (fresh machine / redirected config) — the
+    # write would otherwise raise FileNotFoundError out of the tool.
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(tasks, indent=2, default=str))
 
 
 class TaskCreateTool(ToolBase):

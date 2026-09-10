@@ -60,6 +60,8 @@ class GoogleClient(LLMClient):
 
         result = LLMResult(model=self.config.model)
         content_buf = ""
+        tool_calls: list[dict] = []
+        _seen_fc: set[str] = set()
 
         timeout = httpx.Timeout(connect=15.0, read=300.0, write=15.0, pool=5.0)
         async with (
@@ -82,12 +84,31 @@ class GoogleClient(LLMClient):
                                 content_buf += text
                                 if on_token:
                                     on_token(text)
+                            # functionCall parts carry the tool call in
+                            # streaming mode — keep them (dedupe in case a
+                            # part is repeated across chunks).
+                            fc = part.get("functionCall")
+                            if isinstance(fc, dict):
+                                key = json.dumps(fc, sort_keys=True)
+                                if key not in _seen_fc:
+                                    _seen_fc.add(key)
+                                    tool_calls.append(
+                                        {
+                                            "id": fc.get("name", f"call_{len(tool_calls) + 1}"),
+                                            "type": "function",
+                                            "function": {
+                                                "name": fc.get("name", ""),
+                                                "arguments": json.dumps(fc.get("args", {})),
+                                            },
+                                        }
+                                    )
                     usage = data.get("usageMetadata", {})
                     if usage:
                         self.cost_tracker.add_usage(usage, self.config.model)
                         result.usage = usage
 
         result.content = content_buf
+        result.tool_calls = tool_calls or None
         return result
 
     def _to_google(self, messages: list[dict], tools=None) -> dict:

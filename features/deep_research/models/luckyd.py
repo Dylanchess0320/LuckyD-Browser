@@ -228,10 +228,16 @@ class LuckyDProvider(LLMProvider):
         # Reuse the swarm's DDG backend (now supports ddgs + duckduckgo_search).
         cards: list[EvidenceCard] = []
         try:
+            from ..runtime.budget import BudgetExhausted
             from ..tools.search_ddg import DDGSearch
 
             get_budget().record_search()
             cards = DDGSearch().search(user[:300], max_results=8)
+        except BudgetExhausted:
+            # Don't swallow budget exhaustion as "no results": let the worker
+            # loop stop with stop_reason="budget_exhausted" (BudgetExhausted
+            # is sticky, so every subsequent call would fail anyway).
+            raise
         except Exception:
             cards = []
         if not cards:

@@ -115,22 +115,18 @@ class MCPListTool(ToolBase):
             return ToolOutput(text=f"MCP Servers:\n{status}")
 
 
-def register_mcp_tools(manager: MCPManager) -> int:
+async def register_mcp_tools(manager: MCPManager) -> int:
     """Discover and register all MCP tools into the registry.
+
+    Coroutine: the only caller (main.run_repl) already runs inside an event
+    loop, so discovery is awaited directly. Driving a nested loop with
+    run_until_complete() here raised "event loop is already running" and the
+    failure was swallowed, silently registering zero tools.
 
     Returns the number of registered tools.
     """
-    import asyncio
-
     try:
-        # Use the running loop if available, otherwise create one
-        try:
-            loop = asyncio.get_running_loop()
-            tools_by_server = loop.run_until_complete(manager.discover_tools())
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            tools_by_server = loop.run_until_complete(manager.discover_tools())
-            loop.close()
+        tools_by_server = await manager.discover_tools()
     except Exception:
         return 0
 

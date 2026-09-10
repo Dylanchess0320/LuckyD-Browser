@@ -37,7 +37,7 @@ class LLMConfig:
             )
         if explicit == "anthropic" or (not explicit and os.environ.get("ANTHROPIC_API_KEY")):
             return cls(
-                api_key=os.environ["ANTHROPIC_API_KEY"],
+                api_key=os.environ.get("ANTHROPIC_API_KEY", ""),
                 base_url=os.environ.get("ANTHROPIC_BASE_URL", "https://api.anthropic.com/v1"),
                 model=os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-20250514"),
                 provider="anthropic",
@@ -46,7 +46,7 @@ class LLMConfig:
             )
         if explicit == "google" or (not explicit and os.environ.get("GOOGLE_API_KEY")):
             return cls(
-                api_key=os.environ["GOOGLE_API_KEY"],
+                api_key=os.environ.get("GOOGLE_API_KEY", ""),
                 base_url=os.environ.get(
                     "GOOGLE_BASE_URL", "https://generativelanguage.googleapis.com/v1beta"
                 ),
@@ -65,7 +65,7 @@ class LLMConfig:
             )
         if explicit == "zai" or (not explicit and os.environ.get("ZAI_API_KEY")):
             return cls(
-                api_key=os.environ["ZAI_API_KEY"],
+                api_key=os.environ.get("ZAI_API_KEY", ""),
                 base_url=os.environ.get("ZAI_BASE_URL", "https://api.z.ai/api/paas/v4"),
                 model=os.environ.get("ZAI_MODEL", "glm-4.5"),
                 provider="zai",
@@ -74,7 +74,7 @@ class LLMConfig:
             )
         if explicit == "openrouter" or (not explicit and os.environ.get("OPENROUTER_API_KEY")):
             return cls(
-                api_key=os.environ["OPENROUTER_API_KEY"],
+                api_key=os.environ.get("OPENROUTER_API_KEY", ""),
                 base_url=os.environ.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
                 model=os.environ.get("OPENROUTER_MODEL", "deepseek/deepseek-chat-v3.1"),
                 provider="openrouter",
@@ -184,8 +184,10 @@ class CostTracker:
 
     def add_usage(self, usage: dict, model: str = ""):
         self._model = model or self._model
-        inp = usage.get("prompt_tokens", usage.get("input_tokens", 0))
-        out = usage.get("completion_tokens", usage.get("output_tokens", 0))
+        # Some gateways return explicit nulls for token counts; coerce to 0
+        # so the running totals never blow up with TypeError.
+        inp = usage.get("prompt_tokens", usage.get("input_tokens", 0)) or 0
+        out = usage.get("completion_tokens", usage.get("output_tokens", 0)) or 0
         self.total_input_tokens += inp
         self.total_output_tokens += out
 
@@ -210,6 +212,45 @@ class CostTracker:
             "cost": round(self.total_cost, 6),
             "model": self._model,
         }
+
+
+class StreamingToolCallAccumulator:
+    """Merge OpenAI-style streaming tool_call deltas into complete calls.
+
+    Streaming chunks carry fragments of tool calls — the name and arguments
+    arrive split across chunks, keyed by "index". Appending each chunk's raw
+    list nests lists inside the result and leaves fragments unparseable, so
+    accumulate by index instead (mirrors core/llm_client.py).
+    """
+
+    def __init__(self) -> None:
+        self._by_index: dict[int, dict] = {}
+
+    def add(self, deltas: list | None) -> None:
+        for tc in deltas or []:
+            if not isinstance(tc, dict):
+                continue
+            idx = tc.get("index", 0)
+            entry = self._by_index.setdefault(
+                idx,
+                {
+                    "id": "",
+                    "type": "function",
+                    "function": {"name": "", "arguments": ""},
+                },
+            )
+            if tc.get("id"):
+                entry["id"] = tc["id"]
+            if tc.get("type"):
+                entry["type"] = tc["type"]
+            func = tc.get("function") or {}
+            if func.get("name"):
+                entry["function"]["name"] += func["name"]
+            if func.get("arguments"):
+                entry["function"]["arguments"] += func["arguments"]
+
+    def calls(self) -> list[dict]:
+        return [self._by_index[i] for i in sorted(self._by_index)]
 
 
 # ── Base client ──────────────────────────────────────────────────────

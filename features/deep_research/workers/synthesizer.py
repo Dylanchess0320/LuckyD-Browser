@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+import re
+
 from ..prompts import SYNTHESIZER_SYSTEM, SYNTHESIZER_USER
 from ..runtime.run_store import RunStore
 from ..schemas import EvidenceCard, ResearchReport, WorkerResult
 from ..tools.search_base import LLMProvider
+
+# Matches inline citation tokens like [e0], [e12] used in worker findings.
+_CITE_TOKEN = re.compile(r"\[(e\d+)\]")
 
 
 def _merge_evidence(
@@ -34,10 +39,17 @@ def _merge_evidence(
 def _rewrite_findings(per_result_maps: list[tuple[WorkerResult, dict[str, str]]]) -> str:
     parts = []
     for r, local in per_result_maps:
-        # rewrite this worker's inline [e0] refs using ONLY its own local map
-        findings = r.findings
-        for old, new in local.items():
-            findings = findings.replace(f"[{old}]", f"[{new}]")
+        # Single-pass regex substitution. A naive sequential str.replace()
+        # corrupts citations here: (a) "[e1]" is a prefix-substring of
+        # "[e10]"/"[e11]", so multi-digit tokens get mangled; (b) a rewritten
+        # new id can match a later old id and be replaced AGAIN, cascading
+        # e.g. [e1]->[e3]->[e5]... until the token points at the wrong card.
+        # The callback maps each token exactly once; unknown tokens survive.
+        def _sub(m: re.Match, _local=local) -> str:
+            old = m.group(1)
+            return f"[{_local.get(old, old)}]"
+
+        findings = _CITE_TOKEN.sub(_sub, r.findings)
         parts.append(f"### {r.task_id} ({r.worker_id})\n{findings}")
     return "\n\n".join(parts)
 

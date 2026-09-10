@@ -31,6 +31,11 @@ class NetMonitor:
         self._lock = threading.Lock()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
+        # Generation counter: a _run stuck in its 3s CDP connect can outlive
+        # stop()'s bounded join; the next start() bumps this so the stale
+        # thread recognizes itself as superseded and exits instead of
+        # resurrecting a duplicate capture session.
+        self._gen = 0
         self.target = ""
         self.error = ""
 
@@ -41,9 +46,11 @@ class NetMonitor:
     def start(self, url_substr: str = "") -> None:
         self.stop()  # replace any previous session
         self._stop.clear()
+        self._gen += 1
+        gen = self._gen
         self.error = ""
         self._thread = threading.Thread(
-            target=self._run, args=(url_substr,), name="netmon", daemon=True
+            target=self._run, args=(url_substr, gen), name="netmon", daemon=True
         )
         self._thread.start()
 
@@ -70,7 +77,7 @@ class NetMonitor:
             "rows": rows,
         }
 
-    def _run(self, url_substr: str) -> None:
+    def _run(self, url_substr: str, gen: int) -> None:
         try:
             from websockets.sync.client import connect
         except ImportError:
@@ -78,14 +85,18 @@ class NetMonitor:
             return
         try:
             targets = httpx.get(CDP_HTTP + "/json", timeout=3.0).json()
+            if gen != self._gen or self._stop.is_set():
+                return  # superseded by a newer start() — stay dead
             target = _find_target(targets, url_substr)
             if target is None:
                 self.error = "no page target found"
                 return
+            if gen != self._gen or self._stop.is_set():
+                return  # superseded while resolving — stay dead
             self.target = target.get("url", "")
             with connect(target["webSocketDebuggerUrl"], open_timeout=10.0) as ws:
                 ws.send(json.dumps({"id": 1, "method": "Network.enable", "params": {}}))
-                while not self._stop.is_set():
+                while not self._stop.is_set() and gen == self._gen:
                     try:
                         raw = ws.recv(timeout=0.5)
                     except TimeoutError:

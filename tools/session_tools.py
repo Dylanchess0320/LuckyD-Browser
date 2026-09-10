@@ -17,13 +17,18 @@ _todos: dict[str, dict] = {}
 _shell_history: list[dict] = []
 
 
-def record_shell_command(command: str, exit_code: int, output: str = ""):
-    """Called by bash_tool / powershell to record every command run."""
+def record_shell_command(command: str, exit_code: int, output: str = "", shell: str = ""):
+    """Called by bash_tool / powershell to record every command run.
+
+    `shell` names the interpreter ("bash", "powershell", ...); the history
+    filter matches on it instead of guessing from the command text.
+    """
     _shell_history.append(
         {
             "command": command[:500],
             "exit_code": exit_code,
             "output_preview": output[:200],
+            "shell": shell,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
     )
@@ -159,7 +164,7 @@ class ShellHistoryTool(ToolBase):
         entries = list(_shell_history)
 
         if shell_filter != "all":
-            entries = [e for e in entries if shell_filter in e.get("command", "").lower()[:50]]
+            entries = [e for e in entries if e.get("shell", "") == shell_filter]
 
         if failed_only:
             entries = [e for e in entries if e.get("exit_code", 0) != 0]
@@ -167,7 +172,14 @@ class ShellHistoryTool(ToolBase):
         if search:
             entries = [e for e in entries if search.lower() in e.get("command", "").lower()]
 
-        entries = entries[-last_n:]
+        # Documented max is 100; non-positive values return nothing (a bare
+        # entries[-0:] slice would return the whole history).
+        try:
+            last_n = int(last_n)
+        except (TypeError, ValueError):
+            last_n = 20
+        last_n = max(0, min(last_n, 100))
+        entries = entries[-last_n:] if last_n else []
 
         if not entries:
             return ToolOutput(text="No matching commands.", title="History (0)")

@@ -6,7 +6,7 @@ import json
 
 import httpx
 
-from . import LLMClient, LLMResult
+from . import LLMClient, LLMResult, StreamingToolCallAccumulator
 
 
 class DeepSeekClient(LLMClient):
@@ -75,6 +75,7 @@ class DeepSeekClient(LLMClient):
         result = LLMResult(model=self.config.model)
         think_buf = ""
         content_buf = ""
+        tc_accum = StreamingToolCallAccumulator()
 
         timeout = httpx.Timeout(connect=15.0, read=300.0, write=15.0, pool=5.0)
         async with (
@@ -119,11 +120,10 @@ class DeepSeekClient(LLMClient):
                     if on_token:
                         on_token(content)
 
-                # Tool calls
+                # Tool calls (fragments keyed by "index" — merge them instead
+                # of nesting raw chunk lists)
                 if delta.get("tool_calls"):
-                    if not result.tool_calls:
-                        result.tool_calls = []
-                    result.tool_calls.append(delta["tool_calls"])
+                    tc_accum.add(delta["tool_calls"])
 
                 finish = choice.get("finish_reason", "")
                 if finish:
@@ -131,4 +131,5 @@ class DeepSeekClient(LLMClient):
 
         result.content = content_buf
         result.thinking = think_buf
+        result.tool_calls = tc_accum.calls() or None
         return result

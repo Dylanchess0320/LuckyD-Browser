@@ -163,6 +163,10 @@ class DeepResearchTool(ToolBase):
             drs_settings.provider,
         )
         try:
+            # Validate every override BEFORE touching the global settings:
+            # an invalid option used to return early and leave the earlier
+            # valid overrides applied (the restore in `finally` was skipped).
+            preset = None
             if depth:
                 preset = DEPTH_PRESETS.get(str(depth).lower().strip())
                 if preset is None:
@@ -170,6 +174,24 @@ class DeepResearchTool(ToolBase):
                         text=f"Unknown depth {depth!r}. Use quick, standard, deep, or max.",
                         error=True,
                     )
+            sb = None
+            if search_backend:
+                sb = str(search_backend).lower().strip()
+                if sb not in _VALID_BACKENDS:
+                    return ToolOutput(
+                        text=f"Unknown search_backend {sb!r}. Use {', '.join(_VALID_BACKENDS)}.",
+                        error=True,
+                    )
+            p = None
+            if provider:
+                p = str(provider).lower().strip()
+                if p not in _VALID_PROVIDERS:
+                    return ToolOutput(
+                        text=f"Unknown provider {p!r}. Use {', '.join(_VALID_PROVIDERS)}.",
+                        error=True,
+                    )
+            # Everything validated — now apply the overrides.
+            if preset:
                 drs_settings.research_rounds = preset["research_rounds"]
                 drs_settings.searches_per_round = preset["searches_per_round"]
                 drs_settings.max_urls_per_round = preset["max_urls_per_round"]
@@ -182,23 +204,11 @@ class DeepResearchTool(ToolBase):
                 drs_settings.max_iterations = max(1, min(int(max_iterations), 5))
             if max_parallel is not None:
                 drs_settings.max_parallel = max(1, min(int(max_parallel), 8))
-            if search_backend:
-                sb = str(search_backend).lower().strip()
-                if sb not in _VALID_BACKENDS:
-                    return ToolOutput(
-                        text=f"Unknown search_backend {sb!r}. Use {', '.join(_VALID_BACKENDS)}.",
-                        error=True,
-                    )
+            if sb:
                 drs_settings.search_backend = sb
             if max_seconds is not None:
                 drs_settings.max_seconds = max(0.0, float(max_seconds))
-            if provider:
-                p = str(provider).lower().strip()
-                if p not in _VALID_PROVIDERS:
-                    return ToolOutput(
-                        text=f"Unknown provider {p!r}. Use {', '.join(_VALID_PROVIDERS)}.",
-                        error=True,
-                    )
+            if p:
                 drs_settings.provider = p
             if dry_run:
                 drs_settings.provider = "mock"

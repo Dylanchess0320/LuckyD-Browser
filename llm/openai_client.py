@@ -6,7 +6,7 @@ import json
 
 import httpx
 
-from . import LLMClient, LLMResult
+from . import LLMClient, LLMResult, StreamingToolCallAccumulator
 
 
 class OpenAIClient(LLMClient):
@@ -69,6 +69,7 @@ class OpenAIClient(LLMClient):
 
         result = LLMResult(model=self.config.model)
         content_buf = ""
+        tc_accum = StreamingToolCallAccumulator()
 
         timeout = httpx.Timeout(connect=15.0, read=300.0, write=15.0, pool=5.0)
         async with (
@@ -102,14 +103,15 @@ class OpenAIClient(LLMClient):
                     if on_token:
                         on_token(content)
                 if delta.get("tool_calls"):
-                    if not result.tool_calls:
-                        result.tool_calls = []
-                    result.tool_calls.append(delta["tool_calls"])
+                    # Streaming tool calls arrive as fragments keyed by
+                    # "index" — merge them instead of nesting raw chunk lists.
+                    tc_accum.add(delta["tool_calls"])
                 finish = choice.get("finish_reason", "")
                 if finish:
                     result.finish_reason = finish
 
         result.content = content_buf
+        result.tool_calls = tc_accum.calls() or None
         return result
 
     def _fmt(self, messages: list[dict]) -> list[dict]:

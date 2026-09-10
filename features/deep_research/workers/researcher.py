@@ -83,6 +83,13 @@ def _collect_urls_via_grounding(llm: LLMProvider, query: str, worker_id: str) ->
 
 
 def _collect_urls_ddg(query: str) -> list[EvidenceCard]:
+    from ..runtime.budget import get_budget
+
+    # Budget accounting: the gemini and premium paths both record searches;
+    # without this, DRS_MAX_SEARCH_QUERIES is silently unenforced for the DDG
+    # backend (the default for free-model/LuckyD runs). Let BudgetExhausted
+    # propagate so run_one_task stops with stop_reason="budget_exhausted".
+    get_budget().record_search()
     return DDGSearch().search(query)
 
 

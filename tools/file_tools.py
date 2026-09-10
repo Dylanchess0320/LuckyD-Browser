@@ -80,6 +80,8 @@ class ReadTool(ToolBase):
 
             lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
             display_lines = []
+            # A negative offset would wrap around via lines[-i]; clamp to 0.
+            offset = max(0, offset)
             end = len(lines) if limit is None else min(offset + limit, len(lines))
             for i in range(offset, end):
                 display_lines.append(f"{i:4d} | {lines[i]}")
@@ -175,6 +177,11 @@ class EditTool(ToolBase):
                 )
             if not path.exists():
                 return ToolOutput(text=f"Error: File not found: {file_path}", error=True)
+
+            # An empty old_string matches between every character (and str.count
+            # reports len+1 hits), so replace_all=True would shred the file.
+            if not old_string:
+                return ToolOutput(text="Error: old_string must not be empty", error=True)
 
             original = path.read_text(encoding="utf-8")
             if not replace_all:
