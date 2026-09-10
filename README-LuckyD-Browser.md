@@ -78,6 +78,12 @@ Prefer a cloud model instead? The sidebar supports 9 more providers — see
 **Harness mode (default ON):** sidebar agent tasks run on the coding-agent backend, which can drive
 your **live, visible tabs** through the Control API — exe brain, browser hands.
 
+> 🧪 **On `main` now (6.0 in progress):** a **Trust dashboard** (`/trust`) with permission scopes,
+> an approval queue, and an append-only audit log; **WebMCP** for site-exposed agent tools;
+> **scheduled background agents** with a morning digest; and an open **Skills marketplace**
+> (install/update/remove/publish). Not in the v5.0.0 installer yet — see
+> [CHANGELOG.md](CHANGELOG.md).
+
 <p align="center">
   <img src="docs/screenshots/hq.png" alt="LuckyD Code HQ — the full coding-agent workspace running as a browser tab" width="920"><br>
   <em>The coding-agent HQ lives in a browser tab — 70+ tools, mirroring the sidebar's provider.</em>

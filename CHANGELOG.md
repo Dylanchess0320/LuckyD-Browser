@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — 6.0 in progress
+
+The agentic frontier, on `main` (not yet released):
+
+### Added
+- **Trust foundation** — permission scopes and risk levels for every agent action, secret redaction in outputs, an append-only audit log, and an approval queue. Review everything the agents did on the **`/trust` dashboard** ("agentic with receipts").
+- **WebMCP support** — websites can expose typed agent tools to LuckyD via a JS shim (native support wins when present). Tool registration, aliases, permission levels, and schema validation.
+- **Scheduled/background agents** — cron-scheduled agents that run while you rest, with a **morning digest** of their runs. Manage them at **`/schedules`** (`python main.py schedule ...`).
+- **Open Skills marketplace** — skill registries (bundled + remote) with hash-verified **install/update/remove/publish**; tampered or unparseable skills are refused.
+
 ## [5.0.0] - 2026-09-10
 
 The final, maxed-out release. Everything in 4.0, polished to a shine:

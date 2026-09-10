@@ -33,7 +33,7 @@
 
 Most “AI browsers” rent you a chatbot behind an account. LuckyD is a **real Chromium daily driver** with a **local assistant**, a **coding-agent HQ**, and **ConPTY terminals** living in your tabs.
 
-| | LuckyD 3.9 | Comet / Dia | Edge Copilot | Chrome Gemini |
+| | LuckyD 5.0 | Comet / Dia | Edge Copilot | Chrome Gemini |
 |---|:---:|:---:|:---:|:---:|
 | Free AI with **no account / no key** | ✅ local Ollama | ❌ | ❌ | ❌ |
 | Works **fully offline** | ✅ | ❌ | ❌ | ❌ |
@@ -46,6 +46,17 @@ Most “AI browsers” rent you a chatbot behind an account. LuckyD is a **real 
 
 ---
 
+## New in 6.0 — on `main`
+
+The next frontier, already landed on `main` (not in the 5.0.0 installer yet):
+
+| | |
+|---|---|
+| **🛡 Trust dashboard** | "Agentic with receipts": permission scopes, risk levels, secret redaction, an append-only audit log, and an approval queue — review everything the agents did at `/trust`. |
+| **🔌 WebMCP** | Websites can expose typed agent tools to LuckyD (JS shim + native support), permission-gated so sites can't reach beyond their grant. |
+| **⏰ Scheduled agents** | Background agents on cron schedules with a **morning digest** (`/schedules`) — it works while you rest. |
+| **🧩 Skills marketplace** | Open skill registries with hash-verified install, update, remove, and publish for agent skills. |
+
 ## New in 5.0.0 — Final
 
 The maxed-out release: everything from 4.0, shipped like a finished product.
@@ -56,7 +67,7 @@ The maxed-out release: everything from 4.0, shipped like a finished product.
 | **Version unified** | 5.0.0 everywhere — package, installers, user-agent — guarded by a regression test so it can't drift. |
 | **Fully formatted & linted** | Entire tree `ruff`-clean, CI green. |
 
-*Verified: 189 tests passed, `ruff` clean.*
+*Verified: 365 tests passed, `ruff` clean.*
 
 <details>
 <summary>New in 4.0.0 — Frontier</summary>
