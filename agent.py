@@ -37,6 +37,7 @@ import tools.memory_tools
 import tools.plan_tools
 import tools.schedule_tools
 import tools.session_tools
+import tools.skill_market_tools
 import tools.skill_tools
 import tools.subagent_tool
 import tools.task_tools

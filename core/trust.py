@@ -179,6 +179,16 @@ _TOOL_SCOPE_OVERRIDES: dict[str, str] = {
     "SkillRun": "agents",
     "SkillList": "agents",
     "SkillDelete": "agents",
+    "SkillSearch": "agents",
+    "SkillInfo": "agents",
+    "SkillFetch": "agents",
+    "SkillInstall": "agents",
+    "SkillUpdate": "agents",
+    "SkillRemove": "agents",
+    "SkillPublish": "agents",
+    "SkillSources": "agents",
+    "SkillSourceAdd": "agents",
+    "SkillSourceRemove": "agents",
     "Plan": "agents",
     "PlanApprove": "agents",
     "EnterPlanMode": "agents",
@@ -204,6 +214,9 @@ _TOOL_SCOPE_OVERRIDES: dict[str, str] = {
     "CSV": "system",
     "Secrets": "system",
 }
+
+#: Public view of explicit tool -> scope overrides (used by tests and UI).
+TOOL_SCOPE_OVERRIDES: dict[str, str] = _TOOL_SCOPE_OVERRIDES
 
 _SCOPE_PREFIXES: tuple[tuple[str, str], ...] = (
     ("Browser", "browser"),

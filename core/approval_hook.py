@@ -79,6 +79,10 @@ _TOOL_PERMISSIONS: dict[str, ToolPermissionLevel] = {
     "ListAgents": ToolPermissionLevel.ALWAYS_ALLOW,
     "MCPList": ToolPermissionLevel.ALWAYS_ALLOW,
     "SkillList": ToolPermissionLevel.ALWAYS_ALLOW,
+    "SkillSearch": ToolPermissionLevel.ALWAYS_ALLOW,
+    "SkillInfo": ToolPermissionLevel.ALWAYS_ALLOW,
+    "SkillFetch": ToolPermissionLevel.ALWAYS_ALLOW,
+    "SkillSources": ToolPermissionLevel.ALWAYS_ALLOW,
     "SessionList": ToolPermissionLevel.ALWAYS_ALLOW,
     "TaskList": ToolPermissionLevel.ALWAYS_ALLOW,
     "TaskGet": ToolPermissionLevel.ALWAYS_ALLOW,
@@ -98,6 +102,8 @@ _TOOL_PERMISSIONS: dict[str, ToolPermissionLevel] = {
     "OpenInBrowser": ToolPermissionLevel.NORMAL,
     "SkillRun": ToolPermissionLevel.NORMAL,
     "SkillDelete": ToolPermissionLevel.NORMAL,
+    "SkillPublish": ToolPermissionLevel.NORMAL,
+    # ---- Requires approval ----
     "Plan": ToolPermissionLevel.NORMAL,
     "PlanApprove": ToolPermissionLevel.NORMAL,
     "EnterPlanMode": ToolPermissionLevel.NORMAL,
@@ -122,6 +128,11 @@ _TOOL_PERMISSIONS: dict[str, ToolPermissionLevel] = {
     "BrowserClose": ToolPermissionLevel.REQUIRES_APPROVAL,
     "BrowserState": ToolPermissionLevel.REQUIRES_APPROVAL,
     "BrowserEmulate": ToolPermissionLevel.REQUIRES_APPROVAL,
+    "SkillInstall": ToolPermissionLevel.REQUIRES_APPROVAL,
+    "SkillUpdate": ToolPermissionLevel.REQUIRES_APPROVAL,
+    "SkillRemove": ToolPermissionLevel.REQUIRES_APPROVAL,
+    "SkillSourceAdd": ToolPermissionLevel.REQUIRES_APPROVAL,
+    "SkillSourceRemove": ToolPermissionLevel.REQUIRES_APPROVAL,
     "BrowserIntercept": ToolPermissionLevel.REQUIRES_APPROVAL,
     "BrowserTrace": ToolPermissionLevel.REQUIRES_APPROVAL,
     "BrowserToggleHeadless": ToolPermissionLevel.REQUIRES_APPROVAL,
@@ -155,6 +166,9 @@ _TOOL_PERMISSIONS: dict[str, ToolPermissionLevel] = {
     "TaskCreate": ToolPermissionLevel.REQUIRES_APPROVAL,
     "TaskStop": ToolPermissionLevel.REQUIRES_APPROVAL,
 }
+
+#: Public view of tool -> permission-level mapping (used by tests and UI).
+TOOL_PERMISSIONS: dict[str, ToolPermissionLevel] = _TOOL_PERMISSIONS
 
 
 class ApprovalHook(AgentPlugin):

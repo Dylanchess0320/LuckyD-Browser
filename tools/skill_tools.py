@@ -19,6 +19,26 @@ from .registry import register_tool
 SKILLS_DIR = Path(__file__).parent.parent / "skills"
 
 
+def _skills_dirs() -> list[Path]:
+    """Bundled repo skills + the user's marketplace-installed skills."""
+    dirs = [SKILLS_DIR]
+    try:
+        from core.marketplace import user_skills_dir  # lazy: avoids import cycle
+
+        user_dir = user_skills_dir()
+        if user_dir.resolve() != SKILLS_DIR.resolve():
+            dirs.append(user_dir)
+    except Exception:
+        pass
+    return dirs
+
+
+def _skill_cache_invalidate() -> None:
+    """Hook called after marketplace install/remove. Parsing is live (no cache),
+    so this is currently a no-op kept for API stability."""
+    return
+
+
 def _parse_skill(filepath: Path) -> dict | None:
     """Parse a markdown skill file with YAML frontmatter."""
     try:
@@ -54,19 +74,23 @@ class SkillListTool(ToolBase):
     parameters = {}
 
     async def execute(self) -> ToolOutput:
-        if not SKILLS_DIR.exists():
-            return ToolOutput(text="No skills directory found.", title="Skills")
-
         skills = []
-        for f in sorted(SKILLS_DIR.glob("*.md")):
-            parsed = _parse_skill(f)
-            if parsed:
-                skills.append(
-                    f"  - **{parsed['name']}** v{parsed['version']}: {parsed['description']}"
-                )
+        seen = set()
+        # User-installed skills first so they win on name clashes.
+        for skills_dir in reversed(_skills_dirs()):
+            if not skills_dir.exists():
+                continue
+            for f in sorted(skills_dir.glob("*.md")):
+                parsed = _parse_skill(f)
+                if parsed and parsed["name"] not in seen:
+                    seen.add(parsed["name"])
+                    origin = "installed" if skills_dir != SKILLS_DIR else "bundled"
+                    skills.append(
+                        f"  - **{parsed['name']}** v{parsed['version']} ({origin}): {parsed['description']}"
+                    )
 
         if not skills:
-            return ToolOutput(text="No skills found in skills/ directory.", title="Skills")
+            return ToolOutput(text="No skills found.", title="Skills")
 
         return ToolOutput(
             text="Available skills:\n\n" + "\n".join(skills),
@@ -85,20 +109,21 @@ class SkillRunTool(ToolBase):
     }
 
     async def execute(self, skill_name: str, context: str = "") -> ToolOutput:
-        if not SKILLS_DIR.exists():
-            return ToolOutput(text="No skills directory found.", error=True)
-
-        for f in sorted(SKILLS_DIR.glob("*.md")):
-            parsed = _parse_skill(f)
-            if parsed and parsed["name"].lower() == skill_name.lower():
-                prompt = parsed["prompt"]
-                if context:
-                    prompt += f"\n\n## Additional Context\n{context}"
-                return ToolOutput(
-                    text=prompt,
-                    title=f"Skill: {parsed['name']}",
-                    metadata={"skill": parsed["name"], "version": parsed["version"]},
-                )
+        # User-installed skills take precedence over bundled ones.
+        for skills_dir in reversed(_skills_dirs()):
+            if not skills_dir.exists():
+                continue
+            for f in sorted(skills_dir.glob("*.md")):
+                parsed = _parse_skill(f)
+                if parsed and parsed["name"].lower() == skill_name.lower():
+                    prompt = parsed["prompt"]
+                    if context:
+                        prompt += f"\n\n## Additional Context\n{context}"
+                    return ToolOutput(
+                        text=prompt,
+                        title=f"Skill: {parsed['name']}",
+                        metadata={"skill": parsed["name"], "version": parsed["version"]},
+                    )
 
         return ToolOutput(
             text=f"Skill '{skill_name}' not found. Use SkillList to see available skills.",

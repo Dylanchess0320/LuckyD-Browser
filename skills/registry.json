@@ -1,0 +1,66 @@
+{
+  "registry": "luckyd-bundled",
+  "description": "Skills bundled with LuckyD Browser. Open format \u2014 anyone can host their own registry.json like this one.",
+  "skills": [
+    {
+      "name": "ai-news-brief",
+      "description": "Deliver a fresh, personalized AI news briefing \u2014 model releases, funding rounds, policy shifts, and tool launches \u2014 with memory-aware context so you never get the same headline twice",
+      "version": "1.0",
+      "author": "LuckyD Code",
+      "tags": [
+        "news",
+        "ai",
+        "briefing",
+        "research",
+        "daily-digest"
+      ],
+      "url": "ai-news-brief.md",
+      "sha256": "3ebee970ffd75c7a03cb9debf6de1cfe503f88faecd577aeb222a75265336ea8"
+    },
+    {
+      "name": "graphify",
+      "description": "Explore the codebase knowledge graph \u2014 architectural hubs, dependency paths, impact analysis, and semantic queries",
+      "version": "1.0",
+      "author": "LuckyD Code",
+      "tags": [
+        "graph",
+        "analysis",
+        "dependencies",
+        "architecture",
+        "knowledge-graph"
+      ],
+      "url": "graphify.md",
+      "sha256": "75212f545d149b0e2fa658b0c5301a1ff5b2981b536239b6b93e870b31460dd9"
+    },
+    {
+      "name": "movie-picker",
+      "description": "Recommend movies and shows based on mood, streaming services, and past preferences \u2014 with memory-aware filtering so you never get the same suggestion twice",
+      "version": "1.0",
+      "author": "LuckyD Code",
+      "tags": [
+        "movies",
+        "tv",
+        "entertainment",
+        "recommendations",
+        "streaming"
+      ],
+      "url": "movie-picker.md",
+      "sha256": "0c35ddfffb0f4f8f1aa7b4f726ecba723b33388444bc263c984c53953d4b1f57"
+    },
+    {
+      "name": "top-picks",
+      "description": "Curate ranked \"top X\" lists for any category (AI tools, games, hardware, books, productivity apps, etc.) with web search, comparison table, and memory-aware personalization",
+      "version": "1.0",
+      "author": "LuckyD Code",
+      "tags": [
+        "recommendations",
+        "rankings",
+        "research",
+        "comparisons",
+        "shopping"
+      ],
+      "url": "top-picks.md",
+      "sha256": "858c61d2de820490c8f59f075e7a5bc9f96f6bddf418296119db565053eadc6a"
+    }
+  ]
+}
