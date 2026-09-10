@@ -27,12 +27,15 @@ Sources: [Developers Digest overview](https://www.developersdigest.tech/blog/web
 
 | Tool | What it does | Permission |
 |---|---|---|
-| `WebMCPDiscover` | Lists a page's tools: name, description, typed parameters, annotated forms. Read-only. | always allow |
-| `WebMCPCall` | Calls a named tool with structured JSON args. Runs the site's handler in the page. | requires approval |
-| `WebMCPShim` | Injects LuckyD's `navigator.modelContext` polyfill (`static/webmcp-shim.js`) on pages without native support, and auto-registers annotated forms. | normal |
+| `WebMCPDiscover` | Lists a page's tools: name, description, typed parameters, annotated forms. Read-only. Returns a **binding token** for the page's origin. | always allow |
+| `WebMCPCall` | Calls a named tool with structured JSON args. Runs the site's handler in the page. Requires the binding token from `WebMCPDiscover` for the current origin. | requires approval |
+| `WebMCPShim` | Injects LuckyD's `navigator.modelContext` polyfill (`static/webmcp-shim.js`) on pages without native support, and auto-registers annotated forms. Also returns a binding token like `WebMCPDiscover`. | normal |
 
 All three live in the **browser** permission scope, so they show up in the
-Trust Center (`/trust`) and every call is audit-logged.
+Trust Center (`/trust`) and every call is audit-logged. Permission levels
+are enforced by the agent loop's approval hook (`core/approval_hook.py`):
+`WebMCPCall` cannot run without passing the trust policy (ask / session /
+always / per-site) even though the binding check below also gates it.
 
 ## Demo (no WebMCP site needed)
 
@@ -40,22 +43,62 @@ The shim makes any page WebMCP-capable, so you can try the full loop today:
 
 1. Agent: `BrowserNavigate` to any page with a form (or a blank page).
 2. Agent: `WebMCPShim` — polyfill injected.
-3. Agent: `WebMCPDiscover` — annotated forms appear as tools.
-4. Agent: `WebMCPCall` with the form's fields — the shim fills the form,
-   fires `input`/`change` events, and reports what would be submitted
-   (it never navigates away while the agent is driving).
+3. Agent: `WebMCPDiscover` — annotated forms appear as tools, along with a
+   **binding token** for the page's origin.
+4. Agent: `WebMCPCall` with the form's fields **and the binding token** —
+   the shim fills the form, fires `input`/`change` events, and reports what
+   would be submitted (it never navigates away while the agent is driving).
 
 On a real WebMCP site (or any page whose JS calls `registerTool()`),
 step 2 is unnecessary — discovery just works.
 
+## Tab/origin binding
+
+The core threat: a page on origin X must not discover or invoke tools
+registered by origin Y, nor impersonate another page's identity. LuckyD
+binds every discovery to the page's origin (scheme + host + port):
+
+- **Discovery is scoped to the calling tab's origin.** `WebMCPDiscover`
+  records each tool's name and parameter schema under the current page's
+  origin and returns an opaque, unguessable **binding token** for it. The
+  token rotates on every discovery, so stale tokens die immediately.
+- **Calls must carry the token.** `WebMCPCall` takes a `binding_token`
+  parameter and, before dispatching, verifies server-side (with
+  constant-time comparison) that the token matches the *current* page's
+  origin **and** that the named tool was discovered on that origin. A
+  missing, forged, or cross-origin token is refused without touching the
+  page — as is a tool name that was never discovered on this origin.
+- **Stale registrations are purged.** When the tab navigates cross-origin
+  (or a new origin is discovered), the previous origin's registration is
+  dropped, so tools from a page you left can never be invoked later.
+- Origin-less pages (`about:blank`, `data:` URLs) bind to their URL
+  instead of an origin — there is no origin to confuse there.
+
+The token is an agent-side secret: it is generated with
+`secrets.token_urlsafe`, never exposed to page JavaScript, and checked
+only in Python. (LuckyD's browser currently drives a single tab, so the
+binding is keyed by origin alone; if multi-tab support lands, the key
+becomes tab + origin.)
+
 ## Security model
 
 - **Discovery is read-only** and always allowed; it only reads tool schemas.
+  Page-supplied discovery data is coerced defensively (non-object results,
+  malformed tool entries, and oversized payloads are dropped or capped) so a
+  hostile page can't crash the agent or poison the registry.
 - **Calling a tool executes the site's JavaScript in the page** — treated as
   browser control: it goes through the normal approval flow (ask / session /
-  always / per-site) and is recorded in the audit log.
-- Argument validation happens twice: the shim validates against the tool's
-  schema in-page, and LuckyD validates the JSON before sending.
+  always / per-site) and is recorded in the audit log. On top of that, the
+  origin binding above must check out or the call is refused.
+- **Argument validation happens twice:** the shim validates against the
+  tool's schema in-page, and LuckyD validates the JSON arguments
+  server-side against the schema captured at discovery — before anything
+  is dispatched to the page. A native (non-shim) page that skips validation
+  still can't receive malformed input.
+- **Dispatch has a 30-second timeout**, so a malicious or broken page
+  handler can't hang the agent. Page handler errors propagate back to the
+  agent as error results; page return values are serialized defensively
+  and truncated.
 - The shim never exfiltrates: it only fills forms and reports submissions.
 - Threat model caveat (shared with the spec itself): a malicious page could
   register misleading tools. LuckyD shows the tool's origin page and
