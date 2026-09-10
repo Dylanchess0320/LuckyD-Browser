@@ -13,8 +13,11 @@ import struct
 import sys
 from pathlib import Path
 
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
+try:
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+except ImportError:
+    sys.exit("cryptography is not installed. Run: pip install cryptography")
 
 HERE = Path(__file__).resolve().parent
 MANIFEST = HERE / "manifest.json"
