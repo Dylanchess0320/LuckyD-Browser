@@ -5,13 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [6.0.0] - 2026-09-10
+## [Unreleased] — 6.0 in progress
 
-The agentic frontier, shipped: trust-first AI browsing.
+The agentic frontier, on `main` (not yet released):
 
 **Added**
-
-- **Official Windows installer** — `LuckyDBrowserSetup-6.0.0.exe`, built on a real Windows runner with Inno Setup 6. Per-user install, no admin needed, silent-install flags supported. Ships from the [releases page](https://github.com/Dylanchess0320/LuckyD-Browser/releases).
 - **Trust foundation** — permission scopes and risk levels for every agent action, secret redaction in outputs, an append-only audit log, and an approval queue. Review everything the agents did on the **`/trust` dashboard** ("agentic with receipts").
 - **WebMCP support** — websites can expose typed agent tools to LuckyD via a JS shim (native support wins when present). Tool registration, aliases, permission levels, and schema validation.
 - **Scheduled/background agents** — cron-scheduled agents that run while you rest, with a **morning digest** of their runs. Manage them at **`/schedules`** (`python main.py schedule ...`).

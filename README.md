@@ -46,24 +46,21 @@ Most “AI browsers” rent you a chatbot behind an account. LuckyD is a **real 
 
 ---
 
-## New in 6.0.0 — Agentic
+## New in 6.0 — on `main`
 
-The trust-first AI browser, shipped with an official installer:
+The next frontier, already landed on `main` (not in the 5.0.0 installer yet):
 
 | | |
 |---|---|
-| **⬇ Windows installer** | [`LuckyDBrowserSetup-6.0.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases) — built on a real Windows runner with Inno Setup 6. Per-user, no admin, silent-install flags. |
 | **🛡 Trust dashboard** | "Agentic with receipts": permission scopes, risk levels, secret redaction, an append-only audit log, and an approval queue — review everything the agents did at `/trust`. |
 | **🔒 Trust hardening** | Legacy `auto_approve_all` bypasses removed (now inert with a warning); explicit audited `auto_approve_low_risk` per-run mode; cross-process run locks so scheduled and interactive runs can't collide; mutating schedule-dashboard routes gated by approval; zero-valued schedule fields (`max_retries=0`) honored instead of dropped. |
-| **🔌 WebMCP** | Websites can expose typed agent tools to LuckyD (JS shim + native support), permission-gated so sites can't reach beyond their grant. Server-side schema validation, 30s dispatch timeouts, and origin binding via rotating discovery tokens — a page can't call tools on another origin's behalf, and bindings are keyed per tab. |
+| **🔌 WebMCP** | Websites can expose typed agent tools to LuckyD (JS shim + native support), permission-gated so sites can't reach beyond their grant. Server-side schema validation, 30s dispatch timeouts, and origin binding via rotating discovery tokens — a page can't call tools on another origin's behalf. |
 | **⏰ Scheduled agents** | Background agents on cron schedules with a **morning digest** (`/schedules`) — it works while you rest. |
 | **🧩 Skills marketplace** | Open skill registries with hash-verified install, update, remove, and publish for agent skills. |
-| **🛡 Agent circuit breaker** | The agent loop stops after 4 consecutive all-tool-failure turns with an actionable message instead of burning turns and budget. |
 
-*Verified: 428 tests passed, `ruff` clean, CI green.*
+*On `main`: 411 tests passed, `ruff` clean.*
 
-<details>
-<summary>New in 5.0.0 — Final</summary>
+## New in 5.0.0 — Final
 
 The maxed-out release: everything from 4.0, shipped like a finished product.
 
@@ -74,8 +71,6 @@ The maxed-out release: everything from 4.0, shipped like a finished product.
 | **Fully formatted & linted** | Entire tree `ruff`-clean, CI green. |
 
 *Verified: 365 tests passed, `ruff` clean.*
-
-</details>
 
 <details>
 <summary>New in 4.0.0 — Frontier</summary>
