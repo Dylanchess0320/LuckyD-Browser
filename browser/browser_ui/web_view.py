@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+from string import Template
 from urllib.parse import quote
 
 from browser_core import agent as _agent
@@ -13,6 +14,8 @@ from PySide6.QtGui import QGuiApplication
 from PySide6.QtWebEngineCore import QWebEnginePage, QWebEngineSettings
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWidgets import QMenu
+
+from .theme import palette as _theme_palette
 
 
 class WebPage(QWebEnginePage):
@@ -71,28 +74,36 @@ class WebPage(QWebEnginePage):
 _RETRY_DELAYS_MS = (1200, 2500, 4000)
 _MAX_ATTEMPTS = 3
 
-_CONNECTING_HTML = (
-    "<!doctype html><html><head><meta charset='utf-8'><style>"
-    "body{background:#1b1d23;color:#cfd3dc;font:15px system-ui;display:flex;"
-    "height:100vh;align-items:center;justify-content:center;margin:0}"
-    ".wrap{text-align:center}.spin{font-size:34px}"
-    ".dim{color:#7a7f8a;font-size:12px}</style></head><body><div class='wrap'>"
-    "<div class='spin'>⟳</div><p>Connecting… (attempt {n})</p>"
-    "<p class='dim'>Network hiccup — retrying automatically.</p>"
-    "</div></body></html>"
-)
+
+def _connecting_html(p: dict, attempt: int) -> str:
+    """The transient "Connecting…" placeholder, tinted to the active palette."""
+    return Template(
+        "<!doctype html><html><head><meta charset='utf-8'><style>"
+        "body{background:$window;color:$text;font:15px system-ui;display:flex;"
+        "height:100vh;align-items:center;justify-content:center;margin:0}"
+        ".wrap{text-align:center}.spin{font-size:34px;color:$accent}"
+        ".dim{color:$muted;font-size:12px}</style></head><body><div class='wrap'>"
+        "<div class='spin'>⟳</div><p>Connecting… (attempt $n)</p>"
+        "<p class='dim'>Network hiccup — retrying automatically.</p>"
+        "</div></body></html>"
+    ).substitute(
+        window=p["window"], text=p["text"], accent=p["accent"], muted=p["muted"], n=attempt
+    )
+
 
 # The offline page doubles as a tiny arcade: a canvas endless-runner while
 # you wait for the network (Chrome-dino homage, LuckyD neon skin).
-_OFFLINE_HTML = """<!doctype html><html><head><meta charset='utf-8'><style>
-body{background:#1b1d23;color:#cfd3dc;font:15px system-ui;margin:0;
+# Colors are $placeholders tinted to the active palette per render; the game
+# logic itself is untouched.
+_OFFLINE_TEMPLATE = Template("""<!doctype html><html><head><meta charset='utf-8'><style>
+body{background:$window;color:$text;font:15px system-ui;margin:0;
   display:flex;min-height:100vh;align-items:center;justify-content:center}
 .wrap{text-align:center;max-width:560px;padding:20px}
-.dim{color:#7a7f8a;font-size:12px}
-canvas{background:#12141a;border:1px solid #2a2f3a;border-radius:12px;
+.dim{color:$muted;font-size:12px}
+canvas{background:$panel;border:1px solid $border;border-radius:12px;
   margin-top:18px;cursor:pointer;display:block}
-.hint{color:#5b6470;font-size:11px;margin-top:8px}
-b.score{color:#5b9dff}
+.hint{color:$muted;font-size:11px;margin-top:8px}
+b.score{color:$accent}
 </style></head><body><div class='wrap'>
 <div style='font-size:34px'>⚠</div>
 <p>Still can't reach this site.</p>
@@ -124,18 +135,37 @@ function tick(){
  if(!dead)score+=speed/60;
  // draw
  x.clearRect(0,0,W,H);
- x.strokeStyle='#2a2f3a';x.beginPath();x.moveTo(0,G+27);x.lineTo(W,G+27);x.stroke();
- x.fillStyle=dead?'#ff5b6e':'#5b9dff';
+ x.strokeStyle='$border';x.beginPath();x.moveTo(0,G+27);x.lineTo(W,G+27);x.stroke();
+ x.fillStyle=dead?'$danger':'$accent';
  x.fillRect(dino.x,dino.y,dino.w,26);
- x.fillStyle='#0b0f16';x.fillRect(dino.x+14,dino.y+6,4,4); // eye
- x.fillStyle='#f9a24f';
+ x.fillStyle='$window';x.fillRect(dino.x+14,dino.y+6,4,4); // eye
+ x.fillStyle='$accent2';
  for(const o of obs)x.fillRect(o.x,o.y,o.w,o.h);
- x.fillStyle='#7a7f8a';x.font='11px system-ui';
+ x.fillStyle='$muted';x.font='11px system-ui';
  x.fillText((dead?'💀 press SPACE to retry · ':'')+Math.floor(score),8,16);
  requestAnimationFrame(tick);
 }
 tick();
-</script></div></body></html>"""
+</script></div></body></html>""")
+
+
+def _offline_html(p: dict) -> str:
+    """The offline arcade page, tinted to the active palette (dino kept!)."""
+    return _OFFLINE_TEMPLATE.substitute(
+        window=p["window"],
+        text=p["text"],
+        muted=p["muted"],
+        panel=p["panel"],
+        border=p["border"],
+        accent=p["accent"],
+        accent2=p["accent2"],
+        danger=p["danger"],
+    )
+
+
+# Default-theme rendering, kept as a module constant for the selftest sanity
+# check (browser/selftest.py asserts the offline page still has the arcade).
+_OFFLINE_HTML = _offline_html(_theme_palette(None))
 
 
 class WebView(QWebEngineView):
@@ -182,10 +212,12 @@ class WebView(QWebEngineView):
         attempts = self._load_attempts.get(key, 0) + 1
         self._load_attempts[key] = attempts
         if attempts > _MAX_ATTEMPTS:
-            self.setHtml(_OFFLINE_HTML, url)  # give up gracefully
+            self.setHtml(
+                _offline_html(_theme_palette(self._mw.settings)), url
+            )  # give up gracefully
             return
         self._connecting_for = url
-        self.setHtml(_CONNECTING_HTML.replace("{n}", str(attempts + 1)), url)
+        self.setHtml(_connecting_html(_theme_palette(self._mw.settings), attempts + 1), url)
         # Schedule the retry on a timer OWNED BY THIS VIEW (never a global
         # QTimer.singleShot): if the tab is closed mid-retry the timer is
         # destroyed together with the view, so the callback can never fire

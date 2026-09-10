@@ -44,11 +44,22 @@ _SYSTEM = (
 # neon). Re-applied when the theme changes via AiSidebar._apply_theme().
 _P: dict = {}
 
+# Neutral stand-in, used only if a style helper ever ran before
+# AiSidebar._apply_theme() populated _P. The app always applies the theme
+# first in __init__, so this is unreachable in practice — it exists so no
+# hardcoded neon value can flash through on a light theme.
+_NEUTRAL = "#808080"
+
+
+def _tok(key: str) -> str:
+    """Read a design token — _P is the single source of truth."""
+    return _P.get(key, _NEUTRAL)
+
 
 def _code_style() -> str:
     return (
-        f"background:{_P.get('window', '#0d1322')};"
-        f"border:1px solid {_P.get('border', '#232c42')};border-radius:10px;"
+        f"background:{_tok('window')};"
+        f"border:1px solid {_tok('border')};border-radius:10px;"
         "padding:9px 11px;margin:6px 0;font-family:'Cascadia Code',Consolas,"
         "monospace;font-size:12px;white-space:pre-wrap;"
     )
@@ -56,7 +67,7 @@ def _code_style() -> str:
 
 def _inline_code_style() -> str:
     return (
-        f"background:{_P.get('window', '#0d1322')};border-radius:5px;"
+        f"background:{_tok('window')};border-radius:5px;"
         "padding:1px 6px;font-family:'Cascadia Code',Consolas,monospace;"
         "font-size:12px;"
     )
@@ -100,12 +111,12 @@ def _md_lite(text: str) -> str:
 def _bubble(role: str, content_html: str) -> str:
     """One chat bubble with a colored edge per role."""
     edges = {
-        "user": _P.get("accent", "#4f9cf9"),
-        "assistant": _P.get("accent2", "#9d4ff9"),
-        "error": _P.get("danger", "#e06c75"),
+        "user": _tok("accent"),
+        "assistant": _tok("accent2"),
+        "error": _tok("danger"),
     }
     labels = {"user": "You", "assistant": "Assistant", "error": "Error"}
-    color = edges.get(role, _P.get("muted", "#8b93a7"))
+    color = edges.get(role, _tok("muted"))
     label = labels.get(role, role.title())
     return (
         f"<div style='margin:8px 0;padding:7px 11px;background:rgba(255,255,255,.04);"
@@ -377,7 +388,7 @@ class AiSidebar(QDockWidget):
         layout.addWidget(self.vision_box)
 
         self.status = QLabel("", body)
-        self.status.setStyleSheet(f"color: {_P.get('muted', '#8b93a7')}; font-size: 11px;")
+        self.status.setStyleSheet(f"color: {_tok('muted')}; font-size: 11px;")
         layout.addWidget(self.status)
 
         self.setWidget(body)
@@ -390,7 +401,7 @@ class AiSidebar(QDockWidget):
         """Adopt the active theme's tokens and re-render the chat with them."""
         global _P
         _P = dict(_brand_tokens(getattr(self._mw, "settings", None)))
-        muted = _P.get("muted", "#8b93a7")
+        muted = _tok("muted")
         if hasattr(self, "status"):
             self.status.setStyleSheet(f"color: {muted}; font-size: 11px;")
         if hasattr(self, "_blocks") and self._blocks:
@@ -413,9 +424,9 @@ class AiSidebar(QDockWidget):
 
     def _greet(self) -> None:
         providers = ", ".join(self.bridge.providers()) or "none set up"
-        muted = _P.get("muted", "#9aa1b5")
-        text_c = _P.get("text", "#e8ecf5")
-        accent = _P.get("accent", "#5b9dff")
+        muted = _tok("muted")
+        text_c = _tok("text")
+        accent = _tok("accent")
         # Friendly onboarding: short steps, free rotation hint, keyboard tips
         free_hint = ""
         try:
@@ -431,7 +442,7 @@ class AiSidebar(QDockWidget):
                     f"<div style='color:{muted};padding:6px 2px;line-height:1.5'>"
                     f"<b style='color:{text_c};font-size:14px'>🤖 Assistant — ready</b><br>"
                     f"<span>Ask about this page, summarise, or give the agent a task — it drives the current tab while you watch.</span><br>"
-                    f"<div style='margin:6px 0;padding:8px 10px;background:rgba(255,255,255,.04);border:1px solid {_P.get('border', '#232c42')};border-radius:10px'>"
+                    f"<div style='margin:6px 0;padding:8px 10px;background:rgba(255,255,255,.04);border:1px solid {_tok('border')};border-radius:10px'>"
                     f"<b style='color:{accent}'>Quick start:</b><br>"
                     f"• <b>Summarize</b> or <b>📷 Look at page</b> — one-tap page help<br>"
                     f"• Type a question below (☑ Page context includes the page)<br>"
@@ -506,9 +517,9 @@ class AiSidebar(QDockWidget):
 
     def refresh_harness_status(self) -> None:
         """Update the coding-agent status line from the supervisor cache."""
-        muted = _P.get("muted", "#8b93a7")
-        ok = _P.get("ok", "#34d399")
-        err = _P.get("danger", "#ff5b6e")
+        muted = _tok("muted")
+        ok = _tok("ok")
+        err = _tok("danger")
         warn = "#fbbf24"
         sup = getattr(self._mw._app, "harness", None)
         if sup is None:
@@ -849,9 +860,7 @@ class AiSidebar(QDockWidget):
         view = self._mw.tabs.current_view()
         url = view.url().toString() if view else ""
         self.agent_input.clear()
-        self._append(
-            f"<b style='color:{_P.get('accent', '#f9a24f')}'>Agent task:</b> {html.escape(task)}"
-        )
+        self._append(f"<b style='color:{_tok('accent')}'>Agent task:</b> {html.escape(task)}")
         use_cdp = bool(url) and url.startswith(
             ("http://", "https://", "file://localhost", "file://", "about:")
         )
@@ -872,9 +881,7 @@ class AiSidebar(QDockWidget):
             self._agent_session, task, self._selected_provider(), self
         )
         self._agent_worker.step.connect(
-            lambda m: self._append(
-                f"<span style='color:{_P.get('muted', '#888')}'>{html.escape(m)}</span>"
-            )
+            lambda m: self._append(f"<span style='color:{_tok('muted')}'>{html.escape(m)}</span>")
         )
         self._agent_worker.finished.connect(self._agent_done)
         self.agent_btn.setEnabled(False)
@@ -892,10 +899,7 @@ class AiSidebar(QDockWidget):
             self.status.setText("stopping after current step…")
 
     def _agent_done(self, result: str) -> None:
-        self._append(
-            f"<b style='color:{_P.get('accent', '#f9a24f')}'>Agent finished:</b> "
-            f"{html.escape(result)}"
-        )
+        self._append(f"<b style='color:{_tok('accent')}'>Agent finished:</b> {html.escape(result)}")
         self.agent_btn.setEnabled(True)
         self.stop_btn.setEnabled(False)
         self.status.setText("agent idle")
@@ -931,9 +935,7 @@ class AiSidebar(QDockWidget):
         return _CONTROL_API_HINT.format(base=server.base_url, auth=auth)
 
     def _start_harness_agent(self, task: str) -> None:
-        self._append(
-            f"<b style='color:{_P.get('accent2', '#9d4ff9')}'>Coding agent:</b> {html.escape(task)}"
-        )
+        self._append(f"<b style='color:{_tok('accent2')}'>Coding agent:</b> {html.escape(task)}")
         full_task = task + self._control_api_hint()
         worker = _HarnessWorker(
             self._ensure_harness_bridge(),
@@ -943,9 +945,7 @@ class AiSidebar(QDockWidget):
         )
         worker.progress.connect(lambda m: self.status.setText(m))
         worker.note.connect(
-            lambda m: self._append(
-                f"<span style='color:{_P.get('muted', '#888')}'>{html.escape(m)}</span>"
-            )
+            lambda m: self._append(f"<span style='color:{_tok('muted')}'>{html.escape(m)}</span>")
         )
         worker.finished.connect(self._harness_done)
         worker.failed.connect(self._harness_failed)
@@ -957,7 +957,7 @@ class AiSidebar(QDockWidget):
 
     def _harness_done(self, result: str) -> None:
         self._append(
-            f"<b style='color:{_P.get('accent2', '#9d4ff9')}'>Coding agent finished:</b> "
+            f"<b style='color:{_tok('accent2')}'>Coding agent finished:</b> "
             "<pre style='white-space:pre-wrap;margin:4px 0'>"
             f"{html.escape(result)}</pre>"
         )

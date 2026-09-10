@@ -88,21 +88,13 @@ class DownloadsDock(QDockWidget):
         pause_btn = QPushButton("⏸", controls)
         pause_btn.setFixedSize(22, 22)
         pause_btn.setToolTip("Pause / resume")
-        pause_btn.setStyleSheet(
-            "QPushButton { background: transparent; border: none; "
-            "color: #8b93a7; font-size: 12px; padding: 0; }"
-            "QPushButton:hover { color: #e8ecf5; }"
-        )
+        pause_btn.setObjectName("dl_pause")  # styled in theme.py
         pause_btn.clicked.connect(lambda _=False, d=download, b=pause_btn: self._toggle_pause(d, b))
         row.addWidget(pause_btn)
         cancel_btn = QPushButton("✕", controls)
         cancel_btn.setFixedSize(22, 22)
         cancel_btn.setToolTip("Cancel download")
-        cancel_btn.setStyleSheet(
-            "QPushButton { background: transparent; border: none; "
-            "color: #ff5b6e; font-size: 13px; padding: 0; }"
-            "QPushButton:hover { color: #ff7b8e; }"
-        )
+        cancel_btn.setObjectName("dl_cancel")  # styled in theme.py
         cancel_btn.clicked.connect(lambda _=False, d=download: d.cancel())
         row.addWidget(cancel_btn)
         self._cancel_btns[did] = controls

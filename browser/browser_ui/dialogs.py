@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
     QFileDialog,
     QFormLayout,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -23,7 +24,9 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QMessageBox,
     QPushButton,
+    QTabWidget,
     QVBoxLayout,
+    QWidget,
 )
 
 
@@ -106,6 +109,9 @@ class BookmarksDialog(QDialog):
         self._open_url = open_url
 
         layout = QVBoxLayout(self)
+        self.search = QLineEdit(self)
+        self.search.setPlaceholderText("Search bookmarks…")
+        self.search.textChanged.connect(self._reload)
         self.list = QListWidget(self)
         self.list.itemDoubleClicked.connect(self._open)
 
@@ -124,14 +130,18 @@ class BookmarksDialog(QDialog):
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close, parent=self)
         buttons.rejected.connect(self.reject)
 
+        layout.addWidget(self.search)
         layout.addLayout(row)
         layout.addWidget(self.list)
         layout.addWidget(buttons)
         self._reload()
 
     def _reload(self) -> None:
+        query = self.search.text().strip().lower()
         self.list.clear()
         for url, title, folder, _created in self._storage.bookmarks():
+            if query and query not in f"{title or ''} {url} {folder or ''}".lower():
+                continue
             prefix = f"[{folder}] " if folder else ""
             item = QListWidgetItem(f"⭐ {prefix}{title or url}\n{url}")
             item.setData(Qt.ItemDataRole.UserRole, url)
@@ -200,11 +210,15 @@ class SettingsDialog(QDialog):
         self._profile = profile
 
         layout = QVBoxLayout(self)
-        form = QFormLayout()
+        tabs = QTabWidget(self)
+
+        # ── General ───────────────────────────────────────────────
+        general = QWidget(tabs)
+        gform = QFormLayout(general)
 
         self.homepage = QLineEdit(settings.get("homepage", "newtab"))
         self.homepage.setPlaceholderText("newtab  or  https://example.com")
-        form.addRow("Homepage", self.homepage)
+        gform.addRow("Homepage", self.homepage)
 
         self.startup_box = QComboBox(self)
         self.startup_box.addItem("Continue where you left off", "restore")
@@ -215,42 +229,29 @@ class SettingsDialog(QDialog):
         )
         mode = str(settings.get("startup_mode", "restore"))
         self.startup_box.setCurrentIndex(1 if mode == "newtab" else 0)
-        form.addRow("On startup", self.startup_box)
+        gform.addRow("On startup", self.startup_box)
 
         self.engine = QComboBox(self)
         self.engine.addItems(list(SEARCH_ENGINES.keys()))
         self.engine.setCurrentText(settings.get("search_engine", "Google"))
-        form.addRow("Search engine", self.engine)
+        gform.addRow("Search engine", self.engine)
 
-        self.adblock = QCheckBox("Block ads and trackers", self)
-        self.adblock.setChecked(bool(settings.get("adblock_enabled", True)))
-        form.addRow(self.adblock)
+        dir_row = QHBoxLayout()
+        self.dl_dir = QLineEdit(settings.get("download_dir", ""))
+        self.dl_dir.setPlaceholderText("Default: system Downloads folder")
+        browse = QPushButton("Browse…", self)
+        browse.clicked.connect(self._browse_dir)
+        dir_row.addWidget(self.dl_dir)
+        dir_row.addWidget(browse)
+        gform.addRow("Download folder", dir_row)
 
-        self.https_only = QCheckBox("HTTPS-Only Mode (upgrade public http:// sites)", self)
-        self.https_only.setToolTip(
-            "Main-frame http:// navigations on the public internet become https://.\n"
-            "Localhost and private LAN addresses are never rewritten."
-        )
-        self.https_only.setChecked(bool(settings.get("https_only", True)))
-        form.addRow(self.https_only)
-
-        self.memory_saver = QCheckBox("Memory saver (sleep idle background tabs)", self)
-        self.memory_saver.setToolTip(
-            "Freeze background tabs after 5 minutes, then discard them after 15.\n"
-            "Pinned, audible, and local platform tabs stay awake."
-        )
-        self.memory_saver.setChecked(bool(settings.get("memory_saver", True)))
-        form.addRow(self.memory_saver)
-
-        self.autostart = QCheckBox(
-            "Start the coding-agent backend (luckyd-code.exe) on launch", self
-        )
-        self.autostart.setChecked(bool(settings.get("harness_autostart", True)))
-        form.addRow(self.autostart)
+        self.bm_bar = QCheckBox("Show the bookmarks bar (Ctrl+Shift+B toggles it)", self)
+        self.bm_bar.setChecked(bool(settings.get("bookmark_bar_visible", True)))
+        gform.addRow(self.bm_bar)
 
         self.dash = QCheckBox("Live dashboard on new tabs (needs the Browser Control API)", self)
         self.dash.setChecked(bool(settings.get("dashboard_newtab", True)))
-        form.addRow(self.dash)
+        gform.addRow(self.dash)
 
         self.assistant_startup = QCheckBox(
             "Remember my setup (reopen the AI assistant on startup)", self
@@ -261,22 +262,66 @@ class SettingsDialog(QDialog):
             "Turn off for a clean browser with the assistant hidden until you need it."
         )
         self.assistant_startup.setChecked(bool(settings.get("assistant_visible_startup", True)))
-        form.addRow(self.assistant_startup)
+        gform.addRow(self.assistant_startup)
 
-        self.bm_bar = QCheckBox("Show the bookmarks bar (Ctrl+Shift+B toggles it)", self)
-        self.bm_bar.setChecked(bool(settings.get("bookmark_bar_visible", True)))
-        form.addRow(self.bm_bar)
+        self.autostart = QCheckBox(
+            "Start the coding-agent backend (luckyd-code.exe) on launch", self
+        )
+        self.autostart.setChecked(bool(settings.get("harness_autostart", True)))
+        gform.addRow(self.autostart)
 
-        dir_row = QHBoxLayout()
-        self.dl_dir = QLineEdit(settings.get("download_dir", ""))
-        self.dl_dir.setPlaceholderText("Default: system Downloads folder")
-        browse = QPushButton("Browse…", self)
-        browse.clicked.connect(self._browse_dir)
-        dir_row.addWidget(self.dl_dir)
-        dir_row.addWidget(browse)
-        form.addRow("Download folder", dir_row)
+        self.memory_saver = QCheckBox("Memory saver (sleep idle background tabs)", self)
+        self.memory_saver.setToolTip(
+            "Freeze background tabs after 5 minutes, then discard them after 15.\n"
+            "Pinned, audible, and local platform tabs stay awake."
+        )
+        self.memory_saver.setChecked(bool(settings.get("memory_saver", True)))
+        gform.addRow(self.memory_saver)
 
-        # Zoom: global default + per-site memory
+        tabs.addTab(general, "General")
+
+        # ── Privacy ───────────────────────────────────────────────
+        privacy = QWidget(tabs)
+        pform = QFormLayout(privacy)
+
+        self.adblock = QCheckBox("Block ads and trackers", self)
+        self.adblock.setChecked(bool(settings.get("adblock_enabled", True)))
+        pform.addRow(self.adblock)
+
+        self.https_only = QCheckBox("HTTPS-Only Mode (upgrade public http:// sites)", self)
+        self.https_only.setToolTip(
+            "Main-frame http:// navigations on the public internet become https://.\n"
+            "Localhost and private LAN addresses are never rewritten."
+        )
+        self.https_only.setChecked(bool(settings.get("https_only", True)))
+        pform.addRow(self.https_only)
+
+        clear_row = QHBoxLayout()
+        cache_btn = QPushButton("Clear Cache", self)
+        cache_btn.clicked.connect(self._clear_cache)
+        cookies_btn = QPushButton("Clear Cookies", self)
+        cookies_btn.clicked.connect(self._clear_cookies)
+        perm_btn = QPushButton("Site permissions…", self)
+        perm_btn.clicked.connect(self._open_permissions)
+        clear_row.addWidget(cache_btn)
+        clear_row.addWidget(cookies_btn)
+        clear_row.addWidget(perm_btn)
+        clear_row.addStretch(1)
+        pform.addRow(clear_row)
+
+        tabs.addTab(privacy, "Privacy")
+
+        # ── Appearance ────────────────────────────────────────────
+        appearance = QWidget(tabs)
+        aform = QFormLayout(appearance)
+
+        self.theme_box = QComboBox(self)
+        self.theme_box.addItems([THEMES[k]["label"] for k in THEMES])
+        current_theme = settings.get("theme", "neon")
+        if current_theme in THEMES:
+            self.theme_box.setCurrentText(THEMES[current_theme]["label"])
+        aform.addRow("Theme", self.theme_box)
+
         self.zoom_box = QComboBox(self)
         self._zoom_values = [0.5, 0.67, 0.75, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75, 2.0]
         for value in self._zoom_values:
@@ -289,7 +334,7 @@ class SettingsDialog(QDialog):
             range(len(self._zoom_values)), key=lambda i: abs(self._zoom_values[i] - current_zoom)
         )
         self.zoom_box.setCurrentIndex(nearest)
-        form.addRow("Default zoom", self.zoom_box)
+        aform.addRow("Default zoom", self.zoom_box)
 
         self.zoom_memory = QCheckBox("Remember zoom level per website", self)
         self.zoom_memory.setToolTip(
@@ -297,36 +342,22 @@ class SettingsDialog(QDialog):
             "site at your level next time. Resetting to 100% forgets the site."
         )
         self.zoom_memory.setChecked(bool(settings.get("zoom_remember", True)))
-        form.addRow(self.zoom_memory)
+        aform.addRow(self.zoom_memory)
 
-        # Theme selection
-        self.theme_box = QComboBox(self)
-        self.theme_box.addItems([THEMES[k]["label"] for k in THEMES])
-        current_theme = settings.get("theme", "neon")
-        if current_theme in THEMES:
-            self.theme_box.setCurrentText(THEMES[current_theme]["label"])
-        form.addRow("Theme", self.theme_box)
+        tabs.addTab(appearance, "Appearance")
 
-        # Updates
+        # ── Updates ───────────────────────────────────────────────
+        updates = QWidget(tabs)
+        uform = QFormLayout(updates)
+
         self.auto_update = QCheckBox("Automatically check for updates", self)
         self.auto_update.setToolTip("On startup, silently check GitHub for a newer release.")
         self.auto_update.setChecked(bool(settings.get("update_auto_check", True)))
-        form.addRow(self.auto_update)
+        uform.addRow(self.auto_update)
 
-        layout.addLayout(form)
+        tabs.addTab(updates, "Updates")
 
-        privacy = QHBoxLayout()
-        cache_btn = QPushButton("Clear Cache", self)
-        cache_btn.clicked.connect(self._clear_cache)
-        cookies_btn = QPushButton("Clear Cookies", self)
-        cookies_btn.clicked.connect(self._clear_cookies)
-        perm_btn = QPushButton("Site permissions…", self)
-        perm_btn.clicked.connect(self._open_permissions)
-        privacy.addWidget(cache_btn)
-        privacy.addWidget(cookies_btn)
-        privacy.addWidget(perm_btn)
-        privacy.addStretch(1)
-        layout.addLayout(privacy)
+        layout.addWidget(tabs)
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel,
@@ -348,11 +379,15 @@ class SettingsDialog(QDialog):
 
     def _clear_cache(self) -> None:
         self._profile.clearHttpCache()
-        QMessageBox.information(self, "Cache", "HTTP cache cleared.")
+        toast = getattr(self.parent(), "toast", None)
+        if callable(toast):
+            toast("HTTP cache cleared.", "ok")
 
     def _clear_cookies(self) -> None:
         self._profile.cookieStore().deleteAllCookies()
-        QMessageBox.information(self, "Cookies", "All cookies deleted.")
+        toast = getattr(self.parent(), "toast", None)
+        if callable(toast):
+            toast("All cookies deleted.", "ok")
 
     def accept(self) -> None:
         self._settings.set("homepage", self.homepage.text().strip() or "newtab")
@@ -394,7 +429,7 @@ class ScriptsDialog(QDialog):
             self,
         )
         hint.setWordWrap(True)
-        hint.setStyleSheet("color: gray;")
+        hint.setObjectName("muted")  # theme.py: QLabel#muted
         layout.addWidget(hint)
         self.list = QListWidget(self)
         self.list.itemChanged.connect(self._toggled)
@@ -463,7 +498,7 @@ class PermissionsDialog(QDialog):
             self,
         )
         hint.setWordWrap(True)
-        hint.setStyleSheet("color: gray;")
+        hint.setObjectName("muted")  # theme.py: QLabel#muted
         layout.addWidget(hint)
         if self._focus:
             layout.addWidget(QLabel(f"Current site: {self._focus}", self))
@@ -499,14 +534,41 @@ class PermissionsDialog(QDialog):
             self.list.addItem(item)
             return
         for origin, decisions in rows:
-            bits = [
-                f"{feature_label(k)}: {v}"
-                for k, v in sorted(decisions.items())
-                if v in ("allow", "deny")
-            ]
-            item = QListWidgetItem(f"{origin}\n" + (", ".join(bits) or "(none)"))
+            bits = [(k, v) for k, v in sorted(decisions.items()) if v in ("allow", "deny")]
+            item = QListWidgetItem()
             item.setData(Qt.ItemDataRole.UserRole, origin)
+            card = QWidget(self.list)
+            lay = QVBoxLayout(card)
+            lay.setContentsMargins(10, 8, 10, 8)
+            lay.setSpacing(4)
+            head = QLabel(origin, card)
+            font = head.font()
+            font.setBold(True)
+            head.setFont(font)
+            lay.addWidget(head)
+            grid = QGridLayout()
+            grid.setContentsMargins(0, 0, 0, 0)
+            grid.setColumnStretch(0, 1)
+            for row_idx, (key, decision) in enumerate(bits):
+                name = QLabel(feature_label(key), card)
+                name.setObjectName("muted")
+                switch = QCheckBox(card)
+                switch.setObjectName("perm_switch")  # styled in theme.py
+                switch.setChecked(decision == "allow")
+                switch.setToolTip(
+                    "Allowed — flip to block" if decision == "allow" else "Blocked — flip to allow"
+                )
+                switch.toggled.connect(lambda on, o=origin, k=key: self._toggled(o, k, on))
+                grid.addWidget(name, row_idx, 0)
+                grid.addWidget(switch, row_idx, 1)
+            lay.addLayout(grid)
+            item.setSizeHint(card.sizeHint())
             self.list.addItem(item)
+            self.list.setItemWidget(item, card)
+
+    def _toggled(self, origin: str, key: str, on: bool) -> None:
+        """Flip one remembered decision via its toggle switch."""
+        self._store.set(origin, key, "allow" if on else "deny")
 
     def _reset_selected(self) -> None:
         for item in self.list.selectedItems():

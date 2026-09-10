@@ -103,7 +103,10 @@ DEFAULT_THEME = "neon"
 
 from string import Template
 
-_QSS_A = """
+# One definition: the toolbar and tab-bar blocks used to be written twice
+# (the later copy winning); they are merged here so each selector appears
+# exactly once. Accents are flat $accent — no gradients anywhere.
+_QSS = """
 /* ── base ─────────────────────────────────────────────────────────── */
 QWidget {
     background-color: $window;
@@ -125,91 +128,12 @@ QMenu {
     padding: 6px;
 }
 QMenu::item { padding: 7px 26px 7px 16px; border-radius: 8px; }
-QMenu::item:selected {
-    background: qlineargradient(x1:0,y1:0,x2:1,y2:0, stop:0 $accent, stop:1 $accent2);
-    color: #ffffff;
-}
+QMenu::item:selected { background: $accent; color: #ffffff; }
 QMenu::item:disabled { color: $muted; }
 QMenu::separator { height: 1px; background: $border; margin: 5px 10px; }
 QMenu::icon { padding-left: 6px; }
 
 /* ── toolbar ──────────────────────────────────────────────────────── */
-QToolBar {
-    background: $window; border: none;
-    border-bottom: 1px solid $border;
-    padding: 6px 8px; spacing: 4px;
-}
-QToolButton {
-    background: transparent; border: none; border-radius: 9px;
-    padding: 6px 9px; color: $text; font-size: 15px;
-}
-QToolButton:hover { background: $card; color: $accent; }
-QToolButton:pressed { background: $panel2; }
-QToolButton:disabled { color: $muted; }
-QToolButton#ai_button {
-    color: #ffffff; font-weight: 700; padding: 6px 14px;
-    background: qlineargradient(x1:0,y1:0,x2:1,y2:0, stop:0 $accent, stop:1 $accent2);
-}
-QToolButton#ai_button:hover { color: #ffffff; }
-
-/* ── tabs ─────────────────────────────────────────────────────────── */
-QTabWidget::pane { border: none; background: $window; }
-QTabWidget::tab-bar { alignment: left; }
-QTabBar { background: $window; border: none; border-bottom: 1px solid $border; }
-QTabBar::tab {
-    background: $tab_inactive; color: $muted;
-    border: 1px solid transparent; border-bottom: none;
-    border-top-left-radius: 12px; border-top-right-radius: 12px;
-    padding: 8px 14px; margin: 6px 2px 0 2px; min-width: 110px; max-width: 210px;
-}
-QTabBar::tab:hover { background: $card; color: $text; }
-QTabBar::tab:selected {
-    background: $panel2; color: $text;
-    border-color: $border; border-top: 2px solid $accent;
-}
-QTabBar::close-button { image: none; border-radius: 8px; padding: 2px; }
-QTabBar::close-button:hover { background: $danger; color: #ffffff; }
-QToolButton#tab_plus {
-    font-size: 17px; font-weight: 700; color: $accent;
-    border-radius: 10px; margin: 4px;
-}
-
-/* ── omnibox / inputs ─────────────────────────────────────────────── */
-QLineEdit {
-    background: $panel2; border: 1px solid $border; border-radius: 14px;
-    padding: 8px 14px; selection-background-color: $accent;
-}
-QLineEdit:focus { border: 1px solid $accent; background: $card; }
-QLineEdit#omnibox { border-radius: 16px; font-size: 14px; padding: 9px 16px; }
-QComboBox {
-    background: $panel2; border: 1px solid $border; border-radius: 10px;
-    padding: 6px 10px;
-}
-QComboBox:hover { border-color: $accent; }
-QComboBox::drop-down { border: none; width: 22px; }
-QComboBox QAbstractItemView {
-    background: $panel; border: 1px solid $border; border-radius: 10px;
-    padding: 4px; outline: none;
-}
-QComboBox QAbstractItemView::item { padding: 6px 10px; border-radius: 7px; }
-QComboBox QAbstractItemView::item:selected { background: $accent; color: #fff; }
-"""
-
-
-def palette(settings) -> dict[str, str]:
-    """The active theme's color map (falls back to Neon Night)."""
-    name = str(settings.get("theme", DEFAULT_THEME)) if settings else DEFAULT_THEME
-    return THEMES.get(name, THEMES[DEFAULT_THEME])
-
-
-def theme_name(settings) -> str:
-    name = str(settings.get("theme", DEFAULT_THEME)) if settings else DEFAULT_THEME
-    return name if name in THEMES else DEFAULT_THEME
-
-
-_QSS_B = """
-/* ── buttons ──────────────────────────────────────────────────────── */
-/* ── toolbar ─────────────────────────────────────────────────────── */
 QToolBar {
     background: $window;
     border: none;
@@ -217,6 +141,15 @@ QToolBar {
     spacing: 4px;
     padding: 4px 6px;
 }
+/* Unscoped tool-button rules: for QToolButtons living outside a QToolBar
+   (tab-strip corner widgets, dock headers, …). */
+QToolButton {
+    background: transparent; border: none; border-radius: 9px;
+    padding: 6px 9px; color: $text; font-size: 15px;
+}
+QToolButton:hover { background: $card; color: $accent; }
+QToolButton:pressed { background: $panel2; }
+QToolButton:disabled { color: $muted; }
 QToolBar QToolButton {
     background: transparent;
     border: none;
@@ -234,6 +167,15 @@ QToolBar QToolButton:pressed {
 QToolBar QToolButton:checked {
     background: $card;
     border: 1px solid $accent;
+}
+QToolButton#ai_button {
+    color: #ffffff; font-weight: 700; padding: 6px 14px;
+    background: $accent;
+}
+QToolButton#ai_button:hover { color: #ffffff; }
+QToolButton#tab_plus {
+    font-size: 17px; font-weight: 700; color: $accent;
+    border-radius: 10px; margin: 4px;
 }
 QToolBar QToolButton#tab_plus {
     font-size: 16px;
@@ -290,6 +232,7 @@ QTabWidget::pane {
     border: none;
     position: absolute;
 }
+QTabWidget::tab-bar { alignment: left; }
 QTabBar {
     background: $window;
     border: none;
@@ -303,6 +246,9 @@ QTabBar::tab {
     margin: 3px 1px 3px 1px;
     min-height: 26px;
 }
+/* NOTE: :hover stays above :selected to preserve the original A-then-B
+   cascade (equal specificity — the later rule wins). */
+QTabBar::tab:hover { background: $card; color: $text; }
 QTabBar::tab:selected {
     background: $panel;
     color: $text;
@@ -321,6 +267,7 @@ QTabBar::close-button {
     width: 16px;
     height: 16px;
 }
+QTabBar::close-button:hover { background: $danger; color: #ffffff; }
 QTabBar QToolButton {
     background: transparent;
     border: none;
@@ -331,6 +278,27 @@ QTabBar QToolButton:hover {
     background: $card;
 }
 
+/* ── omnibox / inputs ─────────────────────────────────────────────── */
+QLineEdit {
+    background: $panel2; border: 1px solid $border; border-radius: 14px;
+    padding: 8px 14px; selection-background-color: $accent;
+}
+QLineEdit:focus { border: 1px solid $accent; background: $card; }
+QLineEdit#omnibox { border-radius: 16px; font-size: 14px; padding: 9px 16px; }
+QComboBox {
+    background: $panel2; border: 1px solid $border; border-radius: 10px;
+    padding: 6px 10px;
+}
+QComboBox:hover { border-color: $accent; }
+QComboBox::drop-down { border: none; width: 22px; }
+QComboBox QAbstractItemView {
+    background: $panel; border: 1px solid $border; border-radius: 10px;
+    padding: 4px; outline: none;
+}
+QComboBox QAbstractItemView::item { padding: 6px 10px; border-radius: 7px; }
+QComboBox QAbstractItemView::item:selected { background: $accent; color: #fff; }
+
+/* ── buttons ──────────────────────────────────────────────────────── */
 QPushButton {
     background: $card; border: 1px solid $border; border-radius: 10px;
     padding: 7px 14px;
@@ -338,7 +306,7 @@ QPushButton {
 QPushButton:hover { border-color: $accent; color: $accent; }
 QPushButton:pressed { background: $panel2; }
 QPushButton:default, QPushButton#accent {
-    background: qlineargradient(x1:0,y1:0,x2:1,y2:0, stop:0 $accent, stop:1 $accent2);
+    background: $accent;
     color: #ffffff; border: none; font-weight: 600;
 }
 QPushButton:default:hover, QPushButton#accent:hover { color: #ffffff; }
@@ -348,6 +316,30 @@ QCheckBox::indicator {
     border: 1px solid $border; background: $panel2;
 }
 QCheckBox::indicator:checked { background: $accent; border-color: $accent; }
+
+/* ── toggle switches (permissions grid) ──────────────────────────── */
+QCheckBox#perm_switch { spacing: 8px; background: transparent; }
+QCheckBox#perm_switch::indicator {
+    width: 38px; height: 20px; border-radius: 10px;
+    background: $panel2; border: 1px solid $border;
+}
+QCheckBox#perm_switch::indicator:hover { border-color: $accent; }
+QCheckBox#perm_switch::indicator:checked {
+    background: $accent; border-color: $accent;
+}
+
+/* ── downloads dock: per-item icon buttons ────────────────────────── */
+QPushButton#dl_pause {
+    background: transparent; border: none;
+    color: $muted; font-size: 12px; padding: 0;
+}
+QPushButton#dl_pause:hover { color: $text; }
+QPushButton#dl_cancel {
+    background: transparent; border: none;
+    color: $danger; font-size: 13px; padding: 0;
+}
+/* fixed lighter-danger hover tint: readable on all five themes */
+QPushButton#dl_cancel:hover { color: #ff7b8e; }
 
 /* ── lists / text surfaces ────────────────────────────────────────── */
 QListWidget, QTextBrowser, QTextEdit, QPlainTextEdit {
@@ -363,6 +355,17 @@ QLabel { background: transparent; }
 QLabel#muted { color: $muted; }
 QLabel#accent { color: $accent; font-weight: 600; }
 
+/* ── vertical tabs strip: accent-edged selected row ────────────────── */
+QListWidget#vtabs_list::item {
+    padding: 8px 10px; border-radius: 10px;
+    border-left: 3px solid transparent;
+}
+QListWidget#vtabs_list::item:selected {
+    background: $card; color: $text;
+    border-left: 3px solid $accent;
+}
+QListWidget#vtabs_list::item:hover:!selected { background: $panel2; }
+
 /* ── docks ────────────────────────────────────────────────────────── */
 QDockWidget { color: $muted; font-weight: 600; }
 QDockWidget::title {
@@ -376,7 +379,7 @@ QProgressBar {
 }
 QProgressBar::chunk {
     border-radius: 6px;
-    background: qlineargradient(x1:0,y1:0,x2:1,y2:0, stop:0 $accent, stop:1 $accent2);
+    background: $accent;
 }
 QStatusBar {
     background: $window; border-top: 1px solid $border; color: $muted;
@@ -412,9 +415,20 @@ QToolBar#find_bar { border: none; border-top: 1px solid $border; }
 """
 
 
+def palette(settings) -> dict[str, str]:
+    """The active theme's color map (falls back to Neon Night)."""
+    name = str(settings.get("theme", DEFAULT_THEME)) if settings else DEFAULT_THEME
+    return THEMES.get(name, THEMES[DEFAULT_THEME])
+
+
+def theme_name(settings) -> str:
+    name = str(settings.get("theme", DEFAULT_THEME)) if settings else DEFAULT_THEME
+    return name if name in THEMES else DEFAULT_THEME
+
+
 def stylesheet(p: dict[str, str]) -> str:
     """The full application QSS for one palette."""
-    return Template(_QSS_A + _QSS_B).substitute(p)
+    return Template(_QSS).substitute(p)
 
 
 def apply_to_app(qapp, settings) -> None:

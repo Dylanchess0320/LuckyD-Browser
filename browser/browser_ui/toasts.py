@@ -17,19 +17,28 @@ from PySide6.QtCore import (
 )
 from PySide6.QtWidgets import QGraphicsOpacityEffect, QHBoxLayout, QLabel, QWidget
 
-_KIND_STYLE = {
-    "info": ("#5b9dff", "◆"),
-    "ok": ("#34d399", "✔"),
-    "warn": ("#fbbf24", "⚠"),
-    "error": ("#ff5b6e", "✕"),
+from .theme import palette as _theme_palette
+
+_KIND_ICON = {
+    "info": "◆",
+    "ok": "✔",
+    "warn": "⚠",
+    "error": "✕",
 }
+
+# Semantic warn tint — readable on all five themes.
+_WARN = "#fbbf24"
+
+
+def _edge_color(kind: str, p: dict) -> str:
+    return {"info": p["accent"], "ok": p["ok"], "error": p["danger"]}.get(kind, _WARN)
 
 
 class _Toast(QWidget):
     WIDTH = 320
     HEIGHT = 52
 
-    def __init__(self, parent_window, message: str, kind: str, accent: str):
+    def __init__(self, parent_window, message: str, kind: str = "info"):
         super().__init__(
             parent_window,
             Qt.WindowType.FramelessWindowHint
@@ -38,34 +47,19 @@ class _Toast(QWidget):
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
-        edge, icon = _KIND_STYLE.get(kind, _KIND_STYLE["info"])
-        if kind == "info":
-            edge = accent
-
-        card = QWidget(self)
-        card.setStyleSheet(
-            f"""
-            QWidget {{
-                background: rgba(16, 21, 31, 230);
-                border: 1px solid rgba(255, 255, 255, 28);
-                border-left: 3px solid {edge};
-                border-radius: 12px;
-            }}
-            QLabel {{ background: transparent; border: none; color: #e8ecf5; }}
-            QLabel#icon {{ color: {edge}; font-size: 15px; }}
-            """
-        )
-        row = QHBoxLayout(card)
+        self._card = QWidget(self)
+        self._apply_style(kind)
+        row = QHBoxLayout(self._card)
         row.setContentsMargins(12, 8, 14, 8)
-        dot = QLabel(icon, card)
+        dot = QLabel(_KIND_ICON.get(kind, _KIND_ICON["info"]), self._card)
         dot.setObjectName("icon")
         row.addWidget(dot)
-        text = QLabel(message, card)
+        text = QLabel(message, self._card)
         text.setWordWrap(True)
         row.addWidget(text, 1)
         outer = QHBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
-        outer.addWidget(card)
+        outer.addWidget(self._card)
         self.setFixedWidth(self.WIDTH)
         self.adjustSize()
         self.setFixedHeight(max(self.HEIGHT, self.sizeHint().height()))
@@ -73,6 +67,23 @@ class _Toast(QWidget):
         self._opacity = QGraphicsOpacityEffect(self)
         self.setGraphicsEffect(self._opacity)
         self._opacity.setOpacity(0.0)
+
+    def _apply_style(self, kind: str) -> None:
+        """Theme-synced card styling, rebuilt from the active palette."""
+        p = _theme_palette(getattr(self.parent(), "settings", None))
+        edge = _edge_color(kind, p)
+        self._card.setStyleSheet(
+            f"""
+            QWidget {{
+                background: {p["panel"]};
+                border: 1px solid {p["border"]};
+                border-left: 3px solid {edge};
+                border-radius: 12px;
+            }}
+            QLabel {{ background: transparent; border: none; color: {p["text"]}; }}
+            QLabel#icon {{ color: {edge}; font-size: 15px; }}
+            """
+        )
 
 
 class ToastManager:
@@ -85,14 +96,14 @@ class ToastManager:
 
     def __init__(self, window):
         self._win = window
-        self._accent = "#5b9dff"
         self._items: list[_Toast] = []
 
     def set_accent(self, accent: str) -> None:
-        self._accent = accent
+        """Deprecated no-op: the info edge now follows the active theme."""
+        del accent
 
     def show(self, message: str, kind: str = "info") -> None:
-        toast = _Toast(self._win, message, kind, self._accent)
+        toast = _Toast(self._win, message, kind)
         self._items.append(toast)
         self._layout()
         toast.show()

@@ -38,11 +38,21 @@ from PySide6.QtWidgets import (
 )
 
 from .icons import letter_tile
+from .theme import palette as _theme_palette
 from .web_view import WebView
 
 _SPIN_STEP_MS = 70
 _SPIN_DEG_PER_STEP = 30
 _PREVIEW_DELAY_MS = 450
+
+
+def _rgba(hex_color: str, alpha: int) -> str:
+    """A theme hex color as a translucent rgba() string (glass cards)."""
+    h = hex_color.lstrip("#")
+    if len(h) != 6:
+        return hex_color
+    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+    return f"rgba({r}, {g}, {b}, {alpha})"
 
 
 def _spinner_icon(angle: int, accent: str = "#5b9dff") -> QIcon:
@@ -63,28 +73,19 @@ def _spinner_icon(angle: int, accent: str = "#5b9dff") -> QIcon:
 class _TabPreview(QWidget):
     """Glass hover card shown above a tab after a short delay."""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, tabs=None):
         super().__init__(
             parent,
             Qt.WindowType.FramelessWindowHint
             | Qt.WindowType.ToolTip
             | Qt.WindowType.WindowTransparentForInput,
         )
+        self._tabs = tabs
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         card = QWidget(self)
         card.setObjectName("preview_card")
-        card.setStyleSheet(
-            """
-            QWidget#preview_card {
-                background: rgba(16, 21, 31, 235);
-                border: 1px solid rgba(255, 255, 255, 30);
-                border-radius: 12px;
-            }
-            QLabel { background: transparent; border: none; }
-            QLabel#p_title { color: #e8ecf5; font-weight: 600; font-size: 13px; }
-            QLabel#p_url { color: #8b93a7; font-size: 11px; }
-            """
-        )
+        self._card = card
+        self._apply_style()
         layout = QVBoxLayout(card)
         layout.setContentsMargins(12, 10, 12, 10)
         layout.setSpacing(3)
@@ -106,7 +107,25 @@ class _TabPreview(QWidget):
         outer.addWidget(card)
         self.setMaximumWidth(340)
 
+    def _apply_style(self) -> None:
+        """Theme-synced glass card (re-applied on every show)."""
+        settings = getattr(getattr(self._tabs, "_mw", None), "settings", None)
+        p = _theme_palette(settings)
+        self._card.setStyleSheet(
+            f"""
+            QWidget#preview_card {{
+                background: {_rgba(p["panel"], 235)};
+                border: 1px solid {p["border"]};
+                border-radius: 12px;
+            }}
+            QLabel {{ background: transparent; border: none; }}
+            QLabel#p_title {{ color: {p["text"]}; font-weight: 600; font-size: 13px; }}
+            QLabel#p_url {{ color: {p["muted"]}; font-size: 11px; }}
+            """
+        )
+
     def show_for(self, title: str, url: str, pos: QPoint) -> None:
+        self._apply_style()  # theme may have changed since last hover
         self._tile.setPixmap(letter_tile(url, 22).pixmap(22, 22))
         self._title.setText(title or "New Tab")
         self._url.setText(url[:90])
@@ -121,7 +140,7 @@ class BrowserTabBar(QTabBar):
     def __init__(self, tabs: BrowserTabWidget):
         super().__init__(tabs)
         self._tabs = tabs
-        self._preview = _TabPreview(self)
+        self._preview = _TabPreview(self, self._tabs)
         self._hover_timer = QTimer(self)
         self._hover_timer.setSingleShot(True)
         self._hover_timer.timeout.connect(self._show_preview)
