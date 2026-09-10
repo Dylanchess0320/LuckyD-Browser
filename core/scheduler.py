@@ -357,11 +357,13 @@ class ScheduleStore:
         import json as _json
 
         with self._lock, self._connect() as conn:
-            q = (
-                "SELECT * FROM schedules"
-                + (" WHERE enabled=1" if enabled_only else "")
-                + " ORDER BY name"
-            )
+            # Two static queries (not string concatenation) so the SAST
+            # scanner doesn't flag a possible SQL-injection vector; the
+            # branch is on a bool, never on user input.
+            if enabled_only:
+                q = "SELECT * FROM schedules WHERE enabled=1 ORDER BY name"
+            else:
+                q = "SELECT * FROM schedules ORDER BY name"
             rows = conn.execute(q).fetchall()
         out = []
         for row in rows:

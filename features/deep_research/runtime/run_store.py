@@ -4,12 +4,17 @@ from __future__ import annotations
 
 import contextlib
 import json
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
 from ..config import settings
 from ..schemas import CitationAudit, Critique, EvidenceCard, ResearchPlan, ResearchReport
 from .events import EventEmitter, RunEvent
+
+# Serializes run-directory creation: on Windows the system clock has
+# ~15 ms granularity, so back-to-back runs can share a timestamp.
+_run_dir_lock = threading.Lock()
 
 
 class RunStore:
@@ -19,13 +24,19 @@ class RunStore:
         emitter: EventEmitter | None = None,
         runs_dir: str | None = None,
     ) -> None:
-        # Full microsecond precision: an earlier [:18] truncation kept only 2
-        # microsecond digits, so two runs started within the same 10 ms landed
-        # in the same directory and overwrote each other's artifacts.
+        # Full microsecond precision ("%Y%m%d-%H%M%S-%f", 22 chars). That is
+        # not enough on coarse clocks (Windows ~15 ms), so if the timestamp
+        # directory already exists we append a numeric suffix under a lock —
+        # concurrent runs can never clobber each other's artifacts.
         self.ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-%f")
         base = Path(runs_dir or settings.runs_dir)
-        self.dir = base / self.ts
-        self.dir.mkdir(parents=True, exist_ok=True)
+        with _run_dir_lock:
+            self.dir = base / self.ts
+            n = 0
+            while self.dir.exists():
+                n += 1
+                self.dir = base / f"{self.ts}-{n:02d}"
+            self.dir.mkdir(parents=True)
         self.emitter = emitter or EventEmitter()
         self.log_path = self.dir / "events.log"
         self._log = self.log_path.open("a", encoding="utf-8")

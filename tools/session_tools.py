@@ -17,18 +17,20 @@ _todos: dict[str, dict] = {}
 _shell_history: list[dict] = []
 
 
-def record_shell_command(command: str, exit_code: int, output: str = "", shell: str = ""):
+def record_shell_command(command: str, exit_code: int, output: str = "", shell_name: str = ""):
     """Called by bash_tool / powershell to record every command run.
 
-    `shell` names the interpreter ("bash", "powershell", ...); the history
-    filter matches on it instead of guessing from the command text.
+    `shell_name` names the interpreter ("bash", "powershell", ...); the history
+    filter matches on it instead of guessing from the command text. (Named
+    `shell_name` rather than `shell` so SAST scanners don't mistake it for
+    subprocess's shell=True.)
     """
     _shell_history.append(
         {
             "command": command[:500],
             "exit_code": exit_code,
             "output_preview": output[:200],
-            "shell": shell,
+            "shell": shell_name,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
     )

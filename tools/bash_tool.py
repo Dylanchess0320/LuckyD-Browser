@@ -280,7 +280,7 @@ class BashTool(ToolBase):
         output = "\n".join(text_parts).strip() or "(no output)"
 
         exit_code = proc.returncode
-        record_shell_command(command, exit_code, output, shell="bash")
+        record_shell_command(command, exit_code, output, shell_name="bash")
 
         return ToolOutput(
             text=output,
@@ -345,7 +345,7 @@ class PowerShellTool(ToolBase):
             parts.append(f"\n[stderr]\n{err}")
         output = "\n".join(parts).strip() or "(no output)"
         exit_code = proc.returncode
-        record_shell_command(command, exit_code, output, shell="powershell")
+        record_shell_command(command, exit_code, output, shell_name="powershell")
 
         return ToolOutput(
             text=output,

@@ -221,8 +221,8 @@ class TestShellHistory:
     async def test_shell_filter_matches_recorded_shell(self):
         st, saved = _reset_shell_history()
         try:
-            st.record_shell_command("echo hi", 0, "", shell="bash")
-            st.record_shell_command("Get-ChildItem", 0, "", shell="powershell")
+            st.record_shell_command("echo hi", 0, "", shell_name="bash")
+            st.record_shell_command("Get-ChildItem", 0, "", shell_name="powershell")
             tool = st.ShellHistoryTool()
             bash_only = await tool.execute(shell_filter="bash")
             assert "echo hi" in bash_only.text
@@ -237,8 +237,8 @@ class TestShellHistory:
     async def test_last_n_zero_returns_empty(self):
         st, saved = _reset_shell_history()
         try:
-            st.record_shell_command("echo one", 0, "", shell="bash")
-            st.record_shell_command("echo two", 0, "", shell="bash")
+            st.record_shell_command("echo one", 0, "", shell_name="bash")
+            st.record_shell_command("echo two", 0, "", shell_name="bash")
             result = await st.ShellHistoryTool().execute(last_n=0)
             assert "No matching commands" in result.text
         finally:
@@ -249,7 +249,7 @@ class TestShellHistory:
         st, saved = _reset_shell_history()
         try:
             for i in range(105):
-                st.record_shell_command(f"echo {i}", 0, "", shell="bash")
+                st.record_shell_command(f"echo {i}", 0, "", shell_name="bash")
             result = await st.ShellHistoryTool().execute(last_n=500)
             assert result.title == "History (100 commands)", result.title
             assert result.metadata.get("count") == 100
