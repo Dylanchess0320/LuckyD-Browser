@@ -33,6 +33,7 @@ import config as _config  # noqa: F401  (runs load_env() on import)
 from agent import CodingAgent
 from config import PROJECT_DIR, get_config
 from core.approval_hook import ApprovalHook
+from core.audit_hook import AuditHook
 from core.hooks import get_hooks, register_plugin
 from core.mcp_client import MCPManager
 from core.session_store import get_session_store
@@ -1590,6 +1591,8 @@ Environment:
     hook = ApprovalHook(session_id=agent.conversation_id)
     hook.auto_approve_all = True
     register_plugin(hook)
+    # Audit every tool execution ("agentic with receipts", 6.0)
+    register_plugin(AuditHook(session_id=agent.conversation_id))
 
     # Connect MCP servers (lazy: connected inside async loop when needed)
     mcp_manager = MCPManager()

@@ -33,9 +33,24 @@ from urllib.parse import parse_qs, urlparse
 
 from config import PROJECT_DIR, get_config, load_env
 from core.approval_hook import ApprovalHook
-from core.hooks import register_plugin
+from core.audit_hook import AuditHook
+from core.hooks import get_hooks, register_plugin
+from core.trust import SCOPES, get_audit_log, get_policy, scope_of
 from memory.store import get_memory
 from tools.registry import registry
+
+# The ApprovalHook instance wired in main() — used by the Trust dashboard's
+# pending-approval endpoints. Resolved lazily so import order never matters.
+_APPROVAL_HOOK: ApprovalHook | None = None
+
+
+def _approval_hook() -> ApprovalHook | None:
+    if _APPROVAL_HOOK is not None:
+        return _APPROVAL_HOOK
+    for hook in get_hooks().before_tool:
+        if isinstance(hook, ApprovalHook):
+            return hook
+    return None
 
 load_env()  # load .env before any agent/LLM construction
 
@@ -308,6 +323,47 @@ class HQHandler(BaseHTTPRequestHandler):
             if path in ("/api/tasks", "/api/background"):
                 with _TASKS_LOCK:
                     return self._send_json({"tasks": list(_TASKS.values())})
+            if path == "/trust":
+                return self._send_html(_TRUST_HTML)
+            if path == "/api/audit":
+                log = get_audit_log()
+                return self._send_json(
+                    {
+                        "events": log.recent(
+                            limit=int((q.get("limit") or ["100"])[0]),
+                            tool=(q.get("tool") or [None])[0],
+                            scope=(q.get("scope") or [None])[0],
+                            decision=(q.get("decision") or [None])[0],
+                        ),
+                        "stats": log.stats(),
+                    }
+                )
+            if path == "/api/trust/scopes":
+                policy = get_policy()
+                tools_by_scope: dict[str, list[str]] = {sid: [] for sid in SCOPES}
+                for name in registry.list_tools():
+                    tools_by_scope.setdefault(scope_of(name), []).append(name)
+                return self._send_json(
+                    {
+                        "mode": policy.mode,
+                        "scopes": [
+                            {
+                                "id": sid,
+                                "title": meta["title"],
+                                "desc": meta["desc"],
+                                "policy": policy.scope_policy(sid),
+                                "tools": sorted(tools_by_scope.get(sid, [])),
+                            }
+                            for sid, meta in SCOPES.items()
+                        ],
+                        "sites": policy.sites(),
+                    }
+                )
+            if path == "/api/trust/policy":
+                return self._send_json(get_policy().to_dict())
+            if path == "/api/approvals/pending":
+                hook = _approval_hook()
+                return self._send_json({"pending": hook.pending_requests() if hook else []})
             if path.startswith("/api/background/status/"):
                 tid = path.rsplit("/", 1)[-1]
                 with _TASKS_LOCK:
@@ -383,9 +439,172 @@ class HQHandler(BaseHTTPRequestHandler):
                 if _AGENT is not None:
                     _AGENT.messages.clear()
                 return self._send_json({"ok": True})
+            if path == "/api/trust/policy":
+                policy = get_policy()
+                action = body.get("action", "")
+                try:
+                    if action == "set_mode":
+                        policy.set_mode(body.get("mode", ""))
+                    elif action == "set_scope":
+                        policy.set_scope_policy(body.get("scope", ""), body.get("policy", ""))
+                    elif action == "set_site":
+                        policy.set_site_policy(body.get("host", ""), body.get("policy", "allow"))
+                    elif action == "clear_site":
+                        policy.clear_site_policy(body.get("host", ""))
+                    else:
+                        return self._send_json({"error": f"unknown action: {action}"}, code=400)
+                except ValueError as exc:
+                    return self._send_json({"error": str(exc)}, code=400)
+                return self._send_json({"ok": True, "policy": policy.to_dict()})
+            if path == "/api/approvals/resolve":
+                hook = _approval_hook()
+                if hook is None:
+                    return self._send_json({"error": "approval hook not wired"}, code=503)
+                ok = hook.resolve_approval(
+                    body.get("call_id", ""),
+                    bool(body.get("approved", False)),
+                    body.get("reason"),
+                    body.get("remember", "once"),
+                )
+                if not ok:
+                    return self._send_json({"error": "unknown or expired call_id"}, code=404)
+                return self._send_json({"ok": True})
             return self._send_json({"error": f"not found: {path}"}, code=404)
         except Exception as exc:
             return self._send_json({"error": f"{type(exc).__name__}: {exc}"}, code=500)
+
+
+# ── Trust dashboard (LuckyD 6.0 — "agentic with receipts") ──────────────────
+_TRUST_HTML = """<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LuckyD Trust Center</title>
+<style>
+:root{--bg:#0b0e14;--panel:#141a26;--border:#243049;--text:#e6ebf5;--dim:#8b98b0;
+--acc:#4f8cff;--ok:#3fb950;--warn:#d29922;--bad:#f85149}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);
+font:14px/1.5 system-ui,Segoe UI,Roboto,sans-serif;padding:0 0 60px}
+header{padding:14px 22px;background:var(--panel);border-bottom:1px solid var(--border);
+display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:5}
+header b{color:var(--acc);font-size:17px}.pill{font-size:11px;padding:2px 10px;border-radius:99px;
+background:#0e2417;color:var(--ok);border:1px solid #1d3a26}
+main{max-width:1100px;margin:0 auto;padding:20px}
+section{background:var(--panel);border:1px solid var(--border);border-radius:12px;
+padding:18px;margin-bottom:18px}
+h2{margin:0 0 4px;font-size:16px}.sub{color:var(--dim);font-size:12.5px;margin:0 0 14px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;color:var(--dim);font-weight:600;padding:8px;border-bottom:1px solid var(--border)}
+td{padding:8px;border-bottom:1px solid var(--border);vertical-align:top}
+select,input{background:var(--bg);border:1px solid var(--border);color:var(--text);
+border-radius:8px;padding:7px 10px;font:inherit}
+button{background:var(--acc);color:#fff;border:0;border-radius:8px;padding:8px 16px;
+font:inherit;cursor:pointer;margin-right:8px}
+button.deny{background:var(--bad)}button.ghost{background:transparent;border:1px solid var(--border)}
+button:disabled{opacity:.5}
+.risk{font-size:11px;padding:2px 8px;border-radius:99px;border:1px solid}
+.risk.high{color:var(--bad);border-color:var(--bad)}
+.risk.medium{color:var(--warn);border-color:var(--warn)}
+.risk.low{color:var(--ok);border-color:var(--ok)}
+.dec{font-size:11px;padding:2px 8px;border-radius:99px;background:var(--bg);border:1px solid var(--border)}
+.dec.denied,.dec.blocked{color:var(--bad);border-color:var(--bad)}
+.dec.approved,.dec.executed,.dec.auto{color:var(--ok)}
+.mono{font-family:ui-monospace,Consolas,monospace;font-size:12px;color:var(--dim);
+word-break:break-all;max-width:420px}
+.appr{border:1px solid var(--warn);border-radius:10px;padding:14px;margin-bottom:12px;background:#141207}
+.appr h3{margin:0 0 6px;font-size:14px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.empty{color:var(--dim);font-style:italic}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--panel);
+border:1px solid var(--border);padding:10px 18px;border-radius:10px;display:none}
+</style></head><body>
+<header><b>&#9670; LuckyD Trust Center</b><span class="pill">agentic with receipts</span>
+<span style="flex:1"></span>
+<label class="sub" style="margin:0">Mode&nbsp;
+<select id="mode" onchange="setMode(this.value)">
+<option value="ask">Ask me</option><option value="auto">Auto-approve</option>
+<option value="step-through">Step-through</option></select></label></header>
+<main>
+<section><h2>&#9203; Pending approvals</h2>
+<p class="sub">The agent is waiting on these. Approve once, for this session, always for the scope, or always for the site.</p>
+<div id="pending"><p class="empty">Loading&hellip;</p></div></section>
+<section><h2>&#128274; What the agent can touch</h2>
+<p class="sub">Permission scopes. "Ask" pauses for your approval, "Allow" runs freely, "Deny" blocks outright.</p>
+<table><thead><tr><th>Scope</th><th>Tools</th><th>Policy</th></tr></thead>
+<tbody id="scopes"><tr><td colspan="3" class="empty">Loading&hellip;</td></tr></tbody></table></section>
+<section><h2>&#127760; Site rules</h2>
+<p class="sub">Browser-control rules per website. "Allow" = the agent can drive this site without asking.</p>
+<div id="sites"></div>
+<div class="row" style="margin-top:10px"><input id="sitehost" placeholder="example.com" style="width:220px">
+<button onclick="addSite()">Add allow rule</button></div></section>
+<section><h2>&#129534; Audit log</h2>
+<p class="sub" id="stats"></p>
+<div class="row" style="margin-bottom:10px"><label class="sub" style="margin:0">Scope&nbsp;
+<select id="fScope" onchange="loadAudit()"><option value="">all</option></select></label>
+<label class="sub" style="margin:0">Decision&nbsp;
+<select id="fDec" onchange="loadAudit()"><option value="">all</option>
+<option>approved</option><option>denied</option><option>blocked</option>
+<option>executed</option><option>auto</option></select></label>
+<button class="ghost" onclick="loadAudit()">Refresh</button></div>
+<table><thead><tr><th>Time</th><th>Tool</th><th>Scope</th><th>Risk</th><th>Decision</th><th>Detail</th></tr></thead>
+<tbody id="audit"><tr><td colspan="6" class="empty">Loading&hellip;</td></tr></tbody></table></section>
+</main><div id="toast"></div>
+<script>
+const $=id=>document.getElementById(id);
+function toast(m){const t=$('toast');t.textContent=m;t.style.display='block';
+setTimeout(()=>t.style.display='none',2500);}
+async function api(path,body){const r=await fetch(path,{method:body?'POST':'GET',
+headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});
+return r.json();}
+function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+async function loadPending(){const d=await api('/api/approvals/pending');
+const box=$('pending');
+if(!d.pending.length){box.innerHTML='<p class="empty">Nothing waiting. The agent will pause here when it needs you.</p>';return;}
+box.innerHTML=d.pending.map(p=>`<div class="appr"><h3>${esc(p.tool)} <span class="risk ${p.risk}">${p.risk}</span>
+<span class="dec">${esc(p.scope)}</span></h3><div class="mono">${esc(p.summary)}</div>
+<div class="row" style="margin-top:10px"><select id="rm-${p.call_id}">
+<option value="once">Just once</option><option value="session">This session</option>
+<option value="always">Always (${esc(p.scope)})</option>
+<option value="site">Always on this site</option></select>
+<button onclick="resolve('${p.call_id}',true)">Approve</button>
+<button class="deny" onclick="resolve('${p.call_id}',false)">Deny</button></div></div>`).join('');}
+async function resolve(id,ok){const r=await api('/api/approvals/resolve',
+{call_id:id,approved:ok,remember:$('rm-'+id).value});
+if(r.ok){toast(ok?'Approved':'Denied');loadPending();loadAudit();}else toast('Error: '+(r.error||'?'));}
+async function loadScopes(){const d=await api('/api/trust/scopes');
+$('mode').value=d.mode;
+$('scopes').innerHTML=d.scopes.map(s=>`<tr><td><b>${esc(s.title)}</b><br>
+<span class="sub">${esc(s.desc)}</span></td>
+<td><span class="mono">${s.tools.length} tools</span><br>
+<span class="sub">${esc(s.tools.slice(0,6).join(', '))}${s.tools.length>6?'&hellip;':''}</span></td>
+<td><select onchange="setScope('${s.id}',this.value)">
+${['ask','allow','deny'].map(p=>`<option ${p===s.policy?'selected':''}>${p}</option>`).join('')}
+</select></td></tr>`).join('');
+const fs=$('fScope');const cur=fs.value;
+fs.innerHTML='<option value="">all</option>'+d.scopes.map(s=>`<option value="${s.id}">${esc(s.title)}</option>`).join('');
+fs.value=cur;
+$('sites').innerHTML=Object.entries(d.sites).map(([h,p])=>
+`<span class="dec">${esc(h)}: ${esc(p)}</span> <button class="ghost" onclick="delSite('${esc(h)}')">remove</button> `).join('')
+||'<p class="empty">No site rules yet.</p>';}
+async function setMode(m){const r=await api('/api/trust/policy',{action:'set_mode',mode:m});
+toast(r.ok?'Mode updated':'Error: '+(r.error||'?'));}
+async function setScope(s,p){const r=await api('/api/trust/policy',{action:'set_scope',scope:s,policy:p});
+toast(r.ok?'Policy updated':'Error: '+(r.error||'?'));loadAudit();}
+async function addSite(){const h=$('sitehost').value.trim();if(!h)return;
+const r=await api('/api/trust/policy',{action:'set_site',host:h,policy:'allow'});
+if(r.ok){$('sitehost').value='';loadScopes();}else toast('Error: '+(r.error||'?'));}
+async function delSite(h){await api('/api/trust/policy',{action:'clear_site',host:h});loadScopes();}
+async function loadAudit(){const s=$('fScope').value,d=$('fDec').value;
+const q=new URLSearchParams({limit:100});if(s)q.set('scope',s);if(d)q.set('decision',d);
+const r=await api('/api/audit?'+q);
+$('stats').textContent=`${r.stats.total} events recorded · ${r.stats.denied} denied/blocked`;
+$('audit').innerHTML=r.events.map(e=>`<tr><td class="mono">${esc(e.ts.slice(11,19))}</td>
+<td><b>${esc(e.tool)}</b></td><td>${esc(e.scope)}</td>
+<td><span class="risk ${e.risk}">${esc(e.risk)}</span></td>
+<td><span class="dec ${esc(e.decision)}">${esc(e.decision)}</span></td>
+<td class="mono">${esc(e.summary||JSON.stringify(e.args).slice(0,120))}</td></tr>`).join('')
+||'<tr><td colspan="6" class="empty">No events yet.</td></tr>';}
+loadPending();loadScopes();loadAudit();setInterval(loadPending,2000);
+</script></body></html>"""
 
 
 # ── minimal HQ landing page ──────────────────────────────────────────────────
@@ -452,6 +671,9 @@ def main() -> None:
     hook = ApprovalHook(session_id="web-hq")
     hook.auto_approve_all = True
     register_plugin(hook)
+    register_plugin(AuditHook(session_id="web-hq"))
+    global _APPROVAL_HOOK
+    _APPROVAL_HOOK = hook
 
     # Eagerly import agent so all ~98 tools register before the first request.
     try:
