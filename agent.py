@@ -40,7 +40,8 @@ import tools.skill_tools
 import tools.subagent_tool
 import tools.task_tools
 import tools.utility_tools
-import tools.web_tools  # noqa: F401
+import tools.web_tools
+import tools.webmcp_tools  # noqa: F401
 from config import PROJECT_DIR
 from project import ProjectDetector
 

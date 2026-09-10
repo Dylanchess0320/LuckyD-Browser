@@ -103,6 +103,11 @@ _TOOL_SCOPE_OVERRIDES: dict[str, str] = {
     "WebSearch": "network",
     "WebFetch": "network",
     "Http": "network",
+    # webmcp — site-exposed agent tools drive live tabs, so they belong to
+    # the browser scope (not network), even though the names start with Web.
+    "WebMCPDiscover": "browser",
+    "WebMCPCall": "browser",
+    "WebMCPShim": "browser",
     # browser
     "BrowserNavigate": "browser",
     "BrowserClick": "browser",
