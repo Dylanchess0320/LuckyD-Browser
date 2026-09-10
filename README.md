@@ -55,7 +55,11 @@ A hardened foundation: every local service now authenticates with HttpOnly sessi
 | **Cookie-based auth** | Control API, Coding Agent HQ, and terminal WebSocket use `luckyd_ctl` / `luckyd_hq` / `luckyd_term` session cookies. Zero credentials embedded in served HTML. |
 | **Deep Research XSS hardening** | Report markdown is HTML-escaped before rendering; links allowlisted to `http:`, `https:`, `mailto:` with `rel="noopener"`. |
 | **Cline bridge auth** | `/v1/models` and `/v1/chat/completions` require a bearer token (`CLINE_BRIDGE_TOKEN`); fails closed when unconfigured. |
-| **Reliability fixes** | Checkpoint undo can't loop forever on deleted files; IPv6 loopback (`[::1]`) handled; Windows updater exits cleanly off-Windows. |
+| **SSRF protection** | Agent web tools validate DNS against private/loopback/metadata IPs, re-check redirects, pin connections to validated IPs (anti DNS-rebinding), ignore env proxies. |
+| **Single command blocklist** | One consolidated blocklist gates every shell in the system — agent Bash tool and background processes alike. |
+| **Reliability fixes** | Checkpoint undo can't loop forever on deleted files; IPv6 loopback (`[::1]`) handled; Windows updater exits cleanly off-Windows; race-safe terminal server; session saves survive concurrent windows; tile processes reaped on shutdown. |
+
+*Verified: 189 tests passed, `ruff` clean.*
 
 <details>
 <summary>New in 3.9.0 — Daily Driver</summary>
