@@ -85,6 +85,18 @@ Write-Step '[2/4] Rebuilding luckyd-cli.exe (interactive terminal CLI) from curr
 Rebuild-BackendExe -SpecFile 'main.spec' -ExeName 'luckyd-cli.exe'
 
 # -- 3. PyInstaller (browser) ------------------------------------------------
+# LuckyDBrowser.spec bundles installer/env/.env (the clean template, never a
+# dev .env with real keys). Fresh checkouts don't have it (gitignored), so
+# seed it from the repo-root .env.example before PyInstaller runs.
+$envDir = Join-Path $PSScriptRoot 'env'
+$envFile = Join-Path $envDir '.env'
+if (-not (Test-Path $envFile)) {
+    $template = Join-Path $repoRoot '.env.example'
+    if (-not (Test-Path $template)) { throw "Missing .env template: $template" }
+    New-Item -ItemType Directory -Path $envDir -Force | Out-Null
+    Copy-Item $template $envFile -Force
+    Write-Ok "Seeded installer/env/.env from .env.example (clean template, no keys)"
+}
 Write-Step '[3/4] Building LuckyDBrowser with PyInstaller'
 Push-Location $browserDir
 try {
