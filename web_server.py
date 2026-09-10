@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import hmac
 import json
 import secrets
@@ -51,6 +52,7 @@ def _approval_hook() -> ApprovalHook | None:
         if isinstance(hook, ApprovalHook):
             return hook
     return None
+
 
 load_env()  # load .env before any agent/LLM construction
 
@@ -113,6 +115,27 @@ def _run_async(coro, timeout: float = 600.0):
     """Submit a coroutine to the background loop and block for its result."""
     fut = asyncio.run_coroutine_threadsafe(coro, _LOOP)
     return fut.result(timeout)
+
+
+# ── Scheduled agents (LuckyD 6.0) ──────────────────────────────────────────
+# Lazy singleton so the store is only created on first use.
+_SCHED_STORE = None
+
+
+def _sched_store():
+    global _SCHED_STORE
+    if _SCHED_STORE is None:
+        from core.scheduler import ScheduleStore
+
+        _SCHED_STORE = ScheduleStore()
+    return _SCHED_STORE
+
+
+def _sched_run_background(schedule_id: str) -> None:
+    from core.schedule_runner import run_schedule
+
+    with contextlib.suppress(Exception):
+        run_schedule(_sched_store(), schedule_id, force=True, reason="manual")
 
 
 # ── in-memory background task registry ───────────────────────────────────────
@@ -364,6 +387,28 @@ class HQHandler(BaseHTTPRequestHandler):
             if path == "/api/approvals/pending":
                 hook = _approval_hook()
                 return self._send_json({"pending": hook.pending_requests() if hook else []})
+            if path == "/schedules":
+                return self._send_html(_SCHEDULES_HTML)
+            if path == "/api/schedules":
+                return self._send_json({"schedules": [s.to_dict() for s in _sched_store().list()]})
+            if path == "/api/schedules/runs":
+                sid = (q.get("schedule_id") or [None])[0]
+                limit = int((q.get("limit") or ["20"])[0])
+                return self._send_json({"runs": _sched_store().history(sid, limit)})
+            if path == "/api/schedules/digest":
+                return self._send_json({"runs": _sched_store().digest()})
+            if path == "/api/schedules/daemon":
+                from core.schedule_daemon import get_service
+
+                svc = get_service()
+                return self._send_json(
+                    {
+                        "running": True,
+                        "last_tick": svc.last_tick,
+                        "last_error": svc.last_error,
+                        "poll_sec": svc.poll_sec,
+                    }
+                )
             if path.startswith("/api/background/status/"):
                 tid = path.rsplit("/", 1)[-1]
                 with _TASKS_LOCK:
@@ -469,6 +514,77 @@ class HQHandler(BaseHTTPRequestHandler):
                 if not ok:
                     return self._send_json({"error": "unknown or expired call_id"}, code=404)
                 return self._send_json({"ok": True})
+            if path == "/api/schedules":
+                from tools.schedule_tools import ScheduleCreateTool
+
+                out = _run_async(
+                    ScheduleCreateTool().execute(
+                        name=body.get("name", ""),
+                        prompt=body.get("prompt", ""),
+                        cron=body.get("cron", ""),
+                        every_minutes=int(body.get("every_minutes") or 0),
+                        daily_at=body.get("daily_at", ""),
+                        allow_scopes=json.dumps(body.get("allow_scopes") or []),
+                        max_turns=int(body.get("max_turns") or 25),
+                        max_runtime_minutes=int(body.get("max_runtime_minutes") or 10),
+                        max_retries=int(
+                            body.get("max_retries") if body.get("max_retries") is not None else 1
+                        ),
+                    ),
+                    timeout=30.0,
+                )
+                if out.error:
+                    return self._send_json({"error": out.text}, code=400)
+                return self._send_json({"ok": True, "schedule": out.metadata.get("schedule")})
+            if path == "/api/schedules/digest/seen":
+                _sched_store().mark_digest_seen()
+                return self._send_json({"ok": True})
+            if path.startswith("/api/schedules/"):
+                parts = path.split("/")
+                if len(parts) == 5:
+                    sid, action = parts[3], parts[4]
+                    from tools.schedule_tools import (
+                        ScheduleDeleteTool,
+                        ScheduleDisableTool,
+                        ScheduleEnableTool,
+                        ScheduleUpdateTool,
+                    )
+
+                    if action == "delete":
+                        out = _run_async(ScheduleDeleteTool().execute(sid), timeout=30.0)
+                    elif action == "enable":
+                        out = _run_async(ScheduleEnableTool().execute(sid), timeout=30.0)
+                    elif action == "disable":
+                        out = _run_async(ScheduleDisableTool().execute(sid), timeout=30.0)
+                    elif action == "run":
+                        threading.Thread(
+                            target=_sched_run_background, args=(sid,), daemon=True
+                        ).start()
+                        return self._send_json({"ok": True, "started": True})
+                    elif action == "update":
+                        fields = {
+                            k: body[k]
+                            for k in (
+                                "name",
+                                "prompt",
+                                "cron",
+                                "every_minutes",
+                                "daily_at",
+                                "allow_scopes",
+                                "max_turns",
+                                "max_runtime_minutes",
+                                "max_retries",
+                            )
+                            if body.get(k) not in (None, "")
+                        }
+                        if "allow_scopes" in fields and isinstance(fields["allow_scopes"], list):
+                            fields["allow_scopes"] = json.dumps(fields["allow_scopes"])
+                        out = _run_async(ScheduleUpdateTool().execute(sid, **fields), timeout=30.0)
+                    else:
+                        return self._send_json({"error": f"unknown action: {action}"}, code=404)
+                    if out.error:
+                        return self._send_json({"error": out.text}, code=400)
+                    return self._send_json({"ok": True, "result": out.text})
             return self._send_json({"error": f"not found: {path}"}, code=404)
         except Exception as exc:
             return self._send_json({"error": f"{type(exc).__name__}: {exc}"}, code=500)
@@ -607,6 +723,80 @@ loadPending();loadScopes();loadAudit();setInterval(loadPending,2000);
 </script></body></html>"""
 
 
+# ── Schedules dashboard (LuckyD 6.0 — "works while you rest") ───────────────
+_SCHEDULES_HTML = """<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LuckyD — Scheduled Agents</title>
+<style>
+body{font-family:system-ui,sans-serif;max-width:960px;margin:0 auto;padding:20px;color:#222}
+h1{font-size:22px}h2{font-size:17px;margin-top:28px}
+.card{border:1px solid #ddd;border-radius:10px;padding:14px;margin:10px 0;background:#fafafa}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:8px;border-bottom:1px solid #eee;vertical-align:top}
+button{border:1px solid #ccc;background:#fff;border-radius:6px;padding:5px 10px;cursor:pointer;margin:2px}
+button:hover{background:#f0f0f0}.danger{color:#a00}
+input,select,textarea{border:1px solid #ccc;border-radius:6px;padding:6px;margin:3px 0;width:100%;box-sizing:border-box}
+textarea{height:70px}.row{display:flex;gap:8px}.row>div{flex:1}
+.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:12px}
+.ok{background:#e6f4ea}.bad{background:#fdecea}.run{background:#e8f0fe}.idle{background:#eee}
+#digest{display:none;border-left:4px solid #f9ab00;background:#fff8e1}
+.muted{color:#666;font-size:13px}
+</style></head><body>
+<h1>⏰ Scheduled Agents</h1>
+<p class="muted">Background agents that work while you rest. Unattended runs can never use shell, desktop, or system tools — every run is audit-logged.</p>
+<div id="digest" class="card"></div>
+<h2>New schedule</h2>
+<div class="card">
+<div class="row"><div><label>Name<input id="f_name" placeholder="morning flight check"></label></div>
+<div><label>Kind<select id="f_kind"><option value="daily">daily at…</option><option value="cron">cron</option><option value="every">every N min</option></select></label></div>
+<div><label>When<input id="f_when" placeholder="07:30"></label></div></div>
+<label>Task prompt<textarea id="f_prompt" placeholder="What should the agent do each run?"></textarea></label>
+<div class="row"><div><label>Scopes (comma-sep)<input id="f_scopes" value="read,network,memory"></label></div>
+<div><label>Max turns<input id="f_turns" type="number" value="25"></label></div>
+<div><label>Max minutes<input id="f_mins" type="number" value="10"></label></div>
+<div><label>Retries<input id="f_retries" type="number" value="1"></label></div></div>
+<button onclick="createSched()">Create schedule</button>
+<span id="createMsg" class="muted"></span>
+<p class="muted">daily at → HH:MM (24h) · cron → 5 fields like <code>0 7 * * *</code> · every N min → number ≥ 5</p>
+</div>
+<h2>Schedules</h2>
+<div id="scheds"></div>
+<h2>Recent runs</h2>
+<div id="runs" class="card muted">loading…</div>
+<script>
+async function api(p,o={}){const r=await fetch(p,{headers:{'Content-Type':'application/json'},...o});return r.json();}
+function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+async function loadDigest(){const d=await api('/api/schedules/digest');const el=document.getElementById('digest');
+if(d.runs&&d.runs.length){el.style.display='block';const bad=d.runs.filter(r=>r.status!=='ok').length;
+el.innerHTML='<b>☀️ Morning digest:</b> '+d.runs.length+' run(s) since you last checked'+(bad?' — <b>'+bad+' need attention</b>.':' — all good.')+
+d.runs.map(r=>'<div>'+(r.status==='ok'?'✅':'⚠️')+' <b>'+esc(r.schedule_name)+'</b> — '+esc(r.status)+': '+esc((r.summary||r.error||'').slice(0,160))+'</div>').join('')+
+'<button onclick="seenDigest()">Mark as read</button>';}else{el.style.display='none';}}
+async function seenDigest(){await api('/api/schedules/digest/seen',{method:'POST'});loadDigest();}
+async function loadScheds(){const d=await api('/api/schedules');const el=document.getElementById('scheds');
+if(!d.schedules.length){el.innerHTML='<p class="muted">No schedules yet.</p>';return;}
+el.innerHTML='<table><tr><th>Name</th><th>When</th><th>Next run</th><th>Scopes</th><th>Last</th><th></th></tr>'+
+d.schedules.map(s=>{const when=s.kind==='cron'?('cron '+esc(s.cron)):s.kind==='every'?('every '+s.every_minutes+'m'):('daily '+esc(s.daily_at));
+return '<tr><td><b>'+esc(s.name)+'</b><br><span class="muted">'+esc(s.id)+'</span></td><td>'+when+'</td><td>'+esc(s.next_run_at||'—')+'</td><td class="muted">'+esc(s.allow_scopes.join(','))+'</td><td><span class="badge '+(s.last_status==='ok'?'ok':s.last_status?'bad':'idle')+'">'+esc(s.last_status||'never')+'</span> '+(s.enabled?'':'⏸️')+'</td><td>'+
+(s.enabled?'<button onclick="act(\\''+s.id+'\\',\\'disable\\')">Pause</button>':'<button onclick="act(\\''+s.id+'\\',\\'enable\\')">Enable</button>')+
+'<button onclick="act(\\''+s.id+'\\',\\'run\\')">Run now</button>'+
+'<button class="danger" onclick="act(\\''+s.id+'\\',\\'delete\\')">Delete</button></td></tr>';}).join('')+'</table>';}
+async function act(id,a){if(a==='delete'&&!confirm('Delete this schedule and its history?'))return;await api('/api/schedules/'+id+'/'+a,{method:'POST'});loadScheds();}
+async function createSched(){const kind=document.getElementById('f_kind').value,when=document.getElementById('f_when').value.trim();
+const body={name:document.getElementById('f_name').value,prompt:document.getElementById('f_prompt').value,kind,
+allow_scopes:document.getElementById('f_scopes').value.split(',').map(s=>s.trim()).filter(Boolean),
+max_turns:+document.getElementById('f_turns').value,max_runtime_minutes:+document.getElementById('f_mins').value,
+max_retries:+document.getElementById('f_retries').value};
+if(kind==='cron')body.cron=when;else if(kind==='every')body.every_minutes=+when;else body.daily_at=when;
+const r=await api('/api/schedules',{method:'POST',body:JSON.stringify(body)});
+document.getElementById('createMsg').textContent=r.error?('Error: '+r.error):'Created!';
+if(!r.error)loadScheds();}
+async function loadRuns(){const d=await api('/api/schedules/runs?limit=15');const el=document.getElementById('runs');
+el.innerHTML=d.runs.length?d.runs.map(r=>'<div><span class="badge '+(r.status==='ok'?'ok':r.status==='running'?'run':'bad')+'">'+esc(r.status)+'</span> <b>'+esc(r.schedule_name)+'</b> <span class="muted">'+esc(r.started_at||'')+' · '+Math.round(r.duration_sec||0)+'s · attempt '+r.attempt+'</span><br>'+esc((r.summary||r.error||'').slice(0,220))+'</div>').join(''):'No runs yet.';}
+loadDigest();loadScheds();loadRuns();setInterval(()=>{loadScheds();loadRuns();},15000);
+</script></body></html>"""
+
+
 # ── minimal HQ landing page ──────────────────────────────────────────────────
 _HQ_HTML = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
@@ -680,6 +870,15 @@ def main() -> None:
         import agent  # noqa: F401
     except Exception as exc:
         print(f"  [warn] tool registration failed: {exc}")
+
+    # Start the scheduled-agents daemon (LuckyD 6.0 — "works while you rest").
+    try:
+        from core.schedule_daemon import get_service
+
+        get_service()
+        print("  scheduler daemon: running (see /schedules)")
+    except Exception as exc:
+        print(f"  [warn] scheduler failed to start: {exc}")
 
     server = ThreadingHTTPServer((args.host, args.port), HQHandler)
     server.daemon_threads = True

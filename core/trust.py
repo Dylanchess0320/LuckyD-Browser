@@ -108,6 +108,17 @@ _TOOL_SCOPE_OVERRIDES: dict[str, str] = {
     "WebMCPDiscover": "browser",
     "WebMCPCall": "browser",
     "WebMCPShim": "browser",
+    # scheduled agents manage the agent fleet
+    "ScheduleCreate": "agents",
+    "ScheduleList": "agents",
+    "ScheduleGet": "agents",
+    "ScheduleUpdate": "agents",
+    "ScheduleDelete": "agents",
+    "ScheduleEnable": "agents",
+    "ScheduleDisable": "agents",
+    "ScheduleRunNow": "agents",
+    "ScheduleHistory": "agents",
+    "ScheduleDigest": "agents",
     # browser
     "BrowserNavigate": "browser",
     "BrowserClick": "browser",

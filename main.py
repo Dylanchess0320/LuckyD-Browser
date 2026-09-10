@@ -1178,7 +1178,7 @@ async def run_repl(agent: CodingAgent):
             if n_srv:
                 from tools.mcp_tools import register_mcp_tools
 
-                n_tools = register_mcp_tools(mcp_manager)
+                n_tools = await register_mcp_tools(mcp_manager)
                 print(f"  [MCP] {n_srv} server(s), {n_tools} tool(s) registered")
     except Exception as e:
         print(f"  [MCP] Connection: {e}")
@@ -1444,6 +1444,67 @@ def _cli_model(args):
 # ── Entry point ────────────────────────────────────────────────────────
 
 
+def _cli_schedule(args):
+    """luckyd-code schedule [--daemon | --list | --run-now ID | --history [ID]]
+
+    Manage background scheduled agents (LuckyD 6.0 — "works while you rest").
+    """
+    from core.scheduler import ScheduleStore
+
+    if not args or args[0] in ("--help", "-h"):
+        print(
+            """Usage: luckyd-code schedule [--daemon | --list | --run-now ID | --history [ID]]
+
+  --daemon        Run the scheduler daemon in the foreground (fires due schedules).
+  --list          List all schedules with next run times.
+  --run-now ID    Run a schedule immediately (unattended guardrails apply).
+  --history [ID]  Show recent run history, optionally for one schedule."""
+        )
+        return
+    store = ScheduleStore()
+    if args[0] == "--daemon":
+        from core.schedule_daemon import main as daemon_main
+
+        daemon_main()
+    elif args[0] == "--list":
+        schedules = store.list()
+        if not schedules:
+            print("No schedules. Create one from the agent (ScheduleCreate) or HQ /schedules.")
+            return
+        for s in schedules:
+            state = "enabled" if s.enabled else "disabled"
+            when = (
+                s.cron
+                if s.kind == "cron"
+                else (f"every {s.every_minutes}m" if s.kind == "every" else f"daily {s.daily_at}")
+            )
+            print(
+                f"- {s.name} [{s.id}] ({state}) — {when} — next: {s.next_run_at or '—'}"
+                f" — last: {s.last_status or 'never'}"
+            )
+    elif args[0] == "--run-now" and len(args) > 1:
+        from core.schedule_runner import run_schedule
+
+        record = run_schedule(store, args[1], force=True, reason="manual", retry_delay_sec=5)
+        print(f"Run {record['run_id']}: {record['status']}")
+        if record.get("summary"):
+            print(record["summary"][:500])
+    elif args[0] == "--history":
+        sid = args[1] if len(args) > 1 else None
+        runs = store.history(sid, 20)
+        if not runs:
+            print("No runs recorded yet.")
+            return
+        for r in runs:
+            print(
+                f"- {r['schedule_name']} [{r['started_at']}] {r['status']} "
+                f"({r['duration_sec']:.0f}s): {(r['summary'] or r['error'])[:120]}"
+            )
+    else:
+        print(f"Unknown schedule command: {' '.join(args)} (try --help)")
+        sys.exit(2)
+
+
 def main():
     # Parse CLI args
     args = sys.argv[1:]
@@ -1451,6 +1512,11 @@ def main():
     # Dispatch "model" subcommand early (no API key needed)
     if args and args[0] == "model":
         _cli_model(args[1:])
+        return
+
+    # Dispatch "schedule" subcommand early (6.0 — background agents)
+    if args and args[0] == "schedule":
+        _cli_schedule(args[1:])
         return
 
     cfg = get_config()
