@@ -369,7 +369,10 @@ class TestVersionUnification:
     """Version references are unified; this guards against drift."""
 
     def test_versions_unified_at_current(self):
-        import tomllib
+        try:
+            import tomllib
+        except ModuleNotFoundError:  # Python 3.10: use the tomli backport
+            import tomli as tomllib
 
         import browser
 
