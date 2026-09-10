@@ -216,7 +216,7 @@ def model_catalog(free_only: bool = False) -> list[dict]:
             name = pinfo.get("name", pid)
             # Mark availability in provider label for UI: "✓" if key present
             available = _is_free_provider_available(pid, pinfo)
-            label = f"{name} ✓" if available else f"{name} (needs {pinfo.get('env_key','key')})"
+            label = f"{name} ✓" if available else f"{name} (needs {pinfo.get('env_key', 'key')})"
             # For free_only, skip providers where we'd need a missing key (except local)
             if free_only and not available:
                 # still keep models in seen_models so they don't reappear elsewhere
@@ -1104,7 +1104,7 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
             ui.warn("MCP not configured or no servers connected")
 
     elif cmd == "version":
-        agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v3.6.0")
+        agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v4.0.0")
         agent_name = os.environ.get("LUCKYD_AGENT_NAME", "Agent 1")
         ui.info(f"LuckyD Code {agent_version} ({agent_name})")
 
@@ -1142,11 +1142,11 @@ async def run_one_shot(agent: CodingAgent, message: str):
 
 async def run_one_shot_json(agent: CodingAgent, message: str):
     """Single query mode -- clean JSON-line output for editor extensions."""
-    agent.stream_callback = lambda token: (
-        sys.stdout.write(json.dumps({"type": "token", "text": token}) + chr(10))
+    agent.stream_callback = lambda token: sys.stdout.write(
+        json.dumps({"type": "token", "text": token}) + chr(10)
     )
-    agent.think_callback = lambda token: (
-        sys.stdout.write(json.dumps({"type": "thinking", "text": token}) + chr(10))
+    agent.think_callback = lambda token: sys.stdout.write(
+        json.dumps({"type": "thinking", "text": token}) + chr(10)
     )
     result = ""
     try:
@@ -1503,10 +1503,10 @@ def main():
             else:
                 os.environ["LUCKYD_AGENT_SLOT"] = "1"
                 os.environ["LUCKYD_AGENT_NAME"] = "Agent 1"
-                os.environ["LUCKYD_AGENT_VERSION"] = "v3.6.0"
+                os.environ["LUCKYD_AGENT_VERSION"] = "v4.0.0"
             i += 2
         elif args[i] in ("-v", "--version"):
-            agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v3.6.0")
+            agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v4.0.0")
             agent_name = os.environ.get("LUCKYD_AGENT_NAME", "")
             label = f"LuckyD Code {agent_version}" + (f" ({agent_name})" if agent_name else "")
             print(label)
@@ -1517,7 +1517,7 @@ def main():
 LuckyD Code — AI Coding Agent
 
 Usage:
-  lucky-code                       Interactive REPL (Agent 1 · v3.6.0)
+  lucky-code                       Interactive REPL (Agent 1 · v4.0.0)
   lucky-code --agent 2             Interactive REPL (Agent 2 · v2.2.0)
   lucky-code "your query"          One-shot mode
   lucky-code -c                    Continue last session

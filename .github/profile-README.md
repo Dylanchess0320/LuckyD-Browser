@@ -9,11 +9,11 @@
 
 </div>
 
-### Now shipping — [LuckyD Browser v3.9.0 Daily Driver](https://github.com/Dylanchess0320/LuckyD-Browser/releases/tag/v3.9.0)
+### Now shipping — [LuckyD Browser v4.0.0 Frontier](https://github.com/Dylanchess0320/LuckyD-Browser/releases/tag/v4.0.0)
 
 HTTPS-Only · per-site permissions · workspaces · memory saver · read aloud · summarize this page · local unlimited Ollama · Agent Mesh
 
-**[⬇ Download for Windows](https://github.com/Dylanchess0320/LuckyD-Browser/releases/tag/v3.9.0)** · **[Repo](https://github.com/Dylanchess0320/LuckyD-Browser)** · **[Watch](https://www.youtube.com/watch?v=La6bxaa7icY)**
+**[⬇ Download for Windows](https://github.com/Dylanchess0320/LuckyD-Browser/releases/tag/v4.0.0)** · **[Repo](https://github.com/Dylanchess0320/LuckyD-Browser)** · **[Watch](https://www.youtube.com/watch?v=La6bxaa7icY)**
 
 ```
 ┌──────────── LuckyD Browser ──────────────────────────────────────┐

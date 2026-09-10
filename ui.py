@@ -242,7 +242,7 @@ class TerminalUI:
         """Clean startup banner."""
         header = self._session_header()
         tip = "Type a task, or /help for commands"
-        agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v3.6.0").strip()
+        agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v4.0.0").strip()
         agent_name = os.environ.get("LUCKYD_AGENT_NAME", "").strip()
         ver_label = f"{agent_version}" + (f" ({agent_name})" if agent_name else "")
 
@@ -800,11 +800,11 @@ class TerminalUI:
             c = ANSI["green"] if tier == "free" else ANSI["yellow"]
             dot = "●" if tier == "free" else "○"
             print(f"\n  {c}{dot} {label}{ANSI['reset']}")
-            print(f"  {ANSI['dim']}{'─'*56}{ANSI['reset']}")
+            print(f"  {ANSI['dim']}{'─' * 56}{ANSI['reset']}")
             print(
                 f"  {ANSI['dim']} {'#':>3}  {'Model':<28} {'Provider':<18} {'Status'}{ANSI['reset']}"
             )
-            print(f"  {ANSI['dim']} {'─'*3}  {'─'*28} {'─'*18} {'─'*8}{ANSI['reset']}")
+            print(f"  {ANSI['dim']} {'─' * 3}  {'─' * 28} {'─' * 18} {'─' * 8}{ANSI['reset']}")
             g = 0
             for group in section.get("groups", []) or []:
                 prov_label = str(group.get("provider", ""))
@@ -822,7 +822,9 @@ class TerminalUI:
                         else (
                             "✓ ready"
                             if is_available
-                            else "needs key" if "needs" in prov_label.lower() else "—"
+                            else "needs key"
+                            if "needs" in prov_label.lower()
+                            else "—"
                         )
                     )
                     sc = ANSI["green"] if is_cur or is_available else ANSI["dim"]

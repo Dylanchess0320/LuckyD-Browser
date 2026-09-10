@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.0] - 2026-09-10
+
+### Security
+- **Cookie-based auth for all local services** — the Control API (`:9777`), Coding Agent HQ (`:8000`), and terminal WebSocket (`:9881`) now authenticate via HttpOnly session cookies (`luckyd_ctl`, `luckyd_hq`, `luckyd_term`) instead of bearer tokens in URLs or page source. No credential is ever embedded in served HTML again.
+- **Deep Research XSS hardening** — report markdown is HTML-escaped before formatting, and link URLs are allowlisted to `http:`, `https:`, and `mailto:` (with `rel="noopener"`).
+- **Cline bridge authentication** — `/v1/models` and `/v1/chat/completions` now require a bearer token (`CLINE_BRIDGE_TOKEN`, falling back to `CODING_AGENT_API_KEY`) and fail closed when none is configured.
+- **Nav pages require auth** — `/dashboard`, `/research`, `/mesh`, and `/terminal` return 401 without the session cookie, closing the "any local page can drive the browser" gap.
+- **Loopback-only origin enforcement** on the Control API, with bracketed IPv6 (`[::1]`) handled correctly.
+- Minimal `Content-Security-Policy` headers on local HTML surfaces.
+
+### Fixed
+- `CheckpointManager.undo_to()` could loop forever when a checkpoint's target file was deleted; it now terminates.
+- `undo_last()` no longer retries a checkpoint whose file is already gone.
+- Windows updater exits cleanly on non-Windows systems; `CREATE_NO_WINDOW` is guarded.
+
 ## [3.9.0] - 2026-09-06
 
 ### Added

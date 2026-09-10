@@ -182,7 +182,7 @@ check(
     and zoom_for({"https://a.com": 1.5}, "https://b.com", 1.0) == 1.0,
 )
 
-# v3.9.0 — HTTPS-Only, site permissions, workspaces, memory saver
+# v4.0.0 — cookie auth, XSS hardening, bridge auth, reliability fixes
 from browser_core.https_only import upgrade_url
 from browser_core.lifecycle import DISCARDED, FROZEN, next_state, should_protect
 from browser_core.permissions import ASK, PermissionStore, origin_of

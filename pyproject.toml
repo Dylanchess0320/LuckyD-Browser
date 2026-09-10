@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "luckyd-code"
-version = "3.6.0"
+version = "4.0.0"
 description = "AI-powered coding agent with multi-LLM support, memory graph, and VS Code integration"
 readme = "README.md"
 license = {text = "Proprietary"}
@@ -127,6 +127,11 @@ ignore = [
 ]
 # Brand glyphs used intentionally in UI (REPL chevron, fullwidth plus, X logo)
 allowed-confusables = ["›", "＋", "𝕏"]
+
+[tool.ruff.lint.per-file-ignores]
+# research_page's HTML template is an f-string with no placeholders on purpose:
+# the f-prefix collapses the JS's doubled braces ({{ }}) to single braces.
+"browser/browser_core/research_page.py" = ["F541"]
 
 [tool.ruff.format]
 quote-style = "double"

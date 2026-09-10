@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/screenshots/hero.svg" alt="LuckyD Browser 3.9.0 — Daily Driver" width="100%">
+<img src="docs/screenshots/hero.svg" alt="LuckyD Browser 4.0.0 — Frontier" width="100%">
 
 # LuckyD Browser
 
@@ -13,7 +13,7 @@
 [![Windows](https://img.shields.io/badge/Windows-10%2F11%20x64-0078D4?logo=windows&logoColor=white)](https://github.com/Dylanchess0320/LuckyD-Browser/releases/latest)
 [![Python](https://img.shields.io/badge/python-3.10--3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/downloads/)
 
-**[⬇ Download v3.9.0](https://github.com/Dylanchess0320/LuckyD-Browser/releases/tag/v3.9.0)**
+**[⬇ Download v4.0.0](https://github.com/Dylanchess0320/LuckyD-Browser/releases/tag/v4.0.0)**
 &nbsp;·&nbsp;
 **[Browser guide](README-LuckyD-Browser.md)**
 &nbsp;·&nbsp;
@@ -46,7 +46,19 @@ Most “AI browsers” rent you a chatbot behind an account. LuckyD is a **real 
 
 ---
 
-## New in 3.9.0 — Daily Driver
+## New in 4.0.0 — Frontier
+
+A hardened foundation: every local service now authenticates with HttpOnly session cookies — no tokens in URLs or page source, ever.
+
+| | |
+|---|---|
+| **Cookie-based auth** | Control API, Coding Agent HQ, and terminal WebSocket use `luckyd_ctl` / `luckyd_hq` / `luckyd_term` session cookies. Zero credentials embedded in served HTML. |
+| **Deep Research XSS hardening** | Report markdown is HTML-escaped before rendering; links allowlisted to `http:`, `https:`, `mailto:` with `rel="noopener"`. |
+| **Cline bridge auth** | `/v1/models` and `/v1/chat/completions` require a bearer token (`CLINE_BRIDGE_TOKEN`); fails closed when unconfigured. |
+| **Reliability fixes** | Checkpoint undo can't loop forever on deleted files; IPv6 loopback (`[::1]`) handled; Windows updater exits cleanly off-Windows. |
+
+<details>
+<summary>New in 3.9.0 — Daily Driver</summary>
 
 A browser you can actually live in, not just demo.
 
@@ -60,6 +72,7 @@ A browser you can actually live in, not just demo.
 | **Summarize this page** | `Ctrl+Shift+U` or toolbar ✨ — opens the AI sidebar and summarizes the current tab. |
 
 Also in this lineage: Deep Research swarm (`Ctrl+Shift+R`), Agent Mesh, self-healing workflows, and one-click in-app updates.
+</details>
 
 ---
 
@@ -79,12 +92,12 @@ Also in this lineage: Deep Research swarm (`Ctrl+Shift+R`), Agent Mesh, self-hea
 
 ## Install in 10 seconds
 
-1. Get **[LuckyDBrowserSetup-3.9.0.exe](https://github.com/Dylanchess0320/LuckyD-Browser/releases/tag/v3.9.0)**
+1. Get **[LuckyDBrowserSetup-4.0.0.exe](https://github.com/Dylanchess0320/LuckyD-Browser/releases/tag/v4.0.0)**
 2. Run it — per-user, **no admin**, installs to `%LOCALAPPDATA%\Programs\LuckyDBrowser`
 3. Leave **“Set up free unlimited local AI”** checked → Ollama + `llama3.2:3b` (~2 GB, one time)
 4. `Ctrl+Shift+A` → chat offline. Or bring your own keys (Gemini, Groq, DeepSeek, OpenAI, Anthropic, Z.ai, OpenRouter, Cline, OpenCode)
 
-Silent: `LuckyDBrowserSetup-3.9.0.exe /VERYSILENT /NORESTART`
+Silent: `LuckyDBrowserSetup-4.0.0.exe /VERYSILENT /NORESTART`
 
 Windows 10/11 x64 only.
 
@@ -125,7 +138,7 @@ browser\run_browser.bat
 
 # Shareable installer (needs Inno Setup 6)
 powershell -NoProfile -ExecutionPolicy Bypass -File browser\installer\build_installer.ps1
-# → browser\installer\output\LuckyDBrowserSetup-3.9.0.exe
+# → browser\installer\output\LuckyDBrowserSetup-4.0.0.exe
 ```
 
 ---
@@ -143,6 +156,6 @@ tests/     headless pytest (Qt mocked on Linux CI)
 
 <p align="center">
   <b>MIT © LuckyD</b> · Chromium · Ollama · Qt · xterm.js · pywinpty · PyInstaller · Inno Setup<br>
-  <a href="https://github.com/Dylanchess0320/LuckyD-Browser/releases/tag/v3.9.0">Download v3.9.0</a>
+  <a href="https://github.com/Dylanchess0320/LuckyD-Browser/releases/tag/v4.0.0">Download v4.0.0</a>
   · <a href="https://www.youtube.com/watch?v=La6bxaa7icY">Watch the showcase</a>
 </p>
