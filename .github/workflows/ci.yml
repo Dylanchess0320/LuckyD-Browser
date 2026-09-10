@@ -44,8 +44,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
 
-      - name: Format Check (Black)
-        run: black --check . --diff
+      - name: Format Check (Ruff)
+        run: ruff format --check .
 
       - name: Lint (Ruff)
         run: ruff check .
