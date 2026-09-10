@@ -15,6 +15,13 @@ The agentic frontier, on `main` (not yet released):
 - **Scheduled/background agents** — cron-scheduled agents that run while you rest, with a **morning digest** of their runs. Manage them at **`/schedules`** (`python main.py schedule ...`).
 - **Open Skills marketplace** — skill registries (bundled + remote) with hash-verified **install/update/remove/publish**; tampered or unparseable skills are refused.
 
+### Security
+- **Legacy blanket auto-approve removed** — `hook.auto_approve_all`, `CODING_AGENT_AUTO_APPROVE`/`CODING_AGENT_YOLO`, and the `--auto-approve`/`--yolo` CLI flags are inert (deprecation warning, treated as OFF). Approvals may now only be skipped when the trust policy explicitly authorizes it (policy mode, per-scope/site rules, or the explicit per-run auto-approve-low-risk mode), and every skip is recorded in the audit log. The HQ schedule routes (create/update/delete/pause/run-now) are gated through the approval hook: they return HTTP 403 when the trust policy requires approval.
+- **Shared run lock** — scheduled runs and interactive agent runs (CLI, HQ web server) now serialize through a cross-process file lock (`core/run_lock.py`) around run execution, so workspace files, the trust store, and the schedule store are never mutated concurrently.
+
+### Fixed
+- **Zero-valued schedule fields preserved** — schedule create/update paths no longer drop legitimate `0` values (e.g. `max_retries=0`) via falsy checks; explicit `is None` checks are used instead (invalid zeros like `max_turns=0` now fail loudly with a validation error).
+
 ## [5.0.0] - 2026-09-10
 
 The final, maxed-out release. Everything in 4.0, polished to a shine:

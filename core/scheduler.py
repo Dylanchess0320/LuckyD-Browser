@@ -231,7 +231,7 @@ def validate_schedule_fields(
     else:
         raise ValueError(f"unknown schedule kind {kind!r} (cron | every | daily)")
 
-    scopes = list(allow_scopes) if allow_scopes else list(DEFAULT_ALLOW_SCOPES)
+    scopes = list(allow_scopes) if allow_scopes is not None else list(DEFAULT_ALLOW_SCOPES)
     unknown = [s for s in scopes if s not in VALID_SCOPES]
     if unknown:
         raise ValueError(f"unknown permission scopes: {', '.join(unknown)}")

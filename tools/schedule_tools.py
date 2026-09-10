@@ -179,11 +179,24 @@ class ScheduleUpdateTool(ToolBase):
         s = store.get(id)
         if not s:
             return ToolOutput(text=f"Error: unknown schedule {id!r}.", error=True)
-        changes = {
-            k: v for k, v in kwargs.items() if v not in ("", 0, None) or k in ("cron", "daily_at")
-        }
+        # Explicit-None semantics: only fields actually provided are changed.
+        # 0 is a legitimate value for numeric fields (e.g. max_retries=0) and
+        # must not be dropped by a falsy check. Empty strings mean "not
+        # provided" — except cron/daily_at, where clearing the field is
+        # meaningful when switching the schedule's timing kind.
+        changes: dict[str, Any] = {}
+        for k, v in kwargs.items():
+            if v is None:
+                continue
+            if isinstance(v, str) and v == "" and k not in ("cron", "daily_at"):
+                continue
+            changes[k] = v
         # Timing: exactly one timing field may be set per update.
-        timing = {k: changes[k] for k in ("cron", "every_minutes", "daily_at") if changes.get(k)}
+        timing = {
+            k: changes[k]
+            for k in ("cron", "every_minutes", "daily_at")
+            if k in changes and changes[k] not in (None, "")
+        }
         try:
             if "name" in changes:
                 s.name = changes["name"]
@@ -193,7 +206,7 @@ class ScheduleUpdateTool(ToolBase):
                 s.kind = (
                     "cron"
                     if timing.get("cron")
-                    else ("every" if timing.get("every_minutes") else "daily")
+                    else ("every" if "every_minutes" in timing else "daily")
                 )
                 s.cron = timing.get("cron", "")
                 s.every_minutes = timing.get("every_minutes", 0)

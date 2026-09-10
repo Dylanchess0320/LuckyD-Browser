@@ -1,8 +1,11 @@
 """
 Schedule runner — executes one schedule headlessly under unattended guardrails.
 
-Only one scheduled run executes at a time per process (RUN_LOCK). The runner
-temporarily swaps the process-global hooks for the unattended set
+Runs serialize against each other and against interactive agent runs through
+the shared run lock (core/run_lock.py): a scheduled run, an interactive CLI
+run, and an HQ web-server run never mutate shared state (workspace files,
+trust store, schedule store) concurrently — across threads and processes.
+The runner temporarily swaps the process-global hooks for the unattended set
 (UnattendedApprovalHook + AuditHook) and restores them afterwards, so a
 scheduler thread can live inside the HQ web server without disturbing the
 interactive agent's approvals.
@@ -11,12 +14,11 @@ interactive agent's approvals.
 from __future__ import annotations
 
 import asyncio
-import threading
 import time
 from datetime import datetime, timezone
 from typing import Any
 
-RUN_LOCK = threading.RLock()
+from core.run_lock import run_exclusive
 
 
 async def _agent_run_inner(sched, session_id: str) -> tuple[str, int]:
@@ -55,7 +57,9 @@ def run_schedule(
     if not sched.enabled and not force:
         raise ValueError(f"schedule '{sched.name}' is disabled")
 
-    with RUN_LOCK:
+    # Shared run lock: serializes this scheduled run against other scheduled
+    # runs and against interactive agent runs (threads and processes).
+    with run_exclusive():
         previous_hooks = get_hooks()
         reset_hooks()
         session_id = f"sched_{sched.id}_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"

@@ -4,7 +4,8 @@ Scheduler daemon — background thread that fires due schedules.
 Lives inside the HQ web server process (started on boot) or runs standalone
 via `python main.py schedule --daemon`. Ticks every `poll_sec`, collects due
 schedules, and runs them sequentially through core/schedule_runner (which
-holds RUN_LOCK, so interactive runs and scheduled runs never overlap).
+holds the shared run lock from core/run_lock.py, so interactive runs and
+scheduled runs never overlap).
 """
 
 from __future__ import annotations

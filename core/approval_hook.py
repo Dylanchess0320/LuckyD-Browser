@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import contextlib
 import json
-import os
+import logging
 import threading
 import time
 from collections.abc import Callable
@@ -32,6 +32,8 @@ from core.trust import (
     scope_of,
 )
 from core.types import ToolApprovalRequest, ToolApprovalResult, ToolPermissionLevel
+
+log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -187,17 +189,41 @@ class ApprovalHook(AgentPlugin):
         self.approval_dir = approval_dir
         self.session_id = session_id
         self.timeout_ms = timeout_ms
-        self.auto_approve_all = os.environ.get("CODING_AGENT_AUTO_APPROVE", "").lower() in (
-            "1",
-            "true",
-            "yes",
-        ) or os.environ.get("CODING_AGENT_YOLO", "").lower() in ("1", "true", "yes")
+        # Explicit per-run "auto-approve low-risk only" mode. When True, tools
+        # whose trust risk level is "low" (read-only / harmless) skip the
+        # approval request — everything else still follows the trust policy
+        # below. Every such skip is recorded in the audit log. This is the
+        # only sanctioned auto-approve mode; the legacy blanket
+        # auto_approve_all flag is inert (see the property below).
+        self.auto_approve_low_risk = False
 
         # 6.0 trust foundation
         self._policy = None  # lazy: get_policy()
         self._session_allow: set[str] = set()  # tool names approved for this session
         self._pending: dict[str, _PendingApproval] = {}
         self._pending_lock = threading.Lock()
+
+    @property
+    def auto_approve_all(self) -> bool:
+        """Legacy blanket auto-approve flag — inert since 6.1.
+
+        Always reads False. Assigning a truthy value logs a deprecation
+        warning and is ignored: approvals may only be skipped when the trust
+        policy explicitly authorizes it (policy mode, per-scope/site rules,
+        or the explicit per-run ``auto_approve_low_risk`` mode), and every
+        skip is recorded in the audit log.
+        """
+        return False
+
+    @auto_approve_all.setter
+    def auto_approve_all(self, value: bool) -> None:
+        if value:
+            log.warning(
+                "auto_approve_all is deprecated and inert since LuckyD 6.1: "
+                "blanket auto-approval was removed. Use the trust policy "
+                "(mode / per-scope rules) or the explicit per-run "
+                "auto_approve_low_risk mode instead."
+            )
 
     @property
     def policy(self):
@@ -277,32 +303,53 @@ class ApprovalHook(AgentPlugin):
     def get_permission(self, tool_name: str) -> ToolPermissionLevel:
         return _TOOL_PERMISSIONS.get(tool_name, ToolPermissionLevel.NORMAL)
 
-    def before_tool(self, tool_name: str, tool_args: dict, ctx: HookContext) -> dict | None:
+    def evaluate_policy(self, tool_name: str, tool_args: dict, ctx: HookContext) -> tuple[str, str]:
+        """Evaluate the trust policy for a tool call without asking anyone.
+
+        Returns ``(decision, reason)`` where decision is one of:
+
+        - ``"approved"`` — the trust policy explicitly authorizes skipping the
+          approval request (policy mode, per-scope/site allow rules, or the
+          explicit per-run ``auto_approve_low_risk`` mode for low-risk tools).
+        - ``"denied"`` — the trust policy blocks this tool call.
+        - ``"needs_approval"`` — a human must decide; the caller should use
+          the interactive request path (:meth:`before_tool`).
+
+        Every evaluation is recorded in the audit log with its reason — no
+        silent skips. This is also what non-interactive callers (e.g. the HQ
+        web server's schedule routes) use to gate mutating actions.
+        """
         level = self.get_permission(tool_name)
         clean_args = {k: v for k, v in tool_args.items() if not k.startswith("_")}
         scope = scope_of(tool_name)
 
         if level == ToolPermissionLevel.BLOCKED:
             self._audit_decision(tool_name, clean_args, "blocked", "Tool is blocked")
-            return {
-                "role": "tool",
-                "tool_call_id": tool_args.get("_id", "unknown"),
-                "content": f"Error: Tool '{tool_name}' is blocked for security reasons.",
-            }
+            return "denied", f"Tool '{tool_name}' is blocked for security reasons."
+
+        # Explicit per-run low-risk auto-approve: only low-risk tools skip the
+        # approval request. Everything else continues through the policy below.
+        if self.auto_approve_low_risk and risk_of(tool_name) == "low":
+            reason = "auto-approve low-risk run mode"
+            self._audit_decision(tool_name, clean_args, "auto", reason)
+            return "approved", reason
 
         mode = self.policy.mode
-        # Global auto mode (or legacy env flag): approve everything.
-        if self.auto_approve_all or mode == "auto":
-            return None
+        # The trust policy's own "auto" mode is the explicit, user-configured
+        # way to approve everything (set via the Trust dashboard). Unlike the
+        # removed legacy flag, the skip is recorded in the audit log.
+        if mode == "auto":
+            self._audit_decision(tool_name, clean_args, "auto", "trust policy mode: auto")
+            return "approved", "trust policy mode: auto"
 
         # "Approve for this session" memory.
         if tool_name in self._session_allow:
             self._audit_decision(tool_name, clean_args, "approved", "Allowed for session")
-            return None
+            return "approved", "Allowed for session"
 
         # Step-through mode: ask for every tool call, even read-only ones.
         if mode == "step-through":
-            return self._request_approval(tool_name, tool_args)
+            return "needs_approval", "trust policy mode: step-through (ask for every tool)"
 
         # Per-site rules for browser control ("always allow on this site").
         if scope == "browser":
@@ -311,47 +358,55 @@ class ApprovalHook(AgentPlugin):
             if host:
                 site = self.policy.site_policy(host)
                 if site == "allow":
-                    self._audit_decision(tool_name, clean_args, "auto", f"Site rule: allow {host}")
-                    return None
+                    reason = f"Site rule: allow {host}"
+                    self._audit_decision(tool_name, clean_args, "auto", reason)
+                    return "approved", reason
                 if site == "deny":
-                    self._audit_decision(tool_name, clean_args, "denied", f"Site rule: deny {host}")
-                    return {
-                        "role": "tool",
-                        "tool_call_id": tool_args.get("_id", "unknown"),
-                        "content": f"Tool execution denied by site policy for {host}.",
-                    }
+                    reason = f"Tool execution denied by site policy for {host}."
+                    self._audit_decision(tool_name, clean_args, "denied", reason)
+                    return "denied", reason
 
         # Per-scope policy.
         scope_policy = self.policy.scope_policy(scope)
         if scope_policy == "deny":
-            self._audit_decision(
-                tool_name, clean_args, "denied", f"Scope '{scope}' denied by policy"
-            )
-            return {
-                "role": "tool",
-                "tool_call_id": tool_args.get("_id", "unknown"),
-                "content": f"Tool execution denied: scope '{scope}' is denied in trust policy.",
-            }
+            reason = f"Tool execution denied: scope '{scope}' is denied in trust policy."
+            self._audit_decision(tool_name, clean_args, "denied", reason)
+            return "denied", reason
         if scope_policy == "allow":
-            return None
+            reason = f"Scope '{scope}' allowed by trust policy."
+            self._audit_decision(tool_name, clean_args, "auto", reason)
+            return "approved", reason
 
         if level == ToolPermissionLevel.ALWAYS_ALLOW:
-            return None
+            reason = "read-only tool (always allowed)"
+            self._audit_decision(tool_name, clean_args, "auto", reason)
+            return "approved", reason
         if level == ToolPermissionLevel.REQUIRES_APPROVAL:
-            return self._request_approval(tool_name, tool_args)
+            return "needs_approval", f"Tool '{tool_name}' requires approval."
         # NORMAL: check policy
         if ctx.config:
             policies = ctx.config.get("tool_policies", {})
             tp = policies.get(tool_name, policies.get("*", {}))
             if tp.get("auto_approve", False):
-                return None
+                reason = "auto-approved by tool policy"
+                self._audit_decision(tool_name, clean_args, "auto", reason)
+                return "approved", reason
             if tp.get("block", False):
-                self._audit_decision(tool_name, clean_args, "blocked", "Blocked by tool policy")
-                return {
-                    "role": "tool",
-                    "tool_call_id": tool_args.get("_id", "unknown"),
-                    "content": f"Error: Tool '{tool_name}' is blocked by policy.",
-                }
+                reason = f"Tool '{tool_name}' is blocked by policy."
+                self._audit_decision(tool_name, clean_args, "blocked", reason)
+                return "denied", reason
+        return "needs_approval", f"Tool '{tool_name}' requires approval."
+
+    def before_tool(self, tool_name: str, tool_args: dict, ctx: HookContext) -> dict | None:
+        decision, reason = self.evaluate_policy(tool_name, tool_args, ctx)
+        if decision == "approved":
+            return None
+        if decision == "denied":
+            return {
+                "role": "tool",
+                "tool_call_id": tool_args.get("_id", "unknown"),
+                "content": f"Error: {reason}",
+            }
         return self._request_approval(tool_name, tool_args)
 
     def _request_approval(self, tool_name: str, tool_args: dict) -> dict | None:

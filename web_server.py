@@ -37,6 +37,7 @@ from core.approval_hook import ApprovalHook
 from core.audit_hook import AuditHook
 from core.hooks import get_hooks, register_plugin
 from core.trust import SCOPES, get_audit_log, get_policy, scope_of
+from core.types import HookContext
 from memory.store import get_memory
 from tools.registry import registry
 
@@ -145,8 +146,13 @@ _TASKS_LOCK = threading.Lock()
 
 async def _agent_run(task: str) -> str:
     """Serialise agent runs — the shared agent cannot run two turns at once."""
+    from core.run_lock import run_exclusive
+
     agent = _get_agent()
-    async with _run_lock:
+    # Shared run lock: never run the interactive agent concurrently with
+    # a scheduled run (threads or other processes) — shared state
+    # (workspace files, trust/schedule stores) must not mutate twice.
+    async with _run_lock, run_exclusive():
         return await agent.run(task)
 
 
@@ -196,6 +202,43 @@ class HQHandler(BaseHTTPRequestHandler):
             self.wfile.write(body)
         except (ConnectionError, OSError):
             pass
+
+    def _require_schedule_approval(self, tool_name: str, tool_args: dict) -> bool:
+        """Gate a mutating schedule action through the trust approval hook.
+
+        Returns True when the trust policy explicitly authorizes the action.
+        Otherwise sends HTTP 403 (the denial is recorded in the audit log)
+        and returns False. Non-blocking on purpose: this route has no
+        interactive approver, so a "needs approval" verdict denies here — the
+        user can perform the action conversationally via the agent instead,
+        where the pending-approval queue (Trust dashboard) applies.
+        """
+        hook = _approval_hook()
+        if hook is None:
+            self._send_json({"error": "approval hook not wired"}, code=503)
+            return False
+        decision, reason = hook.evaluate_policy(
+            tool_name, tool_args, HookContext(turn=0, messages=[], config={})
+        )
+        if decision == "approved":
+            return True
+        if decision == "needs_approval":
+            # evaluate_policy doesn't audit the not-yet-made decision; the
+            # denial on this route is the final outcome, so record it.
+            hook._audit_decision(
+                tool_name,
+                tool_args,
+                "denied",
+                f"schedule dashboard action blocked: {reason}",
+            )
+        self._send_json(
+            {
+                "error": f"schedule action requires approval: {reason}",
+                "needs_approval": decision == "needs_approval",
+            },
+            code=403,
+        )
+        return False
 
     def _cookie_token(self) -> str:
         """Extract our session cookie value without logging it."""
@@ -517,20 +560,33 @@ class HQHandler(BaseHTTPRequestHandler):
             if path == "/api/schedules":
                 from tools.schedule_tools import ScheduleCreateTool
 
-                out = _run_async(
-                    ScheduleCreateTool().execute(
-                        name=body.get("name", ""),
-                        prompt=body.get("prompt", ""),
-                        cron=body.get("cron", ""),
-                        every_minutes=int(body.get("every_minutes") or 0),
-                        daily_at=body.get("daily_at", ""),
-                        allow_scopes=json.dumps(body.get("allow_scopes") or []),
-                        max_turns=int(body.get("max_turns") or 25),
-                        max_runtime_minutes=int(body.get("max_runtime_minutes") or 10),
-                        max_retries=int(
-                            body.get("max_retries") if body.get("max_retries") is not None else 1
-                        ),
+                # Explicit None checks (not `or` defaults): 0 is a legitimate
+                # value for the numeric fields (e.g. max_retries=0).
+                create_args = {
+                    "name": body.get("name", ""),
+                    "prompt": body.get("prompt", ""),
+                    "cron": body.get("cron", ""),
+                    "every_minutes": int(
+                        body.get("every_minutes") if body.get("every_minutes") is not None else 0
                     ),
+                    "daily_at": body.get("daily_at", ""),
+                    "allow_scopes": json.dumps(body.get("allow_scopes") or []),
+                    "max_turns": int(
+                        body.get("max_turns") if body.get("max_turns") is not None else 25
+                    ),
+                    "max_runtime_minutes": int(
+                        body.get("max_runtime_minutes")
+                        if body.get("max_runtime_minutes") is not None
+                        else 10
+                    ),
+                    "max_retries": int(
+                        body.get("max_retries") if body.get("max_retries") is not None else 1
+                    ),
+                }
+                if not self._require_schedule_approval("ScheduleCreate", create_args):
+                    return
+                out = _run_async(
+                    ScheduleCreateTool().execute(**create_args),
                     timeout=30.0,
                 )
                 if out.error:
@@ -551,12 +607,20 @@ class HQHandler(BaseHTTPRequestHandler):
                     )
 
                     if action == "delete":
+                        if not self._require_schedule_approval("ScheduleDelete", {"id": sid}):
+                            return
                         out = _run_async(ScheduleDeleteTool().execute(sid), timeout=30.0)
                     elif action == "enable":
+                        if not self._require_schedule_approval("ScheduleEnable", {"id": sid}):
+                            return
                         out = _run_async(ScheduleEnableTool().execute(sid), timeout=30.0)
                     elif action == "disable":
+                        if not self._require_schedule_approval("ScheduleDisable", {"id": sid}):
+                            return
                         out = _run_async(ScheduleDisableTool().execute(sid), timeout=30.0)
                     elif action == "run":
+                        if not self._require_schedule_approval("ScheduleRunNow", {"id": sid}):
+                            return
                         threading.Thread(
                             target=_sched_run_background, args=(sid,), daemon=True
                         ).start()
@@ -575,10 +639,16 @@ class HQHandler(BaseHTTPRequestHandler):
                                 "max_runtime_minutes",
                                 "max_retries",
                             )
-                            if body.get(k) not in (None, "")
+                            # Explicit None/"" checks: 0 is a legitimate value
+                            # (e.g. max_retries=0) and must not be dropped.
+                            if body.get(k) is not None and body.get(k) != ""
                         }
                         if "allow_scopes" in fields and isinstance(fields["allow_scopes"], list):
                             fields["allow_scopes"] = json.dumps(fields["allow_scopes"])
+                        if not self._require_schedule_approval(
+                            "ScheduleUpdate", {"id": sid, **fields}
+                        ):
+                            return
                         out = _run_async(ScheduleUpdateTool().execute(sid, **fields), timeout=30.0)
                     else:
                         return self._send_json({"error": f"unknown action: {action}"}, code=404)
@@ -854,12 +924,11 @@ def main() -> None:
     # Wire the same tiered approval system the CLI uses (core/approval_hook.py)
     # so this entry point isn't the one path that bypasses it. Previously
     # nothing ever called register_plugin() here, so ApprovalHook never even
-    # loaded for this server — Bash/Write/Git ran with zero gating. Mirrors
-    # main.py's default (auto_approve_all=True): the token+Origin checks above
-    # are what actually gates access to this server; this keeps the hook
-    # consistently wired so it's live if that default is ever changed.
+    # loaded for this server — Bash/Write/Git ran with zero gating. The legacy
+    # blanket auto_approve_all bypass is inert since 6.1: approvals follow the
+    # trust policy (ask by default); the token+Origin checks above gate access
+    # to this server, and pending approvals are resolved via /trust.
     hook = ApprovalHook(session_id="web-hq")
-    hook.auto_approve_all = True
     register_plugin(hook)
     register_plugin(AuditHook(session_id="web-hq"))
     global _APPROVAL_HOOK

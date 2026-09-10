@@ -36,6 +36,7 @@ from core.approval_hook import ApprovalHook
 from core.audit_hook import AuditHook
 from core.hooks import get_hooks, register_plugin
 from core.mcp_client import MCPManager
+from core.run_lock import run_exclusive
 from core.session_store import get_session_store
 from model_resolver import invalidate_cache, resolve_model
 from tools.registry import registry
@@ -752,7 +753,8 @@ def _console_approval(request) -> type(None):
     """Prompt user for tool approval in REPL. Returns None to proceed; returning a dict blocks the tool.
 
     Note: When using the interactive REPL, type your response when you see the box below.
-    For non-interactive use, run with --auto-approve or set CODING_AGENT_AUTO_APPROVE=1.
+    For non-interactive use, approvals follow the trust policy (the legacy
+    --auto-approve / CODING_AGENT_AUTO_APPROVE=1 blanket bypass is inert since 6.1).
     """
     from core.types import ToolPermissionLevel
 
@@ -1129,7 +1131,10 @@ async def run_one_shot(agent: CodingAgent, message: str):
     ui.start_spinner("working…")
     result = ""
     try:
-        result = await agent.run(message)
+        # Shared run lock: never mutate shared state concurrently with a
+        # scheduled run (or another process's interactive run).
+        async with run_exclusive():
+            result = await agent.run(message)
     except Exception as e:
         ui.error(f"Agent error: {e}")
         result = ""
@@ -1151,7 +1156,9 @@ async def run_one_shot_json(agent: CodingAgent, message: str):
     )
     result = ""
     try:
-        result = await agent.run(message)
+        # Shared run lock (see run_one_shot): serialize with scheduled runs.
+        async with run_exclusive():
+            result = await agent.run(message)
     except Exception as e:
         json.dump({"type": "error", "text": str(e)}, sys.stdout)
         sys.stdout.write(chr(10))
@@ -1224,7 +1231,9 @@ async def run_repl(agent: CodingAgent):
         ui.start_spinner("working…")
         result = ""
         try:
-            result = await agent.run(user_input)
+            # Shared run lock (see run_one_shot): serialize with scheduled runs.
+            async with run_exclusive():
+                result = await agent.run(user_input)
         except Exception as e:
             ui.error(f"Agent error: {e}")
             result = ""
@@ -1549,7 +1558,17 @@ def main():
             temperature = float(args[i + 1])
             i += 2
         elif args[i] in ("-y", "--yes", "--auto-approve", "--yolo"):
-            os.environ["CODING_AGENT_AUTO_APPROVE"] = "1"
+            # Deprecated since 6.1: blanket auto-approval was removed. The
+            # flag is inert — approvals now follow the trust policy
+            # (core/trust.py). Kept parsing so old scripts warn instead of
+            # failing on an unknown flag.
+            print(
+                "  [warn] --auto-approve is deprecated and inert since LuckyD 6.1: "
+                "blanket auto-approval was removed. Tool approvals now follow "
+                "the trust policy (see the /trust dashboard); every skip is "
+                "audited.",
+                file=sys.stderr,
+            )
             i += 1
         elif args[i] == "--max-turns" and i + 1 < len(args):
             os.environ["CODING_AGENT_MAX_TURNS"] = args[i + 1]
@@ -1607,7 +1626,7 @@ Options:
 Environment:
   <PROVIDER>_API_KEY   Set in .env for your provider
   CODING_AGENT_PROVIDER Explicit provider override
-  CODING_AGENT_AUTO_APPROVE=1   Bypass all tool approvals
+  CODING_AGENT_AUTO_APPROVE=1   Deprecated (inert since 6.1): approvals follow the trust policy
 """
             )
             sys.exit(0)
@@ -1653,9 +1672,15 @@ Environment:
         max_tokens=cfg["max_tokens"],
     )
 
-    # Wire approval hook (auto-approve all tools by default)
-    hook = ApprovalHook(session_id=agent.conversation_id)
-    hook.auto_approve_all = True
+    # Wire approval hook — every tool decision flows through the trust policy
+    # (core/trust.py). Approvals prompt on this console; the legacy blanket
+    # auto-approve (CODING_AGENT_AUTO_APPROVE / --yolo) is inert since 6.1.
+    # (--json mode gets no console callback so approval prompts can't corrupt
+    # the JSON-line protocol; those approvals park for the Trust dashboard.)
+    hook = ApprovalHook(
+        session_id=agent.conversation_id,
+        approval_callback=None if json_mode else _console_approval,
+    )
     register_plugin(hook)
     # Audit every tool execution ("agentic with receipts", 6.0)
     register_plugin(AuditHook(session_id=agent.conversation_id))
