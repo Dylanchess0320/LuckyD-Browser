@@ -22,7 +22,7 @@ class TestBrowserResearchPage:
         token = "test-auth-token-12345"
         html = research_html()
         assert "LuckyD Deep Research" in html
-        assert "SWARM v5.0" in html
+        assert "SWARM v6.0" in html
         # 4.0: no credential may be embedded in served HTML.
         assert token not in html
         assert "const TOKEN" not in html

@@ -2,7 +2,7 @@
 
 Verifies that ``docs/`` matches reality:
 - internal relative markdown links resolve to real files,
-- no stale "4.x" references describe the *current* release (5.0),
+- no stale "5.x" references describe the *current* release (6.0),
 - shell commands / referenced files in the docs actually exist,
 - documented code behavior (auth model, ports, installer name) matches the code.
 
@@ -72,8 +72,41 @@ def test_mkdocs_nav_pages_exist():
 
 
 # ---------------------------------------------------------------------------
-# 2. no stale 4.x references describing the current release
+# 2. no stale version references describing the current release
 # ---------------------------------------------------------------------------
+
+
+# docs/docs/changelog.md keeps a historical "## [X.Y.Z] - ..." section per
+# release; only the current version's section describes the live product.
+def _current_version() -> str:
+    import ast
+
+    tree = ast.parse((REPO / "browser" / "__init__.py").read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign) and any(
+            isinstance(t, ast.Name) and t.id == "__version__" for t in node.targets
+        ):
+            return ast.literal_eval(node.value)
+    raise AssertionError("browser/__init__.py has no __version__")
+
+
+_VERSION_HEADING = re.compile(r"## \[(\d+\.\d+\.\d+)\]")
+
+
+def _iter_live_lines(path: Path) -> list[tuple[int, str]]:
+    """Lines of a docs-site page, skipping archived "## [old] - ..." sections."""
+    current = _current_version()
+    out: list[tuple[int, str]] = []
+    in_old_section = False
+    for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        hm = _VERSION_HEADING.match(line)
+        if hm:
+            in_old_section = hm.group(1) != current
+            continue
+        if not in_old_section:
+            out.append((lineno, line))
+    return out
+
 
 # Lines matching these patterns talk *about* 4.0 historically (features
 # introduced in 4.0, the 4.0.0 changelog section, "New in 4.0" blurbs).
@@ -87,21 +120,33 @@ HISTORICAL_40 = re.compile(
 STALE_40 = re.compile(r"(?<![\d.])4\.0(\.0)?(?![\d.])")
 
 
-def test_no_stale_4x_for_current_release():
+# Lines matching these patterns talk *about* 5.0 historically (features
+# introduced in 5.0, the 5.0.0 changelog section, "New in 5.0" blurbs).
+HISTORICAL_50 = re.compile(
+    r"\(5\.0\)|in 5\.0|from 5\.0|since 5\.0|5\.0\.0\]|5\.0\.0 —|5\.0\.0 -|"
+    r"New in 5\.0|everything (in|from) 5\.0|"
+    r"RELEASE_NOTES_5\.0|Unified in 5\.0|Final",
+    re.IGNORECASE,
+)
+# (?<![\d.]) keeps "1.5.0" / "2.5.0"-style versions from matching.
+STALE_50 = re.compile(r"(?<![\d.])5\.0(\.0)?(?![\d.])")
+
+
+def test_no_stale_5x_for_current_release():
     # Only the live docs site describes the current release; root-level
     # CHANGELOG.md / RELEASE_NOTES_*.md are historical archives by design.
     stale: list[str] = []
     for md in sorted(DOCS_SITE.glob("*.md")):
-        for lineno, line in enumerate(md.read_text(encoding="utf-8").splitlines(), start=1):
-            if STALE_40.search(line) and not HISTORICAL_40.search(line):
+        for lineno, line in _iter_live_lines(md):
+            if STALE_50.search(line) and not HISTORICAL_50.search(line):
                 stale.append(f"{md.relative_to(REPO)}:{lineno}: {line.strip()}")
-    assert not stale, "stale 4.x refs about the current release:\n" + "\n".join(stale)
+    assert not stale, "stale 5.x refs about the current release:\n" + "\n".join(stale)
 
 
-def test_current_release_docs_say_5x():
+def test_current_release_docs_say_6x():
     for page in ("index.md", "getting-started.md", "release-notes.md"):
         text = (DOCS_SITE / page).read_text(encoding="utf-8")
-        assert "5.0.0" in text, f"docs/docs/{page} never mentions 5.0.0"
+        assert "6.0.0" in text, f"docs/docs/{page} never mentions 6.0.0"
 
 
 # ---------------------------------------------------------------------------
@@ -123,14 +168,34 @@ def test_installer_exe_name_matches_iss():
     m = re.search(r"OutputBaseFilename=(LuckyDBrowserSetup-[\d.]+)", iss)
     assert m, "OutputBaseFilename not found in LuckyDBrowser.iss"
     exe = m.group(1) + ".exe"
+    vm = re.search(r'#define AppVersion\s+"([\d.]+)"', iss)
+    assert vm, "AppVersion not found in LuckyDBrowser.iss"
+    current_version = vm.group(1)
     # Historical release-note archives name their own era's installer.
-    historical = {"RELEASE_NOTES.md", "RELEASE_NOTES_3.9.md", "RELEASE_NOTES_4.0.md"}
+    historical = {
+        "RELEASE_NOTES.md",
+        "RELEASE_NOTES_3.9.md",
+        "RELEASE_NOTES_4.0.md",
+        "RELEASE_NOTES_5.0.md",
+    }
+    # Changelog sections for older versions ("## [5.0.0] - ...") name their
+    # own era's installer too; only the current version's section is checked.
+    version_heading = re.compile(r"## \[(\d+\.\d+\.\d+)\]")
     for md in iter_md_files():
         if md.name in historical:
             continue
-        text = md.read_text(encoding="utf-8")
-        for found in re.findall(r"LuckyDBrowserSetup-[\d.]+\.exe", text):
-            assert found == exe, f"{md.relative_to(REPO)} names {found} but the .iss builds {exe}"
+        in_old_section = False
+        for line in md.read_text(encoding="utf-8").splitlines():
+            hm = version_heading.match(line)
+            if hm:
+                in_old_section = hm.group(1) != current_version
+                continue
+            if in_old_section:
+                continue
+            for found in re.findall(r"LuckyDBrowserSetup-[\d.]+\.exe", line):
+                assert found == exe, (
+                    f"{md.relative_to(REPO)} names {found} but the .iss builds {exe}"
+                )
 
 
 def test_promo_kit_screenshots_exist():
