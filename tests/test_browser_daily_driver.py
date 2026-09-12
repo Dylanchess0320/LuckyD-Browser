@@ -111,8 +111,7 @@ def test_software_video_decode_is_default() -> None:
 
     assert DEFAULTS["hw_video_decode"] is False
     assert (
-        webengine_chromium_flags(False)
-        == "--disable-accelerated-video-decode "
+        webengine_chromium_flags(False) == "--disable-accelerated-video-decode "
         "--disable-gpu-compositing --disable-gpu-rasterization"
     )
     assert webengine_chromium_flags(True) == ""

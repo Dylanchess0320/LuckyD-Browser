@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="420" viewBox="0 0 1280 420" role="img" aria-label="LuckyD Browser 3.9 Daily Driver">
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="420" viewBox="0 0 1280 420" role="img" aria-label="LuckyD Browser — Agentic and Local AI">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%" stop-color="#070b16"/>
@@ -28,6 +28,6 @@
   <text x="204" y="148" fill="#e8ecf5" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="54" font-weight="700">LuckyD Browser</text>
   <text x="204" y="196" fill="#9aa1b5" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="22">The AI browser that runs yours. Local. Unlimited. One window.</text>
   <rect x="204" y="230" rx="16" width="168" height="40" fill="url(#accent)"/>
-  <text x="288" y="257" text-anchor="middle" fill="#ffffff" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="16" font-weight="700">v3.9.0 Daily Driver</text>
-  <text x="392" y="257" fill="#8b93a7" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="15">HTTPS-Only · Workspaces · Memory Saver · Read Aloud</text>
+  <text x="288" y="257" text-anchor="middle" fill="#ffffff" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="16" font-weight="700">v6.0.0 Agentic</text>
+  <text x="392" y="257" fill="#8b93a7" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="15">Trust Dashboard · WebMCP · Scheduled Agents · ConPTY Terminals</text>
 </svg>

@@ -220,6 +220,5 @@ def webengine_chromium_flags(hw_video_decode: bool = False) -> str:
     if hw_video_decode:
         return ""
     return (
-        "--disable-accelerated-video-decode "
-        "--disable-gpu-compositing --disable-gpu-rasterization"
+        "--disable-accelerated-video-decode --disable-gpu-compositing --disable-gpu-rasterization"
     )

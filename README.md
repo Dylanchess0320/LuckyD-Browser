@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/screenshots/hero.svg" alt="LuckyD Browser 5.0.0" width="100%">
+<img src="docs/screenshots/hero.svg" alt="LuckyD Browser" width="100%">
 
 # LuckyD Browser
 
@@ -13,7 +13,7 @@
 [![Windows](https://img.shields.io/badge/Windows-10%2F11%20x64-0078D4?logo=windows&logoColor=white)](https://github.com/Dylanchess0320/LuckyD-Browser/releases/latest)
 [![Python](https://img.shields.io/badge/python-3.10--3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/downloads/)
 
-**[⬇ Download v5.0.0](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v5.0.0/LuckyDBrowserSetup-5.0.0.exe)**
+**[⬇ Download Latest Release](https://github.com/Dylanchess0320/LuckyD-Browser/releases/latest)**
 &nbsp;·&nbsp;
 **[Browser guide](README-LuckyD-Browser.md)**
 &nbsp;·&nbsp;
@@ -33,7 +33,7 @@
 
 Most “AI browsers” rent you a chatbot behind an account. LuckyD is a **real Chromium daily driver** with a **local assistant**, a **coding-agent HQ**, and **ConPTY terminals** living in your tabs.
 
-| | LuckyD 5.0 | Comet / Dia | Edge Copilot | Chrome Gemini |
+| | LuckyD | Comet / Dia | Edge Copilot | Chrome Gemini |
 |---|:---:|:---:|:---:|:---:|
 | Free AI with **no account / no key** | ✅ local Ollama | ❌ | ❌ | ❌ |
 | Works **fully offline** | ✅ | ❌ | ❌ | ❌ |
@@ -130,12 +130,12 @@ Also in this lineage: Deep Research swarm (`Ctrl+Shift+R`), Agent Mesh, self-hea
 
 ## Install in 10 seconds
 
-1. Get **[LuckyDBrowserSetup-5.0.0.exe](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v5.0.0/LuckyDBrowserSetup-5.0.0.exe)**
+1. Get **[LuckyDBrowserSetup-6.0.0.exe](https://github.com/Dylanchess0320/LuckyD-Browser/releases/latest)**
 2. Run it — per-user, **no admin**, installs to `%LOCALAPPDATA%\Programs\LuckyDBrowser`
 3. Leave **“Set up free unlimited local AI”** checked → Ollama + `llama3.2:3b` (~2 GB, one time)
 4. `Ctrl+Shift+A` → chat offline. Or bring your own keys (Gemini, Groq, DeepSeek, OpenAI, Anthropic, Z.ai, OpenRouter, Cline, OpenCode)
 
-Silent: `LuckyDBrowserSetup-5.0.0.exe /VERYSILENT /NORESTART`
+Silent: `LuckyDBrowserSetup-6.0.0.exe /VERYSILENT /NORESTART`
 
 Windows 10/11 x64 only.
 
@@ -176,7 +176,7 @@ browser\run_browser.bat
 
 # Shareable installer (needs Inno Setup 6)
 powershell -NoProfile -ExecutionPolicy Bypass -File browser\installer\build_installer.ps1
-# → browser\installer\output\LuckyDBrowserSetup-5.0.0.exe
+# → browser\installer\output\LuckyDBrowserSetup-6.0.0.exe
 ```
 
 ---
@@ -194,6 +194,6 @@ tests/     headless pytest (Qt mocked on Linux CI)
 
 <p align="center">
   <b>MIT © LuckyD</b> · Chromium · Ollama · Qt · xterm.js · pywinpty · PyInstaller · Inno Setup<br>
-  <a href="https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v5.0.0/LuckyDBrowserSetup-5.0.0.exe">Download v5.0.0</a>
+  <a href="https://github.com/Dylanchess0320/LuckyD-Browser/releases/latest">Download Latest Release</a>
   · <a href="https://www.youtube.com/watch?v=La6bxaa7icY">Watch the showcase</a>
 </p>

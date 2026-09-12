@@ -32,7 +32,7 @@ VersionInfoCompany={#AppPublisher}
 VersionInfoDescription={#AppName} Setup
 VersionInfoProductName={#AppName}
 VersionInfoProductVersion=6.0.0.0
-; Per-user install ??? no admin rights required (admin users may opt into all-users).
+; Per-user install — no admin rights required (admin users may opt into all-users).
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 DefaultDirName={localappdata}\Programs\LuckyDBrowser
@@ -55,10 +55,10 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: checkedonce
 
 [Files]
-; Everything PyInstaller produced ??? LuckyDBrowser.exe plus the _internal
+; Everything PyInstaller produced — LuckyDBrowser.exe plus the _internal
 ; folder (Qt WebEngine runtime, assets, bundled luckyd-code.exe backend).
 Source: "..\dist\LuckyDBrowser\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-; Free local AI bootstrap ??? run post-install (see [Run]) so every user gets
+; Free local AI bootstrap — run post-install (see [Run]) so every user gets
 ; Ollama + a default model without lifting a finger.
 Source: "ollama_setup.ps1"; DestDir: "{app}"; Flags: ignoreversion
 
@@ -74,7 +74,7 @@ Type: files; Name: "{userprograms}\LuckyDBrowser\LuckyDBrowser.lnk"
 Type: files; Name: "{userprograms}\LuckyD Browser.lnk"
 
 [Icons]
-Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Comment: "{#AppName} ??? Chromium-based AI browser by LuckyD"
+Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Comment: "{#AppName} — Chromium-based AI browser by LuckyD"
 Name: "{group}\Uninstall {#AppName}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: desktopicon
 
@@ -86,7 +86,7 @@ Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -Fil
 Filename: "{app}\{#AppExeName}"; Description: "Launch {#AppName}"; Flags: nowait postinstall skipifsilent
 
 [Code]
-// A running browser would lock files during install/upgrade ??? stop it first.
+// A running browser would lock files during install/upgrade — stop it first.
 procedure KillRunningApp;
 var
   ResultCode: Integer;

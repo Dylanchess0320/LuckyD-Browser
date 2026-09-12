@@ -1,5 +1,5 @@
 """
-Agent loop â€” the main agent execution loop.
+Agent loop — the main agent execution loop.
 Replaces agent.py's run() method with a modular architecture using:
 - core/llm_client.py for LLM API calls
 - core/message_builder.py for system prompt construction
@@ -442,7 +442,7 @@ class CodingAgent:
             pass
 
     async def _call_llm_for_extraction(self, messages: list[dict]) -> dict | None:
-        """Simple LLM call for memory extraction â€” non-streaming, minimal retry."""
+        """Simple LLM call for memory extraction — non-streaming, minimal retry."""
         url = f"{self.base_url}/chat/completions"
         headers = {"Content-Type": "application/json"}
         _k = (self.api_key or "").strip()
@@ -794,7 +794,7 @@ class CodingAgent:
                 content_preview = result_msg["content"][:100].replace("\n", " ")
                 is_err = result_msg["content"].startswith("Error")
                 status = "[ERR]" if is_err else "[OK]"
-                print(f"  {status} [{tool_name}] {elapsed:.1f}s â€” {content_preview}")
+                print(f"  {status} [{tool_name}] {elapsed:.1f}s — {content_preview}")
                 self._emit_event(
                     AgentEventType.TOOL_END if not is_err else AgentEventType.TOOL_ERROR,
                     {"tool": tool_name, "elapsed": elapsed, "error": is_err},

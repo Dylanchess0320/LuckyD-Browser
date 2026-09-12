@@ -31,13 +31,12 @@ def test_greeting_tolerates_bad_input() -> None:
 
 def test_suggest_priority_order() -> None:
     # Agent result beats everything else.
-    assert "agent" in suggest(
-        open_tabs=20, downloads_done=2, agent_finished=True, update_pending=True
-    ).lower()
+    assert (
+        "agent"
+        in suggest(open_tabs=20, downloads_done=2, agent_finished=True, update_pending=True).lower()
+    )
     # Update beats downloads and tab overload.
-    assert "update" in suggest(
-        open_tabs=20, downloads_done=2, update_pending=True
-    ).lower()
+    assert "update" in suggest(open_tabs=20, downloads_done=2, update_pending=True).lower()
     # Downloads beat tab overload.
     assert "download" in suggest(open_tabs=20, downloads_done=1).lower()
     # Tab overload only fires at 12+.
