@@ -46,21 +46,21 @@ Most “AI browsers” rent you a chatbot behind an account. LuckyD is a **real 
 
 ---
 
-## New in 6.0.0 — Agentic
+## Latest release
 
-The trust-first AI browser, shipped with an official installer:
+Lucky polish — slim chrome, corrected colors — on top of the agentic stack,
+shipped with an official installer:
 
 | | |
 |---|---|
-| **⬇ Windows installer** | [`LuckyDBrowserSetup-6.0.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases) — built on a real Windows runner with Inno Setup 6. Per-user, no admin, silent-install flags. |
+| **⬇ Windows installer** | [`LuckyDBrowserSetup-8.0.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases) — built on a real Windows runner with Inno Setup 6. Per-user, no admin, silent-install flags. |
 | **🛡 Trust dashboard** | "Agentic with receipts": permission scopes, risk levels, secret redaction, an append-only audit log, and an approval queue — review everything the agents did at `/trust`. |
 | **🔒 Trust hardening** | Legacy `auto_approve_all` bypasses removed (now inert with a warning); explicit audited `auto_approve_low_risk` per-run mode; cross-process run locks so scheduled and interactive runs can't collide; mutating schedule-dashboard routes gated by approval; zero-valued schedule fields (`max_retries=0`) honored instead of dropped. |
 | **🔌 WebMCP** | Websites can expose typed agent tools to LuckyD (JS shim + native support), permission-gated so sites can't reach beyond their grant. Server-side schema validation, 30s dispatch timeouts, and origin binding via rotating discovery tokens — a page can't call tools on another origin's behalf, and bindings are keyed per tab. |
 | **⏰ Scheduled agents** | Background agents on cron schedules with a **morning digest** (`/schedules`) — it works while you rest. |
 | **🧩 Skills marketplace** | Open skill registries with hash-verified install, update, remove, and publish for agent skills. |
 | **🛡 Agent circuit breaker** | The agent loop stops after 4 consecutive all-tool-failure turns with an actionable message instead of burning turns and budget. |
-
-*Verified: 428 tests passed, `ruff` clean, CI green.*
+| **🔔 Quiet update badge** | A silent check runs at startup — when a new release exists, a small toolbar badge lights up. No modal, no interruption. |
 
 <details>
 <summary>New in 5.0.0 — Final</summary>
@@ -118,7 +118,7 @@ Also in this lineage: Deep Research swarm (`Ctrl+Shift+R`), Agent Mesh, self-hea
 
 | Surface | What it is | Open it |
 |---|---|---|
-| **AI Sidebar** | Markdown chat, model picker, visual Q&A, autonomous agent on your **real visible tab** | `Ctrl+Shift+A` |
+| **AI Sidebar** | Chat-first: Markdown chat, contextual skill chips, honest cost labels per model (`· free tier`, `· credit-billed ⚠`), visual Q&A, autonomous agent on your **real visible tab** | `Ctrl+Shift+A` |
 | **Coding Agent HQ** | Full `luckyd-code` workspace in a tab — 70+ tools, memory, sessions | `Ctrl+Shift+H` |
 | **Terminals** | Real Windows ConPTY via xterm.js — agent CLI, PowerShell, CMD, Agent Mesh | `` Ctrl+` `` |
 | **Dashboard** | Live new-tab hub: status pills, Ask LuckyD, one-tap tiles, speed dial | New tab |
@@ -130,12 +130,14 @@ Also in this lineage: Deep Research swarm (`Ctrl+Shift+R`), Agent Mesh, self-hea
 
 ## Install in 10 seconds
 
-1. Get **[LuckyDBrowserSetup-6.0.0.exe](https://github.com/Dylanchess0320/LuckyD-Browser/releases/latest)**
+1. Get **[LuckyDBrowserSetup-8.0.0.exe](https://github.com/Dylanchess0320/LuckyD-Browser/releases/latest)**
 2. Run it — per-user, **no admin**, installs to `%LOCALAPPDATA%\Programs\LuckyDBrowser`
 3. Leave **“Set up free unlimited local AI”** checked → Ollama + `llama3.2:3b` (~2 GB, one time)
 4. `Ctrl+Shift+A` → chat offline. Or bring your own keys (Gemini, Groq, DeepSeek, OpenAI, Anthropic, Z.ai, OpenRouter, Cline, OpenCode)
 
-Silent: `LuckyDBrowserSetup-6.0.0.exe /VERYSILENT /NORESTART`
+No local model yet? The **$0 OpenCode Zen gateway** is the built-in fallback — no local server, no key, the sidebar just works.
+
+Silent: `LuckyDBrowserSetup-8.0.0.exe /VERYSILENT /NORESTART`
 
 Windows 10/11 x64 only.
 
@@ -176,7 +178,7 @@ browser\run_browser.bat
 
 # Shareable installer (needs Inno Setup 6)
 powershell -NoProfile -ExecutionPolicy Bypass -File browser\installer\build_installer.ps1
-# → browser\installer\output\LuckyDBrowserSetup-6.0.0.exe
+# → browser\installer\output\LuckyDBrowserSetup-8.0.0.exe
 ```
 
 ---

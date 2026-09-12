@@ -1,6 +1,6 @@
 # WebMCP in LuckyD — the Agentic Web, early
 
-LuckyD 6.0 speaks **WebMCP** (Web Model Context Protocol), the open standard
+LuckyD speaks **WebMCP** (Web Model Context Protocol), the open standard
 proposed at Google I/O 2026 for the "Agentic Web". Instead of scraping the DOM
 and simulating clicks, sites expose structured tools — and LuckyD's agent
 calls them directly.
@@ -76,9 +76,9 @@ binds every discovery to the page's origin (scheme + host + port):
 
 The token is an agent-side secret: it is generated with
 `secrets.token_urlsafe`, never exposed to page JavaScript, and checked
-only in Python. (LuckyD's browser currently drives a single tab, so the
-binding is keyed by origin alone; if multi-tab support lands, the key
-becomes tab + origin.)
+only in Python. Bindings are keyed by **(tab, origin)**: a binding token
+discovered in one tab is refused in another, so a token can never leak
+across tabs.
 
 ## Security model
 

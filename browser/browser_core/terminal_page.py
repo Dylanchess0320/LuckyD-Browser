@@ -417,7 +417,7 @@ _MESH_CSS = """  :root{color-scheme:dark}
 """
 
 _MESH_HTML = (
-    page_head("Agent Mesh — LuckyD Browser", _MESH_CSS)
+    page_head("Agent Mesh — LuckyD", _MESH_CSS)
     + """<body>
 <header><h1><span>🕸</span> Agent Mesh</h1><span class="sub">Four independent sessions, one workspace</span>
 <span class="key" id="mesh-status">Loading harness status…</span></header>

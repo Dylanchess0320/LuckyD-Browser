@@ -2,94 +2,319 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>New Tab</title>
 <style>
-  /* LuckyD brand tokens (Neon Night default) — mirrors browser_core.brand.css_vars().
-     A static file can't call brand.py at serve time, so the default theme's vars are
-     inlined here and every hardcoded color below resolves through them. */
+  /* ── LuckyD Neon Night tokens — mirrors browser/browser_ui/theme.py
+        THEMES["neon"] (the default). This is a static file, so the values
+        are inlined; keep in sync with theme.py. ─────────────────────── */
   :root {
-    --ld-window:#0b0f1a; --ld-panel:#10151f; --ld-panel2:#141a28; --ld-card:#1a2132;
-    --ld-border:#232c42; --ld-text:#e8ecf5; --ld-muted:#8b93a7;
-    --ld-accent:#5b9dff; --ld-accent2:#b46bff; --ld-ok:#34d399; --ld-danger:#ff5b6e;
-    --ld-grad:linear-gradient(135deg,#0b0f1a 0%,#141a28 60%,#10151f 100%);
-    --ld-grad-accent:linear-gradient(135deg,#5b9dff 0%,#b46bff 100%);
-    --ld-focus-ring:0 0 0 3px rgba(91,157,255,0.35);
-    --ld-success:#34d399; --ld-warn:#fbbf24; --ld-error:#ff5b6e;
-    --ld-faint:rgba(139,147,167,0.6); --ld-disabled:rgba(139,147,167,0.55);
-    --ld-r-sm:6px; --ld-r-md:10px; --ld-r-lg:14px; --ld-r-full:999px;
-    --ld-sh-2:0 4px 16px rgba(0,0,0,.35);
+    --ld-window:  #0b0f1a;
+    --ld-panel:   #10151f;
+    --ld-panel2:  #141a28;
+    --ld-card:    #1a2132;
+    --ld-border:  #232c42;
+    --ld-text:    #e8ecf5;
+    --ld-muted:   #8b93a7;
+    --ld-accent:  #5b9dff;
+    --ld-accent2: #b46bff;
+    --ld-ok:      #34d399;
+    --ld-danger:  #ff5b6e;
+
+    /* System-font stack only — works fully offline, native on every OS. */
+    --font: -apple-system, BlinkMacSystemFont,
+            "Segoe UI Variable Text", "Segoe UI",
+            "Helvetica Neue", "Noto Sans", system-ui, sans-serif;
+
+    /* Type scale */
+    --fs-display: clamp(28px, 4.6vw, 38px);  /* hero greeting */
+    --fs-clock:   27px;
+    --fs-date:    12px;
+    --fs-search:  16px;
+    --fs-ui:      13.5px;
+    --fs-tile:    12px;
+    --fs-label:   11px;                       /* small caps / section labels */
+
+    --r-lg: 16px;
+    --r-md: 12px;
+    --r-sm: 8px;
+    --r-full: 999px;
+
+    --ring: 0 0 0 3px rgba(91, 157, 255, .28);
   }
-  :root { --card: rgba(255,255,255,.06); --border: var(--ld-border);
-    --text: var(--ld-text); --muted: var(--ld-muted); }
+
   * { margin: 0; padding: 0; box-sizing: border-box; }
   input, select, button { font: inherit; }
+
   body {
-    font-family: 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
-    font-weight: 600;
-    color: var(--text); min-height: 100vh; overflow-x: hidden;
-    background: var(--ld-grad);
-    background-size: 200% 200%; animation: drift 24s ease-in-out infinite;
+    font-family: var(--font);
+    font-weight: 500;
+    color: var(--ld-text);
+    min-height: 100vh;
+    overflow-x: hidden;
+    background: var(--ld-window);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
-  @keyframes drift { 0%,100% { background-position: 0% 0%; } 50% { background-position: 100% 100%; } }
-  header { display: flex; justify-content: flex-end; align-items: center; padding: 22px 32px; }
+  /* Faint ambient wash — a calm command-center glow, not a gradient accent. */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(55% 34% at 50% 0%, rgba(91, 157, 255, .06), transparent 70%);
+  }
+
+  ::selection { background: rgba(91, 157, 255, .32); }
+
+  /* ── Header: wordmark left, clock right ─────────────────────────── */
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 22px 34px;
+  }
+  .brand {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: .24em;
+    text-transform: uppercase;
+    color: var(--ld-muted);
+    user-select: none;
+  }
+  .brand b { color: var(--ld-accent); font-weight: 700; }
+
   #clock { text-align: right; }
-  #clock .time { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
-  #clock .date { font-size: 12px; color: var(--muted); }
-  main { max-width: 760px; margin: 9vh auto 0; padding: 0 24px; }
-  .search { display: flex; background: var(--card); border: 1px solid var(--border);
-    border-radius: 16px; backdrop-filter: blur(14px); overflow: hidden;
-    transition: border-color .15s, box-shadow .15s; }
-  .search:focus-within { border-color: var(--ld-accent);
-    box-shadow: 0 8px 32px color-mix(in srgb, var(--ld-accent) 18%, transparent); }
-  .search select { background: transparent; color: var(--muted); border: none; outline: none;
-    padding: 0 10px 0 16px; font-size: 14px; cursor: pointer; }
-  .search select option { background: var(--ld-panel2); }
-  .search input { flex: 1; background: transparent; border: none; outline: none;
-    color: var(--text); font-size: 16px; padding: 16px 8px; }
-  .search button { background: var(--ld-accent); border: none; color: #fff; font-size: 15px;
-    padding: 0 26px; cursor: pointer; }
-  .search button:hover { filter: brightness(1.12); }
-  .grid { margin-top: 40px; display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
-  .tile { display: flex; flex-direction: column; align-items: center; gap: 9px;
-    padding: 15px 4px 12px; background: var(--card); border: 1px solid var(--border);
-    border-radius: 14px; text-decoration: none; color: var(--text); font-size: 12px;
-    position: relative; transition: transform .12s, border-color .12s, background .12s; }
-  .tile:hover { transform: translateY(-2px);
-    border-color: color-mix(in srgb, var(--ld-accent) 50%, transparent);
-    background: rgba(255,255,255,.09); }
+  #clock .time {
+    font-size: var(--fs-clock);
+    font-weight: 650;
+    letter-spacing: -.01em;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+  }
+  #clock .date {
+    margin-top: 5px;
+    font-size: var(--fs-date);
+    font-weight: 600;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--ld-muted);
+  }
+
+  /* ── Hero greeting ─────────────────────────────────────────────── */
+  main { max-width: 780px; margin: 7vh auto 0; padding: 0 24px 48px; }
+  .hero { text-align: center; margin-bottom: 30px; }
+  .greeting {
+    font-size: var(--fs-display);
+    font-weight: 700;
+    letter-spacing: -.025em;   /* tighter for display */
+    line-height: 1.12;
+    color: var(--ld-text);
+  }
+  .greeting .accent { color: var(--ld-accent); }
+  .hero .sub {
+    margin-top: 10px;
+    font-size: var(--fs-ui);
+    font-weight: 500;
+    letter-spacing: .03em;
+    color: var(--ld-muted);
+  }
+
+  /* ── Search ────────────────────────────────────────────────────── */
+  .search {
+    display: flex;
+    align-items: stretch;
+    background: var(--ld-panel);
+    border: 1px solid var(--ld-border);
+    border-radius: var(--r-lg);
+    overflow: hidden;
+    transition: border-color .15s ease, box-shadow .15s ease;
+  }
+  .search:focus-within {
+    border-color: var(--ld-accent);
+    box-shadow: var(--ring), 0 14px 44px rgba(0, 0, 0, .45);
+  }
+  .search select {
+    background: transparent;
+    color: var(--ld-muted);
+    border: none;
+    border-right: 1px solid var(--ld-border);
+    outline: none;
+    padding: 0 10px 0 20px;
+    font-size: var(--fs-ui);
+    font-weight: 600;
+    letter-spacing: .02em;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+  .search select:hover { color: var(--ld-text); }
+  .search select option { background: var(--ld-panel2); color: var(--ld-text); }
+  .search input {
+    flex: 1;
+    min-width: 0;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--ld-text);
+    font-size: var(--fs-search);
+    font-weight: 500;
+    letter-spacing: .005em;
+    line-height: 1.4;
+    padding: 18px 16px;
+  }
+  .search input::placeholder { color: var(--ld-muted); opacity: .75; }
+  .search button {
+    background: var(--ld-accent);
+    border: none;
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: .02em;
+    padding: 0 28px;
+    cursor: pointer;
+    transition: filter .12s ease;
+  }
+  .search button:hover { filter: brightness(1.1); }
+  .search button:active { filter: brightness(.94); }
+
+  /* ── Section label ─────────────────────────────────────────────── */
+  .eyebrow {
+    margin: 44px 2px 14px;
+    font-size: var(--fs-label);
+    font-weight: 700;
+    letter-spacing: .18em;     /* open for small caps */
+    text-transform: uppercase;
+    color: var(--ld-muted);
+  }
+
+  /* ── Shortcut tiles ────────────────────────────────────────────── */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 12px;
+  }
+  .tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 17px 4px 14px;
+    background: var(--ld-panel);
+    border: 1px solid var(--ld-border);
+    border-radius: var(--r-md);
+    text-decoration: none;
+    color: var(--ld-text);
+    font-size: var(--fs-tile);
+    font-weight: 600;
+    letter-spacing: .015em;
+    line-height: 1.3;
+    position: relative;
+    transition: transform .12s ease, border-color .12s ease, background .12s ease;
+  }
+  .tile:hover {
+    transform: translateY(-2px);
+    border-color: rgba(91, 157, 255, .55);
+    background: var(--ld-panel2);
+  }
+  .tile:focus-visible {
+    outline: none;
+    box-shadow: var(--ring);
+    border-color: var(--ld-accent);
+  }
   .tile img { width: 26px; height: 26px; border-radius: 6px; }
-  .tile .del { position: absolute; top: 3px; right: 6px; color: var(--muted); font-size: 13px;
-    opacity: 0; cursor: pointer; }
-  .tile:hover .del { opacity: 1; }
-  .tile.add { color: var(--muted); font-size: 24px; justify-content: center; cursor: pointer; }
-  .tile.add span { font-size: 11px; }
+  .tile .del {
+    position: absolute;
+    top: 4px;
+    right: 7px;
+    color: var(--ld-muted);
+    font-size: 12px;
+    opacity: 0;
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 6px;
+  }
+  .tile .del:hover { color: var(--ld-danger); background: var(--ld-card); }
+  .tile:hover .del, .tile:focus-within .del { opacity: 1; }
+  .tile.add {
+    color: var(--ld-muted);
+    font-size: 22px;
+    font-weight: 400;
+    cursor: pointer;
+    border-style: dashed;
+  }
+  .tile.add:hover { color: var(--ld-accent); }
+  .tile.add span { font-size: var(--fs-label); font-weight: 600; letter-spacing: .08em; }
+
+  /* ── Add-shortcut form ─────────────────────────────────────────── */
   #addform { margin-top: 14px; display: none; gap: 8px; }
-  #addform input { flex: 1; background: var(--card); border: 1px solid var(--border);
-    border-radius: 10px; color: var(--text); padding: 10px 12px; font-size: 13px; outline: none; }
-  #addform button { background: var(--ld-accent); border: none; color: #fff; border-radius: 10px;
-    padding: 0 16px; cursor: pointer; }
+  #addform input {
+    flex: 1;
+    min-width: 0;
+    background: var(--ld-panel);
+    border: 1px solid var(--ld-border);
+    border-radius: var(--r-sm);
+    color: var(--ld-text);
+    font-size: var(--fs-ui);
+    letter-spacing: .01em;
+    padding: 11px 14px;
+    outline: none;
+    transition: border-color .12s ease, box-shadow .12s ease;
+  }
+  #addform input:focus { border-color: var(--ld-accent); box-shadow: var(--ring); }
+  #addform input::placeholder { color: var(--ld-muted); opacity: .7; }
+  #addform button {
+    background: var(--ld-accent);
+    border: none;
+    color: #fff;
+    font-size: var(--fs-ui);
+    font-weight: 600;
+    letter-spacing: .03em;
+    border-radius: var(--r-sm);
+    padding: 0 20px;
+    cursor: pointer;
+  }
+  #addform button:hover { filter: brightness(1.1); }
+
   footer { display: none; }
+
+  @media (max-width: 640px) {
+    header { padding: 18px 20px; }
+    .grid { grid-template-columns: repeat(3, 1fr); }
+    main { margin-top: 5vh; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
 </style>
 </head>
 <body>
 <header>
+  <div class="brand">Lucky<b>D</b></div>
   <div id="clock"><div class="time" id="time"></div><div class="date" id="date"></div></div>
 </header>
 <main>
+  <div class="hero">
+    <div class="greeting" id="greeting"></div>
+    <div class="sub">Local-first browsing. No accounts, no keys, no noise.</div>
+  </div>
   <form class="search" id="searchform">
-    <select id="engine">
+    <select id="engine" aria-label="Search engine">
       <option value="google">Google</option>
       <option value="bing">Bing</option>
       <option value="ddg">DuckDuckGo</option>
       <option value="brave">Brave</option>
     </select>
-    <input id="q" placeholder="Search the web" autocomplete="off" autofocus>
+    <input id="q" placeholder="Search the web or type a URL" autocomplete="off" autofocus aria-label="Search the web or type a URL">
     <button type="submit">Search</button>
   </form>
+  <div class="eyebrow">Shortcuts</div>
   <div class="grid" id="grid"></div>
   <div id="addform">
-    <input id="newname" placeholder="Name (e.g. Stack Overflow)">
-    <input id="newurl" placeholder="URL (e.g. https://stackoverflow.com)">
+    <input id="newname" placeholder="Name (e.g. Stack Overflow)" aria-label="Shortcut name">
+    <input id="newurl" placeholder="URL (e.g. https://stackoverflow.com)" aria-label="Shortcut URL">
     <button id="addbtn" type="button">Add</button>
   </div>
 </main>
@@ -110,12 +335,25 @@ shortcuts = shortcuts.filter(([n, u]) => !/fmhy/i.test(n + u));
 localStorage.setItem('ld_shortcuts', JSON.stringify(shortcuts));
 document.getElementById('engine').value = localStorage.getItem('ld_engine') || 'google';
 
+function setGreeting(now) {
+  const h = now.getHours();
+  const part = (h < 5 ? 'Up late' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening');
+  const g = document.getElementById('greeting');
+  if (g.dataset.part === part) return;
+  g.dataset.part = part;
+  g.innerHTML = '';
+  g.appendChild(document.createTextNode(part + ', '));
+  const b = document.createElement('b'); b.className = 'accent'; b.textContent = 'Lucky\u2019s ready.';
+  g.appendChild(b);
+}
+
 function tick() {
   const now = new Date();
   document.getElementById('time').textContent =
     now.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
   document.getElementById('date').textContent =
     now.toLocaleDateString([], {weekday: 'long', month: 'long', day: 'numeric'});
+  setGreeting(now);
 }
 tick(); setInterval(tick, 10000);
 
@@ -127,7 +365,7 @@ function render() {
     a.className = 'tile'; a.href = url;
     let host = ''; try { host = new URL(url).hostname; } catch (e) {}
     a.innerHTML = '<img src="https://www.google.com/s2/favicons?domain=' + host +
-      '&sz=64" onerror="this.style.visibility=\'hidden\'"><span></span>' +
+      '&sz=64" alt="" onerror="this.style.visibility=\'hidden\'"><span></span>' +
       '<span class="del" title="Remove">&#10005;</span>';
     a.querySelector('span').textContent = name;
     a.querySelector('.del').addEventListener('click', ev => {
@@ -137,11 +375,15 @@ function render() {
     grid.appendChild(a);
   });
   const add = document.createElement('div');
-  add.className = 'tile add'; add.innerHTML = '<div>+<span>Add</span></div>';
-  add.addEventListener('click', () => {
+  add.className = 'tile add'; add.tabIndex = 0; add.setAttribute('role', 'button');
+  add.setAttribute('aria-label', 'Add shortcut');
+  add.innerHTML = '<div>+<span>Add</span></div>';
+  const toggle = () => {
     const f = document.getElementById('addform');
     f.style.display = f.style.display === 'flex' ? 'none' : 'flex';
-  });
+  };
+  add.addEventListener('click', toggle);
+  add.addEventListener('keydown', ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); toggle(); } });
   grid.appendChild(add);
 }
 function save() { localStorage.setItem('ld_shortcuts', JSON.stringify(shortcuts)); }

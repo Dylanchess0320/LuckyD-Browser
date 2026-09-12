@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [8.0.0] - 2026-09-12
+
+The Cleanup, phase one: skills in the sidebar, smart routing, and a Neon Night home.
+
+### Added
+- **Contextual skill chips** — the 5 bundled skills (`ai-news-brief`, `chess`, `graphify`, `movie-picker`, `top-picks`) now surface as `✨` chips above the AI sidebar input as you type; one tap attaches the skill as chat context (`browser/browser_core/skills.py`, `tests/test_skills_wiring.py`).
+- **Smart model routing** — `core/router.py`'s ModelRouter is wired into `AIBridge.chat()` auto mode: it picks the provider per question (explicit picks always win; non-viable picks fall back to the existing chain) (`tests/test_router_wiring.py`).
+- **Neon Night home** — the real `/dashboard` and the `newtab.html` fallback share one refined typographic system: tabular clock, small-caps labels, system-only font stack, offline-safe, `prefers-reduced-motion` support.
+- **$0 OpenCode Zen fallback** — with no Ollama and no keys, chat falls back to the free Zen gateway instead of an empty-token provider (`tests/test_ai_bridge_fallback.py`).
+
+### Changed
+- **Honest provider labels** — sidebar provider chips say `· free tier` / `· credit-billed ⚠`.
+- **Antigravity decluttered** — redundant Tools-menu and command-palette launchers removed; it's already in the terminal.
+- **Copy freshness** — README, docs, `.github`, and in-app text brought current; About dialog and window titles now say "LuckyD"; stale `SWARM v6.0` badge → `SWARM`.
+- **Version unified to 8.0.0** everywhere — package, PyInstaller/Inno metadata, `LuckyDBrowser/8.0` user-agent, and docs.
+
 ## [7.0.0] - 2026-09-12
 
 Lucky polish: soul, slim chrome, correct colors — on top of everything in 6.0.0.

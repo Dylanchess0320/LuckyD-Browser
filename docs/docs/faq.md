@@ -2,7 +2,7 @@
 
 ## Is LuckyD Browser really free?
 
-Yes. The local AI (Ollama + `llama3.2:3b`) is free and unlimited — no account, no key, no subscription. The browser itself is MIT open source. Cloud providers (OpenAI, Anthropic, Gemini, …) need your own API keys and bill through those providers.
+Yes. The local AI (Ollama + `llama3.2:3b`) is free and unlimited — no account, no key, no subscription. And even without a local model installed, the sidebar falls back to the free OpenCode Zen gateway at $0 (no key needed), honestly labeled in the model picker. The browser itself is MIT open source. Cloud providers (OpenAI, Anthropic, Gemini, …) need your own API keys and bill through those providers.
 
 ## Does it work offline?
 

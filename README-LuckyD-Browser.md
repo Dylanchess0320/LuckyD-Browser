@@ -6,7 +6,7 @@ No accounts. No API keys. No subscriptions. The installer sets everything up for
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20x64-blue)](https://github.com/Dylanchess0320/LuckyD-Browser/releases)
 [![Built with](https://img.shields.io/badge/built%20with-PySide6%20%2F%20Qt%20WebEngine-green)](https://www.qt.io/)
-[![AI](https://img.shields.io/badge/AI-local%20Ollama%20%2B%209%20cloud%20providers-purple)](#ai-providers)
+[![AI](https://img.shields.io/badge/AI-local%20Ollama%20%2B%20cloud%20providers-purple)](#ai-providers)
 
 LuckyD Browser is more than a browser — it's a **one-window AI platform**:
 
@@ -48,20 +48,20 @@ The setup automatically installs **[Ollama](https://ollama.com)** (per-user, no 
 tool-capable local model (`llama3.2:3b`, ~2 GB one-time download). From then on the assistant runs
 **100% locally** — unlimited, offline, and private. Your prompts never leave your machine.
 
-Prefer a cloud model instead? The sidebar supports 9 more providers — see
-[AI Providers](#ai-providers). Your own keys, your choice.
+Prefer a cloud model instead? The sidebar auto-detects providers in priority order —
+see [AI Providers](#ai-providers). Your own keys, your choice.
 
 ---
 
 ## 📦 Download & install
 
-**[⬇ Download Latest Release](https://github.com/Dylanchess0320/LuckyD-Browser/releases/latest)** (`LuckyDBrowserSetup-6.0.0.exe`)
+**[⬇ Download Latest Release](https://github.com/Dylanchess0320/LuckyD-Browser/releases/latest)** (`LuckyDBrowserSetup-8.0.0.exe`)
 
 - Windows 10/11 x64 · per-user install · **no admin rights needed**
 - Installs to `%LOCALAPPDATA%\Programs\LuckyDBrowser`
 - Start Menu shortcut, optional desktop icon, **Settings > Apps** uninstall entry
 - Everything is bundled (Chromium runtime + coding-agent backend) — nothing else required
-- Silent install for scripting: `LuckyDBrowserSetup-6.0.0.exe /VERYSILENT /NORESTART`
+- Silent install for scripting: `LuckyDBrowserSetup-8.0.0.exe /VERYSILENT /NORESTART`
 
 ---
 
@@ -78,7 +78,7 @@ Prefer a cloud model instead? The sidebar supports 9 more providers — see
 **Harness mode (default ON):** sidebar agent tasks run on the coding-agent backend, which can drive
 your **live, visible tabs** through the Control API — exe brain, browser hands.
 
-> 🚀 **Shipped in 6.0+:** a **Trust dashboard** (`/trust`) with permission scopes,
+> 🚀 **Trust-first stack, shipping in the latest release:** a **Trust dashboard** (`/trust`) with permission scopes,
 > an approval queue, and an append-only audit log; **WebMCP** for site-exposed agent tools;
 > **scheduled background agents** with a morning digest; Lucky apprentice personality; and an open **Skills marketplace**
 > (install/update/remove/publish). See [CHANGELOG.md](CHANGELOG.md).
@@ -116,11 +116,12 @@ The assistant auto-detects providers at launch, in this priority order:
 | 1 — **Local** | **Ollama** | ❌ | Free, unlimited, offline — **auto-installed by setup** |
 | 1 — Local | LM Studio | ❌ | Auto-detected on `127.0.0.1:1234` |
 | 2 | Cline free tier | Cline login | Free-tier models, rate-limited |
-| 3 | ClinePass | Cline login | Flat-subscription gateway |
-| 3 | Google Gemini | ✔ | Free tier available |
-| 3 | Groq | ✔ | Free tier available |
-| 3 | Z.ai / OpenRouter | ✔ | |
-| 3 | DeepSeek / OpenAI / Anthropic | ✔ | |
+| 3 | **OpenCode Zen** ($0 gateway) | ❌ | Always registered — the no-server, no-key fallback when nothing local is available |
+| 4 | ClinePass | Cline login | Flat-subscription gateway |
+| 4 | Google Gemini | ✔ | Free tier available |
+| 4 | Groq | ✔ | Free tier available |
+| 4 | Z.ai / OpenRouter | ✔ | |
+| 4 | DeepSeek / OpenAI / Anthropic | ✔ | |
 
 - The **model picker** lists whatever your providers actually have installed/available.
 - **Vision is automatic**: screenshots stream to the model when it supports images

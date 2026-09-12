@@ -25,7 +25,7 @@ Shell names are **allowlisted server-side**: the WebSocket request can never inj
 
 ## Under the hood
 
-- **Bridge:** `browser_core/terminal_server.py` on `127.0.0.1:9881`
+- **Bridge:** `browser/browser_core/terminal_server.py` on `127.0.0.1:9881`
 - **Environment:** spawned with a sanitized env block (NUL-joined, matching the winpty contract)
 - **Limits:** 1 MB max WebSocket frame, bounded scrollback buffer
 - **Auth (4.0):** the terminal WebSocket authenticates with the HttpOnly `luckyd_term` session cookie provisioned by the browser — no `?token=` in URLs anymore

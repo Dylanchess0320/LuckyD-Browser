@@ -5,9 +5,9 @@
 <p class="tagline">The AI browser that runs <em>your</em> models — local, unlimited, offline — plus a full coding agent and real terminals in one window.</p>
 
 <div class="cta-row" markdown>
-[⬇ Download v7.0.0](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v7.0.0/LuckyDBrowserSetup-7.0.0.exe){ .luckyd-btn }
+[⬇ Download v8.0.0](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v8.0.0/LuckyDBrowserSetup-8.0.0.exe){ .luckyd-btn }
 [Getting started](getting-started.md){ .luckyd-btn-ghost }
-[What's new in 6.0](release-notes.md){ .luckyd-btn-ghost }
+[What's new](release-notes.md){ .luckyd-btn-ghost }
 </div>
 
 <div class="luckyd-badges" markdown>
@@ -76,12 +76,12 @@
 
 ## Install in 10 seconds
 
-1. Get [**LuckyDBrowserSetup-7.0.0.exe**](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v7.0.0/LuckyDBrowserSetup-7.0.0.exe)
+1. Get [**LuckyDBrowserSetup-8.0.0.exe**](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v8.0.0/LuckyDBrowserSetup-8.0.0.exe)
 2. Run it — per-user, **no admin**, installs to `%LOCALAPPDATA%\Programs\LuckyDBrowser`
 3. Leave **"Set up free unlimited local AI"** checked → Ollama + `llama3.2:3b` (~2 GB, one time)
 4. `Ctrl+Shift+A` → chat offline. Or bring your own keys (Gemini, Groq, DeepSeek, OpenAI, Anthropic, Z.ai, OpenRouter, Cline, OpenCode)
 
-Windows 10/11 x64 only. Silent install: `LuckyDBrowserSetup-7.0.0.exe /VERYSILENT /NORESTART`
+Windows 10/11 x64 only. Silent install: `LuckyDBrowserSetup-8.0.0.exe /VERYSILENT /NORESTART`
 
 ## Why LuckyD
 
@@ -98,6 +98,16 @@ Most "AI browsers" rent you a chatbot behind an account. LuckyD is a **real Chro
 
 > The others rent you their AI. **LuckyD runs yours.**
 
+## New in 8.0.0 — The Cleanup, phase one
+
+Contextual skills move into the AI sidebar, the model router gets smart, and the home page gets the Neon Night treatment. Ships with the 8.0.0 installer built from this source.
+
+- **✨ Contextual skill chips** — chess, movie-picker, news brief, graphify, and top-picks surface as chips above the sidebar input as you type; one tap attaches the skill as chat context
+- **🧠 Smart model routing** — the `core/router.py` ModelRouter now picks the provider per question in auto mode (explicit picks always win; non-viable picks fall back safely)
+- **🌃 Neon Night home** — the real `/dashboard` and the `newtab` fallback share one refined typographic system: tabular clock, small-caps labels, system fonts, fully offline-safe
+- **Honest AI labels + $0 fallback** — provider chips say `· free tier` / `· credit-billed ⚠`; with no Ollama and no keys, chat falls back to the free OpenCode Zen gateway
+- **Antigravity decluttered** — redundant Tools-menu/palette launchers removed (it's already in the terminal); full copy-freshness pass across README, docs, and in-app text
+
 ## New in 7.0.0 — Agentic
 
 The agentic frontier, shipped: an AI browser you can trust with real agency. [Read the release notes →](release-notes.md)
@@ -107,7 +117,7 @@ The agentic frontier, shipped: an AI browser you can trust with real agency. [Re
 - **🔌 WebMCP** — websites can expose typed agent tools to LuckyD; server-side schema validation, 30-second timeouts, and origin-bound rotating binding tokens keep hostile pages out
 - **⏰ Scheduled agents** — background agents on cron schedules with a **morning digest** (`/schedules`)
 - **🧩 Skills marketplace** — open skill registries with hash-verified install, update, remove, and publish
-- **Official Windows installer** — `LuckyDBrowserSetup-7.0.0.exe`, built on a real Windows runner with Inno Setup 6; per-user, no admin, silent-install flags
+- **Official Windows installer** — `LuckyDBrowserSetup-8.0.0.exe`, built on a real Windows runner with Inno Setup 6; per-user, no admin, silent-install flags
 
 *Verified: 428 tests passed, `ruff` clean.*
 
@@ -134,6 +144,6 @@ A hardened foundation: every local service now authenticates with HttpOnly sessi
 
 <p align="center">
   <b>MIT © LuckyD</b> · Chromium · Ollama · Qt · xterm.js · pywinpty · PyInstaller · Inno Setup<br>
-  <a href="https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v7.0.0/LuckyDBrowserSetup-7.0.0.exe">Download v7.0.0</a>
+  <a href="https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v8.0.0/LuckyDBrowserSetup-8.0.0.exe">Download v8.0.0</a>
   · <a href="https://www.youtube.com/@LuckyDYoutube">YouTube</a>
 </p>

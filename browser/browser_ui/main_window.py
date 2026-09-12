@@ -56,7 +56,7 @@ from .vertical_tabs import VerticalTabsDock
 
 ASSETS_DIR = Path(__file__).resolve().parent.parent / "assets"
 NEWTAB_PATH = ASSETS_DIR / "newtab.html"
-APP_DISPLAY = "LuckyD Browser"
+APP_DISPLAY = "LuckyD"
 
 
 class MainWindow(QMainWindow):
@@ -531,7 +531,6 @@ class MainWindow(QMainWindow):
         )
         self._add(tools_menu, "Agent Terminal", lambda: self.open_terminal("agent"), "Ctrl+`")
         self._add(tools_menu, "Agent 2 Terminal", lambda: self.open_terminal("agent2"))
-        self._add(tools_menu, "Antigravity Terminal", lambda: self.open_terminal("mesh-agy"))
         self._add(
             tools_menu,
             "PowerShell Terminal",
@@ -1843,10 +1842,9 @@ class MainWindow(QMainWindow):
             f"<b>Channel:</b> {channel}<br>"
             f"<b>Last checked for updates:</b> {last_checked}</p>"
             + (f"<p><i>Update to version {skipped} was skipped.</i></p>" if skipped else "")
-            + "<p>A privacy-first, ad-free web browser built on Qt WebEngine.</p>"
-            "<p>Free, open source, no telemetry.</p>"
-            "<p>Tabs · Bookmarks · History · Downloads · Incognito · "
-            "Find-in-page · Ad-block · DevTools</p>",
+            + "<p>LuckyD — a trust-first AI browser. Chat-first AI sidebar with "
+            "contextual skills, a deep research swarm, and local-first Ollama for $0 AI.</p>"
+            "<p>Free, open source, no telemetry.</p>",
             dlg,
         )
         text.setTextFormat(Qt.TextFormat.RichText)

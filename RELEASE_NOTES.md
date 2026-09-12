@@ -1,9 +1,9 @@
-# LuckyD Browser v1.3.0 — Release Notes
+# LuckyD Browser v8.0.0 — Release Notes
 
 > **The AI browser that doesn't need an API key.** Free, unlimited, offline AI built in —
 > plus a full coding agent and developer terminal living in your tabs.
 
-**[⬇ Download `LuckyDBrowserSetup-1.3.0.exe`](../../releases)** — Windows 10/11 x64 · per-user install · no admin needed
+**[⬇ Download `LuckyDBrowserSetup-8.0.0.exe`](../../releases)** — Windows 10/11 x64 · per-user install · no admin needed
 
 ---
 
@@ -42,7 +42,7 @@ no keys shipped in the bundle.
   and a Settings > Apps uninstall entry.
 - The AI bootstrap runs after setup in a small console window (one-time ~2 GB model download).
   Uncheck it if you only want cloud providers — you can run it later from the install folder.
-- Silent install: `LuckyDBrowserSetup-1.3.0.exe /VERYSILENT /NORESTART`
+- Silent install: `LuckyDBrowserSetup-8.0.0.exe /VERYSILENT /NORESTART`
 
 ## Upgrade tips
 
@@ -54,7 +54,7 @@ no keys shipped in the bundle.
 
 | File | Size |
 |---|---|
-| `LuckyDBrowserSetup-1.3.0.exe` | 164.7 MB |
+| `LuckyDBrowserSetup-8.0.0.exe` | (see the release page) |
 
 *(add SHA-256 here when uploading)*
 

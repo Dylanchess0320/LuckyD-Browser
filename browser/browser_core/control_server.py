@@ -162,7 +162,7 @@ display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
 background:#16202f;text-align:center}h1{color:#7c5cff;margin:0 0 12px}p{color:#9fb0c9}</style>
 </head><body><div class="card"><h1>🔒 Unauthorized</h1>
 <p>This LuckyD page needs the browser's session cookie. Open it from inside
-LuckyD Browser (dashboard, terminal, research…) instead of pasting the URL
+LuckyD (dashboard, terminal, research…) instead of pasting the URL
 elsewhere.</p></div></body></html>"""
 
 

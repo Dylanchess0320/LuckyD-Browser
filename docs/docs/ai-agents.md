@@ -9,6 +9,7 @@ The sidebar is the front door to everything:
 - **Markdown chat** with a **model picker** — switch between local Ollama and any configured cloud provider
 - **Visual Q&A** — ask about what you're looking at; vision-capable models get automatic per-step screenshots
 - **Autonomous agent on your real visible tab** — the agent reads the page, clicks, types, and scrolls through the Control API
+- **Contextual skill chips** — start typing and the sidebar suggests matching skills from the bundled set (`ai-news-brief`, `chess`, `graphify`, `movie-picker`, `top-picks`); one tap attaches that skill's know-how to the chat
 - **Omnibox shortcut** — type `? your question` in the address bar to send it straight to the sidebar
 
 ## Harness mode (default on)
@@ -18,6 +19,8 @@ Sidebar tasks run on the coding-agent backend — 70+ tools, memory graph, orche
 ## Providers
 
 **Free & local (no key):** Ollama — install the bundled `llama3.2:3b` at setup and chat fully offline.
+
+**Free online fallback (no key):** with no local model or API key configured, the provider order falls through to the **OpenCode Zen** $0 gateway — it shows up in the model picker with its own honest label, so the sidebar still works out of the box.
 
 **Cloud (your keys, Settings):** Gemini · Groq · DeepSeek · OpenAI · Anthropic · Z.ai · OpenRouter · Cline · OpenCode
 

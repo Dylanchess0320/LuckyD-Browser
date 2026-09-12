@@ -1,5 +1,10 @@
 # LuckyD Browser v1.3.0 — Release Notes
 
+> ⚠️ **Superseded.** This page describes the v1.3.0 release. For the current
+> release notes, see the [docs site](docs/release-notes.md) and the
+> [releases page](https://github.com/Dylanchess0320/LuckyD-Browser/releases/latest).
+> History below is preserved as written.
+
 > **The AI browser that doesn't need an API key.** Free, unlimited, offline AI built in —
 > plus a full coding agent and developer terminal living in your tabs.
 

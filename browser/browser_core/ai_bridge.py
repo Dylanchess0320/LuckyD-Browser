@@ -17,6 +17,14 @@ from pathlib import Path
 import httpx
 from browser_core import cline_session
 
+# Smart model routing (core/router.py) — optional. The router is a pure local
+# heuristic (no network); if it cannot be imported, auto mode keeps today's
+# static fallback chain.
+try:
+    from core.router import route_task as _route_task
+except Exception:  # pragma: no cover - import guard
+    _route_task = None
+
 ENV_PATH = Path(__file__).resolve().parent.parent.parent / ".env"
 _HAS_STREAM_END = re.compile(r"\[DONE\]")
 
@@ -368,13 +376,16 @@ class AIBridge:
              offline, no key or login needed
           2. cline-usage — Cline free tier, when auth actually exists
              (API key or a logged-in Cline CLI session)
-          3. Cloud keyed providers, in _PROVIDER_SPECS order
+          3. OpenCode Zen ($0 free gateway, always registered, key optional)
+          4. Cloud keyed providers, in _PROVIDER_SPECS order
         """
         for name in self._local_names:
             if name in self._configs:
                 return name
         if "cline-usage" in self._configs and self._cline_usable():
             return "cline-usage"
+        if "opencode" in self._configs:
+            return "opencode"
         return next(iter(self._configs), None)
 
     def _cline_usable(self) -> bool:
@@ -507,11 +518,99 @@ class AIBridge:
         self._model_cache[provider] = models
         return models
 
+    # ── Smart routing (Phase 3) ──────────────────────────────────────
+    def _is_viable_provider(self, name: str) -> bool:
+        """True when the bridge can actually use this provider right now.
+
+        Registration already encodes reachability/credentials: local servers
+        are only registered when the startup probe succeeded, keyed clouds
+        only when a key exists, and the Zen gateway is key-optional ($0).
+        Cline entries may be registered with an empty token, so they need
+        the explicit usability check.
+        """
+        if self._configs.get(name) is None:
+            return False
+        if name in ("clinepass", "cline-usage"):
+            return self._cline_usable()
+        return True
+
+    @staticmethod
+    def _routing_text(messages) -> str:
+        """Latest user message as plain text ('' when unavailable)."""
+        try:
+            for msg in reversed(messages or []):
+                if not isinstance(msg, dict) or msg.get("role") != "user":
+                    continue
+                content = msg.get("content", "")
+                if isinstance(content, str):
+                    return content
+                if isinstance(content, list):
+                    return " ".join(
+                        part.get("text", "")
+                        for part in content
+                        if isinstance(part, dict) and isinstance(part.get("text"), str)
+                    )
+            return ""
+        except Exception:
+            return ""
+
+    @staticmethod
+    def _routing_context_size(messages) -> int:
+        """Rough context size in tokens (~4 chars/token) for the router."""
+        try:
+            chars = 0
+            for msg in messages or []:
+                if not isinstance(msg, dict):
+                    continue
+                content = msg.get("content", "")
+                if isinstance(content, str):
+                    chars += len(content)
+                elif isinstance(content, list):
+                    for part in content:
+                        if isinstance(part, dict):
+                            text = part.get("text", "")
+                            if isinstance(text, str):
+                                chars += len(text)
+            return chars // 4
+        except Exception:
+            return 0
+
+    def _routed_provider(self, messages) -> str | None:
+        """Router's provider pick for auto mode, or None.
+
+        Returns a name only when the router's pick is one the bridge already
+        considers viable (router catalog names map 1:1 onto bridge provider
+        names). Anything else — import failure, router error, non-viable
+        pick — returns None and today's static chain runs unchanged.
+        """
+        if _route_task is None:
+            return None
+        try:
+            decision = _route_task(
+                self._routing_text(messages),
+                self._routing_context_size(messages),
+            )
+            name = getattr(decision.model, "provider", "") or ""
+        except Exception:
+            return None
+        return name if name and self._is_viable_provider(name) else None
+
     async def chat(self, messages, provider=None, on_token=None):
         # Auto (no provider) uses the free unlimited rotation first: local
         # keyless servers + Zen top free models round-robin on every call and
         # on 429 rate-limit. Explicit provider skips rotation.
-        if provider is None:
+        if isinstance(provider, str) and provider.lower() == "auto":
+            provider = None  # the UI's "auto" sentinel means auto mode
+        is_auto = provider is None
+        # Smart routing (Phase 3): in auto mode the local router picks the
+        # provider from the request instead of the static fallback chain.
+        # An explicit provider pick always wins — routing never fires then.
+        # A non-viable router pick (no credential/server) → None → today's
+        # chain runs exactly as before.
+        routed = self._routed_provider(messages) if is_auto else None
+        fast_path_ran = False
+        if is_auto and routed is None:
+            fast_path_ran = True
             # Prefer free unlimited pool before falling back to any provider
             free_pool = self._free_unlimited_providers()
             # If we have a Zen free gateway, try its top models round-robin
@@ -564,10 +663,15 @@ class AIBridge:
                     continue
             # No free unlimited succeeded — fall through to full provider fallback
         order = [provider] if provider else self.providers()
+        if routed is not None:
+            # Routed provider goes first; the rest of today's chain follows
+            # as fallback (free pool included — still reachable on failure).
+            order = [routed] + [p for p in order if p != routed]
         last_err: Exception | None = None
         for name in order:
             # Skip members already tried in the free unlimited fast-path above
-            if provider is None and name in self._free_unlimited_providers():
+            # (only when the fast path actually ran — routing skips it).
+            if fast_path_ran and name in self._free_unlimited_providers():
                 # For Zen we already cycled all top models; the current model in config is already tried.
                 # Only retry the free pool's current configured model once more with the generic path.
                 # To avoid double-dipping, skip unless the error was non-rate and we want a second chance.
@@ -637,7 +741,7 @@ class AIBridge:
             )
         )
         body["model"] = model
-        headers = {"User-Agent": "LuckyDBrowser/7.0"}
+        headers = {"User-Agent": "LuckyDBrowser/8.0"}
 
         if kind == "gemini":
             url = f"{base_url}/models/{model}:streamGenerateContent?key={api_key}&alt=sse"

@@ -13,6 +13,15 @@ from browser_core.agent import AgentSession, JsBridge
 from browser_core.ai_bridge import AIBridge
 from browser_core.brand import tokens as _brand_tokens
 from browser_core.lucky import greeting as _lucky_greeting
+from browser_core.lucky import suggest as _lucky_suggest
+from browser_core.lucky import system_prompt as _lucky_system_prompt
+from browser_core.skills import (
+    Skill,
+    list_skills,
+    match_skill,
+    skill_chip_label,
+    skill_system_prompt,
+)
 from PySide6.QtCore import QBuffer, QIODevice, Qt, QThread, QTimer, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -27,16 +36,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-_SYSTEM = (
-    "You are Lucky, the user's apprentice inside LuckyD Browser — "
-    "warm, a little playful, genuinely useful. "
-    "Concise and factual; short paragraphs or bullets. "
-    "When page context is provided, ground answers in it and say when the "
-    "answer is not on the page. "
-    "Format answers in GitHub-flavored Markdown: fenced code blocks for "
-    "code/commands, **bold** for key terms, short bullet lists for steps. "
-    "You NEVER act on your own — you notice, propose one next step, and wait."
-)
+# Lucky's voice, single-sourced from browser_core.lucky (VOICE). The literal
+# copy used to live here; using system_prompt() keeps the sidebar's system
+# prompt identical to the tested persona — no drift, no duplication.
+_SYSTEM = _lucky_system_prompt()
 
 # ── markdown-lite → HTML (chat bubbles) ──────────────────────────────────
 # Deliberately small: fenced code, inline code, bold, headings, bullet and
@@ -261,6 +264,11 @@ class AiSidebar(QDockWidget):
         self._shot_prompt = ""
         self._history: list[dict] = []
         self._stream_count = 0
+        # Skill picked from a suggestion chip, consumed by the next _start_chat
+        # as a system message — the normal chat path, permissions/audit unchanged.
+        self._pending_skill: Skill | None = None
+        # Bundled skills, loaded once (registry.json is a ~2KB local file).
+        self._skills: list[Skill] = list_skills()
         # Chat is a list of blocks (role + payload) re-rendered as bubbles;
         # streaming updates the last assistant block with throttled renders.
         self._blocks: list[dict] = []
@@ -357,8 +365,20 @@ class AiSidebar(QDockWidget):
         self.chat.anchorClicked.connect(self._open_link)
         layout.addWidget(self.chat)
 
+        # ── contextual skill chips (appear when the input matches a skill) ──
+        self._skill_row = QHBoxLayout()
+        self._skill_row.setContentsMargins(0, 2, 0, 2)
+        self._skill_hint = QLabel("Skill:", body)
+        self._skill_hint.setStyleSheet(f"color: {_tok('muted')}; font-size: 11px;")
+        self._skill_row.addWidget(self._skill_hint)
+        self._skill_row.addStretch(1)
+        self._skill_chip_buttons: list[QPushButton] = []
+        self._set_skill_chips_visible(False)
+        layout.addLayout(self._skill_row)
+
         row = QHBoxLayout()
         self.input = QLineEdit(body)
+        self.input.textChanged.connect(self._update_skill_chips)
         self.input.setPlaceholderText("Ask about this page or anything…  (Enter to send)")
         self.input.setToolTip("Tip: check 'Page context' to include the current page text")
         self.send_btn = QPushButton("Send", body)
@@ -468,6 +488,24 @@ class AiSidebar(QDockWidget):
                 ),
             }
         ]
+        # Lucky's suggest-only nudge, shown once with the greeting: at most
+        # one quiet proposal from local signals (open tabs here — the only
+        # signal the sidebar can read cheaply), "" stays invisible.
+        try:
+            open_tabs = int(self._mw.tabs.count())
+        except Exception:
+            open_tabs = 0
+        nudge = _lucky_suggest(open_tabs=open_tabs)
+        if nudge:
+            self._blocks.append(
+                {
+                    "role": "raw",
+                    "text": (
+                        f"<div style='color:{muted};padding:2px 2px 6px 2px;"
+                        f"font-size:12px'>🍀 {html.escape(nudge)}</div>"
+                    ),
+                }
+            )
         self._render()
 
     def _render_block(self, block: dict) -> str:
@@ -675,6 +713,12 @@ class AiSidebar(QDockWidget):
 
     def _start_chat(self, page_text: str) -> None:
         messages = [{"role": "system", "content": _SYSTEM}]
+        # A skill chip was picked: attach its instructions as a system message.
+        # This flows through the identical chat path (same worker, same
+        # permissions, same audit) as any other message — no new pipeline.
+        skill, self._pending_skill = self._pending_skill, None
+        if skill is not None:
+            messages.append({"role": "system", "content": skill_system_prompt(skill)})
         if page_text:
             # Local CPU models ingest prompts slowly — send a smaller excerpt.
             provider = self._selected_provider() or self.bridge.default_provider()
@@ -718,6 +762,45 @@ class AiSidebar(QDockWidget):
         self.status.setText("failed")
         self._chat_worker = None
 
+    # ── contextual skill chips ─────────────────────────────────────────
+
+    def _set_skill_chips_visible(self, visible: bool) -> None:
+        self._skill_hint.setVisible(visible)
+        for btn in self._skill_chip_buttons:
+            btn.setVisible(visible)
+
+    def _update_skill_chips(self, text: str) -> None:
+        """Show suggestion chips when the input matches a bundled skill."""
+        for btn in self._skill_chip_buttons:
+            self._skill_row.removeWidget(btn)
+            btn.deleteLater()
+        self._skill_chip_buttons = []
+        if self._chat_worker is not None:
+            self._set_skill_chips_visible(False)
+            return
+        matches = match_skill(text or "", self._skills)
+        if not matches:
+            self._set_skill_chips_visible(False)
+            return
+        for skill in matches:
+            btn = QPushButton(skill_chip_label(skill), self)
+            btn.setToolTip(skill.description or skill.name)
+            btn.clicked.connect(lambda _checked=False, s=skill: self._use_skill(s))
+            self._skill_row.addWidget(btn)
+            self._skill_chip_buttons.append(btn)
+        self._set_skill_chips_visible(True)
+
+    def _use_skill(self, skill: Skill) -> None:
+        """Chip click → normal chat flow with the skill's context attached."""
+        if self._chat_worker is not None:
+            self.status.setText("busy — wait for the current response")
+            return
+        if not self.input.text().strip():
+            return
+        self._pending_skill = skill
+        self._set_skill_chips_visible(False)
+        self._send()
+
     # ── quick actions ────────────────────────────────────────────────
 
     def _quick(self, prompt: str) -> None:
@@ -739,6 +822,7 @@ class AiSidebar(QDockWidget):
 
     def _clear_chat(self) -> None:
         self._history = []
+        self._pending_skill = None
         self.status.setText("Conversation cleared")
         self._greet()
 

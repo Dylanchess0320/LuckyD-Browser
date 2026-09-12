@@ -1,4 +1,4 @@
-# Contributing to LuckyD Code
+# Contributing to LuckyD Browser
 
 First off, thank you for considering contributing! 🎉
 
@@ -47,8 +47,8 @@ By participating, you are expected to uphold this code.
 
 ```bash
 # Clone your fork
-git clone https://github.com/your-username/coding-agent.git
-cd coding-agent
+git clone https://github.com/your-username/LuckyD-Browser.git
+cd LuckyD-Browser
 
 # Create virtual environment
 python -m venv .venv
@@ -118,37 +118,16 @@ chore: maintenance tasks
 ## Project Structure
 
 ```
-coding-agent/
+LuckyD-Browser/
 ├── main.py              # Entry point
-├── agent.py             # Core agent logic
-├── config.py            # Configuration
-├── ui.py                # Terminal UI
-├── logging_setup.py     # Structured logging
-├── model_resolver.py    # Model auto-detection
-├── sandbox.py           # Safe command execution
-├── bridge.py            # VS Code bridge
-├── tools/               # Plugin tool system
-│   ├── registry.py      # Tool registry
-│   ├── base.py          # Base tool class
-│   ├── file_tools.py    # File operations
-│   ├── bash_tool.py     # Command execution
-│   └── ...              # 20+ tools
-├── llm/                 # LLM provider clients
-│   ├── deepseek_client.py
-│   ├── openai_client.py
-│   ├── anthropic_client.py
-│   ├── google_client.py
-│   └── ollama_client.py
-├── memory/              # Memory graph system
-│   ├── graph.py         # Knowledge graph
-│   ├── store.py         # Persistent store
-│   └── embeddings.py    # ONNX embeddings
-├── project/             # Project detection
+├── browser/             # The browser: Qt UI (browser_ui/), engine (browser_core/),
+│                        # installer (installer/), assets
+├── core/                # Shared core: smart model router, coding-agent engine
+├── skills/              # Bundled contextual skills (registry.json + markdown)
 ├── tests/               # Test suite
-├── docs/                # Documentation site
-└── vscode-extension/    # VS Code extension
+└── docs/                # Documentation site
 ```
 
 ## Questions?
 
-Open a [Discussion](https://github.com/luckyd/coding-agent/discussions) or join our community chat.
+Open a [Discussion](https://github.com/Dylanchess0320/LuckyD-Browser/discussions) or join our community chat.

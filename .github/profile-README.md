@@ -9,11 +9,11 @@
 
 </div>
 
-### Now shipping — [LuckyD Browser v6.0.0](https://github.com/Dylanchess0320/LuckyD-Browser/releases/tag/v6.0.0)
+### Now shipping — [the latest LuckyD release](https://github.com/Dylanchess0320/LuckyD-Browser/releases/latest)
 
-Trust dashboard · WebMCP site tools · scheduled agents · skills marketplace · agent circuit breaker
+Trust-first AI browsing: permission scopes, risk levels, append-only audit log, and a `/trust` dashboard · WebMCP site tools · scheduled agents with a morning digest · skills marketplace · contextual skill chips in the sidebar · quiet update badge (no modal nagging)
 
-**[⬇ Download for Windows](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v6.0.0/LuckyDBrowserSetup-6.0.0.exe)** · **[Repo](https://github.com/Dylanchess0320/LuckyD-Browser)** · **[Watch](https://www.youtube.com/watch?v=La6bxaa7icY)**
+**[⬇ Download for Windows](https://github.com/Dylanchess0320/LuckyD-Browser/releases/latest)** · **[Repo](https://github.com/Dylanchess0320/LuckyD-Browser)** · **[Watch](https://www.youtube.com/watch?v=La6bxaa7icY)**
 
 ```
 ┌──────────── LuckyD Browser ──────────────────────────────────────┐

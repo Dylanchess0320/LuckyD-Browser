@@ -36,4 +36,4 @@ personalize). The skill markdown is the source of truth for output format.
 - Provider: ClinePass, model: `cline-pass/kimi-k3`.
 - Skills live in `skills/*.md` with YAML frontmatter (name, description, version,
   author, tags). They are auto-discovered by `tools/skill_tools.py`.
-- Memory is stored in `data/memory/` and is searchable via `MemoryRecall`.
+- Memory is stored in `data/memory_store/` and is searchable via `MemoryRecall`.

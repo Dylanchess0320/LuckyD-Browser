@@ -30,25 +30,36 @@ except ImportError:  # imported as browser.browser_core.dashboard
 # Dashboard-specific CSS — the shared head (doctype, token injection, base body
 # styles, toast helper, "?" shortcut overlay) comes from page_shell.
 _DASH_CSS = r"""  :root {
-    --card: rgba(255,255,255,.06); --border: var(--ld-border, rgba(255,255,255,.10));
-    --text: var(--ld-text, #e8eaf2); --muted: var(--ld-muted, #9aa1b5);
+    color-scheme: dark;
+    --card: var(--ld-card, #1a2132); --border: var(--ld-border, #232c42);
+    --text: var(--ld-text, #e8ecf5); --muted: var(--ld-muted, #8b93a7);
     --accent: var(--ld-accent, #5b9dff); --accent2: var(--ld-accent2, #b46bff);
     --ok: var(--ld-ok, #34d399); --warn: #fbbf24; --err: var(--ld-danger, #ff5b6e);
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   input, select, button { font: inherit; }
+  ::selection { background: rgba(91,157,255,.30); color: var(--text); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   body {
-    font-family: 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
-    font-weight: 600;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text",
+      "Segoe UI", "Helvetica Neue", system-ui, sans-serif;
+    font-weight: 400;
     color: var(--text); min-height: 100vh; overflow-x: hidden;
-    background: var(--ld-grad, linear-gradient(135deg, #0b1020 0%, #101a30 45%, #1a1030 100%));
-    background-size: 200% 200%; animation: drift 24s ease-in-out infinite;
+    background: var(--ld-window, #0b0f1a);
+    line-height: 1.4;
   }
-  @keyframes drift { 0%,100% { background-position: 0% 0%; } 50% { background-position: 100% 100%; } }
-  header { display: flex; justify-content: space-between; align-items: center; padding: 20px 32px; flex-wrap: wrap; gap: 10px; }
-  #pills { display: flex; gap: 8px; flex-wrap: wrap; }
-  .pill { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px;
-    padding: 5px 11px; border-radius: 999px; background: var(--card);
+  /* Faint fixed ambient wash — calm, no motion. */
+  body::before {
+    content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background: radial-gradient(58% 42% at 50% 0%, rgba(91,157,255,.07), transparent 70%);
+  }
+  header, main { position: relative; z-index: 1; }
+  header { display: flex; justify-content: space-between; align-items: flex-start;
+    padding: 22px 34px; flex-wrap: wrap; gap: 12px; }
+  #pills { display: flex; gap: 8px; flex-wrap: wrap; padding-top: 8px; }
+  .pill { display: inline-flex; align-items: center; gap: 7px; font-size: 11px;
+    font-weight: 600; letter-spacing: .05em;
+    padding: 6px 12px; border-radius: 999px; background: var(--card);
     border: 1px solid var(--border); color: var(--muted); white-space: nowrap; }
   .pill .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
   .pill.ok .dot { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
@@ -56,34 +67,46 @@ _DASH_CSS = r"""  :root {
   .pill.err .dot { background: var(--err); box-shadow: 0 0 8px var(--err); }
   .pill.ok { color: var(--ok); } .pill.warn { color: var(--warn); } .pill.err { color: var(--err); }
   #clock { text-align: right; }
-  #clock .time { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
-  #clock .date { font-size: 12px; color: var(--muted); }
-  #hello-line { font-size: 14px; color: var(--muted); margin-top: 6px; }
+  #clock .time { font-size: 27px; font-weight: 650; letter-spacing: -.01em;
+    font-variant-numeric: tabular-nums; line-height: 1.1; }
+  #clock .date { font-size: 11px; font-weight: 600; letter-spacing: .18em;
+    text-transform: uppercase; color: var(--muted); margin-top: 5px; }
+  #hello-line { font-size: 13px; font-weight: 500; letter-spacing: .01em;
+    color: var(--muted); margin-top: 8px; }
   #hello-line b { color: var(--accent); font-weight: 700; }
   #party { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
     pointer-events: none; z-index: 99; }
-  #party .burst { font-size: 30px; font-weight: 800; padding: 22px 38px; border-radius: 18px;
+  #party .burst { font-size: 30px; font-weight: 800; letter-spacing: -.01em;
+    padding: 22px 38px; border-radius: 18px;
     background: var(--card); border: 1px solid var(--accent); color: var(--text);
     box-shadow: 0 0 60px var(--accent); animation: pop .5s ease-out; }
   @keyframes pop { 0% { transform: scale(.6); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
-  main { max-width: 780px; margin: 5vh auto 40px; padding: 0 24px; }
+  main { max-width: 780px; margin: 4vh auto 48px; padding: 0 24px; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
 """
 _CSS = r"""  .search { display: flex; background: var(--card); border: 1px solid var(--border);
-    border-radius: 16px; backdrop-filter: blur(14px); overflow: hidden;
+    border-radius: 16px; overflow: hidden;
     transition: border-color .15s, box-shadow .15s; }
-  .search:focus-within { border-color: var(--accent); box-shadow: 0 8px 32px rgba(91,157,255,.18); }
+  .search:focus-within { border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(91,157,255,.16); }
   .search select { background: transparent; color: var(--muted); border: none; outline: none;
-    padding: 0 10px 0 16px; font-size: 14px; cursor: pointer; }
-  .search select option { background: #141a2e; }
+    padding: 0 10px 0 16px; font-size: 13.5px; font-weight: 600; cursor: pointer; }
+  .search select option { background: var(--ld-panel, #10151f); }
   .search input { flex: 1; background: transparent; border: none; outline: none;
-    color: var(--text); font-size: 16px; padding: 15px 8px; }
-  .search button { background: linear-gradient(90deg, var(--accent), var(--accent2));
-    border: none; color: #fff; font-size: 15px; font-weight: 600; padding: 0 24px; cursor: pointer; }
-  .search button:hover { filter: brightness(1.12); }
-  .grid { margin-top: 26px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    color: var(--text); font-size: 16px; font-weight: 500; letter-spacing: .005em;
+    padding: 15px 8px; }
+  .search input::placeholder { color: var(--muted); opacity: .7; }
+  .search button { background: var(--accent); border: none; color: #fff;
+    font-size: 14.5px; font-weight: 650; letter-spacing: .02em; padding: 0 26px;
+    cursor: pointer; transition: filter .12s; }
+  .search button:hover { filter: brightness(1.1); }
+  .grid { margin-top: 24px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
   .tile { display: flex; flex-direction: column; align-items: center; gap: 8px;
     padding: 16px 6px 13px; background: var(--card); border: 1px solid var(--border);
     border-radius: 14px; text-decoration: none; color: var(--text); font-size: 12px;
+    font-weight: 600; letter-spacing: .01em;
     position: relative; transition: transform .12s, border-color .12s, background .12s; }
   .tile:hover { transform: translateY(-2px); border-color: rgba(120,170,255,.5); background: rgba(255,255,255,.09); }
   .tile .ico { font-size: 22px; }
@@ -92,47 +115,56 @@ _CSS = r"""  .search { display: flex; background: var(--card); border: 1px solid
     align-items: center; justify-content: center; color: #fff; font-size: 14px;
     font-weight: 700; text-shadow: 0 1px 2px rgba(0,0,0,.35); }
   .tile .del { position: absolute; top: 3px; right: 6px; color: var(--muted); font-size: 13px; opacity: 0; cursor: pointer; }
-  .tile:hover .del { opacity: 1; }
+  .tile:hover .del, .tile:focus-within .del { opacity: 1; }
   .tile.add { color: var(--muted); font-size: 24px; justify-content: center; cursor: pointer; }
-  .tile.add span { font-size: 11px; }
+  .tile.add span { font-size: 11px; font-weight: 600; letter-spacing: .05em; }
   .tile.hq { border-color: rgba(91,157,255,.45); background: rgba(91,157,255,.10); }
   .tile.hq:hover { border-color: var(--accent); background: rgba(91,157,255,.16); }
   .tile.research { border-color: rgba(56,189,248,.45); background: rgba(56,189,248,.10); }
   .tile.research:hover { border-color: var(--accent); background: rgba(56,189,248,.18); }
-  .section { margin-top: 26px; font-size: 11px; font-weight: 700; letter-spacing: 1.2px;
+  .section { margin-top: 28px; font-size: 11px; font-weight: 700; letter-spacing: .18em;
     text-transform: uppercase; color: var(--muted); }
   #addform { margin-top: 14px; display: none; gap: 8px; }
   #addform input { flex: 1; background: var(--card); border: 1px solid var(--border);
-    border-radius: 10px; color: var(--text); padding: 10px 12px; font-size: 13px; outline: none; }
-  #addform button { background: var(--accent); border: none; color: #fff; border-radius: 10px; padding: 0 16px; cursor: pointer; }
+    border-radius: 10px; color: var(--text); padding: 10px 12px; font-size: 13.5px;
+    font-weight: 500; outline: none; }
+  #addform input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(91,157,255,.14); }
+  #addform button { background: var(--accent); border: none; color: #fff; border-radius: 10px;
+    padding: 0 18px; font-size: 13.5px; font-weight: 650; letter-spacing: .02em; cursor: pointer; }
+  #addform button:hover { filter: brightness(1.1); }
 
   /* Dual-mode Omnibar + AI Response Card */
   .mode-tabs { display: flex; gap: 8px; margin-bottom: 12px; justify-content: center; }
-  .mode-tab { padding: 6px 16px; border-radius: 999px; background: var(--card);
-    border: 1px solid var(--border); color: var(--muted); font-size: 12px; font-weight: 600;
-    cursor: pointer; transition: all .15s ease; user-select: none; }
+  .mode-tab { padding: 7px 18px; border-radius: 999px; background: var(--card);
+    border: 1px solid var(--border); color: var(--muted); font-size: 12px; font-weight: 650;
+    letter-spacing: .03em; cursor: pointer;
+    transition: color .15s, background .15s, border-color .15s; user-select: none; }
   .mode-tab:hover { color: var(--text); background: rgba(255,255,255,.09); }
-  .mode-tab.active { background: linear-gradient(90deg, var(--accent), var(--accent2));
-    border-color: transparent; color: #fff; box-shadow: 0 2px 14px rgba(91,157,255,.32); }
+  .mode-tab.active { background: var(--accent); border-color: transparent; color: #fff;
+    box-shadow: 0 2px 14px rgba(91,157,255,.30); }
 
   .ai-chips { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; justify-content: center; }
   .ai-chip { background: var(--card); border: 1px solid var(--border); border-radius: 999px;
-    padding: 5px 12px; font-size: 11.5px; color: var(--muted); cursor: pointer;
+    padding: 6px 13px; font-size: 11.5px; font-weight: 500; letter-spacing: .01em;
+    color: var(--muted); cursor: pointer;
     transition: transform .12s, border-color .12s, color .12s; }
   .ai-chip:hover { transform: translateY(-1px); border-color: var(--accent); color: var(--text); }
 
   #ai-card { margin-top: 20px; padding: 18px 22px; background: rgba(18,24,42,.88);
-    border: 1px solid var(--accent); border-radius: 16px; backdrop-filter: blur(20px);
+    border: 1px solid var(--accent); border-radius: 16px;
     box-shadow: 0 10px 40px rgba(0,0,0,.5), 0 0 25px rgba(91,157,255,.18);
     display: none; animation: pop .25s ease-out; text-align: left; }
   #ai-card-header { display: flex; justify-content: space-between; align-items: center;
     border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 12px; }
-  #ai-card-header .title { font-size: 13px; font-weight: 700; color: var(--accent); display: flex; align-items: center; gap: 6px; }
+  #ai-card-header .title { font-size: 13px; font-weight: 700; letter-spacing: .05em;
+    color: var(--accent); display: flex; align-items: center; gap: 6px; }
   #ai-card-header .actions { display: flex; gap: 6px; }
   .ai-btn { background: var(--card); border: 1px solid var(--border); color: var(--muted);
-    border-radius: 8px; font-size: 11.5px; padding: 4px 10px; cursor: pointer; transition: all .12s; }
+    border-radius: 8px; font-size: 11.5px; font-weight: 600; padding: 4px 10px;
+    cursor: pointer; transition: color .12s, border-color .12s; }
   .ai-btn:hover { color: var(--text); border-color: var(--accent); }
-  #ai-card-body { font-size: 13.5px; line-height: 1.65; color: var(--text); white-space: pre-wrap; word-break: break-word; }
+  #ai-card-body { font-size: 13.5px; font-weight: 400; line-height: 1.6; color: var(--text);
+    white-space: pre-wrap; word-break: break-word; }
 """
 
 # Shortcuts the dashboard itself documents (taglines in the JS below) — only

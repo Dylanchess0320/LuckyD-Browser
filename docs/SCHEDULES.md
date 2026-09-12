@@ -1,6 +1,6 @@
 # Scheduled Agents — works while you rest
 
-LuckyD 6.0 can run agents on a timetable, unattended: nightly research briefs,
+LuckyD can run agents on a timetable, unattended: nightly research briefs,
 morning price checks, weekly repo hygiene. You describe the task once; LuckyD
 does it while you sleep and leaves a digest for the morning.
 

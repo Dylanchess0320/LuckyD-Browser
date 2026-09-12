@@ -126,7 +126,7 @@ feature list. Launch Tuesday–Thursday.
 
 1. ☐ Repo About: description + topics + social preview image
 2. ☐ Push README.md + docs/screenshots/ + LICENSE
-3. ☐ Create Release v1.3.0 (paste RELEASE_NOTES.md, attach the Setup.exe + SHA-256)
+3. ☐ Create Release v8.0.0 (paste RELEASE_NOTES.md, attach the Setup.exe + SHA-256)
 4. ☐ Show HN, Tue–Thu 8–10am ET + first comment
 5. ☐ r/LocalLLaMA post (same day)
 6. ☐ X thread (same day, link HN in a reply if it trends)
