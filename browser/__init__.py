@@ -1,11 +1,11 @@
 """LuckyD Browser - a full-featured Chromium-based web browser for Windows."""
 
-__version__ = "6.0.0"
+__version__ = "7.0.0"
 
 # Shown once after an update (first launch with a new version).
 WHATS_NEW = (
-    "LuckyD v6.0.0 - Agentic: trust-first AI browsing — permission scopes, "
-    "an approval queue, and an append-only audit log on the /trust dashboard; "
-    "WebMCP site tools; scheduled background agents with a morning digest; "
-    "and an open skills marketplace."
+    "LuckyD v7.0.0 - Lucky polish: named apprentice voice, time-of-day "
+    "greetings, slim chrome, correct colors on older GPUs, plus everything "
+    "from 6.0.0 — trust-first browsing, WebMCP site tools, scheduled agents, "
+    "and the open skills marketplace."
 )

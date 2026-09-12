@@ -245,7 +245,7 @@ class TerminalUI:
         """Clean startup banner."""
         header = self._session_header()
         tip = "Type a task, or /help for commands"
-        agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v6.0.0").strip()
+        agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v7.0.0").strip()
         agent_name = os.environ.get("LUCKYD_AGENT_NAME", "").strip()
         ver_label = f"{agent_version}" + (f" ({agent_name})" if agent_name else "")
 

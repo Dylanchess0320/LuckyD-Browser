@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.0.0] - 2026-09-12
+
+Lucky polish: soul, slim chrome, correct colors — on top of everything in 6.0.0.
+
+**Added**
+
+- **Lucky identity** — named apprentice voice (suggest-only, never acts alone), time-of-day greeting on new-tab dashboard and AI sidebar, registered settings defaults, quiet toolbar update badge.
+- **Slim chrome** — toolbar emoji button cluster removed; dashboard Apps grid owns those actions (Ctrl+* shortcuts and menus remain).
+- **Official Windows installer** — `LuckyDBrowserSetup-7.0.0.exe`, built on a real Windows runner with Inno Setup 6. Per-user install, no admin needed, silent-install flags supported. Ships from the [releases page](https://github.com/Dylanchess0320/LuckyD-Browser/releases).
+- **Version unified to 7.0.0** everywhere — package, PyInstaller/Inno metadata, `LuckyDBrowser/7.0` user-agent, and docs.
+
+**Fixed**
+
+- **Colors on older GPUs** — software path now also disables GPU compositing and rasterization (2022-era AMD driver corrupts composited page tints and video).
+- **Dashboard polish** — duplicate Antigravity tile dropped; Agent Mesh Muse Spark entry removed.
+- **CI and encoding hygiene** — mojibake fixes, runnable Inno build helper.
+
 ## [6.0.0] - 2026-09-10
 
 The agentic frontier, shipped: trust-first AI browsing.

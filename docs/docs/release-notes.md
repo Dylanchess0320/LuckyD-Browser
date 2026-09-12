@@ -1,15 +1,15 @@
-# LuckyD Browser v6.0.0 — Release Notes
+# LuckyD Browser v7.0.0 — Release Notes
 
-**[⬇ Download `LuckyDBrowserSetup-6.0.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v6.0.0/LuckyDBrowserSetup-6.0.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed
+**[⬇ Download `LuckyDBrowserSetup-7.0.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v7.0.0/LuckyDBrowserSetup-7.0.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed
 
-v6.0.0 is the agentic frontier of LuckyD Browser: an AI browser you can trust
+v7.0.0 is the agentic frontier of LuckyD Browser: an AI browser you can trust
 with real agency. It adds a trust foundation that keeps receipts on everything
 the agents do — a **`/trust` dashboard**, permission scopes and risk levels,
 secret redaction, and an append-only audit log — plus **WebMCP** tool bindings
 for websites, **scheduled background agents** with a morning digest, and an
 **open Skills marketplace**, all shipped with an official Windows installer.
 
-## What's new in 6.0.0
+## What's new in 7.0.0
 
 - **Trust dashboard** (`/trust`) — "agentic with receipts": permission scopes
   and risk levels for every agent action, an approval queue, secret redaction
@@ -38,11 +38,11 @@ for websites, **scheduled background agents** with a morning digest, and an
 - **Open Skills marketplace** — skill registries (bundled + remote) with
   hash-verified **install/update/remove/publish**; tampered or unparseable
   skills are refused.
-- **Official Windows installer** (`LuckyDBrowserSetup-6.0.0.exe`), built on a
+- **Official Windows installer** (`LuckyDBrowserSetup-7.0.0.exe`), built on a
   real Windows runner with Inno Setup 6. Per-user install, no admin required.
-  Silent install: `LuckyDBrowserSetup-6.0.0.exe /VERYSILENT /NORESTART`.
-- **Version unified to 6.0.0** everywhere — package, PyInstaller/Inno metadata,
-  `LuckyDBrowser/6.0` user-agent, and docs — guarded by a regression test so it
+  Silent install: `LuckyDBrowserSetup-7.0.0.exe /VERYSILENT /NORESTART`.
+- **Version unified to 7.0.0** everywhere — package, PyInstaller/Inno metadata,
+  `LuckyDBrowser/7.0` user-agent, and docs — guarded by a regression test so it
   can't drift again.
 - **428 automated tests passing**, `ruff check` and `ruff format --check`
   clean, CI green — including an overnight hardening sweep of 32 bug fixes,
@@ -60,13 +60,13 @@ for websites, **scheduled background agents** with a morning digest, and an
 
 ## Upgrade
 
-Install `LuckyDBrowserSetup-6.0.0.exe` over your existing install — profile,
+Install `LuckyDBrowserSetup-7.0.0.exe` over your existing install — profile,
 bookmarks, and settings are preserved.
 
 ## Verify
 
 ```powershell
-# After install, the app reports 6.0.0 in Help → About and in the console banner.
+# After install, the app reports 7.0.0 in Help → About and in the console banner.
 ```
 
 ---

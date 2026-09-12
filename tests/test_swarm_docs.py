@@ -146,7 +146,7 @@ def test_no_stale_5x_for_current_release():
 def test_current_release_docs_say_6x():
     for page in ("index.md", "getting-started.md", "release-notes.md"):
         text = (DOCS_SITE / page).read_text(encoding="utf-8")
-        assert "6.0.0" in text, f"docs/docs/{page} never mentions 6.0.0"
+        assert "7.0.0" in text, f"docs/docs/{page} never mentions 7.0.0"
 
 
 # ---------------------------------------------------------------------------
@@ -177,6 +177,7 @@ def test_installer_exe_name_matches_iss():
         "RELEASE_NOTES_3.9.md",
         "RELEASE_NOTES_4.0.md",
         "RELEASE_NOTES_5.0.md",
+        "RELEASE_NOTES_6.0.md",
     }
     # Changelog sections for older versions ("## [5.0.0] - ...") name their
     # own era's installer too; only the current version's section is checked.
