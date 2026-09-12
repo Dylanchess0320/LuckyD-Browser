@@ -62,3 +62,18 @@ Use this skill when the user asks for "what should I watch", "movie suggestions"
 - Always mention the streaming service and whether it's included with subscription or
   rental/purchase.
 - If the user is in a region with different availability, ask or default to US.
+
+## Local backend (WhatToWatch legacy)
+
+When running with the user's files available, ground recommendations in the
+legacy app instead of guessing:
+
+- Mood → genre maps: `moods.py` (`MOODS`, 9 presets — Feel-good, Laugh out loud,
+  Mind-bending, Scary night, Date night, Epic adventure, True stories,
+  Edge of your seat, Family night; `mood_genres(name, media_type)` returns TMDB
+  genre ids for `movie`/`tv`).
+- Catalog + availability: `tmdb_client.py` (TMDB v3 Discover/search, poster URLs;
+  `demo_data.py: DemoClient` for offline fallback).
+- Personal state: `watchlist.py` (watchlist + watched), `ratings.py` (1–10),
+  `history.py` (recently viewed) — consult before suggesting, record picks after.
+- Android companion: `android-app/` builds `WhatToWatch.apk`.

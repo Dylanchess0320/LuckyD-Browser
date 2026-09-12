@@ -32,8 +32,6 @@ _SHELL_LABELS = {
     "grok": "Grok",
     "mesh-muse": "Muse Code",
     "muse": "Muse Code",
-    "mesh-muse-spark": "Muse Spark",
-    "muse-spark": "Muse Spark",
 }
 
 
@@ -53,7 +51,6 @@ _MESH_AGENTS = {
     "mesh-pi": ("Pi", "⚪", "#94a3b8", "minimal toolkit"),
     "mesh-grok": ("Grok", "𝕏", "#f1f5f9", "xAI · builder"),
     "mesh-muse": ("Muse Code", "Ⓜ️", "#0082fb", "Meta · native via WSL Ubuntu"),
-    "mesh-muse-spark": ("Muse Spark", "✨", "#c084fc", "Meta · via opencode, no WSL needed"),
 }
 
 

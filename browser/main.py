@@ -24,6 +24,29 @@ for path in (BASE.parent, BASE):
 # Playwright/browser-use control of the live tabs (see browser/README.md).
 os.environ.setdefault("QTWEBENGINE_REMOTE_DEBUGGING", "127.0.0.1:9222")
 
+
+def _apply_video_decode_flags() -> None:
+    """Force software video decode unless the user opted into GPU decode.
+
+    Must run before any QtWebEngine import: Chromium reads
+    QTWEBENGINE_CHROMIUM_FLAGS once at engine startup. Software decode is
+    the default because broken GPU decode on older drivers shows videos in
+    grayscale/tinted — correct colors beat marginally smoother 4K.
+    """
+    try:
+        from browser_core.settings import SettingsStore, webengine_chromium_flags
+
+        extra = webengine_chromium_flags(bool(SettingsStore().get("hw_video_decode", False)))
+        if extra:
+            prior = os.environ.get("QTWEBENGINE_CHROMIUM_FLAGS", "").strip()
+            combined = (prior + " " + extra).strip()
+            os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = combined
+    except Exception:
+        pass  # a flag problem must never block startup
+
+
+_apply_video_decode_flags()
+
 if getattr(sys, "frozen", False):
     # Packaged builds have no console — without this hook a startup exception
     # dies in a bare "Unhandled exception in script" dialog. Land it in a file

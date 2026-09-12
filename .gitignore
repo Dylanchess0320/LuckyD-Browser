@@ -96,6 +96,14 @@ luckyd-cli.exe
 luckyd-code-v3.6.exe
 Switch-ClineAccount.bat
 
+# Local agent-harness probing scratch — NEVER commit (these may embed live
+# API keys written into the script bodies, plus their captured output logs).
+scripts/_cat*.py
+scripts/_mprobe*.py
+scripts/_resp*.py
+scripts/_sess*.py
+scripts/_*.txt
+
 # Per-agent overlay env files + local dev scratch (never commit — may hold keys)
 .luckyd-agent-*.env
 .verify_*.py
@@ -123,6 +131,18 @@ selftest_err.txt
 browser/LuckyD-Launch/*.exe
 browser/installer/output/*.exe
 browser/installer/output/
+
+# ── LuckyD UI (React+Vite+Electron) ───────────────────────────────────
+apps/luckyd-ui/dist/
+apps/luckyd-ui/vite_dev.log
+apps/luckyd-ui/build-out.log
+apps/luckyd-ui/build-err.log
+apps/luckyd-ui/build-run.log
+apps/luckyd-ui/eb.log
+apps/luckyd-ui/release/
+# PyInstaller work + bundled bridge exe for the UI sidecar (build artifacts)
+apps/luckyd-ui/scripts/build/
+apps/luckyd-ui/scripts/dist/
 
 # ── Nexus app (Capacitor/React) build artifacts ───────────────────────
 *.apk

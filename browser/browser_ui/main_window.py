@@ -102,6 +102,9 @@ class MainWindow(QMainWindow):
         self.tabs = BrowserTabWidget(self)
         self.setCentralWidget(self.tabs)
 
+        # Quiet update badge state BEFORE the toolbar creates the real QAction.
+        self._pending_update: dict | None = None
+        self._update_act = None
         self._build_toolbar()
         self._build_bookmark_bar()
         self._build_statusbar()
@@ -224,39 +227,44 @@ class MainWindow(QMainWindow):
         self.omnibox.navigate.connect(self.load_in_current_tab)
         bar.addWidget(self.omnibox)
 
+        # ── Quiet update badge (hidden until a silent check finds one) ──
+        self._update_act = QAction("⬆", self)
+        self._update_act.setToolTip("Update available — click to review")
+        self._update_act.setVisible(False)
+        self._update_act.triggered.connect(self._show_pending_update)
+        bar.addAction(self._update_act)
+
+        # Legacy toolbar buttons (star/AI/coding-agent/mesh/summarize/read)
+        # were removed in 7.0: the new-tab dashboard's Apps grid covers them
+        # with one click and the shortcuts still work (Ctrl+D, Ctrl+Shift+A,
+        # Ctrl+Shift+H, Ctrl+Alt+M, Ctrl+Shift+U, Ctrl+Shift+L). The actions
+        # still exist SOLELY because other code references them (e.g.
+        # _update_star → star_act, docks → ai_act); they are just never added
+        # to the navigation bar.
         self.star_act = QAction("☆", self)
         self.star_act.setToolTip("Bookmark this page (Ctrl+D) — ★ when saved")
         self.star_act.triggered.connect(self.toggle_bookmark)
-        bar.addAction(self.star_act)
 
-        # ── AI Assistant ───────────────────────────────────────────────
-        bar.addSeparator()
         self.ai_act = QAction("🤖", self)
         self.ai_act.setToolTip("AI Assistant — chat, summarise, vision, agent (Ctrl+Shift+A)")
         self.ai_act.setCheckable(True)
         self.ai_act.triggered.connect(self._toggle_assistant)
-        bar.addAction(self.ai_act)
 
-        # ── Coding Agent ───────────────────────────────────────────────
         hq_act = QAction("⌘", self)
         hq_act.setToolTip("Coding Agent workspace — 70+ tools, auto-start (Ctrl+Shift+H)")
         hq_act.triggered.connect(self.open_hq)
-        bar.addAction(hq_act)
 
         mesh_act = QAction("🕸", self)
         mesh_act.setToolTip("Agent Mesh — four parallel sessions (Ctrl+Alt+M)")
         mesh_act.triggered.connect(self.open_agent_mesh)
-        bar.addAction(mesh_act)
 
         summarize_act = QAction("✨", self)
         summarize_act.setToolTip("Summarize this page (Ctrl+Shift+U)")
         summarize_act.triggered.connect(self.summarize_page)
-        bar.addAction(summarize_act)
 
         self.read_act = QAction("🔊", self)
         self.read_act.setToolTip("Read this page aloud (Ctrl+Shift+L) — click again to stop")
         self.read_act.triggered.connect(self.read_aloud_page)
-        bar.addAction(self.read_act)
 
         if self.incognito:
             incog_label = QLabel(" 🕶 Incognito", self)
@@ -1867,17 +1875,14 @@ class MainWindow(QMainWindow):
         return current_version()
 
     def check_for_updates(self, silent: bool = False) -> None:
-        """Check GitHub for a newer release; offer to download + install."""
-        from PySide6.QtWidgets import QMessageBox
+        """Check GitHub for a newer release; offer to download + install.
 
-        if not getattr(sys, "frozen", False):
-            if not silent:
-                QMessageBox.information(
-                    self,
-                    "Updates",
-                    "You're running from source.\n\nUpdate with:\n  git pull",
-                )
-            return
+        Works both frozen and from-source. Frozen builds download + apply the
+        installer; source checkouts report the newer version and point at
+        ``git pull`` / the release page (there is no installer to apply).
+        Silent (startup) checks never show a modal — they raise the quiet
+        toolbar badge + toast instead.
+        """
 
         if self._update_checker is not None and self._update_checker.isRunning():
             return  # a check is already in flight
@@ -1914,6 +1919,10 @@ class MainWindow(QMainWindow):
             checker.deleteLater()
 
     def _on_no_update(self, silent: bool) -> None:
+        self._pending_update = None
+        with contextlib.suppress(Exception):
+            if getattr(self, "_update_act", None) is not None:
+                self._update_act.setVisible(False)
         if not silent:
             from PySide6.QtWidgets import QMessageBox
 
@@ -1933,6 +1942,26 @@ class MainWindow(QMainWindow):
                 f"Could not check for updates:\n{message}",
             )
 
+    def _show_update_badge(self, info: dict) -> None:
+        """Reveal the quiet toolbar update badge for a pending release."""
+        version = str(info.get("version") or "?")
+        act = getattr(self, "_update_act", None)
+        if act is not None:
+            with contextlib.suppress(Exception):
+                act.setToolTip(
+                    f"Update to v{version} available "
+                    f"(you have v{self._current_version()}) — click to review"
+                )
+                act.setVisible(True)
+
+    def _show_pending_update(self) -> None:
+        """Toolbar badge clicked: re-present the pending update modally."""
+        info = dict(getattr(self, "_pending_update", None) or {})
+        if not info:
+            self.check_for_updates(silent=False)
+            return
+        self._on_update_available(info, silent=False)
+
     def _on_update_available(self, info: dict, silent: bool) -> None:
         from PySide6.QtWidgets import QMessageBox
 
@@ -1944,6 +1973,50 @@ class MainWindow(QMainWindow):
         except Exception:
             skipped = ""
         if skipped and skipped == str(version):
+            return
+
+        from_source = not getattr(sys, "frozen", False)
+
+        # ── From-source: report, don't install. ──────────────────────
+        if from_source:
+            self._pending_update = dict(info)
+            if silent:
+                self.toast(
+                    f"Version {version} available "
+                    f"(you have v{self._current_version()}, running from source) — "
+                    "see Help > Check for Updates",
+                    "info",
+                )
+                return
+            from PySide6.QtWidgets import QMessageBox
+
+            box = QMessageBox(self)
+            box.setWindowTitle("Update Available")
+            box.setIcon(QMessageBox.Icon.Information)
+            box.setText(
+                f"<b>Version {version}</b> is available "
+                f"(you have v{self._current_version()}, running from source).<br><br>"
+                "Update with:<br>&nbsp;&nbsp;<tt>git pull</tt><br><br>"
+                "Or grab the installer from the release page."
+            )
+            btn_page = box.addButton("Open Release Page", QMessageBox.ButtonRole.AcceptRole)
+            box.addButton("Close", QMessageBox.ButtonRole.RejectRole)
+            box.exec()
+            if box.clickedButton() is btn_page:
+                page = str(info.get("url") or info.get("installer_url") or "")
+                if page:
+                    self.open_in_new_tab(QUrl(page))
+            return
+
+        # ── Frozen + silent (startup): quiet badge, never a modal. ───
+        if silent:
+            self._pending_update = dict(info)
+            self._show_update_badge(info)
+            self.toast(
+                f"Version {version} available — click ⬆ to update "
+                f"(you have v{self._current_version()})",
+                "info",
+            )
             return
 
         size_mb = float(info.get("installer_size") or 0) / (1024 * 1024)
@@ -1988,8 +2061,22 @@ class MainWindow(QMainWindow):
                 self.toast(f"Will skip version {version}", "info")
             except Exception:
                 pass
+            self._pending_update = None
+            with contextlib.suppress(Exception):
+                if getattr(self, "_update_act", None) is not None:
+                    self._update_act.setVisible(False)
 
     def _start_update_download(self, info: dict) -> None:
+        # Source checkouts have no installer to apply — open the page.
+        if not getattr(sys, "frozen", False):
+            page = str(info.get("url") or info.get("installer_url") or "")
+            if page:
+                self.toast("Running from source — opening the release page", "info")
+                self.open_in_new_tab(QUrl(page))
+            else:
+                self.toast("Update with: git pull", "info")
+            return
+
         url = str(info.get("installer_url") or "")
         if not url:
             # No direct installer asset attached to the release (e.g. the

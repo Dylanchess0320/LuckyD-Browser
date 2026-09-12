@@ -99,6 +99,9 @@ PALETTES: dict[str, dict[str, str]] = {
         "danger": "#dc2626",
         "ok": "#059669",
     },
+    # NOTE: theme.py also ships the unlockable "synthwave" palette; it is
+    # intentionally NOT mirrored here — control-server/dashboard HTML only
+    # needs the four user-visible themes, and unknown names fall back to neon.
 }
 
 DEFAULT_THEME = "neon"

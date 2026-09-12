@@ -22,6 +22,11 @@ try:
 except ImportError:  # imported as browser.browser_core.dashboard
     from browser.browser_core.page_shell import VARS_PLACEHOLDER, page_head
 
+try:
+    from browser_core.brand import css_vars as _css_vars
+except ImportError:  # imported as browser.browser_core.dashboard
+    from browser.browser_core.brand import css_vars as _css_vars
+
 # Dashboard-specific CSS — the shared head (doctype, token injection, base body
 # styles, toast helper, "?" shortcut overlay) comes from page_shell.
 _DASH_CSS = r"""  :root {
@@ -53,8 +58,8 @@ _DASH_CSS = r"""  :root {
   #clock { text-align: right; }
   #clock .time { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
   #clock .date { font-size: 12px; color: var(--muted); }
-  #hello-line { font-size: 12.5px; color: var(--muted); margin-top: 3px; }
-  #hello-line b { color: var(--text); }
+  #hello-line { font-size: 14px; color: var(--muted); margin-top: 6px; }
+  #hello-line b { color: var(--accent); font-weight: 700; }
   #party { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
     pointer-events: none; z-index: 99; }
   #party .burst { font-size: 30px; font-weight: 800; padding: 22px 38px; border-radius: 18px;
@@ -212,7 +217,6 @@ const APPS = [
   ['🤖', 'AI Assistant', 'luckyd://assistant'],
   ['🕸️', 'Agent Mesh', '/mesh'],
   ['🖥️', 'Agent Terminal', '/terminal'],
-  ['🛸', 'Antigravity CLI', '/terminal?shell=mesh-agy'],
   ['🎬', 'Workflows', '/workflows'],
   ['📡', 'Network', '/network'],
   ['🔖', 'Bookmarks', 'luckyd://bookmarks'],
@@ -251,8 +255,8 @@ const TAGLINES = [
 ];
 (function greet() {
   const h = new Date().getHours();
-  document.getElementById('hello').textContent =
-    (h < 5 ? 'Up late' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening') + ' —';
+  const part = (h < 5 ? 'Up late' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening');
+  document.getElementById('hello').textContent = '🍀 ' + part + ' — Lucky\'s ready.';
   document.getElementById('tagline').textContent = TAGLINES[Math.floor(Math.random() * TAGLINES.length)];
 })();
 
@@ -461,13 +465,11 @@ def dashboard_html(settings=None) -> str:
     own profile (4.0) — no token is injected into the page, and the
     dashboard's same-origin fetch() calls authenticate automatically.
     """
-    from browser_core.brand import css_vars
-
-    block = "  " + css_vars(settings) + "\n"
+    block = "  " + _css_vars(settings) + "\n"
     if VARS_PLACEHOLDER in DASHBOARD_HTML:
         html = DASHBOARD_HTML.replace("  " + VARS_PLACEHOLDER + "\n", block, 1)
     else:
-        html = "<style>" + css_vars(settings) + "</style>" + DASHBOARD_HTML
+        html = "<style>" + _css_vars(settings) + "</style>" + DASHBOARD_HTML
     # Platform tiles: registry-driven extras appended to the built-in Apps.
     try:
         from browser_core.tile_registry import load_tiles
@@ -602,9 +604,7 @@ def hq_shell_html(harness_url: str, settings=None) -> str:
     header bar plus a same-origin iframe that re-paints the exe UI with the
     browser's active theme gradient (JS can reach in because both pages are
     127.0.0.1 loopback — treated as same-origin even across ports)."""
-    from browser_core.brand import css_vars
-
-    return _HQ_SHELL_TMPL.replace("__BRAND_VARS__", css_vars(settings), 1).replace(
+    return _HQ_SHELL_TMPL.replace("__BRAND_VARS__", _css_vars(settings), 1).replace(
         "__HARNESS_URL__", harness_url
     )
 

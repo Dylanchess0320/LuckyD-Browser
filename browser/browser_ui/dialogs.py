@@ -278,6 +278,15 @@ class SettingsDialog(QDialog):
         self.memory_saver.setChecked(bool(settings.get("memory_saver", True)))
         gform.addRow(self.memory_saver)
 
+        self.hw_video = QCheckBox("Hardware video decoding (faster; restart to apply)", self)
+        self.hw_video.setToolTip(
+            "ON = GPU-accelerated video (smoother 4K, but some older drivers show\n"
+            "videos in black-and-white or tinted).\n"
+            "OFF = reliable colors on every GPU (recommended)."
+        )
+        self.hw_video.setChecked(bool(settings.get("hw_video_decode", False)))
+        gform.addRow(self.hw_video)
+
         tabs.addTab(general, "General")
 
         # ── Privacy ───────────────────────────────────────────────
@@ -396,6 +405,7 @@ class SettingsDialog(QDialog):
         self._settings.set("adblock_enabled", self.adblock.isChecked())
         self._settings.set("https_only", self.https_only.isChecked())
         self._settings.set("memory_saver", self.memory_saver.isChecked())
+        self._settings.set("hw_video_decode", self.hw_video.isChecked())
         self._settings.set("harness_autostart", self.autostart.isChecked())
         self._settings.set("dashboard_newtab", self.dash.isChecked())
         self._settings.set("assistant_visible_startup", self.assistant_startup.isChecked())

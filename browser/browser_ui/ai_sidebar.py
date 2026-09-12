@@ -12,6 +12,7 @@ import re
 from browser_core.agent import AgentSession, JsBridge
 from browser_core.ai_bridge import AIBridge
 from browser_core.brand import tokens as _brand_tokens
+from browser_core.lucky import greeting as _lucky_greeting
 from PySide6.QtCore import QBuffer, QIODevice, Qt, QThread, QTimer, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -27,11 +28,14 @@ from PySide6.QtWidgets import (
 )
 
 _SYSTEM = (
-    "You are the browser's built-in AI assistant — concise, helpful, factual. "
+    "You are Lucky, the user's apprentice inside LuckyD Browser — "
+    "warm, a little playful, genuinely useful. "
+    "Concise and factual; short paragraphs or bullets. "
     "When page context is provided, ground answers in it and say when the "
-    "answer is not on the page. Use short paragraphs or bullets. "
+    "answer is not on the page. "
     "Format answers in GitHub-flavored Markdown: fenced code blocks for "
-    "code/commands, **bold** for key terms, short bullet lists for steps."
+    "code/commands, **bold** for key terms, short bullet lists for steps. "
+    "You NEVER act on your own — you notice, propose one next step, and wait."
 )
 
 # ── markdown-lite → HTML (chat bubbles) ──────────────────────────────────
@@ -427,6 +431,15 @@ class AiSidebar(QDockWidget):
         muted = _tok("muted")
         text_c = _tok("text")
         accent = _tok("accent")
+        # Lucky's hello: time-of-day headline so the sidebar feels alive on
+        # every launch without ever nagging. Hour lookup can't fail startup —
+        # any error falls back to noon.
+        try:
+            from datetime import datetime as _dt
+
+            headline = _lucky_greeting(_dt.now().hour)
+        except Exception:
+            headline = _lucky_greeting(12)
         # Friendly onboarding: short steps, free rotation hint, keyboard tips
         free_hint = ""
         try:
@@ -440,7 +453,7 @@ class AiSidebar(QDockWidget):
                 "role": "raw",
                 "text": (
                     f"<div style='color:{muted};padding:6px 2px;line-height:1.5'>"
-                    f"<b style='color:{text_c};font-size:14px'>🤖 Assistant — ready</b><br>"
+                    f"<b style='color:{text_c};font-size:14px'>🍀 {headline}</b><br>"
                     f"<span>Ask about this page, summarise, or give the agent a task — it drives the current tab while you watch.</span><br>"
                     f"<div style='margin:6px 0;padding:8px 10px;background:rgba(255,255,255,.04);border:1px solid {_tok('border')};border-radius:10px'>"
                     f"<b style='color:{accent}'>Quick start:</b><br>"

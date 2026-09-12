@@ -91,6 +91,23 @@ DEFAULTS = {
     "memory_saver": True,
     "memory_saver_freeze_sec": 300,
     "memory_saver_discard_sec": 900,
+    # Video decoding: False (default) forces software decode — correct colors
+    # on every GPU. Some older drivers (e.g. 2022-era AMD) corrupt
+    # hardware-decoded video (grayscale/tinted YouTube). True opts back into
+    # GPU decode for smoother high-res playback. Takes effect on restart
+    # (applied as a Chromium flag before QtWebEngine starts).
+    "hw_video_decode": False,
+    # 7.0 one-window model (Phase 2): these shipped in the UI/settings file
+    # before they were registered here, so fresh SettingsStore defaults and
+    # headless tests saw KeyErrors/missing toggles. Canonical values:
+    "vertical_tabs": False,
+    "dashboard_newtab": True,
+    "assistant_visible_startup": True,
+    "theme": "neon",
+    "ai_provider": "",
+    "ai_model_overrides": {},
+    "update_last_checked": "",
+    "last_seen_version": "",
 }
 
 
@@ -189,3 +206,20 @@ class SettingsStore:
             self._data.get("search_engine", "Google"), SEARCH_ENGINES["Google"]
         )
         return template.format(query=quote_plus(query))
+
+
+def webengine_chromium_flags(hw_video_decode: bool = False) -> str:
+    """Extra QTWEBENGINE_CHROMIUM_FLAGS for the video-decode mode.
+
+    Software decode (default) disables GPU video acceleration AND GPU
+    compositing/rasterization so colors render correctly on drivers with
+    broken hardware paths (this machine's 2022-era AMD driver corrupts
+    video AND composited page tints). Pure function so main.py can apply it
+    before QtWebEngine starts (and tests can pin it).
+    """
+    if hw_video_decode:
+        return ""
+    return (
+        "--disable-accelerated-video-decode "
+        "--disable-gpu-compositing --disable-gpu-rasterization"
+    )

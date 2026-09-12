@@ -18,6 +18,21 @@
       "sha256": "3ebee970ffd75c7a03cb9debf6de1cfe503f88faecd577aeb222a75265336ea8"
     },
     {
+      "name": "chess",
+      "description": "Analyze finished chess.com games with local Stockfish \u2014 per-move grades, accuracy, blunders and what to study next. Post-game only, never live assistance.",
+      "version": "1.0",
+      "author": "LuckyD Code",
+      "tags": [
+        "chess",
+        "analysis",
+        "stockfish",
+        "training",
+        "post-game"
+      ],
+      "url": "chess.md",
+      "sha256": "1906df92c4c4e5dfb73aa88aee6dd26e53dc9ec499e213eefb9c378fd629b8d6"
+    },
+    {
       "name": "graphify",
       "description": "Explore the codebase knowledge graph \u2014 architectural hubs, dependency paths, impact analysis, and semantic queries",
       "version": "1.0",
@@ -45,7 +60,7 @@
         "streaming"
       ],
       "url": "movie-picker.md",
-      "sha256": "0c35ddfffb0f4f8f1aa7b4f726ecba723b33388444bc263c984c53953d4b1f57"
+      "sha256": "0a8b9a03b976a582c722824ef3791aa8c76d14ca0e49d363d022e1fb028b95e3"
     },
     {
       "name": "top-picks",

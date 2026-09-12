@@ -1,0 +1,96 @@
+{
+  "name": "luckyd",
+  "productName": "LuckyD",
+  "version": "6.2.0",
+  "private": true,
+  "description": "LuckyD — your local AI platform. Chat-first desktop app on the Python backend. Zero backend changes required.",
+  "type": "module",
+  "main": "electron-main.cjs",
+  "scripts": {
+    "dev": "vite --port 5173 --strictPort",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --port 5173",
+    "electron:dev": "electron .",
+    "electron:build": "electron-builder --win --mac --linux",
+    "dist:win": "npm run build && electron-builder --win",
+    "installer": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-installer.ps1"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-markdown": "^9.1.0",
+    "remark-gfm": "^4.0.1",
+    "zustand": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.15",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11"
+  },
+  "optionalDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "ai.luckyd.app",
+    "productName": "LuckyD",
+    "copyright": "MIT © LuckyD",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron-main.cjs",
+      "preload.cjs",
+      "package.json",
+      "!node_modules/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../../browser/assets/professional_icon.ico",
+        "to": "icon.ico"
+      },
+      {
+        "from": "../../luckyd-code.exe",
+        "to": "backend/luckyd-code.exe"
+      },
+      {
+        "from": "scripts/dist/luckyd-agents-bridge.exe",
+        "to": "luckyd-agents-bridge.exe"
+      }
+    ],
+    "win": {
+      "target": ["nsis"],
+      "icon": "../../browser/assets/professional_icon.ico",
+      "artifactName": "LuckyD-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "LuckyD",
+      "uninstallDisplayName": "LuckyD",
+      "installerIcon": "../../browser/assets/professional_icon.ico",
+      "uninstallerIcon": "../../browser/assets/professional_icon.ico"
+    },
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "../../browser/assets/professional_icon.ico"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "category": "Utility"
+    }
+  },
+  "allowScripts": {
+    "electron@33.4.11": true,
+    "esbuild@0.21.5": true
+  }
+}

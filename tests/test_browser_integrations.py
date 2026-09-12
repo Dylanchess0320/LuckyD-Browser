@@ -217,28 +217,23 @@ def test_hermes_shell_boots_chat(monkeypatch, tmp_path: Path) -> None:
     assert cmd[1:] == ["chat"]
 
 
-def test_muse_spark_shell_pins_opencode_model(monkeypatch, tmp_path: Path) -> None:
-    """mesh-muse-spark must spawn opencode pinned to the Muse Spark model.
+def test_muse_spark_removed_from_mesh(monkeypatch, tmp_path: Path) -> None:
+    """Muse Spark was removed from the Agent Mesh (Dylan, 2026-09-12).
 
-    muse-spark has no Windows exe — it reuses opencode, so availability
-    follows the opencode install (works today, no WSL needed).
+    It duplicated Muse Code with a worse experience (no Windows exe, pinned
+    opencode + a contributor-free model), so both the dock chip and the
+    shell allowlist must NOT offer it. Native ``muse`` (WSL) is unchanged.
     """
     from browser.browser_core.terminal_page import _MESH_AGENTS, _SHELL_LABELS
-    from browser.browser_core.terminal_server import SHELLS, _mesh_shell_command
+    from browser.browser_core.terminal_server import SHELLS
 
-    assert "mesh-muse-spark" in SHELLS
-    assert "muse-spark" in SHELLS
-    assert "mesh-muse-spark" in _MESH_AGENTS
-    assert _SHELL_LABELS.get("mesh-muse-spark") == "Muse Spark"
-    mock_opencode = tmp_path / "opencode.cmd"
-    mock_opencode.touch()
-    monkeypatch.setattr(
-        "browser.browser_core.terminal_server._find_mesh_exe",
-        lambda exe: str(mock_opencode) if exe == "opencode" else None,
-    )
-    cmd = _mesh_shell_command("mesh-muse-spark")
-    assert cmd[0].lower().endswith("opencode.cmd")
-    assert cmd[1:] == ["--model", "opencode/muse-spark-1.3-contributor-free"]
+    assert "mesh-muse-spark" not in SHELLS
+    assert "muse-spark" not in SHELLS
+    assert "mesh-muse-spark" not in _MESH_AGENTS
+    assert "muse-spark" not in _SHELL_LABELS
+    # Native Muse Code survives.
+    assert "mesh-muse" in _MESH_AGENTS
+    assert _SHELL_LABELS.get("muse") == "Muse Code"
 
 
 def test_muse_shell_uses_wsl_bridge_without_probing_distro(monkeypatch, tmp_path: Path) -> None:

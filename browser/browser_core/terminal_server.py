@@ -319,12 +319,10 @@ SHELLS = (
     "mesh-pi",
     "mesh-grok",
     "mesh-muse",
-    "mesh-muse-spark",
     "agy",
     "antigravity",
     "grok",
     "muse",
-    "muse-spark",
 )
 
 # Agent Mesh shells: shell name -> executable resolved on PATH.
@@ -345,8 +343,6 @@ MESH_SHELLS = {
     "mesh-pi": "pi",
     "mesh-grok": "grok",
     "grok": "grok",
-    "mesh-muse-spark": "opencode",
-    "muse-spark": "opencode",
 }
 
 # Extra default args per mesh shell (appended after the resolved executable).
@@ -361,10 +357,6 @@ MESH_SHELLS = {
 MESH_SHELL_ARGS: dict[str, list[str]] = {
     "mesh-dsh": ["--profile", "web", "--no-open"],
     "mesh-hermes": ["chat"],
-    # muse-spark has no Windows exe — reuses opencode pinned to the Muse
-    # Spark model. Availability follows the opencode install (no WSL needed).
-    "mesh-muse-spark": ["--model", "opencode/muse-spark-1.3-contributor-free"],
-    "muse-spark": ["--model", "opencode/muse-spark-1.3-contributor-free"],
 }
 
 # Native Muse Code (`muse`) has no Windows build — Meta ships macOS/Linux

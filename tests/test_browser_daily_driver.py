@@ -103,3 +103,16 @@ def test_new_defaults_are_on() -> None:
     assert DEFAULTS["memory_saver"] is True
     assert DEFAULTS["memory_saver_freeze_sec"] == 300
     assert DEFAULTS["memory_saver_discard_sec"] == 900
+
+
+def test_software_video_decode_is_default() -> None:
+    """Colors-first default: GPU paths stay off unless opted in."""
+    from browser.browser_core.settings import webengine_chromium_flags
+
+    assert DEFAULTS["hw_video_decode"] is False
+    assert (
+        webengine_chromium_flags(False)
+        == "--disable-accelerated-video-decode "
+        "--disable-gpu-compositing --disable-gpu-rasterization"
+    )
+    assert webengine_chromium_flags(True) == ""
