@@ -806,7 +806,9 @@ def test_export_env_to_os_pushes_key_vars(monkeypatch) -> None:
         ai_bridge,
         "_load_env",
         lambda: {
-            "LUCKYD_N4_TEST_KEY": "secret-abc",
+            # NOTE: single-char fake value — no real secret here; keeps
+            # gitleaks' generic-api-key rule quiet.
+            "LUCKYD_N4_TEST_KEY": "v",
             "LUCKYD_N4_PLAIN": "nope",
             "LUCKYD_N4_MODEL": "m",
         },
@@ -816,7 +818,7 @@ def test_export_env_to_os_pushes_key_vars(monkeypatch) -> None:
     control_server._export_env_to_os()
     import os
 
-    assert os.environ["LUCKYD_N4_TEST_KEY"] == "secret-abc"
+    assert os.environ["LUCKYD_N4_TEST_KEY"] == "v"
     assert os.environ["LUCKYD_N4_MODEL"] == "m"
     assert "LUCKYD_N4_PLAIN" not in os.environ
 

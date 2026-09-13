@@ -233,18 +233,33 @@ def test_backend_error_becomes_500(server) -> None:
 
 
 def test_oversized_body_is_ignored(server) -> None:
-    """Content-Length > 1 MB must not be read into memory (OOM guard)."""
+    """Content-Length > 1 MB must not be read into memory (OOM guard).
+
+    The server may answer 400 (body dropped → url required) or slam the
+    connection shut mid-send — both mean the 2 MB body was never buffered.
+    Either way the server must stay alive for the next request.
+    """
     conn = http.client.HTTPConnection("127.0.0.1", server, timeout=10)
     big = b"x" * (2 << 20)
-    conn.request(
-        "POST",
-        "/navigate",
-        body=big,
-        headers={"Content-Type": "application/json", **_authz()},
-    )
-    resp = conn.getresponse()
-    assert resp.status == 400  # body dropped → url required
-    conn.close()
+    try:
+        conn.request(
+            "POST",
+            "/navigate",
+            body=big,
+            headers={"Content-Type": "application/json", **_authz()},
+        )
+        resp = conn.getresponse()
+        assert resp.status == 400  # body dropped → url required
+        resp.read()
+    except (BrokenPipeError, ConnectionResetError):
+        # Server closed the connection instead of reading the body.
+        # OOM guard held — this is the racy-but-valid outcome on CI.
+        pass
+    finally:
+        conn.close()
+    # Liveness: the server still answers afterwards.
+    status, _, _ = _req(server, "GET", "/tabs", headers=_authz())
+    assert status == 200
 
 
 def test_malformed_json_body_is_ignored(server) -> None:
