@@ -22,6 +22,7 @@ from pathlib import Path
 
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding as apadding
+from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.serialization import load_pem_private_key
 
 HERE = Path(__file__).resolve().parent
@@ -88,6 +89,13 @@ def main() -> int:
         print("key.pem missing — run gen_key.py first")
         return 1
     key = load_pem_private_key(KEYFILE.read_bytes(), password=None)
+    # CRX3 only supports sha256_with_rsa — reject non-RSA keys up front
+    # instead of failing deep in the signing call. (Newer `cryptography`
+    # versions widen load_pem_private_key's return union with ML-DSA/ML-KEM
+    # types, so the isinstance check also keeps mypy honest.)
+    if not isinstance(key, rsa.RSAPrivateKey):
+        print("key.pem must be an RSA private key (CRX3 uses sha256_with_rsa)")
+        return 1
     pub_der = key.public_key().public_bytes(
         serialization.Encoding.DER,
         serialization.PublicFormat.SubjectPublicKeyInfo,

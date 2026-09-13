@@ -9,12 +9,18 @@ from __future__ import annotations
 
 import re
 from datetime import datetime, timezone
+from typing import Any
 from urllib.parse import urlparse
 
+# Optional domain helper. Declared as Any (not `import ... except: = None`)
+# so the assignment type-checks whether or not tldextract is installed.
+tldextract: Any = None
 try:
-    import tldextract
+    import tldextract as _tldextract_real
+
+    tldextract = _tldextract_real
 except Exception:
-    tldextract = None
+    pass
 
 # Domains that tend to be high-quality primary or reputable sources.
 _HIGH_QUALITY = {

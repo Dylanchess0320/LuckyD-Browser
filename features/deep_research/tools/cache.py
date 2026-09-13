@@ -13,11 +13,6 @@ import threading
 import time
 from pathlib import Path
 
-try:
-    import tldextract  # optional; only used for domain helpers
-except Exception:
-    tldextract = None
-
 from ..config import settings
 
 

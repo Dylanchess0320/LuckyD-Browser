@@ -12,6 +12,7 @@ Returns EvidenceCards with snippets; ``[]`` when unavailable.
 from __future__ import annotations
 
 import html as _html
+import importlib
 import re as _re
 import urllib.parse as _urlparse
 
@@ -20,18 +21,14 @@ from .search_base import SearchProvider
 
 
 def _load_ddgs():
-    try:
-        from ddgs import DDGS
-
-        return DDGS
-    except Exception:
-        pass
-    try:
-        from duckduckgo_search import DDGS
-
-        return DDGS
-    except Exception:
-        return None
+    # Prefer the modern `ddgs` package, fall back to the legacy shim name.
+    # importlib (not repeated from-imports) keeps mypy happy: no redefinition.
+    for _mod in ("ddgs", "duckduckgo_search"):
+        try:
+            return importlib.import_module(_mod).DDGS
+        except Exception:
+            continue
+    return None
 
 
 def _ddg_html_fallback(query: str, max_results: int = 8) -> list[EvidenceCard]:
