@@ -283,6 +283,18 @@ class ReflectionEngine:
                 )
                 for d in self.config.dimensions
             ]
+        except Exception:
+            # LLM caller itself failed (network, timeout, auth) — degrade
+            # gracefully instead of crashing the agent turn.
+            return [
+                QualityScore(
+                    dimension=d,
+                    score=0.5,
+                    feedback="Reflection unavailable",
+                    suggestion="",
+                )
+                for d in self.config.dimensions
+            ]
 
     async def _improve_output(self, request: str, output: str, feedback: str) -> str:
         """Generate an improved version of the output."""

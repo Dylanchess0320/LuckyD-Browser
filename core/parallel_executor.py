@@ -307,6 +307,45 @@ class ParallelExecutor:
 # ── Convenience: auto-parallelize tool calls from LLM response ────────
 
 
+def _balanced_json_arrays(text: str) -> list[str]:
+    """Find `[...]` regions with balanced brackets, respecting string literals.
+
+    The old regex (`[^]]*`) could not match objects containing nested arrays,
+    which made the explicitly-supported ``depends_on`` field unparseable.
+    """
+    regions: list[str] = []
+    i, n = 0, len(text)
+    while i < n:
+        if text[i] != "[":
+            i += 1
+            continue
+        depth = 0
+        in_str = False
+        escaped = False
+        j = i
+        while j < n:
+            ch = text[j]
+            if in_str:
+                if escaped:
+                    escaped = False
+                elif ch == "\\":
+                    escaped = True
+                elif ch == '"':
+                    in_str = False
+            elif ch == '"':
+                in_str = True
+            elif ch == "[":
+                depth += 1
+            elif ch == "]":
+                depth -= 1
+                if depth == 0:
+                    regions.append(text[i : j + 1])
+                    break
+            j += 1
+        i = j + 1 if depth == 0 else i + 1
+    return regions
+
+
 def extract_tool_calls(response_text: str) -> list[ToolCall]:
     """Parse tool calls from LLM response text (JSON format).
 
@@ -314,31 +353,28 @@ def extract_tool_calls(response_text: str) -> list[ToolCall]:
     Returns empty list if no valid tool calls found.
     """
     import json
-    import re
 
     calls: list[ToolCall] = []
 
     # Look for JSON arrays containing tool call objects
     # Pattern: [{"name": "...", "arguments": {...}}, ...]
-    pattern = r'\[(\s*\{[^]]*"name"[^]]*\}\s*,?)+\s*\]'
-    matches = re.findall(pattern, response_text, re.DOTALL)
-
-    for i, match in enumerate(matches):
+    for i, region in enumerate(_balanced_json_arrays(response_text)):
         try:
-            parsed = json.loads(f"[{match}]")
-            if isinstance(parsed, list):
-                for j, item in enumerate(parsed):
-                    if isinstance(item, dict) and "name" in item:
-                        calls.append(
-                            ToolCall(
-                                id=f"{i}_{j}",
-                                name=item["name"],
-                                arguments=item.get("arguments", {}),
-                                depends_on=item.get("depends_on", []),
-                            )
-                        )
+            parsed = json.loads(region)
         except json.JSONDecodeError:
             continue
+        if not isinstance(parsed, list):
+            continue
+        for j, item in enumerate(parsed):
+            if isinstance(item, dict) and "name" in item:
+                calls.append(
+                    ToolCall(
+                        id=f"{i}_{j}",
+                        name=item["name"],
+                        arguments=item.get("arguments", {}),
+                        depends_on=item.get("depends_on", []),
+                    )
+                )
 
     return calls
 

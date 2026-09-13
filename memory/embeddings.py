@@ -112,11 +112,11 @@ def encode(texts: list[str], batch_size: int = MAX_BATCH) -> list[list[float]]:
 
     Returns empty list if ONNX is unavailable.
     """
-    import numpy as np
-    import torch
-
     if not is_available():
         return []
+
+    import numpy as np
+    import torch
 
     all_embeddings: list[np.ndarray] = []
 

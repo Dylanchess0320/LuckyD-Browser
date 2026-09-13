@@ -144,7 +144,7 @@ class DesktopKeyboardTool(ToolBase):
                 preview = text[:50] + ("..." if len(text) > 50 else "")
                 return ToolOutput(text=f"Typed: '{preview}'", title="Keyboard Type")
             elif action == "press":
-                await asyncio.to_thread(pyautogui.press(text))
+                await asyncio.to_thread(pyautogui.press, text)
                 return ToolOutput(text=f"Pressed: {text}", title="Key Press")
             elif action == "hotkey":
                 keys = [k.strip() for k in text.split("+")]

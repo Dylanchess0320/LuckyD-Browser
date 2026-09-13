@@ -41,7 +41,7 @@ class _QtThreadStub:
     updater's UpdateChecker / ReleaseDownloader."""
 
     def __init__(self, *args, **kwargs):
-        pass
+        self._interrupted = False
 
     def start(self):
         pass
@@ -51,6 +51,12 @@ class _QtThreadStub:
 
     def isRunning(self):  # noqa: N802 — mirrors QThread API
         return False
+
+    def requestInterruption(self):  # noqa: N802 — mirrors QThread API
+        self._interrupted = True
+
+    def isInterruptionRequested(self):  # noqa: N802 — mirrors QThread API
+        return self._interrupted
 
 
 sys.modules["PySide6.QtWebEngineCore"].QWebEngineUrlRequestInterceptor = _QtInterceptorStub

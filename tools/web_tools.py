@@ -187,7 +187,7 @@ class HttpTool(ToolBase):
                     text="Refused: bearer tokens are only sent over HTTPS",
                     error=True,
                 )
-            req_headers = headers or {}
+            req_headers = dict(headers) if headers else {}
             if bearer_token:
                 req_headers["Authorization"] = f"Bearer {bearer_token}"
 

@@ -29,7 +29,10 @@ BUILTIN_DIR = Path(__file__).resolve().parent.parent / "assets" / "userscripts"
 USER_DIR = DATA_DIR / "userscripts"
 
 _META_RE = re.compile(r"==UserScript==(.*?)==/UserScript==", re.DOTALL)
-_TAG_RE = re.compile(r"@(\w[\w-]*)\s+(.*)")
+# Tag values stay on their own line: \s+ would cross the newline and capture
+# the next line's "//" comment prefix as the value (e.g. a bare "// @name"
+# line produced the name "//"). A missing/blank value is now ignored.
+_TAG_RE = re.compile(r"@(\w[\w-]*)[ \t]+([^\n]*)")
 
 
 @dataclass

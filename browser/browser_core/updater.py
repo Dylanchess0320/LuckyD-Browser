@@ -142,8 +142,17 @@ def parse_version(text: str) -> tuple:
     return tuple(int(n) for n in nums) if nums else (0,)
 
 
-def is_newer(candidate: str, current: str = CURRENT_VERSION) -> bool:
-    """True if candidate version is strictly newer than the running version."""
+def is_newer(candidate: str, current: str | None = None) -> bool:
+    """True if candidate version is strictly newer than the running version.
+
+    ``current`` defaults to the live running version. It must NOT be bound
+    as ``= CURRENT_VERSION`` at def time: current_version() can refresh the
+    global later (frozen exe reading its FileVersion), and a def-time
+    default would keep comparing against the stale import-time value —
+    making every release look newer forever.
+    """
+    if current is None:
+        current = current_version()
     c, cur = parse_version(candidate), parse_version(current)
     # Pad to equal length so (1,4) < (1,4,1) compares correctly.
     n = max(len(c), len(cur))

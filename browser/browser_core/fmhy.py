@@ -127,9 +127,11 @@ class FmhyIndex:
             ).lower()
             score = 0
             for term in terms:
-                if term in hay:
-                    score += 3 if term in entry["name"].lower() else 1
-            if score >= len(terms):  # every term must match something
+                if term not in hay:
+                    break  # every term must match something — a single
+                # name hit (+3) must not compensate for an unmatched term.
+                score += 3 if term in entry["name"].lower() else 1
+            else:
                 scored.append((score, entry))
         scored.sort(key=lambda item: item[0], reverse=True)
         return [entry for _score, entry in scored[:limit]]

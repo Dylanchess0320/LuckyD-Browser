@@ -484,10 +484,14 @@ class BrowserEmulateTool(ToolBase):
                 if device in dir(pw_devices):
                     device_name = device
                 else:
-                    # Fuzzy match
-                    dlow = device.lower()
+                    # Fuzzy match, ignoring separators: "iPhone 12" must match
+                    # the "iPhone_12" attribute (spaces never appear in attr names).
+                    def _norm(s: str) -> str:
+                        return "".join(ch for ch in s.lower() if ch.isalnum())
+
+                    target = _norm(device)
                     for name in dir(pw_devices):
-                        if not name.startswith("_") and dlow in name.lower():
+                        if not name.startswith("_") and target and target in _norm(name):
                             device_name = name
                             break
                 if device_name:

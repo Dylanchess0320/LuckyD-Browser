@@ -156,7 +156,7 @@ _ERROR_PATTERNS: list[ErrorPattern] = [
     ),
     ErrorPattern(
         exception_type="KeyError",
-        regex=re.compile(r"KeyError: (?P<key>.+)"),
+        regex=re.compile(r"(?P<key>.+)"),
         likely_causes=[
             "The dictionary key does not exist.",
             "Case-sensitivity mismatch (e.g. 'Name' vs 'name').",
