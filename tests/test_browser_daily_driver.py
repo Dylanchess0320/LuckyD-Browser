@@ -113,5 +113,6 @@ def test_software_video_decode_is_default() -> None:
     assert (
         webengine_chromium_flags(False) == "--disable-accelerated-video-decode "
         "--disable-gpu-compositing --disable-gpu-rasterization"
+        " --force-color-profile=srgb"
     )
     assert webengine_chromium_flags(True) == ""

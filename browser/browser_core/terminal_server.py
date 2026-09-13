@@ -352,19 +352,18 @@ MESH_SHELLS = {
 }
 
 # Extra default args per mesh shell (appended after the resolved executable).
-# dsh is a profile launcher — a bare `dsh` with no args exits immediately with
-# `error: --profile <name> is required`. The only profile shipped out of the
-# box is `web` (serves the harness UI on 127.0.0.1:3080), so boot that.
-# `--no-open` avoids popping the OS default browser on every spawn — the user
-# is already inside LuckyD Browser and can navigate to the URL themselves.
+# dsh (DeepSeek Harness 0.1.x) launches its web UI with `dsh web`. The old
+# `--profile web` flag form this used is no longer the launch command, and
+# `--no-open` was never a real dsh flag — the pane died on it. (A bare `dsh`
+# with no args exits immediately, which is why args are needed at all.)
 # hermes likewise needs its explicit `chat` subcommand — a bare `hermes`
 # exits immediately on a closed stdin, which showed up as an instantly dead
 # terminal pane (same class of bug as the dsh one above).
 MESH_SHELL_ARGS: dict[str, list[str]] = {
-    "mesh-dsh": ["--profile", "web", "--no-open"],
-    "mesh-deepseek": ["--profile", "web", "--no-open"],
-    "deepseek": ["--profile", "web", "--no-open"],
-    "dsh": ["--profile", "web", "--no-open"],
+    "mesh-dsh": ["web"],
+    "mesh-deepseek": ["web"],
+    "deepseek": ["web"],
+    "dsh": ["web"],
     "mesh-hermes": ["chat"],
 }
 

@@ -1,4 +1,29 @@
-# LuckyD Browser v8.0.0 — Release Notes
+# LuckyD Browser — Release Notes
+
+## [9.0.0] — Reliability release
+
+**`LuckyDBrowserSetup-9.0.0.exe`** — Windows 10/11 x64 · per-user install · no admin needed
+
+- **Ollama detection fixed** — local AI is found even when a proxy/VPN is set
+  (localhost no longer routed through the proxy), and the chat path bypasses
+  it too.
+- **Honest AI status** — the dashboard pill now says exactly what's wrong:
+  "Ollama not running", "no models pulled", or the working providers.
+- **OpenCode Zen updated** — Zen's old keyless $0 tier is gone (every keyless
+  call 401s now). Zen registers only with `OPENCODE_API_KEY` and serves its
+  current platform catalog; the default model is `gemini-3.5-flash-lite`.
+- **DeepSeek Harness boots** — Agent Mesh now spawns `dsh web` (the old
+  `--profile web --no-open` invocation is no longer valid).
+- **Ctrl+K palette fixed** — the command palette takes keyboard focus again.
+- **Readable home page** — shortcut labels get brighter type with text shadow.
+- **YouTube colors fixed** — `--force-color-profile=srgb` on the software
+  video path (was rendering with wrong BT.601 colorimetry).
+
+On top of everything from 8.0.0.
+
+---
+
+## [8.0.0] — The Cleanup, phase one
 
 **[⬇ Download `LuckyDBrowserSetup-8.0.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v8.0.0/LuckyDBrowserSetup-8.0.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed
 

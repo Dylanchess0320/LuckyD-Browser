@@ -1,9 +1,10 @@
 """Fallback-default regression tests for browser/browser_core/ai_bridge.py.
 
-QUICK-WIN FIX 2: when no Ollama/LM Studio server is reachable, no provider
-keys are configured, and Cline auth is absent, the default provider must be
-the OpenCode Zen $0 free gateway ("opencode", key optional) — never
-"clinepass" registered with an empty token (a dead end).
+HISTORY: these tests once asserted OpenCode Zen as a keyless $0 fallback.
+That tier died 2026-09 (verified: every keyless Zen chat call 401s), so
+Zen now registers ONLY with OPENCODE_API_KEY. With no local server, no
+keys, and no Cline auth there is simply no provider — the dashboard says
+so honestly instead of routing into a guaranteed 401.
 """
 
 from __future__ import annotations
@@ -38,10 +39,20 @@ def no_local_no_keys(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(cline_session, "has_session", lambda: False)
 
 
-def test_fallback_default_is_opencode_zen(no_local_no_keys) -> None:
-    """With no local server, no keys, no Cline auth → Zen gateway."""
+def test_fallback_default_is_opencode_zen(
+    no_local_no_keys, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With OPENCODE_API_KEY set → Zen gateway is the default."""
+    monkeypatch.setattr(ai_bridge, "_load_env", lambda: {"OPENCODE_API_KEY": "zk-test"})
     bridge = AIBridge()
     assert bridge.default_provider() == "opencode"
+
+
+def test_no_key_no_zen_registered(no_local_no_keys) -> None:
+    """Without OPENCODE_API_KEY, Zen must NOT register (keyless 401s)."""
+    bridge = AIBridge()
+    assert "opencode" not in bridge.providers()
+    assert bridge.default_provider() is None
 
 
 def test_fallback_default_never_empty_token_clinepass(no_local_no_keys) -> None:
@@ -49,19 +60,23 @@ def test_fallback_default_never_empty_token_clinepass(no_local_no_keys) -> None:
     bridge = AIBridge()
     default = bridge.default_provider()
     assert default != "clinepass"
-    token = bridge._configs[default][2]  # pyright: ignore[reportPrivateUsage]
-    # Zen is the only provider allowed to run keyless.
-    assert default == "opencode" or token
+    # No provider at all in this fixture — nothing may run keyless except
+    # local servers (none here).
+    assert default is None
 
 
-def test_opencode_zen_registered_keyless(no_local_no_keys) -> None:
-    """The Zen gateway is registered with no API key required."""
+def test_opencode_zen_registered_when_keyed(
+    no_local_no_keys, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The Zen gateway registers when OPENCODE_API_KEY is set."""
+    monkeypatch.setattr(ai_bridge, "_load_env", lambda: {"OPENCODE_API_KEY": "zk-test"})
     bridge = AIBridge()
     model, base, key, kind = bridge._configs["opencode"]
     assert "opencode.ai" in base
-    assert key == ""  # key optional — still usable
+    assert key == "zk-test"
     assert kind == "openai"  # OpenAI-compatible endpoint
-    assert model  # a default free model is pinned
+    assert model  # a default platform model is pinned
+    assert model in ai_bridge._ZEN_CATALOG
 
 
 def test_local_server_still_beats_zen(monkeypatch: pytest.MonkeyPatch) -> None:

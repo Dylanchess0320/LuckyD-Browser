@@ -820,9 +820,10 @@ class QtBrowserBackend:
             return {
                 "ai_providers": self._ai.providers(),
                 "ai_default": self._ai.default_provider(),
+                "ai_local_status": self._ai.local_status(),
             }
         except Exception:
-            return {"ai_providers": [], "ai_default": None}
+            return {"ai_providers": [], "ai_default": None, "ai_local_status": {}}
 
     def tabs(self) -> list[dict]:
         def _do():

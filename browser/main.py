@@ -41,6 +41,10 @@ def _apply_video_decode_flags() -> None:
             prior = os.environ.get("QTWEBENGINE_CHROMIUM_FLAGS", "").strip()
             combined = (prior + " " + extra).strip()
             os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = combined
+            # Logged so future "video colors still wrong" reports can be
+            # diagnosed against the user's actual settings.json (hw decode
+            # on/off changes this string entirely).
+            print(f"[luckyd] QTWEBENGINE_CHROMIUM_FLAGS={combined}", flush=True)
     except Exception:
         pass  # a flag problem must never block startup
 

@@ -174,11 +174,11 @@ def test_antigravity_cli_integration(monkeypatch, tmp_path: Path) -> None:
 
 
 def test_dsh_shell_boots_web_profile(monkeypatch, tmp_path: Path) -> None:
-    """mesh-dsh must spawn `dsh --profile web`, never a bare `dsh`.
+    """mesh-dsh must spawn `dsh web`, never a bare `dsh`.
 
-    dsh is a profile launcher: a bare invocation exits immediately with
-    `error: --profile <name> is required`, which showed up as an instantly
-    dead terminal pane when the DeepSeek chip was clicked.
+    Modern dsh (0.1.x) launches its web UI with the `web` subcommand; a bare
+    invocation exits immediately, which showed up as an instantly dead
+    terminal pane when the DeepSeek chip was clicked.
     """
     from browser.browser_core.terminal_server import _mesh_shell_command
 
@@ -190,7 +190,7 @@ def test_dsh_shell_boots_web_profile(monkeypatch, tmp_path: Path) -> None:
     )
     cmd = _mesh_shell_command("mesh-dsh")
     assert cmd[0].lower().endswith("dsh.cmd")
-    assert cmd[1:] == ["--profile", "web", "--no-open"]
+    assert cmd[1:] == ["web"]
 
 
 def test_hermes_shell_boots_chat(monkeypatch, tmp_path: Path) -> None:

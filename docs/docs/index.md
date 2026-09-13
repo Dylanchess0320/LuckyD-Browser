@@ -5,7 +5,7 @@
 <p class="tagline">The AI browser that runs <em>your</em> models — local, unlimited, offline — plus a full coding agent and real terminals in one window.</p>
 
 <div class="cta-row" markdown>
-[⬇ Download v8.0.0](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v8.0.0/LuckyDBrowserSetup-8.0.0.exe){ .luckyd-btn }
+[⬇ Download v8.0.0](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v8.0.0/LuckyDBrowserSetup-9.0.0.exe){ .luckyd-btn }
 [Getting started](getting-started.md){ .luckyd-btn-ghost }
 [What's new](release-notes.md){ .luckyd-btn-ghost }
 </div>
@@ -76,12 +76,12 @@
 
 ## Install in 10 seconds
 
-1. Get [**LuckyDBrowserSetup-8.0.0.exe**](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v8.0.0/LuckyDBrowserSetup-8.0.0.exe)
+1. Get [**LuckyDBrowserSetup-9.0.0.exe**](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v8.0.0/LuckyDBrowserSetup-9.0.0.exe)
 2. Run it — per-user, **no admin**, installs to `%LOCALAPPDATA%\Programs\LuckyDBrowser`
 3. Leave **"Set up free unlimited local AI"** checked → Ollama + `llama3.2:3b` (~2 GB, one time)
 4. `Ctrl+Shift+A` → chat offline. Or bring your own keys (Gemini, Groq, DeepSeek, OpenAI, Anthropic, Z.ai, OpenRouter, Cline, OpenCode)
 
-Windows 10/11 x64 only. Silent install: `LuckyDBrowserSetup-8.0.0.exe /VERYSILENT /NORESTART`
+Windows 10/11 x64 only. Silent install: `LuckyDBrowserSetup-9.0.0.exe /VERYSILENT /NORESTART`
 
 ## Why LuckyD
 
@@ -117,7 +117,7 @@ The agentic frontier, shipped: an AI browser you can trust with real agency. [Re
 - **🔌 WebMCP** — websites can expose typed agent tools to LuckyD; server-side schema validation, 30-second timeouts, and origin-bound rotating binding tokens keep hostile pages out
 - **⏰ Scheduled agents** — background agents on cron schedules with a **morning digest** (`/schedules`)
 - **🧩 Skills marketplace** — open skill registries with hash-verified install, update, remove, and publish
-- **Official Windows installer** — `LuckyDBrowserSetup-8.0.0.exe`, built on a real Windows runner with Inno Setup 6; per-user, no admin, silent-install flags
+- **Official Windows installer** — `LuckyDBrowserSetup-9.0.0.exe`, built on a real Windows runner with Inno Setup 6; per-user, no admin, silent-install flags
 
 *Verified: 428 tests passed, `ruff` clean.*
 
@@ -144,6 +144,6 @@ A hardened foundation: every local service now authenticates with HttpOnly sessi
 
 <p align="center">
   <b>MIT © LuckyD</b> · Chromium · Ollama · Qt · xterm.js · pywinpty · PyInstaller · Inno Setup<br>
-  <a href="https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v8.0.0/LuckyDBrowserSetup-8.0.0.exe">Download v8.0.0</a>
+  <a href="https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v8.0.0/LuckyDBrowserSetup-9.0.0.exe">Download v8.0.0</a>
   · <a href="https://www.youtube.com/@LuckyDYoutube">YouTube</a>
 </p>

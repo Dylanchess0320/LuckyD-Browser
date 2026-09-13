@@ -139,46 +139,51 @@ def test_nonviable_router_pick_falls_back_to_default_chain(
     monkeypatch: pytest.MonkeyPatch, recorder: _CallRecorder
 ) -> None:
     """Router picks "anthropic" but no anthropic credential exists → today."""
-    _hermetic(monkeypatch, env={})  # no keys: only Zen gateway is usable
+    _hermetic(monkeypatch, env={"GOOGLE_API_KEY": "test-google-key"})
     monkeypatch.setattr(ai_bridge, "_route_task", _fake_route_task("anthropic"))
 
     bridge = AIBridge()
     assert not bridge._is_viable_provider("anthropic")
     text, used = asyncio.run(bridge.chat([{"role": "user", "content": "hi"}]))
 
-    # Today's chain: free unlimited pool first → OpenCode Zen gateway.
+    # Today's chain: free unlimited pool first → highest-priority viable.
     assert text == "ok-text"
-    assert used == "opencode"
-    assert recorder.names == ["opencode"]
+    assert used == "google"
+    assert recorder.names == ["google"]
 
 
 def test_router_import_failure_keeps_today_chain(
     monkeypatch: pytest.MonkeyPatch, recorder: _CallRecorder
 ) -> None:
     """If the router cannot be imported, auto mode is exactly today's chain."""
-    _hermetic(monkeypatch, env={})
+    _hermetic(monkeypatch, env={"GOOGLE_API_KEY": "test-google-key"})
     monkeypatch.setattr(ai_bridge, "_route_task", None)
 
     bridge = AIBridge()
     text, used = asyncio.run(bridge.chat([{"role": "user", "content": "hi"}]))
 
     assert text == "ok-text"
-    assert used == "opencode"
-    assert recorder.names == ["opencode"]
+    assert used == "google"
+    assert recorder.names == ["google"]
 
 
 def test_empty_token_cline_never_routed(
     monkeypatch: pytest.MonkeyPatch, recorder: _CallRecorder
 ) -> None:
-    """clinepass registered with an empty token is not a viable router pick."""
+    """clinepass registered with an empty token is not a viable router pick.
+
+    With no other providers available, auto chat must fail honestly ("no AI
+    providers configured") rather than burn a call on the dead clinepass
+    entry — and the recorder proves no such call was attempted.
+    """
     _hermetic(monkeypatch, env={})
     monkeypatch.setattr(ai_bridge, "_route_task", _fake_route_task("clinepass"))
 
     bridge = AIBridge()
     assert not bridge._is_viable_provider("clinepass")
-    _text, used = asyncio.run(bridge.chat([{"role": "user", "content": "hi"}]))
+    with pytest.raises(RuntimeError, match="no AI providers configured"):
+        asyncio.run(bridge.chat([{"role": "user", "content": "hi"}]))
 
-    assert used == "opencode"
     assert "clinepass" not in recorder.names
 
 

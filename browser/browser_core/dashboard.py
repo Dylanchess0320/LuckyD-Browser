@@ -97,7 +97,7 @@ _CSS = r"""  .search { display: flex; background: var(--card); border: 1px solid
   .search input { flex: 1; background: transparent; border: none; outline: none;
     color: var(--text); font-size: 16px; font-weight: 500; letter-spacing: .005em;
     padding: 15px 8px; }
-  .search input::placeholder { color: var(--muted); opacity: .7; }
+  .search input::placeholder { color: var(--muted); opacity: 1; }
   .search button { background: var(--accent); border: none; color: #fff;
     font-size: 14.5px; font-weight: 650; letter-spacing: .02em; padding: 0 26px;
     cursor: pointer; transition: filter .12s; }
@@ -114,6 +114,8 @@ _CSS = r"""  .search { display: flex; background: var(--card); border: 1px solid
   .tile .fav { width: 26px; height: 26px; border-radius: 7px; display: inline-flex;
     align-items: center; justify-content: center; color: #fff; font-size: 14px;
     font-weight: 700; text-shadow: 0 1px 2px rgba(0,0,0,.35); }
+  .tile .tname { color: var(--text); font-size: 12.5px; font-weight: 700; letter-spacing: .02em;
+    text-shadow: 0 1px 3px rgba(0,0,0,.45); }
   .tile .del { position: absolute; top: 3px; right: 6px; color: var(--muted); font-size: 13px; opacity: 0; cursor: pointer; }
   .tile:hover .del, .tile:focus-within .del { opacity: 1; }
   .tile.add { color: var(--muted); font-size: 24px; justify-content: center; cursor: pointer; }
@@ -347,9 +349,25 @@ async function refreshStatus() {
     }
     setPill('pill-api', 'ok', 'Browser API on');
     const prov = (s.ai_providers || []);
-    setPill('pill-ai', prov.length ? 'ok' : 'warn',
-      prov.length ? 'AI: ' + prov.slice(0, 3).map(friendlyProvider).join(' · ') +
-        (prov.length > 3 ? '…' : '') : 'AI not set up');
+    const localSt = (s.ai_local_status || {});
+    let aiLabel, aiState;
+    if (prov.length) {
+      aiState = 'ok';
+      aiLabel = 'AI: ' + prov.slice(0, 3).map(friendlyProvider).join(' · ') +
+        (prov.length > 3 ? '…' : '');
+    } else if (localSt.ollama === 'not_running' || localSt.lmstudio === 'not_running') {
+      // Tell the user exactly what's wrong instead of a dead "not set up".
+      const which = localSt.ollama === 'not_running' ? 'Ollama' : 'LM Studio';
+      aiState = 'err';
+      aiLabel = which + ' not running — start it, then reload';
+    } else if (localSt.ollama === 'no_models' || localSt.lmstudio === 'no_models') {
+      aiState = 'warn';
+      aiLabel = 'Ollama up, no models — run: ollama pull qwen3:4b';
+    } else {
+      aiState = 'warn';
+      aiLabel = 'AI not set up';
+    }
+    setPill('pill-ai', aiState, aiLabel);
     const blocked = Number(s.ads_blocked || 0);
     // A "0 blocked" pill reads like a problem — show it only once it's earned.
     document.getElementById('pill-ads').style.display = blocked ? '' : 'none';
@@ -367,7 +385,7 @@ function renderApps() {
   APPS.concat(PLATFORM_TILES).forEach(([ico, name, href], i) => {
     const a = document.createElement('a');
     a.className = 'tile' + (i === 0 ? ' hq' : ''); a.href = href;
-    a.innerHTML = '<span class="ico">' + ico + '</span><span></span>';
+    a.innerHTML = '<span class="ico">' + ico + '</span><span class="tname"></span>';
     a.querySelector('span:last-child').textContent = name;
     g.appendChild(a);
   });
@@ -394,7 +412,7 @@ function render() {
     const a = document.createElement('a');
     a.className = 'tile'; a.href = url;
     a.appendChild(tileFor(url));
-    a.insertAdjacentHTML('beforeend', '<span></span>' +
+    a.insertAdjacentHTML('beforeend', '<span class="tname"></span>' +
       '<span class="del" title="Remove">&#10005;</span>');
     a.querySelector('span').textContent = name;
     a.querySelector('.del').addEventListener('click', ev => {

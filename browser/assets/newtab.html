@@ -224,6 +224,8 @@
     border-color: var(--ld-accent);
   }
   .tile img { width: 26px; height: 26px; border-radius: 6px; }
+  .tile .tname { color: var(--ld-text); font-size: 13px; font-weight: 700;
+    letter-spacing: .02em; text-shadow: 0 1px 3px rgba(0,0,0,.45); }
   .tile .del {
     position: absolute;
     top: 4px;
@@ -365,7 +367,7 @@ function render() {
     a.className = 'tile'; a.href = url;
     let host = ''; try { host = new URL(url).hostname; } catch (e) {}
     a.innerHTML = '<img src="https://www.google.com/s2/favicons?domain=' + host +
-      '&sz=64" alt="" onerror="this.style.visibility=\'hidden\'"><span></span>' +
+      '&sz=64" alt="" onerror="this.style.visibility=\'hidden\'"><span class="tname"></span>' +
       '<span class="del" title="Remove">&#10005;</span>';
     a.querySelector('span').textContent = name;
     a.querySelector('.del').addEventListener('click', ev => {

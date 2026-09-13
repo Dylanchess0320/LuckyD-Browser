@@ -148,42 +148,55 @@ _CLINEPASS_CATALOG = [
     "cline-pass/qwen3.7-plus",
 ]
 
-# OpenCode Zen (opencode.ai) free catalog — every $0 model on the Zen
-# gateway, synced from opencode's open model registry (models.dev), 2026-08.
-# Used as the fetch_models() fallback for the zen endpoint and to keep the
-# sidebar picker complete when the live catalog request fails. All of these
-# are tool-capable unless noted; [V] marks vision-capable entries.
+# OpenCode Zen (opencode.ai) platform catalog.
+# HISTORY: until 2026-09 Zen served a keyless $0 tier of third-party "-free"
+# models. That tier is gone — verified 2026-09-13: /models lists only
+# opencode-platform models and every chat call without OPENCODE_API_KEY
+# returns 401 "Missing API key". The provider is now keyed like any cloud.
+# The list below mirrors the live /models catalog (2026-09-13) and is only
+# the fetch_models() fallback when the live catalog request fails.
 _OPENCODE_ZEN_BASE = "https://opencode.ai/zen/v1"
-_OPENCODE_ZEN_DEFAULT = "nemotron-3-ultra-free"
-_OPENCODE_FREE_CATALOG = [
-    "nemotron-3-ultra-free",
-    "hy3-free",
-    "laguna-s-2.1-free",
-    "nemotron-3.5-lightning-free",
-    "deepseek-v4-flash-free",
-    "mimo-v2.5-free",  # [V]
-    "muse-spark-1.2-contributor-free",  # [V]
-    "big-pickle",
-    "glm-4.7-free",
-    "glm-5-free",
-    "grok-code",  # [V]
-    "hy3-preview-free",
-    "kimi-k2.5-free",  # [V]
-    "ling-2.6-flash-free",
-    "ling-3.0-flash-free",
-    "ling-3.0-tiny-free",
-    "longcat-2.0-free",
-    "mimo-v2-flash-free",
-    "mimo-v2-omni-free",  # [V]
-    "mimo-v2-pro-free",  # [V]
-    "minimax-m2.1-free",
-    "minimax-m2.5-free",
-    "minimax-m3-free",
-    "north-mini-code-free",
-    "qwen3.6-plus-free",  # [V]
-    "ring-2.6-1t-free",
-    "trinity-large-preview-free",
-    "x-preview-f-free",  # [V]
+_OPENCODE_ZEN_DEFAULT = "gemini-3.5-flash-lite"
+_ZEN_CATALOG = [
+    "gemini-3.5-flash-lite",
+    "gpt-5-nano",
+    "gpt-5.4-nano",
+    "gpt-5.4-mini",
+    "claude-haiku-4-5",
+    "gemini-3.5-flash",
+    "gemini-3-flash",
+    "gemini-3.6-flash",
+    "gemini-3.7-flash",
+    "gemini-3.8-flash",
+    "gpt-5.1-codex-mini",
+    "gpt-5.5",
+    "gpt-5.4",
+    "gpt-5.2",
+    "gpt-5.1",
+    "gpt-5",
+    "claude-sonnet-4",
+    "claude-sonnet-4-5",
+    "claude-sonnet-4-6",
+    "claude-sonnet-5",
+    "gpt-5.1-codex",
+    "gpt-5.2-codex",
+    "gpt-5.3-codex",
+    "gpt-5.1-codex-max",
+    "gpt-5.3-codex-spark",
+    "gpt-6-astra",
+    "gpt-5.5-pro",
+    "gpt-5.4-pro",
+    "gpt-5.6-sol",
+    "gpt-5.6-terra",
+    "gpt-5.6-luna",
+    "gemini-3.1-pro",
+    "claude-opus-4-5",
+    "claude-opus-4-6",
+    "claude-opus-4-7",
+    "claude-opus-4-8",
+    "claude-opus-5",
+    "claude-fable-5",
+    "claude-fable-5-1",
 ]
 
 # OpenRouter free fallback — the :free chat models plus the auto free-router,
@@ -206,29 +219,23 @@ _OPENROUTER_FREE_FALLBACK = [
     "poolside/laguna-xs-2.1:free",
 ]
 
-# ── Curated FREE top models with no strict rate limits ────────────────
-# These are the $0 models that run without per-minute throttling and are
-# therefore safe to rotate through on 429s. Local Ollama/LMStudio are
-# always unlimited (no key, no quota); OpenCode Zen's $0 gateway is
-# generous and the models below are the highest-quality picks (size +
-# reasoning + vision). Free-tier Google/Groq/Cline are intentionally
-# EXCLUDED here because they rate-limit aggressively.
-_FREE_TOP_ZEN = [
-    "nemotron-3-ultra-free",  # flagship — 550B, verified working
-    "hy3-free",  # fast, verified working
-    "laguna-s-2.1-free",  # verified live
-    "nemotron-3.5-lightning-free",
-    "deepseek-v4-flash-free",
-    "mimo-v2.5-free",  # vision
-    "muse-spark-1.2-contributor-free",  # vision
-    "big-pickle",
-    "kimi-k2.5-free",  # vision + long context
-    "glm-4.7-free",
-    "grok-code",  # vision, coder
-    "qwen3.6-plus-free",  # vision
-    "minimax-m3-free",
+# ── Curated Zen top models (keyed — for failure rotation, not free) ──
+# Fast/cheap platform models first; the chat path rotates through these
+# when the configured Zen model fails (404, unsupported, rate limit).
+# These are NOT free — Zen requires OPENCODE_API_KEY since 2026-09.
+_ZEN_TOP_MODELS = [
+    "gemini-3.5-flash-lite",  # fastest/cheapest in live catalog
+    "gpt-5-nano",
+    "gpt-5.4-nano",
+    "gpt-5.4-mini",
+    "claude-haiku-4-5",
+    "gemini-3.5-flash",
+    "gpt-5.1-codex-mini",
+    "claude-sonnet-4",
+    "gpt-5.1-codex",
+    "claude-opus-4-5",
 ]
-_FREE_TOP_ZEN_SET = set(_FREE_TOP_ZEN)
+_ZEN_TOP_MODELS_SET = set(_ZEN_TOP_MODELS)
 
 # Cline Usage (credit-billed / free tier) — same gateway, usage-based billing.
 # Free-tier models work at $0.00 but are rate-limited; credit models deduct
@@ -274,7 +281,7 @@ class AIBridge:
         self._configs: dict[str, tuple[str, str, str, str]] = {}
         self._model_cache: dict[str, list[str]] = {}
         self._clinepass_from_session = False
-        # Round-robin cursor for free unlimited model rotation (Zen top pool)
+        # Round-robin cursor for Zen top-model rotation on failures
         self._free_cursor: int = 0
         # Local keyless servers first: free + unlimited should be the default.
         self._configs.update(self._detect_local(env))
@@ -292,11 +299,14 @@ class AIBridge:
             model = env.get(f"{prefix}_MODEL", "").strip() or model
             base_url = env.get(f"{prefix}_BASE_URL", "").strip() or base_url
             self._configs[name] = (model, base_url, key, kind)
-        # Register OpenCode Zen ($0 free gateway, key optional)
+        # Register OpenCode Zen only when keyed. The $0 keyless tier died
+        # 2026-09 (every keyless chat call 401s), so registering it without
+        # a key just burns rotation cycles on guaranteed failures.
         opencode_key = env.get("OPENCODE_API_KEY", "").strip()
-        opencode_base = env.get("OPENCODE_BASE_URL", "").strip() or _OPENCODE_ZEN_BASE
-        opencode_model = env.get("OPENCODE_MODEL", "").strip() or _OPENCODE_ZEN_DEFAULT
-        self._configs["opencode"] = (opencode_model, opencode_base, opencode_key, "openai")
+        if opencode_key:
+            opencode_base = env.get("OPENCODE_BASE_URL", "").strip() or _OPENCODE_ZEN_BASE
+            opencode_model = env.get("OPENCODE_MODEL", "").strip() or _OPENCODE_ZEN_DEFAULT
+            self._configs["opencode"] = (opencode_model, opencode_base, opencode_key, "openai")
 
     def _detect_clinepass(self, env) -> None:
         """Register ClinePass subscription + Cline Usage (credit-billed/free tier).
@@ -329,21 +339,34 @@ class AIBridge:
         usage_model = env.get("CLINE_USAGE_MODEL", "").strip() or _CLINE_USAGE_MODEL
         self._configs["cline-usage"] = (usage_model, base, token, "openai")
 
+    # Per-server probe diagnosis: name -> "ok" | "not_running" | "no_models".
+    # Surfaced through local_status() so the UI can tell the user exactly
+    # what's wrong instead of a generic "AI not set up".
+    _local_status: dict[str, str] = {}
+
     @staticmethod
     def _detect_local(env) -> dict[str, tuple[str, str, str, str]]:
         """Probe local OpenAI-compatible servers; returns keyless configs."""
         found: dict[str, tuple[str, str, str, str]] = {}
+        AIBridge._local_status = {}
         for name, host_var, default_host, model_var in _LOCAL_SPECS:
             host = (env.get(host_var, "").strip() or default_host).rstrip("/")
             base_url = host if host.endswith("/v1") else host + "/v1"
             try:
-                resp = httpx.get(base_url + "/models", timeout=1.5)
+                # trust_env=False: localhost must never go through a proxy.
+                # With HTTP(S)_PROXY set (VPNs, some ISPs), the default
+                # client routes 127.0.0.1 via the proxy and the probe fails
+                # even though Ollama is up — the classic "Ollama not
+                # detected" ghost.
+                resp = httpx.get(base_url + "/models", timeout=1.5, trust_env=False)
                 resp.raise_for_status()
                 models = [m.get("id", "") for m in resp.json().get("data", [])]
             except Exception:
+                AIBridge._local_status[name] = "not_running"
                 continue
             models = [m for m in models if m and "embed" not in m.lower()]
             if not models:
+                AIBridge._local_status[name] = "no_models"
                 continue
             model = env.get(model_var, "").strip() if model_var else ""
             if model not in models:
@@ -352,10 +375,15 @@ class AIBridge:
                     models[0],
                 )
             found[name] = (model, base_url, "", "openai")
+            AIBridge._local_status[name] = "ok"
         return found
 
     def providers(self) -> list[str]:
         return list(self._configs)
+
+    def local_status(self) -> dict[str, str]:
+        """Probe diagnosis per local server: ok | not_running | no_models."""
+        return dict(AIBridge._local_status)
 
     def is_opencode_zen(self, provider: str) -> bool:
         """True when the provider's endpoint is the OpenCode Zen gateway."""
@@ -376,7 +404,7 @@ class AIBridge:
              offline, no key or login needed
           2. cline-usage — Cline free tier, when auth actually exists
              (API key or a logged-in Cline CLI session)
-          3. OpenCode Zen ($0 free gateway, always registered, key optional)
+          3. OpenCode Zen (keyed since 2026-09 — only when OPENCODE_API_KEY set)
           4. Cloud keyed providers, in _PROVIDER_SPECS order
         """
         for name in self._local_names:
@@ -386,7 +414,13 @@ class AIBridge:
             return "cline-usage"
         if "opencode" in self._configs:
             return "opencode"
-        return next(iter(self._configs), None)
+        # clinepass/cline-usage register with empty tokens for the
+        # fetch_models() catalog fallback — never default to that dead end.
+        for name in self._configs:
+            if name in ("clinepass", "cline-usage") and not self._cline_usable():
+                continue
+            return name
+        return None
 
     def _cline_usable(self) -> bool:
         """True when Cline auth exists (API key or logged-in CLI session).
@@ -429,20 +463,16 @@ class AIBridge:
         self._configs[provider] = (model.strip(), info[1], info[2], info[3])
 
     def free_top_models(self) -> list[str]:
-        """Cherry-picked free top models with no strict rate limits (Zen)."""
-        return list(_FREE_TOP_ZEN)
+        """Curated Zen top models (keyed) — the sidebar's suggestion pool."""
+        return list(_ZEN_TOP_MODELS)
 
     def _free_unlimited_providers(self) -> list[str]:
-        """Providers with no rate limits — local + Zen free gateway."""
-        order: list[str] = []
-        for name in self._local_names:
-            if name in self._configs:
-                order.append(name)
-        # Zen free (via opencode or openai pointed at zen) is also unlimited
-        for name in ("opencode", "openai"):
-            if name in self._configs and self.is_opencode_zen(name) and name not in order:
-                order.append(name)
-        return order
+        """Providers with no rate limits — local servers only.
+
+        (OpenCode Zen used to be in this pool when it had a $0 keyless
+        tier; since 2026-09 it is a normal keyed cloud provider.)
+        """
+        return [name for name in self._local_names if name in self._configs]
 
     def fetch_models(self, provider: str) -> list[str]:
         """Model ids available on a provider — live catalog when it has one
@@ -476,44 +506,41 @@ class AIBridge:
             except Exception:
                 models = []
         if self.is_opencode_zen(provider):
-            # LuckyD: ONLY free TOP models (no rate limits) — clean picker
-            # and rotation members always visible.
+            # LuckyD: curated top models first, then the rest of the live
+            # platform catalog — clean picker, rotation members visible.
             if models:
                 live_set = set(models)
-                live_top = [m for m in _FREE_TOP_ZEN if m in live_set]
-                extra_live = [m for m in models if m.endswith("-free") and m not in live_top]
-                models = (
-                    (live_top + extra_live) if (live_top or extra_live) else list(_FREE_TOP_ZEN)
-                )
+                top = [m for m in _ZEN_TOP_MODELS if m in live_set]
+                rest = [m for m in models if m not in top]
+                models = top + rest
             else:
-                models = list(_FREE_TOP_ZEN)
+                models = list(_ZEN_CATALOG)
         if not models:
             if provider == "clinepass":
                 models = list(_CLINEPASS_CATALOG)
             elif provider == "cline-usage":
                 models = list(_CLINE_USAGE_CATALOG)
             elif self.is_opencode_zen(provider):
-                # Only free top (no rate limits) — not the full 29-model catalog
-                models = list(_FREE_TOP_ZEN)
+                models = list(_ZEN_CATALOG)
             elif provider == "openrouter":
                 # Only free tier; sorted :free first for the picker
                 models = list(_OPENROUTER_FREE_FALLBACK)
             else:
                 models = [model]
         # Ensure the current model is present (user override may be outside top)
-        if model not in models and model in _OPENCODE_FREE_CATALOG:
+        if model not in models and model in _ZEN_CATALOG:
             # If it's a valid free model but not top, keep it visible at top
             models.insert(0, model)
         elif model in models:
             models.remove(model)
             models.insert(0, model)
-        elif model not in models and self.is_opencode_zen(provider) and model.endswith("-free"):
+        elif model not in models and self.is_opencode_zen(provider) and model in _ZEN_CATALOG:
             models.insert(0, model)
         if provider == "openrouter" and len(models) > 1:
             models = sorted(models, key=lambda m: not m.endswith(":free"))
-        # For Zen, pin top order: _FREE_TOP_ZEN order first, then any extra
+        # For Zen, pin top order: _ZEN_TOP_MODELS order first, then any extra
         if self.is_opencode_zen(provider):
-            top_order = {m: i for i, m in enumerate(_FREE_TOP_ZEN)}
+            top_order = {m: i for i, m in enumerate(_ZEN_TOP_MODELS)}
             models = sorted(models, key=lambda m: top_order.get(m, 999))
         self._model_cache[provider] = models
         return models
@@ -524,9 +551,9 @@ class AIBridge:
 
         Registration already encodes reachability/credentials: local servers
         are only registered when the startup probe succeeded, keyed clouds
-        only when a key exists, and the Zen gateway is key-optional ($0).
-        Cline entries may be registered with an empty token, so they need
-        the explicit usability check.
+        (including the Zen gateway) only when a key exists. Cline entries
+        may be registered with an empty token, so they need the explicit
+        usability check.
         """
         if self._configs.get(name) is None:
             return False
@@ -611,20 +638,21 @@ class AIBridge:
         fast_path_ran = False
         if is_auto and routed is None:
             fast_path_ran = True
-            # Prefer free unlimited pool before falling back to any provider
+            # Prefer free unlimited pool (locals) before falling back to
+            # any provider. A keyed Zen gateway still rotates its top models
+            # per-model on failure further down.
             free_pool = self._free_unlimited_providers()
-            # If we have a Zen free gateway, try its top models round-robin
-            # before touching rate-limited clouds.
             for name in free_pool:
                 info = self._configs.get(name)
                 if info is None:
                     continue
                 if self.is_opencode_zen(name):
                     last_err = None
-                    # Try up to len(_FREE_TOP_ZEN) models starting at cursor
-                    for offset in range(len(_FREE_TOP_ZEN)):
-                        idx = (self._free_cursor + offset) % len(_FREE_TOP_ZEN)
-                        m = _FREE_TOP_ZEN[idx]
+                    # Try top models starting at cursor (model-level 404s /
+                    # unsupported / rate limits rotate to the next)
+                    for offset in range(len(_ZEN_TOP_MODELS)):
+                        idx = (self._free_cursor + offset) % len(_ZEN_TOP_MODELS)
+                        m = _ZEN_TOP_MODELS[idx]
                         trial = (m, info[1], info[2], info[3])
                         if name in ("clinepass", "cline-usage") and self._clinepass_from_session:
                             try:
@@ -635,7 +663,7 @@ class AIBridge:
                                 break
                         try:
                             text = await self._call(name, trial, messages, on_token)
-                            self._free_cursor = (idx + 1) % len(_FREE_TOP_ZEN)
+                            self._free_cursor = (idx + 1) % len(_ZEN_TOP_MODELS)
                             self._configs[name] = trial
                             return text, name
                         except Exception as exc:
@@ -669,6 +697,11 @@ class AIBridge:
             order = [routed] + [p for p in order if p != routed]
         last_err: Exception | None = None
         for name in order:
+            if provider is None and not self._is_viable_provider(name):
+                # Auto mode never burns a call on a provider that can't work
+                # (e.g. clinepass registered with an empty token) — the
+                # honest end state is "no AI providers configured".
+                continue
             # Skip members already tried in the free unlimited fast-path above
             # (only when the fast path actually ran — routing skips it).
             if fast_path_ran and name in self._free_unlimited_providers():
@@ -695,7 +728,7 @@ class AIBridge:
             # For explicit provider that is Zen, allow per-model rotation on any failure
             if provider is not None and self.is_opencode_zen(name):
                 configured_m = info[0]
-                candidates = [configured_m] + [m for m in _FREE_TOP_ZEN if m != configured_m]
+                candidates = [configured_m] + [m for m in _ZEN_TOP_MODELS if m != configured_m]
                 for m in candidates:
                     trial = (m, info[1], info[2], info[3])
                     try:
@@ -713,7 +746,7 @@ class AIBridge:
                 last_err = exc
                 if self.is_opencode_zen(name):
                     configured_m = info[0]
-                    for m in [alt for alt in _FREE_TOP_ZEN if alt != configured_m]:
+                    for m in [alt for alt in _ZEN_TOP_MODELS if alt != configured_m]:
                         trial = (m, info[1], info[2], info[3])
                         try:
                             text = await self._call(name, trial, messages, on_token)
@@ -741,7 +774,7 @@ class AIBridge:
             )
         )
         body["model"] = model
-        headers = {"User-Agent": "LuckyDBrowser/8.0"}
+        headers = {"User-Agent": "LuckyDBrowser/9.0"}
 
         if kind == "gemini":
             url = f"{base_url}/models/{model}:streamGenerateContent?key={api_key}&alt=sse"
@@ -761,8 +794,10 @@ class AIBridge:
         text = ""
         # Local keyless models can be slow on CPU — allow a longer first token.
         timeout = 300.0 if not api_key else 60.0
+        # Same proxy ghost as the probe: localhost must bypass proxies.
+        no_proxy = name in self._local_names
         async with (
-            httpx.AsyncClient(timeout=timeout) as client,
+            httpx.AsyncClient(timeout=timeout, trust_env=not no_proxy) as client,
             client.stream("POST", url, json=body, headers=headers) as resp,
         ):
             if resp.status_code >= 400:

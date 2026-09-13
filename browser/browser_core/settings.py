@@ -214,11 +214,15 @@ def webengine_chromium_flags(hw_video_decode: bool = False) -> str:
     Software decode (default) disables GPU video acceleration AND GPU
     compositing/rasterization so colors render correctly on drivers with
     broken hardware paths (this machine's 2022-era AMD driver corrupts
-    video AND composited page tints). Pure function so main.py can apply it
-    before QtWebEngine starts (and tests can pin it).
+    video AND composited page tints). --force-color-profile=srgb pins the
+    software YUV→RGB path to sRGB — without it Chromium converts with
+    BT.601 coefficients and YouTube renders visibly wrong colors.
+    Pure function so main.py can apply it before QtWebEngine starts
+    (and tests can pin it).
     """
     if hw_video_decode:
         return ""
     return (
         "--disable-accelerated-video-decode --disable-gpu-compositing --disable-gpu-rasterization"
+        " --force-color-profile=srgb"
     )

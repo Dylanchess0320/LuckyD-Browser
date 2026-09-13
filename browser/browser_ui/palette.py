@@ -33,7 +33,8 @@ class CommandPalette(QWidget):
     def __init__(self, mw: QWidget):
         super().__init__(mw, Qt.WindowType.FramelessWindowHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
+        # NOTE: no WA_ShowWithoutActivating — the palette must steal keyboard
+        # focus on open, otherwise typing keeps going to the web page.
         self._mw = mw
         self.setWindowOpacity(0.97)
 
@@ -146,7 +147,8 @@ class CommandPalette(QWidget):
         self._position()
         self.show()
         self.raise_()
-        self._e.setFocus()
+        self.activateWindow()  # Windows needs the explicit activation nudge
+        self._e.setFocus(Qt.FocusReason.PopupFocusReason)
         if self._lst.count():
             self._lst.setCurrentRow(0)
 
