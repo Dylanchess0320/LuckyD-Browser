@@ -52,11 +52,11 @@ no keys shipped in the bundle.
 
 ## Checksums
 
-| File | Size |
-|---|---|
-| `LuckyDBrowserSetup-8.0.0.exe` | (see the release page) |
+| File | Size | SHA-256 |
+|---|---|---|
+| `LuckyDBrowserSetup-8.0.0.exe` | 303,932,125 bytes | `3DB0D7C70D7BF0F6A6269888649E1D7864D148B982C86512A44840893DD11D0D` |
 
-*(add SHA-256 here when uploading)*
+> Hash computed 2026-09-13 from `browser/installer/output/LuckyDBrowserSetup-8.0.0.exe`. Recompute after any rebuild: `Get-FileHash browser\installer\output\LuckyDBrowserSetup-8.0.0.exe -Algorithm SHA256`.
 
 ---
 

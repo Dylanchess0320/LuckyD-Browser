@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **DeepSeek terminal aliases** — `deepseek` / `dsh` / `mesh-deepseek` shells in the
+  Agent Mesh terminal, all booting the `web` profile like `mesh-dsh`
+  (`browser/browser_core/terminal_server.py`, `terminal_page.py`).
+- **`opencode` restored to the coding-agent provider stack** — `core/providers.py`
+  keeps the `$0` OpenCode Zen gateway (`OPENCODE_API_KEY` optional) so the CLI,
+  docs, and `providers_config.json` agree again.
+
+### Changed
+- **Ollama defaults corrected** — `core/providers.py` now defaults to
+  `http://127.0.0.1:11434/v1` + `llama3.2:3b` (the model the installer ships),
+  auto-detects a running local server, and normalizes `/v1` on the endpoint.
+- **Tool schema hardening** — `tools/base.py::to_openai_schema()` strips nested
+  `required` flags from properties and tolerates non-dict params instead of
+  crashing with `AttributeError`.
+- **Pinned core dependencies** — `requirements.txt` pins verified 2026-09-13
+  versions (httpx, fastapi, uvicorn, langgraph, trafilatura, …) for reproducible CI.
+- **CI is a hard gate again** — `mypy` runs without `|| true` /
+  `continue-on-error`, and pytest enforces `--cov-fail-under=60`.
+- **Release notes carry the installer hash** — `RELEASE_NOTES.md` records the
+  SHA-256 + size of `LuckyDBrowserSetup-8.0.0.exe`.
+
+### Fixed
+- **Version strings re-unified to 8.0.0** — `main.py` help/`--version` text and
+  `build_nuitka.py` no longer claim `v3.6.0`; the Nuitka sidecar is
+  `luckyd-code-v8.0.exe`.
+- **Strict-typing cleanup** — `core/providers.py`, `tools/base.py`, and
+  `model_resolver.py` pass `mypy --ignore-missing-imports` (typed
+  `ProviderDefaults`, no `Any`-leaking cache helpers).
+
 ## [8.0.0] - 2026-09-12
 
 The Cleanup, phase one: skills in the sidebar, smart routing, and a Neon Night home.

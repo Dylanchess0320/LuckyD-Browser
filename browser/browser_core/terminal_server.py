@@ -315,6 +315,9 @@ SHELLS = (
     "mesh-cline",
     "mesh-openclaw",
     "mesh-dsh",
+    "mesh-deepseek",
+    "deepseek",
+    "dsh",
     "mesh-hermes",
     "mesh-pi",
     "mesh-grok",
@@ -339,6 +342,9 @@ MESH_SHELLS = {
     "mesh-cline": "cline",
     "mesh-openclaw": "openclaw",
     "mesh-dsh": "dsh",
+    "mesh-deepseek": "dsh",
+    "deepseek": "dsh",
+    "dsh": "dsh",
     "mesh-hermes": "hermes",
     "mesh-pi": "pi",
     "mesh-grok": "grok",
@@ -356,6 +362,9 @@ MESH_SHELLS = {
 # terminal pane (same class of bug as the dsh one above).
 MESH_SHELL_ARGS: dict[str, list[str]] = {
     "mesh-dsh": ["--profile", "web", "--no-open"],
+    "mesh-deepseek": ["--profile", "web", "--no-open"],
+    "deepseek": ["--profile", "web", "--no-open"],
+    "dsh": ["--profile", "web", "--no-open"],
     "mesh-hermes": ["chat"],
 }
 
@@ -562,7 +571,7 @@ def _spawn_pty(
     if shell == "agent":
         env["LUCKYD_AGENT_SLOT"] = "1"
         env["LUCKYD_AGENT_NAME"] = "Agent 1"
-        env["LUCKYD_AGENT_VERSION"] = "v6.0.0"
+        env["LUCKYD_AGENT_VERSION"] = "v3.6.0"
     elif shell == "agent2":
         env["LUCKYD_AGENT_SLOT"] = "2"
         env["LUCKYD_AGENT_NAME"] = "Agent 2"

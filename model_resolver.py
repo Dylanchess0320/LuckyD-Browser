@@ -28,20 +28,23 @@ _FAST_KEYWORDS = ("flash", "fast", "lite", "mini", "turbo", "instant")
 _PRO_KEYWORDS = ("pro", "reasoner", "thinking", "ultra", "expert", "max")
 
 
-def _cache_get() -> dict | None:
+def _cache_get() -> dict[str, object] | None:
     """Read cached model list if still fresh."""
     if not CACHE_FILE.exists():
         return None
     try:
         data = json.loads(CACHE_FILE.read_text())
-        if time.time() - data.get("_timestamp", 0) < CACHE_TTL:
+        if not isinstance(data, dict):
+            return None
+        ts = data.get("_timestamp", 0)
+        if isinstance(ts, (int, float)) and time.time() - ts < CACHE_TTL:
             return data
     except (json.JSONDecodeError, KeyError):
         pass
     return None
 
 
-def _cache_set(data: dict) -> None:
+def _cache_set(data: dict[str, object]) -> None:
     """Write model list to cache."""
     data["_timestamp"] = time.time()
     CACHE_FILE.write_text(json.dumps(data))
@@ -137,14 +140,18 @@ def resolve_model(
 
     # Try cache first (may include last-known-good fallbacks)
     cached = _cache_get()
+    model_ids: list[str] = []
+    last_good_fast: str | None = None
+    last_good_pro: str | None = None
     if cached:
-        model_ids = cached.get("models", [])
-        last_good_fast = cached.get("_last_good_fast")
-        last_good_pro = cached.get("_last_good_pro")
+        raw_ids = cached.get("models", [])
+        model_ids = [m for m in raw_ids if isinstance(m, str)] if isinstance(raw_ids, list) else []
+        lgf = cached.get("_last_good_fast")
+        last_good_fast = lgf if isinstance(lgf, str) else None
+        lgp = cached.get("_last_good_pro")
+        last_good_pro = lgp if isinstance(lgp, str) else None
     else:
         model_ids = _fetch_models(api_key, base_url)
-        last_good_fast = None
-        last_good_pro = None
         if model_ids:
             _cache_set({"models": model_ids})
 
@@ -162,7 +169,7 @@ def resolve_model(
     # Store last-known-good for next time
     if model_ids and (fast or pro):
         try:
-            cache_data = _cache_get() or {}
+            cache_data: dict[str, object] = _cache_get() or {}
             cache_data["models"] = model_ids
             cache_data["_last_good_fast"] = fast
             cache_data["_last_good_pro"] = pro
@@ -171,12 +178,14 @@ def resolve_model(
             pass  # cache write is best-effort
 
     if preferred == "pro":
-        return pro
+        return pro or FALLBACK_PRO_MODEL
     if preferred == "flash":
-        return fast
+        return fast or FALLBACK_MODEL
 
     # 'auto': prefer flash unless thinking mode is requested
-    return pro if thinking else fast
+    if thinking:
+        return pro or FALLBACK_PRO_MODEL
+    return fast or FALLBACK_MODEL
 
 
 def invalidate_cache() -> None:
@@ -189,5 +198,6 @@ def get_cached_models() -> list[str]:
     """Get currently cached model list (may be stale)."""
     cached = _cache_get()
     if cached:
-        return cached.get("models", [])
+        models = cached.get("models", [])
+        return [m for m in models if isinstance(m, str)] if isinstance(models, list) else []
     return []

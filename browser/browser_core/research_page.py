@@ -903,8 +903,8 @@ def research_html() -> str:
       <select id="provider-select">
         <option value="auto" selected>✨ Auto (Free Zen pool → OpenRouter → Ollama)</option>
         <option value="opencode">🆓 OpenCode Zen Free (nemotron-3-ultra)</option>
-        <option value="openrouter">🌐 OpenRouter Free (:free models)</option>
         <option value="ollama">💻 Local Ollama (offline, unlimited)</option>
+        <option value="openrouter">🌐 OpenRouter Free (:free models)</option>
         <option value="gemini">♊ Google Gemini (native grounding)</option>
         <option value="luckyd">🤖 LuckyD / Active Browser Provider</option>
         <option value="mock">🧪 Mock (Offline Fast Test)</option>

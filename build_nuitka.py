@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-LuckyD Code v3.6 — Nuitka Standalone Compiler Script.
+LuckyD Code v8.0 — Nuitka Standalone Compiler Script.
 
 Compiles the interactive LuckyD Code CLI into a high-performance native Windows executable.
 Usage:
@@ -20,7 +20,7 @@ REPO_ROOT = Path(__file__).resolve().parent
 
 def build_nuitka(onefile: bool = True) -> int:
     print("=" * 60)
-    print(" Compiling LuckyD Code v3.6 with Nuitka (Native Build)")
+    print(" Compiling LuckyD Code v8.0 with Nuitka (Native Build)")
     print("=" * 60)
 
     icon_path = REPO_ROOT / "browser" / "assets" / "professional_icon.ico"
@@ -56,15 +56,15 @@ def build_nuitka(onefile: bool = True) -> int:
 
     result = subprocess.run(cmd, cwd=str(REPO_ROOT), env=env)
     if result.returncode == 0:
-        print("\n[SUCCESS] LuckyD Code v3.6 Nuitka build completed successfully in dist/")
+        print("\n[SUCCESS] LuckyD Code v8.0 Nuitka build completed successfully in dist/")
         dist_exe = REPO_ROOT / "dist" / "luckyd-cli.exe"
         if dist_exe.exists():
             import shutil
 
             shutil.copy2(dist_exe, REPO_ROOT / "luckyd-cli.exe")
-            shutil.copy2(dist_exe, REPO_ROOT / "luckyd-code-v3.6.exe")
+            shutil.copy2(dist_exe, REPO_ROOT / "luckyd-code-v8.0.exe")
             print(
-                f"[OK] Refreshed {REPO_ROOT / 'luckyd-cli.exe'} and {REPO_ROOT / 'luckyd-code-v3.6.exe'}"
+                f"[OK] Refreshed {REPO_ROOT / 'luckyd-cli.exe'} and {REPO_ROOT / 'luckyd-code-v8.0.exe'}"
             )
     else:
         print(f"\n[ERROR] Nuitka build exited with code {result.returncode}")

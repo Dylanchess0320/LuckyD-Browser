@@ -14,6 +14,7 @@ import asyncio
 import contextlib
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -803,7 +804,8 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
     elif cmd == "clear":
         agent.reset()
         # Also clear the terminal screen so you truly start fresh
-        os.system("cls" if os.name == "nt" else "clear")
+        # (fixed argv — no shell, no injection surface; B605-safe).
+        subprocess.run(["cmd", "/c", "cls"] if os.name == "nt" else ["clear"], check=False)
         project_name = (
             agent._project_info.name
             if agent._project_info and not agent._project_info.is_empty()
@@ -1610,7 +1612,7 @@ Usage:
   lucky-code --resume <id>         Resume specific session
 
 Options:
-  --agent 1|2        Select agent slot (1 = v3.6 Nuitka, 2 = v2.2)
+  --agent 1|2        Select agent slot (1 = v8.0 Nuitka, 2 = v2.2)
   --model NAME       Model: auto (default), flash, pro, or specific name
   --provider NAME    Set provider: opencode, openrouter, deepseek, google, ollama, zai, groq
   --thinking         Use the thinking/reasoning model

@@ -7,6 +7,16 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from typing import TypedDict
+
+
+class ProviderDefaults(TypedDict, total=False):
+    env_key: str | None
+    env_base: str
+    env_model: str
+    default_base: str
+    default_model: str
+
 
 # ── Provider constants ────────────────────────────────────────────────
 
@@ -38,7 +48,7 @@ PROVIDER_NAMES = {
     "cline-usage": "Cline (usage)",
 }
 
-PROVIDER_DEFAULTS = {
+PROVIDER_DEFAULTS: dict[str, ProviderDefaults] = {
     "openai": {
         "env_key": "OPENAI_API_KEY",
         "env_base": "OPENAI_BASE_URL",
@@ -64,8 +74,8 @@ PROVIDER_DEFAULTS = {
         "env_key": None,
         "env_base": "OLLAMA_HOST",
         "env_model": "OLLAMA_MODEL",
-        "default_base": "http://localhost:11434",
-        "default_model": "codellama",
+        "default_base": "http://127.0.0.1:11434/v1",
+        "default_model": "llama3.2:3b",
     },
     "deepseek": {
         "env_key": "DEEPSEEK_API_KEY",
@@ -174,10 +184,20 @@ def detect_provider() -> str | None:
     if os.environ.get("DEEPSEEK_API_KEY") or os.environ.get("CODING_AGENT_API_KEY"):
         return "deepseek"
 
+    # Auto-detect local Ollama if running
+    try:
+        import httpx
+
+        r = httpx.get("http://127.0.0.1:11434/api/tags", timeout=0.5)
+        if r.status_code == 200:
+            return "ollama"
+    except Exception:
+        pass
+
     return None
 
 
-def _assistant_browser_settings() -> dict:
+def _assistant_browser_settings() -> dict[str, object]:
     """Read the LuckyD browser assistant's saved provider/model picks.
 
     The AI sidebar persists its selection in browser/data/settings.json under
@@ -203,7 +223,7 @@ def _assistant_browser_settings() -> dict:
         return {}
 
 
-def resolve_provider_config(provider: str | None = None) -> dict:
+def resolve_provider_config(provider: str | None = None) -> dict[str, object]:
     """Build a full provider config dict. Returns the standard config fields.
 
     When no explicit CODING_AGENT_PROVIDER is set, the HQ mirrors whatever
@@ -231,13 +251,17 @@ def resolve_provider_config(provider: str | None = None) -> dict:
                 provider = detect_provider() or "deepseek"
 
     provider = provider.lower()
-    defaults = PROVIDER_DEFAULTS.get(provider, PROVIDER_DEFAULTS["deepseek"])
+    fallback = PROVIDER_DEFAULTS["deepseek"]
+    entry = PROVIDER_DEFAULTS.get(provider, fallback)
+    env_key = entry.get("env_key")
+    env_base = str(entry.get("env_base") or fallback["env_base"])
+    env_model = str(entry.get("env_model") or fallback["env_model"])
+    default_base = str(entry.get("default_base") or fallback["default_base"])
+    default_model = str(entry.get("default_model") or fallback["default_model"])
 
     api_key = ""
-    if defaults["env_key"]:
-        api_key = os.environ.get(defaults["env_key"], "") or os.environ.get(
-            "CODING_AGENT_API_KEY", ""
-        )
+    if env_key:
+        api_key = os.environ.get(env_key, "") or os.environ.get("CODING_AGENT_API_KEY", "")
 
     # ClinePass: fall back to the logged-in Cline CLI session (WorkOS token,
     # auto-refreshed) when no explicit key is set — same as the browser.
@@ -250,12 +274,12 @@ def resolve_provider_config(provider: str | None = None) -> dict:
             # source tree, lives under browser/browser_core/. Try a plain import
             # first (works when bundled), then add the source path as a fallback.
             try:
-                import cline_session  # type: ignore
+                import cline_session
             except ImportError:
                 bc = str(Path(__file__).resolve().parent.parent / "browser" / "browser_core")
                 if bc not in sys.path:
                     sys.path.insert(0, bc)
-                import cline_session  # type: ignore
+                import cline_session
 
             api_key = cline_session.fresh_token()
         except Exception as exc:
@@ -273,13 +297,39 @@ def resolve_provider_config(provider: str | None = None) -> dict:
             else:
                 provider = "deepseek"
 
-    base_url = os.environ.get(defaults["env_base"], defaults["default_base"])
-    model_name = os.environ.get(defaults["env_model"], defaults["default_model"])
+    env_base = str(entry.get("env_base") or fallback["env_base"])
+    env_model = str(entry.get("env_model") or fallback["env_model"])
+    default_base = str(entry.get("default_base") or fallback["default_base"])
+    default_model = str(entry.get("default_model") or fallback["default_model"])
+
+    base_url = os.environ.get(env_base, default_base)
+    model_name: str = os.environ.get(env_model, default_model)
 
     # When mirroring the browser assistant, its model pick wins (unless the user
     # also set an explicit model override for this provider in the repo .env).
-    if mirror_model and defaults["env_model"] not in os.environ:
+    if mirror_model and env_model not in os.environ:
         model_name = mirror_model
+
+    # For Ollama, normalize endpoint and auto-detect available installed models
+    if provider == "ollama":
+        base_url = base_url.rstrip("/")
+        if not base_url.endswith("/v1"):
+            base_url = f"{base_url}/v1"
+        try:
+            import httpx
+
+            r = httpx.get(f"{base_url}/models", timeout=1.5)
+            if r.status_code == 200:
+                data = r.json()
+                entries = data.get("data", []) if isinstance(data, dict) else []
+                avail: list[str] = [
+                    str(mid) for m in entries if isinstance(m, dict) for mid in [m.get("id")] if mid
+                ]
+                if avail and (not model_name or model_name not in avail):
+                    pref = next((m for m in avail if "llama3" in m or "qwen" in m), avail[0])
+                    model_name = pref
+        except Exception:
+            pass
 
     # For DeepSeek, resolve "auto" model
     if provider == "deepseek":
@@ -296,7 +346,7 @@ def resolve_provider_config(provider: str | None = None) -> dict:
                     in ("1", "true", "yes"),
                 )
             except Exception:
-                model_name = defaults["default_model"]
+                model_name = default_model
         else:
             model_name = raw_model
 
@@ -306,7 +356,7 @@ def resolve_provider_config(provider: str | None = None) -> dict:
         "api_key": api_key,
         "base_url": base_url,
         "model": model_name,
-        "raw_model": os.environ.get(defaults["env_model"], defaults["default_model"]),
+        "raw_model": os.environ.get(env_model, default_model),
         "provider": provider,
         "thinking": thinking,
     }
@@ -316,11 +366,11 @@ def build_llm_config(provider: str | None = None) -> LLMConfig:
     """Build an LLMConfig from environment variables."""
     cfg = resolve_provider_config(provider)
     return LLMConfig(
-        api_key=cfg["api_key"],
-        base_url=cfg["base_url"],
-        model=cfg["model"],
-        provider=cfg["provider"],
-        thinking=cfg.get("thinking", False),
+        api_key=str(cfg["api_key"]),
+        base_url=str(cfg["base_url"]),
+        model=str(cfg["model"]),
+        provider=str(cfg["provider"]),
+        thinking=bool(cfg.get("thinking", False)),
     )
 
 
