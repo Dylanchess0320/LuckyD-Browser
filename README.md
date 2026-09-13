@@ -48,19 +48,63 @@ Most “AI browsers” rent you a chatbot behind an account. LuckyD is a **real 
 
 ## Latest release
 
-Lucky polish — slim chrome, corrected colors — on top of the agentic stack,
-shipped with an official installer:
+**v8.0.0 — The Cleanup, phase one**: skills in the sidebar, smart model routing, and a Neon Night home — on top of the agentic stack, shipped with an official installer:
 
 | | |
 |---|---|
 | **⬇ Windows installer** | [`LuckyDBrowserSetup-8.0.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases) — built on a real Windows runner with Inno Setup 6. Per-user, no admin, silent-install flags. |
+| **🧩 Skills in sidebar** | The 5 bundled skills (`ai-news-brief`, `chess`, `graphify`, `movie-picker`, `top-picks`) surface as ✨ chips above the AI sidebar input as you type; one tap attaches the skill as chat context. |
+| **🧠 Smart model routing** | Auto mode picks the provider per question — explicit picks always win, non-viable picks fall back gracefully. |
+| **🌙 Neon Night home** | `/dashboard` and the new-tab fallback share one refined typographic system: tabular clock, small-caps labels, system-only font stack, offline-safe, `prefers-reduced-motion` support. |
+| **🏷 Honest provider labels** | Sidebar provider chips say `· free tier` / `· credit-billed ⚠` — no more guessing what a request costs. |
+| **💸 $0 OpenCode Zen fallback** | With no Ollama and no keys, chat falls back to the free Zen gateway instead of an empty-token provider. |
+| **🔔 Quiet update badge** | A silent check runs at startup — when a new release exists, a small toolbar badge lights up. No modal, no interruption. |
+
+> **9.0 in development** — `main` now carries an overnight hardening pass: **1,855 tests passing** (1,389 added overnight), coverage **52% → 81%** with the 60% CI gate enforced, **24 production bugs fixed**, and a UX overhaul (Ctrl+K palette: Tab focus trap, Enter activates the top result, fuzzy ranking, Home/End nav; keyboard-operable dashboard with ARIA; AI sidebar honest provider/error states; clearer error copy), plus Windows CI fixes. No 9.0 installer yet — grab v8.0.0 above, or run from source.
+
+<details>
+<summary>New in 8.0.0 — The Cleanup, phase one</summary>
+
+Skills in the sidebar, smart routing, and a Neon Night home.
+
+| | |
+|---|---|
+| **Contextual skill chips** | The 5 bundled skills (`ai-news-brief`, `chess`, `graphify`, `movie-picker`, `top-picks`) now surface as `✨` chips above the AI sidebar input as you type; one tap attaches the skill as chat context. |
+| **Smart model routing** | `ModelRouter` is wired into `AIBridge.chat()` auto mode: it picks the provider per question (explicit picks always win; non-viable picks fall back to the existing chain). |
+| **Neon Night home** | The real `/dashboard` and the `newtab.html` fallback share one refined typographic system: tabular clock, small-caps labels, system-only font stack, offline-safe, `prefers-reduced-motion` support. |
+| **$0 OpenCode Zen fallback** | With no Ollama and no keys, chat falls back to the free Zen gateway instead of an empty-token provider. |
+| **Honest provider labels** | Sidebar provider chips say `· free tier` / `· credit-billed ⚠`. |
+| **Antigravity decluttered** | Redundant Tools-menu and command-palette launchers removed; it's already in the terminal. |
+| **Copy freshness** | README, docs, `.github`, and in-app text brought current; About dialog and window titles now say "LuckyD". |
+
+*Verified: 465 tests passed, `ruff` clean.*
+
+</details>
+
+<details>
+<summary>New in 7.0.0 — Lucky polish</summary>
+
+Lucky polish — slim chrome, corrected colors, soul — on top of everything in 6.0.0.
+
+</details>
+
+<details>
+<summary>New in 6.0.0 — Trust foundation</summary>
+
+Agentic with receipts: permission scopes, risk levels, secret redaction, an append-only audit log, and an approval queue at `/trust` — plus WebMCP, scheduled/background agents, and the open Skills marketplace.
+
+| | |
+|---|---|
 | **🛡 Trust dashboard** | "Agentic with receipts": permission scopes, risk levels, secret redaction, an append-only audit log, and an approval queue — review everything the agents did at `/trust`. |
 | **🔒 Trust hardening** | Legacy `auto_approve_all` bypasses removed (now inert with a warning); explicit audited `auto_approve_low_risk` per-run mode; cross-process run locks so scheduled and interactive runs can't collide; mutating schedule-dashboard routes gated by approval; zero-valued schedule fields (`max_retries=0`) honored instead of dropped. |
 | **🔌 WebMCP** | Websites can expose typed agent tools to LuckyD (JS shim + native support), permission-gated so sites can't reach beyond their grant. Server-side schema validation, 30s dispatch timeouts, and origin binding via rotating discovery tokens — a page can't call tools on another origin's behalf, and bindings are keyed per tab. |
 | **⏰ Scheduled agents** | Background agents on cron schedules with a **morning digest** (`/schedules`) — it works while you rest. |
 | **🧩 Skills marketplace** | Open skill registries with hash-verified install, update, remove, and publish for agent skills. |
 | **🛡 Agent circuit breaker** | The agent loop stops after 4 consecutive all-tool-failure turns with an actionable message instead of burning turns and budget. |
-| **🔔 Quiet update badge** | A silent check runs at startup — when a new release exists, a small toolbar badge lights up. No modal, no interruption. |
+
+*Verified: 428 tests passed, `ruff` clean.*
+
+</details>
 
 <details>
 <summary>New in 5.0.0 — Final</summary>

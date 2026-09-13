@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [9.0.0] — in development
+
+Overnight hardening pass on `main`: **1,855 tests passing** (1,389 added
+overnight), coverage **52% → 81%** with the 60% CI gate (`--cov-fail-under=60`)
+now enforced, and **24 production bugs fixed** across `browser_core`, `core`,
+`tools`, and `memory`.
+
+### Added
+- **Ctrl+K palette overhaul** — Tab focus trap, Enter activates the top result,
+  fuzzy ranking, Home/End navigation.
+- **Dashboard keyboard + ARIA** — the dashboard is fully keyboard-operable with
+  ARIA landmarks and labels.
+- **AI sidebar honest states** — provider and error states say what is actually
+  happening; clearer error copy throughout.
+
+### Fixed
+- **24 production bugs** — across `browser_core`, `core`, `tools`, and `memory`.
+- **Windows CI fixes** — Windows CI jobs stabilized for the 9.0 cycle.
+
 ## [Unreleased]
 
 ### Added
