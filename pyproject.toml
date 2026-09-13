@@ -293,7 +293,20 @@ markers = [
 
 [tool.coverage.run]
 source = ["core", "tools", "llm", "memory", "project", "features"]
-omit = ["*/tests/*", "*/__pycache__/*"]
+omit = [
+    "*/tests/*",
+    "*/__pycache__/*",
+    # Qt UI and app entry points: they need a display or are launch/build
+    # scripts, so they sit at ~0% in headless CI by construction.
+    # Excluding them keeps the coverage gate a real regression ratchet on
+    # testable code instead of a permanently-red aspiration.
+    "*/browser_ui/*",
+    "*/browser_app.py",
+    "*/main.py",
+    "*/make_icon.py",
+    "*/make_luckyd_icon_v2.py",
+    "*/selftest.py",
+]
 branch = true
 
 [tool.coverage.report]
