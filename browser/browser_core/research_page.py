@@ -66,7 +66,7 @@ class SwarmManager:
 
         with self._lock:
             if self._active_run and self._active_run.get("status") == "running":
-                raise RuntimeError("A research swarm is already running")
+                raise RuntimeError("Research is already running — check the live activity panel")
 
             run_id = f"run-{time.strftime('%Y%m%d-%H%M%S')}"
             self._cancel_requested = False
@@ -370,7 +370,7 @@ def research_html() -> str:
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>LuckyD Deep Research Swarm</title>
+<title>LuckyD Deep Research</title>
 <style>
   /* __BRAND_VARS__ */
   :root {{
@@ -863,7 +863,7 @@ def research_html() -> str:
   </div>
   <span id="status-pill" class="pill">idle</span>
   <span class="sp"></span>
-  <button class="btn" id="btn-runs" onclick="toggleDrawer()">📜 Past Runs (<span id="runs-count">0</span>)</button>
+  <button class="btn" id="btn-runs" onclick="toggleDrawer()">📜 Past runs (<span id="runs-count">0</span>)</button>
   <button class="btn" onclick="window.open('/mesh', '_blank')">🛸 Agent Mesh</button>
   <button class="btn" onclick="window.open('/hq', '_blank')">⚡ Agent HQ</button>
 </header>
@@ -872,26 +872,26 @@ def research_html() -> str:
   <!-- Left configuration & progress pane -->
   <div class="left-pane">
     <div class="form-group">
-      <label for="query-input">Research Question or Topic</label>
+      <label for="query-input">What should the research team look into?</label>
       <textarea id="query-input" placeholder="e.g. Compare modern transformer inference architectures (vLLM, SGLang, TensorRT-LLM) on latency, throughput, and memory efficiency..."></textarea>
     </div>
 
     <div class="grid-2">
       <div class="form-group">
-        <label for="depth-select">Swarm Depth</label>
+        <label for="depth-select">Research depth</label>
         <select id="depth-select">
-          <option value="quick">⚡ Quick (1 round · fast)</option>
-          <option value="standard" selected>🎯 Standard (2 rounds · balanced)</option>
-          <option value="deep">🔬 Deep (3 rounds · thorough)</option>
-          <option value="max">🧠 Max (4 rounds · exhaustive)</option>
+          <option value="quick">⚡ Quick — one pass, minutes</option>
+          <option value="standard" selected>🎯 Standard — two passes, balanced</option>
+          <option value="deep">🔬 Deep — three passes, thorough</option>
+          <option value="max">🧠 Max — four passes, exhaustive</option>
         </select>
       </div>
       <div class="form-group">
-        <label for="backend-select">Search Backend</label>
+        <label for="backend-select">Search backend</label>
         <select id="backend-select">
-          <option value="auto" selected>✨ Auto (Smart Engine)</option>
-          <option value="ddg">🦆 DuckDuckGo (Free / Keyless)</option>
-          <option value="gemini">🌐 Gemini Grounding</option>
+          <option value="auto" selected>✨ Auto (smart engine)</option>
+          <option value="ddg">🦆 DuckDuckGo (free, no key)</option>
+          <option value="gemini">🌐 Gemini grounding</option>
           <option value="tavily">🔍 Tavily AI Search</option>
           <option value="brave">🦁 Brave Search</option>
         </select>
@@ -901,13 +901,13 @@ def research_html() -> str:
     <div class="form-group">
       <label for="provider-select">LLM Provider</label>
       <select id="provider-select">
-        <option value="auto" selected>✨ Auto (Free Zen pool → OpenRouter → Ollama)</option>
-        <option value="opencode">🆓 OpenCode Zen Free (nemotron-3-ultra)</option>
+        <option value="auto" selected>✨ Auto (recommended — free pools first)</option>
+        <option value="opencode">🆓 OpenCode Zen (free pool)</option>
         <option value="ollama">💻 Local Ollama (offline, unlimited)</option>
-        <option value="openrouter">🌐 OpenRouter Free (:free models)</option>
+        <option value="openrouter">🌐 OpenRouter (free models)</option>
         <option value="gemini">♊ Google Gemini (native grounding)</option>
-        <option value="luckyd">🤖 LuckyD / Active Browser Provider</option>
-        <option value="mock">🧪 Mock (Offline Fast Test)</option>
+        <option value="luckyd">🤖 Browser's active AI provider</option>
+        <option value="mock">🧪 Test run (offline, no network)</option>
       </select>
     </div>
 
@@ -921,7 +921,7 @@ def research_html() -> str:
 
     <div style="display: flex; gap: 8px; margin-top: 4px;">
       <button class="btn btn-primary" id="btn-launch" style="flex: 1;" onclick="startSwarm()">
-        🚀 Launch Swarm
+        🚀 Start research
       </button>
       <button class="btn btn-danger" id="btn-stop" style="display: none;" onclick="cancelSwarm()">
         ⏹ Cancel
@@ -930,12 +930,12 @@ def research_html() -> str:
 
     <!-- Swarm pipeline visualizer -->
     <div class="pipeline-card">
-      <label>Swarm Architecture & Execution</label>
+      <label>How the research runs</label>
       <div class="stages">
         <div class="stage-step" id="st-plan">1. Plan</div>
         <div class="stage-step" id="st-res">2. Research</div>
-        <div class="stage-step" id="st-syn">3. Synth</div>
-        <div class="stage-step" id="st-crit">4. Audit</div>
+        <div class="stage-step" id="st-syn">3. Synthesize</div>
+        <div class="stage-step" id="st-crit">4. Review</div>
         <div class="stage-step" id="st-fin">5. Report</div>
       </div>
       <div class="metrics-strip">
@@ -947,9 +947,9 @@ def research_html() -> str:
     </div>
 
     <div class="form-group">
-      <label>Live Swarm Event Stream</label>
+      <label>Live activity</label>
       <div class="events-box" id="events-box">
-        <div style="color: var(--muted); font-style: italic;">Ready to launch swarm...</div>
+        <div style="color: var(--muted); font-style: italic;">Ready when you are — events will stream in here.</div>
       </div>
     </div>
   </div>
@@ -969,8 +969,8 @@ def research_html() -> str:
       <div id="view-report" class="report-box">
         <div class="empty-hint">
           <h3>🔬 No report generated yet</h3>
-          <p style="margin-top: 8px;">Enter your research topic on the left and click <b>Launch Swarm</b>.</p>
-          <p style="margin-top: 4px; font-size: 12px; color: var(--muted);">The multi-agent swarm will plan sub-questions, dispatch parallel workers, extract verified evidence, synthesize findings, and produce a grounded report with full citations.</p>
+          <p style="margin-top: 8px;">Enter your research topic on the left and click <b>Start research</b>.</p>
+          <p style="margin-top: 4px; font-size: 12px; color: var(--muted);">The research team will plan sub-questions, dispatch parallel workers, extract verified evidence, synthesize findings, and produce a grounded report with full citations.</p>
         </div>
       </div>
       <div id="view-evidence" style="display: none; max-width: 900px; margin: 0 auto;"></div>
@@ -984,7 +984,7 @@ def research_html() -> str:
 <!-- History slide-out drawer -->
 <div class="drawer" id="runs-drawer">
   <div class="drawer-header">
-    <b style="color: #fff; font-size: 15px;">📜 Research Runs History</b>
+    <b style="color: #fff; font-size: 15px;">📜 Past research</b>
     <span class="sp"></span>
     <button class="btn" onclick="toggleDrawer()">✕</button>
   </div>
@@ -1101,7 +1101,7 @@ async function startSwarm() {{
 
   $('btn-launch').disabled = true;
   $('btn-stop').style.display = 'inline-flex';
-  $('events-box').innerHTML = '<div style="color: var(--accent);">🚀 Dispatched research swarm...</div>';
+  $('events-box').innerHTML = '<div style="color: var(--accent);">🚀 Research started — working on it…</div>';
   updatePipelineStage('planning');
 
   try {{
@@ -1119,7 +1119,7 @@ async function startSwarm() {{
     activeRunId = res.run_id;
     pollStatus();
   }} catch (e) {{
-    alert('Failed to start swarm: ' + e.message);
+    alert('Could not start research: ' + e.message);
     resetButtons();
   }}
 }}

@@ -5,9 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [8.0.0] - 2026-09-12
+## [Unreleased]
 
-The Cleanup, phase one: skills in the sidebar, smart routing, and a Neon Night home.
+### Changed
+- **Research page humanized** — "swarm" jargon retired across the Deep Research
+  page: `Research depth` / `Search backend` labels with friendlier option text,
+  provider choices described in plain words (free pools first, the browser's
+  active provider, an offline test run), `Start research`, `How the research
+  runs`, `Live activity`, `Past research`, a `LuckyD Deep Research` page title,
+  and de-swarmed JS messages (`browser/browser_core/research_page.py`).
+
+### Fixed
+- **Test isolation** — `tests/test_browser_research.py` appends `browser/` to
+  `sys.path` instead of prepending it, so combined test runs can no longer
+  shadow the repo-root `main.py` and break `test_browser_integrations.py`.
+
+
+## [8.0.0] - 2026-09-13
+
+The Cleanup, phase one: skills in the sidebar, smart routing, and a Neon Night home — plus a friendlier Deep Research page.
 
 **Added**
 

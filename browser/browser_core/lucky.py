@@ -60,7 +60,7 @@ def greeting(hour: int) -> str:
         part = "Good evening"
     else:
         part = "Up late"
-    return f"{part} — Lucky's ready"
+    return f"{part} — Lucky's ready."
 
 
 def suggest(

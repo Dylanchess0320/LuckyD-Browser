@@ -184,10 +184,10 @@ _HEAD = page_head(
 _BODY = r"""<body>
 <header>
   <div id="pills">
-    <span class="pill" id="pill-harness"><span class="dot"></span><span>coding agent…</span></span>
-    <span class="pill ok" id="pill-api"><span class="dot"></span><span>browser API</span></span>
+    <span class="pill" id="pill-harness"><span class="dot"></span><span>Coding agent…</span></span>
+    <span class="pill ok" id="pill-api"><span class="dot"></span><span>Browser API</span></span>
     <span class="pill" id="pill-ai"><span class="dot"></span><span>AI…</span></span>
-    <span class="pill" id="pill-ads"><span class="dot"></span><span>shield…</span></span>
+    <span class="pill" id="pill-ads" style="display:none"><span class="dot"></span><span>Shield…</span></span>
   </div>
   <div id="clock"><div class="time" id="time"></div><div class="date" id="date"></div>
     <div id="hello-line"><b id="hello"></b> <span id="tagline"></span></div></div>
@@ -196,7 +196,7 @@ _BODY = r"""<body>
 <main>
   <div class="mode-tabs">
     <button type="button" class="mode-tab active" id="tab-search" onclick="setSearchMode('search')">🔍 Web Search</button>
-    <button type="button" class="mode-tab" id="tab-ask" onclick="setSearchMode('ask')">⚡ Ask LuckyD AI</button>
+    <button type="button" class="mode-tab" id="tab-ask" onclick="setSearchMode('ask')">⚡ Ask Lucky</button>
   </div>
 
   <form class="search" id="searchform">
@@ -219,7 +219,7 @@ _BODY = r"""<body>
 
   <div id="ai-card">
     <div id="ai-card-header">
-      <div class="title"><span>◈</span> <span>LuckyD AI Answer</span></div>
+      <div class="title"><span>◈</span> <span>Lucky's answer</span></div>
       <div class="actions">
         <button type="button" class="ai-btn" onclick="copyAiAnswer()">📋 Copy</button>
         <button type="button" class="ai-btn" onclick="location.href='luckyd://assistant'">↗️ Open Sidebar</button>
@@ -245,10 +245,11 @@ _JS = r"""<script>
 const ENGINES = { google: 'https://www.google.com/search?q=', bing: 'https://www.bing.com/search?q=',
   ddg: 'https://duckduckgo.com/?q=', brave: 'https://search.brave.com/search?q=' };
 const APPS = [
-  ['⌘', 'Coding Agent', '/hq'],
+  ['⌘', 'Agent HQ', '/hq'],
   ['🤖', 'AI Assistant', 'luckyd://assistant'],
   ['🕸️', 'Agent Mesh', '/mesh'],
   ['🖥️', 'Agent Terminal', '/terminal'],
+  ['🔬', 'Deep Research', '/research'],
   ['🎬', 'Workflows', '/workflows'],
   ['📡', 'Network', '/network'],
   ['🔖', 'Bookmarks', 'luckyd://bookmarks'],
@@ -281,7 +282,7 @@ tick(); setInterval(tick, 10000);
 
 // Time-aware greeting with a rotating LuckyD wink.
 const TAGLINES = [
-  'your tabs missed you', 'no accounts, no keys, no worries', 'the agent is ready when you are',
+  'your tabs missed you', 'no accounts, no keys, no worries', 'Lucky is ready when you are',
   'press Ctrl+K for everything', 'tip: Ctrl+` opens a terminal', 'surf different',
   'tip: Ctrl+Shift+S screenshots the page', 'workflows replay your best moves',
 ];
@@ -323,27 +324,38 @@ function setPill(id, cls, text) {
   p.className = 'pill ' + cls;
   p.querySelector('span:last-child').textContent = text;
 }
+// Provider ids are internals — the dashboard speaks product names.
+const PROVIDER_NAMES = {
+  ollama: 'Ollama', lmstudio: 'LM Studio', opencode: 'OpenCode Zen',
+  openrouter: 'OpenRouter', clinepass: 'Cline Pass', 'cline-usage': 'Cline Credits',
+  google: 'Gemini', groq: 'Groq', zai: 'Z.ai', deepseek: 'DeepSeek',
+  openai: 'OpenAI', anthropic: 'Anthropic', cline: 'Cline',
+};
+function friendlyProvider(id) { return PROVIDER_NAMES[id] || id; }
 async function refreshStatus() {
   try {
     const r = await fetch('/status');
     const s = await r.json();
     if (s.harness) {
       const tools = Number(s.harness_tools || 0);
-      setPill('pill-harness', 'ok', tools ? 'coding agent online · ' + tools + ' tools' : 'coding agent online');
+      setPill('pill-harness', 'ok',
+        tools ? 'Coding agent online · ' + tools + ' tools' : 'Coding agent online');
     } else if (s.harness_starting) {
-      setPill('pill-harness', 'warn', 'coding agent starting…');
+      setPill('pill-harness', 'warn', 'Coding agent starting…');
     } else {
-      setPill('pill-harness', 'err', 'coding agent offline');
+      setPill('pill-harness', 'err', 'Coding agent offline');
     }
-    setPill('pill-api', 'ok', 'browser API on');
+    setPill('pill-api', 'ok', 'Browser API on');
     const prov = (s.ai_providers || []);
     setPill('pill-ai', prov.length ? 'ok' : 'warn',
-      prov.length ? 'AI: ' + prov.slice(0, 3).join(', ') + (prov.length > 3 ? '…' : '') : 'AI not set up');
+      prov.length ? 'AI: ' + prov.slice(0, 3).map(friendlyProvider).join(' · ') +
+        (prov.length > 3 ? '…' : '') : 'AI not set up');
     const blocked = Number(s.ads_blocked || 0);
-    setPill('pill-ads', blocked ? 'ok' : '',
-      '🛡 ' + blocked.toLocaleString() + ' blocked');
+    // A "0 blocked" pill reads like a problem — show it only once it's earned.
+    document.getElementById('pill-ads').style.display = blocked ? '' : 'none';
+    setPill('pill-ads', 'ok', '🛡 ' + blocked.toLocaleString() + ' blocked');
   } catch (e) {
-    setPill('pill-harness', 'err', 'status unavailable');
+    setPill('pill-harness', 'err', 'Status unavailable');
   }
 }
 refreshStatus(); setInterval(refreshStatus, 5000);
@@ -410,7 +422,7 @@ function setSearchMode(mode) {
   document.getElementById('tab-ask').className = 'mode-tab' + (isAsk ? ' active' : '');
   document.getElementById('engine').style.display = isAsk ? 'none' : 'block';
   const q = document.getElementById('q');
-  q.placeholder = isAsk ? 'Ask LuckyD AI anything or generate code/analysis…' : 'Search the web or type a URL';
+  q.placeholder = isAsk ? 'Ask Lucky anything — questions, code, analysis…' : 'Search the web or type a URL';
   document.getElementById('searchbtn').textContent = isAsk ? 'Ask AI' : 'Go';
 }
 setSearchMode(currentSearchMode);
@@ -421,7 +433,7 @@ async function askAI(query) {
   const card = document.getElementById('ai-card');
   const body = document.getElementById('ai-card-body');
   card.style.display = 'block';
-  body.textContent = 'Thinking… contacting AI model…';
+  body.textContent = 'Thinking…';
   card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
   try {
@@ -438,7 +450,8 @@ async function askAI(query) {
     body.textContent = text;
     window.__lastAiAnswer = text;
   } catch (err) {
-    body.textContent = 'Could not get AI answer: ' + err.message + '\n\nTip: You can open the AI Sidebar directly (Ctrl+Shift+A) or check provider status.';
+    body.textContent = 'Could not get an AI answer — ' + err.message +
+      '\n\nTip: open the AI Sidebar (Ctrl+Shift+A) or check your provider in Settings.';
   }
 }
 

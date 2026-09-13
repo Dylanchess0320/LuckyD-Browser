@@ -280,7 +280,7 @@ class AiSidebar(QDockWidget):
 
         top = QHBoxLayout()
         self.provider_box = QComboBox(body)
-        self.provider_box.addItem("auto (fallback chain)", None)
+        self.provider_box.addItem("✨ Auto (recommended)", None)
         # Show providers with cline-usage first when available
         ordered = list(self.bridge.providers())
         default = self.bridge.default_provider()
@@ -308,46 +308,56 @@ class AiSidebar(QDockWidget):
         self.provider_box.currentIndexChanged.connect(self._provider_changed)
 
         # Live coding-agent backend status.
-        self.harness_status = QLabel("coding agent: …", body)
+        self.harness_status = QLabel("Coding agent: …", body)
         self.harness_status.setTextFormat(Qt.TextFormat.RichText)
         layout.addWidget(self.harness_status)
 
         if not self.bridge.providers():
             warn = QLabel(
                 "No AI backend found. Free + no API key: install Ollama "
-                "(https://ollama.com) and run `ollama pull qwen3:4b` "
-                "(CPU-friendly), then restart — or add cloud keys to the "
-                "repo .env.",
+                "(https://ollama.com) and run `ollama pull llama3.2:3b` "
+                "(the model this browser ships with), then restart — or add "
+                "cloud keys to the repo .env.",
                 body,
             )
             warn.setWordWrap(True)
             layout.addWidget(warn)
 
         actions = QHBoxLayout()
-        for label, slot in (
-            ("Summarize", self._summarize),
-            ("📷 Look at page", self._visual_qa),
-            ("Clear", self._clear_chat),
+        for label, tip, slot in (
+            ("Summarize", "Summarize this page in 5 bullet points", self._summarize),
+            ("📷 Look at page", "Ask about a screenshot of this page", self._visual_qa),
+            ("Clear", "Clear this conversation", self._clear_chat),
         ):
             btn = QPushButton(label, body)
+            btn.setToolTip(tip)
             btn.clicked.connect(slot)
             actions.addWidget(btn)
         layout.addLayout(actions)
 
         actions2 = QHBoxLayout()
-        for label, slot in (
-            ("📊 Extract", self._extract_data),
-            ("🛡️ Audit", self._security_audit),
-            ("🔬 Research", lambda: self._mw.open_deep_research(self.input.text().strip())),
-            ("📋 Copy", self._copy_chat),
+        for label, tip, slot in (
+            (
+                "📊 Extract",
+                "Pull tables, prices, and contact info into Markdown",
+                self._extract_data,
+            ),
+            ("🛡️ Audit", "Security and privacy review of this page", self._security_audit),
+            (
+                "🔬 Research",
+                "Open Deep Research with the text below as the question",
+                lambda: self._mw.open_deep_research(self.input.text().strip()),
+            ),
+            ("📋 Copy", "Copy this conversation as Markdown", self._copy_chat),
         ):
             btn = QPushButton(label, body)
+            btn.setToolTip(tip)
             btn.clicked.connect(slot)
             actions2.addWidget(btn)
         layout.addLayout(actions2)
 
         self.harness_box = QCheckBox(body)
-        self.harness_box.setText("\U0001f50c Full coding agent (recommended)")
+        self.harness_box.setText("🔌 Full coding agent (recommended)")
         self.harness_box.setToolTip(
             "Agent tasks run on the full coding-agent backend, which "
             "starts automatically and can drive your open tabs. "
@@ -379,8 +389,10 @@ class AiSidebar(QDockWidget):
         row = QHBoxLayout()
         self.input = QLineEdit(body)
         self.input.textChanged.connect(self._update_skill_chips)
-        self.input.setPlaceholderText("Ask about this page or anything…  (Enter to send)")
-        self.input.setToolTip("Tip: check 'Page context' to include the current page text")
+        self.input.setPlaceholderText("Ask about this page or anything…")
+        self.input.setToolTip(
+            "Tip: tick 'Page context' to include the current page text (Enter to send)"
+        )
         self.send_btn = QPushButton("Send", body)
         self.send_btn.setToolTip("Send to AI (Enter)")
         self.send_btn.clicked.connect(self._send)
@@ -388,14 +400,16 @@ class AiSidebar(QDockWidget):
         row.addWidget(self.send_btn)
         layout.addLayout(row)
 
-        layout.addWidget(QLabel("Autonomous agent (drives the current tab):", body))
+        layout.addWidget(QLabel("Autonomous agent — drives the current tab:", body))
         agent_row = QHBoxLayout()
         self.agent_input = QLineEdit(body)
         self.agent_input.setPlaceholderText("e.g. Search this site for X, report back")
         self.agent_input.returnPressed.connect(self._start_agent)
         self.agent_btn = QPushButton("Start", body)
+        self.agent_btn.setToolTip("Run the task on the current tab")
         self.agent_btn.clicked.connect(self._start_agent)
         self.stop_btn = QPushButton("Stop", body)
+        self.stop_btn.setToolTip("Stop the running task")
         self.stop_btn.setEnabled(False)
         self.stop_btn.clicked.connect(self._stop_agent)
         agent_row.addWidget(self.agent_input, 1)
@@ -405,8 +419,8 @@ class AiSidebar(QDockWidget):
         self.vision_box = QCheckBox("Vision steps (auto — screenshots each step)", body)
         self.vision_box.setToolTip(
             "The agent sees a screenshot every step (uses image tokens). "
-            "Auto-ENABLED when the selected model accepts images "
-            "(gpt-4o, gemini, claude-sonnet, gemma3…), auto-DISABLED "
+            "Auto-enabled when the selected model accepts images "
+            "(gpt-4o, gemini, claude-sonnet, gemma3…), auto-disabled "
             "for text-only models so the agent never sends a bad payload."
         )
         layout.addWidget(self.vision_box)
@@ -447,7 +461,9 @@ class AiSidebar(QDockWidget):
     # ── rendering ────────────────────────────────────────────────────
 
     def _greet(self) -> None:
-        providers = ", ".join(self.bridge.providers()) or "none set up"
+        providers = (
+            ", ".join(self._provider_label(p) for p in self.bridge.providers()) or "none set up"
+        )
         muted = _tok("muted")
         text_c = _tok("text")
         accent = _tok("accent")
@@ -474,16 +490,16 @@ class AiSidebar(QDockWidget):
                 "text": (
                     f"<div style='color:{muted};padding:6px 2px;line-height:1.5'>"
                     f"<b style='color:{text_c};font-size:14px'>🍀 {headline}</b><br>"
-                    f"<span>Ask about this page, summarise, or give the agent a task — it drives the current tab while you watch.</span><br>"
+                    f"<span>Ask about this page, or give the agent below a task — it drives the current tab while you watch.</span><br>"
                     f"<div style='margin:6px 0;padding:8px 10px;background:rgba(255,255,255,.04);border:1px solid {_tok('border')};border-radius:10px'>"
                     f"<b style='color:{accent}'>Quick start:</b><br>"
                     f"• <b>Summarize</b> or <b>📷 Look at page</b> — one-tap page help<br>"
-                    f"• Type a question below (☑ Page context includes the page)<br>"
+                    f"• Type a question below — tick <b>Page context</b> to include this page<br>"
                     f"• Agent box below: “Search this site for X, report back”<br>"
                     f"</div>"
                     f"<span style='font-size:11px'>AI: {html.escape(providers)}</span><br>"
                     f"<span style='font-size:11px;color:{accent}'>{html.escape(free_hint)}</span><br>"
-                    f"<span style='font-size:11px'>Tips: <b>?</b> in address bar asks AI • <b>Ctrl+K</b> palette • <b>Esc</b> exits fullscreen</span>"
+                    f"<span style='font-size:11px'>Tips: <b>?</b> in the address bar asks AI • <b>Ctrl+K</b> commands • <b>Esc</b> exits fullscreen</span>"
                     f"</div>"
                 ),
             }
@@ -575,24 +591,24 @@ class AiSidebar(QDockWidget):
         sup = getattr(self._mw._app, "harness", None)
         if sup is None:
             self.harness_status.setText(
-                f"<span style='color:{muted}'>coding agent: unavailable</span>"
+                f"<span style='color:{muted}'>Coding agent: unavailable</span>"
             )
             return
         st = sup.status()
         if st.get("up"):
-            self.harness_status.setText(f"<span style='color:{ok}'>● coding agent online</span>")
+            self.harness_status.setText(f"<span style='color:{ok}'>● Coding agent online</span>")
         elif st.get("starting"):
             self.harness_status.setText(
-                f"<span style='color:{warn}'>● coding agent starting…</span>"
+                f"<span style='color:{warn}'>● Coding agent starting…</span>"
             )
         elif st.get("error"):
             self.harness_status.setText(
-                f"<span style='color:{err}'>● coding agent offline</span> "
+                f"<span style='color:{err}'>● Coding agent offline</span> "
                 f"<span style='color:{muted};font-size:10px'>retries automatically</span>"
             )
         else:
             self.harness_status.setText(
-                f"<span style='color:{muted}'>● coding agent off — starts when needed</span>"
+                f"<span style='color:{muted}'>● Coding agent off — starts when needed</span>"
             )
 
     def _sync_vision_default(self) -> None:
@@ -642,8 +658,9 @@ class AiSidebar(QDockWidget):
         if endpoint_label:
             return endpoint_label
         labels = {
-            "clinepass": "ClinePass",
-            "cline-usage": "Cline Usage",
+            "clinepass": "Cline Pass",
+            "cline-usage": "Cline Credits",
+            "opencode": "OpenCode Zen",
             "ollama": "Ollama",
             "lmstudio": "LM Studio",
             "google": "Google Gemini",
@@ -691,7 +708,7 @@ class AiSidebar(QDockWidget):
             saved = {}
         saved[provider] = model
         self._mw.settings.set("ai_model_overrides", saved)
-        self.status.setText(f"{provider} model → {model}")
+        self.status.setText(f"{self._provider_label(provider)} model → {model}")
         self._sync_vision_default()
 
     def _send(self) -> None:
@@ -732,7 +749,7 @@ class AiSidebar(QDockWidget):
             )
         messages.extend(self._history[-8:])
         self._begin_assistant()
-        self.status.setText("thinking…")
+        self.status.setText("Thinking…")
         self._chat_worker = _ChatWorker(self.bridge, messages, self._selected_provider(), self)
         self._chat_worker.token.connect(self._on_token)
         self._chat_worker.finished.connect(self._chat_done)
@@ -746,7 +763,7 @@ class AiSidebar(QDockWidget):
             self._blocks[-1]["text"] = text or self._blocks[-1]["text"]
         self._render()  # final, unthrottled render
         self._history.append({"role": "assistant", "content": text})
-        self.status.setText(f"answered by {provider}")
+        self.status.setText(f"Answered by {self._provider_label(provider)}")
         self._chat_worker = None
 
     def _chat_failed(self, error: str) -> None:
@@ -759,7 +776,7 @@ class AiSidebar(QDockWidget):
             self._blocks.pop()
         self._blocks.append({"role": "error", "text": error})
         self._render()
-        self.status.setText("failed")
+        self.status.setText("Request failed")
         self._chat_worker = None
 
     # ── contextual skill chips ─────────────────────────────────────────
@@ -793,7 +810,7 @@ class AiSidebar(QDockWidget):
     def _use_skill(self, skill: Skill) -> None:
         """Chip click → normal chat flow with the skill's context attached."""
         if self._chat_worker is not None:
-            self.status.setText("busy — wait for the current response")
+            self.status.setText("Busy — wait for the current response")
             return
         if not self.input.text().strip():
             return
@@ -806,7 +823,7 @@ class AiSidebar(QDockWidget):
     def _quick(self, prompt: str) -> None:
         """Send a preset prompt about the current page."""
         if self._chat_worker is not None:
-            self.status.setText("busy — wait for the current response")
+            self.status.setText("Busy — wait for the current response")
             return
         self._user(prompt)
         self._history.append({"role": "user", "content": prompt})
@@ -850,9 +867,9 @@ class AiSidebar(QDockWidget):
             from PySide6.QtGui import QGuiApplication
 
             QGuiApplication.clipboard().setText(content)
-            self.status.setText("Chat copied to clipboard as Markdown!")
+            self.status.setText("Chat copied to clipboard")
         else:
-            self.status.setText("Nothing to copy")
+            self.status.setText("Nothing to copy yet")
 
     def ask(self, question: str) -> None:
         """Programmatic question (e.g. omnibox "?…" prefix) — into the chat."""
@@ -863,7 +880,7 @@ class AiSidebar(QDockWidget):
     def ask_about(self, instruction: str, selected_text: str) -> None:
         """Context-menu entry: run an instruction over the selected text."""
         if self._chat_worker is not None:
-            self.status.setText("busy — try again in a moment")
+            self.status.setText("Busy — try again in a moment")
             return
         self.show()
         snippet = selected_text[:80] + ("…" if len(selected_text) > 80 else "")
@@ -879,7 +896,7 @@ class AiSidebar(QDockWidget):
         ]
         messages.extend(self._history[-8:])
         self._begin_assistant()
-        self.status.setText("thinking…")
+        self.status.setText("Thinking…")
         self._chat_worker = _ChatWorker(self.bridge, messages, self._selected_provider(), self)
         self._chat_worker.token.connect(self._on_token)
         self._chat_worker.finished.connect(self._chat_done)
@@ -892,13 +909,13 @@ class AiSidebar(QDockWidget):
             return
         view = self._mw.tabs.current_view()
         if view is None or view.url().scheme() not in ("http", "https"):
-            self._append("<i>Open a web page first.</i>")
+            self._append("<i>Open a web page first, then try again.</i>")
             return
         self._shot_prompt = self.input.text().strip() or (
             "Describe this page: what is it, what stands out, anything actionable?"
         )
         self.input.clear()
-        self.status.setText("capturing screenshot…")
+        self.status.setText("Capturing screenshot…")
         self._shot_worker = _ShotWorker(view.url().toString(), self)
         self._shot_worker.done.connect(self._shot_ready)
         self._shot_worker.failed.connect(self._shot_failed)
@@ -908,7 +925,7 @@ class AiSidebar(QDockWidget):
         self._shot_worker = None
         prompt = self._shot_prompt
         self._user("📷 " + prompt)
-        self.status.setText("asking vision model…")
+        self.status.setText("Asking vision model…")
         content = [
             {"type": "text", "text": prompt},
             {
@@ -942,7 +959,7 @@ class AiSidebar(QDockWidget):
                 b64 = base64.b64encode(bytes(buffer.data())).decode()
                 self._shot_ready(b64, mime="image/png")
                 return
-        self._append(f"<i>Screenshot failed: {html.escape(error)}</i>")
+        self._append(f"<i>Couldn't take a screenshot — {html.escape(error)}</i>")
 
     # ── autonomous agent ─────────────────────────────────────────────
 
@@ -983,23 +1000,23 @@ class AiSidebar(QDockWidget):
         self._agent_worker.finished.connect(self._agent_done)
         self.agent_btn.setEnabled(False)
         self.stop_btn.setEnabled(True)
-        self.status.setText("agent running…")
+        self.status.setText("Agent running…")
         self._agent_worker.start()
 
     def _stop_agent(self) -> None:
         if self._harness_worker is not None:
             self._harness_worker.stop()
-            self.status.setText("stopping coding agent task…")
+            self.status.setText("Stopping…")
             return
         if self._agent_session is not None:
             self._agent_session.stop()
-            self.status.setText("stopping after current step…")
+            self.status.setText("Stopping…")
 
     def _agent_done(self, result: str) -> None:
-        self._append(f"<b style='color:{_tok('accent')}'>Agent finished:</b> {html.escape(result)}")
+        self._append(f"<b style='color:{_tok('accent')}'>Done:</b> {html.escape(result)}")
         self.agent_btn.setEnabled(True)
         self.stop_btn.setEnabled(False)
-        self.status.setText("agent idle")
+        self.status.setText("Agent idle")
         self._agent_worker = None
         self._agent_session = None
 
@@ -1032,7 +1049,7 @@ class AiSidebar(QDockWidget):
         return _CONTROL_API_HINT.format(base=server.base_url, auth=auth)
 
     def _start_harness_agent(self, task: str) -> None:
-        self._append(f"<b style='color:{_tok('accent2')}'>Coding agent:</b> {html.escape(task)}")
+        self._append(f"<b style='color:{_tok('accent2')}'>Task:</b> {html.escape(task)}")
         full_task = task + self._control_api_hint()
         worker = _HarnessWorker(
             self._ensure_harness_bridge(),
@@ -1049,12 +1066,12 @@ class AiSidebar(QDockWidget):
         self._harness_worker = worker
         self.agent_btn.setEnabled(False)
         self.stop_btn.setEnabled(True)
-        self.status.setText("coding agent: connecting…")
+        self.status.setText("Task started…")
         worker.start()
 
     def _harness_done(self, result: str) -> None:
         self._append(
-            f"<b style='color:{_tok('accent2')}'>Coding agent finished:</b> "
+            f"<b style='color:{_tok('accent2')}'>Done:</b> "
             "<pre style='white-space:pre-wrap;margin:4px 0'>"
             f"{html.escape(result)}</pre>"
         )
@@ -1062,21 +1079,21 @@ class AiSidebar(QDockWidget):
         # "no response after 25 turns" result doesn't look like a dead end.
         if "turn limit" in result.lower() or "no response after" in result.lower():
             self._append(
-                "<i style='color:#fbbf24'>The coding agent hit its turn limit "
+                "<i style='color:#fbbf24'>The agent hit its turn limit "
                 "before finishing. Re-run with a narrower task, or type "
                 "“continue” to let it keep going.</i>"
             )
         self.agent_btn.setEnabled(True)
         self.stop_btn.setEnabled(False)
-        self.status.setText("coding agent idle")
+        self.status.setText("Agent idle")
         self._harness_worker = None
         self.refresh_harness_status()
 
     def _harness_failed(self, message: str) -> None:
-        self._append(f"<i>Coding agent error: {html.escape(message)}</i>")
+        self._append(f"<i>That run failed — {html.escape(message)}</i>")
         self.agent_btn.setEnabled(True)
         self.stop_btn.setEnabled(False)
-        self.status.setText("coding agent failed")
+        self.status.setText("Agent run failed")
         self._harness_worker = None
         self.refresh_harness_status()
 
@@ -1108,14 +1125,14 @@ class _HarnessWorker(QThread):
         try:
             result = self._loop.run_until_complete(self._task)
         except asyncio.CancelledError:
-            self.finished.emit("Stopped by user.")
+            self.finished.emit("Stopped.")
             return
         except Exception as exc:
             self.failed.emit(str(exc))
             return
         finally:
             self._loop.close()
-        self.finished.emit(result or "(harness returned an empty result)")
+        self.finished.emit(result or "(empty reply — try again)")
 
     def stop(self):
         if self._loop is not None and self._task is not None and not self._task.done():
@@ -1123,23 +1140,23 @@ class _HarnessWorker(QThread):
 
     async def _flow(self) -> str:
         bridge = self._bridge
-        self.progress.emit("harness: connecting…")
+        self.progress.emit("Connecting to coding agent…")
         ok = False
         try:
             ok = await bridge.connect(timeout=4.0)
         except Exception:
             ok = False
         if not ok:
-            self.progress.emit("harness: starting luckyd-code.exe backend…")
+            self.progress.emit("Starting coding-agent backend…")
             try:
                 ok = await bridge.start(timeout=25.0)
             except FileNotFoundError as exc:
-                return f"Harness backend not found: {exc}"
+                return f"Coding-agent backend not found: {exc}"
             except Exception:
                 ok = False
         if not ok:
             return (
-                f"Harness server unreachable at {bridge.base} — start it with "
+                f"Coding-agent server isn't responding at {bridge.base} — start it with "
                 "`luckyd-code.exe --web` or `python start_platform.py`, then retry."
             )
         tools = []

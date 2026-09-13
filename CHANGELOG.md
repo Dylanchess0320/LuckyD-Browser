@@ -14,6 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`opencode` restored to the coding-agent provider stack** — `core/providers.py`
   keeps the `$0` OpenCode Zen gateway (`OPENCODE_API_KEY` optional) so the CLI,
   docs, and `providers_config.json` agree again.
+- **Research page humanized** — "swarm" jargon retired across the Deep Research
+  page: `Research depth` / `Search backend` labels with friendlier option text,
+  provider choices described in plain words (free pools first, the browser's
+  active provider, an offline test run), `Start research`, `How the research
+  runs`, `Live activity`, `Past research`, a `LuckyD Deep Research` page title,
+  and de-swarmed JS messages (`browser/browser_core/research_page.py`).
+- **Release notes carry the installer hash** — `RELEASE_NOTES.md` records the
 
 ### Changed
 - **Ollama defaults corrected** — `core/providers.py` now defaults to

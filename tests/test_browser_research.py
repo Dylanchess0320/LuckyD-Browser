@@ -10,9 +10,12 @@ import pytest
 # Ensure browser and repo root are in path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 BROWSER_DIR = REPO_ROOT / "browser"
+# Browser dir appended (never prepended): the repo-root `main.py` (coding
+# agent) must never be shadowed by `browser/main.py` in tests that import
+# both — same guarantee test_security_40.py relies on.
 for p in (REPO_ROOT, BROWSER_DIR):
     if str(p) not in sys.path:
-        sys.path.insert(0, str(p))
+        sys.path.append(str(p))
 
 from browser_core.research_page import SwarmManager, research_html
 

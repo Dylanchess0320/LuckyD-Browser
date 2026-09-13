@@ -341,9 +341,9 @@ function setGreeting(now) {
   const g = document.getElementById('greeting');
   if (g.dataset.part === part) return;
   g.dataset.part = part;
+  const b = document.createElement('b'); b.className = 'accent'; b.textContent = "Lucky's ready.";
   g.innerHTML = '';
-  g.appendChild(document.createTextNode(part + ', '));
-  const b = document.createElement('b'); b.className = 'accent'; b.textContent = 'Lucky\u2019s ready.';
+  g.appendChild(document.createTextNode(part + ' — '));
   g.appendChild(b);
 }
 
