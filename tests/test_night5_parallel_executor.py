@@ -66,7 +66,10 @@ def test_can_parallelize_classification():
 
 async def test_execute_batch_parallel_order_and_counts(stub_registry):
     async def fake_read(path: str = ""):
-        await asyncio.sleep(0.01)
+        # 0.05s, not 0.01s: some Windows CI hosts have a coarse
+        # time.monotonic() granularity (~15ms), so a 10ms sleep can
+        # measure as exactly 0.0ms and flake the duration assertion.
+        await asyncio.sleep(0.05)
         return f"contents of {path}"
 
     stub_registry["Read"] = fake_read

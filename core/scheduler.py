@@ -448,15 +448,18 @@ class ScheduleStore:
             )
 
     def history(self, schedule_id: str | None = None, limit: int = 20) -> list[dict[str, Any]]:
+        # rowid DESC breaks started_at ties (timestamps have 1s granularity,
+        # so rapid retries land in the same second) — newest row first,
+        # deterministically, on every platform.
         with self._lock, self._connect() as conn:
             if schedule_id:
                 rows = conn.execute(
-                    "SELECT * FROM runs WHERE schedule_id=? ORDER BY started_at DESC LIMIT ?",
+                    "SELECT * FROM runs WHERE schedule_id=? ORDER BY started_at DESC, rowid DESC LIMIT ?",
                     (schedule_id, limit),
                 ).fetchall()
             else:
                 rows = conn.execute(
-                    "SELECT * FROM runs ORDER BY started_at DESC LIMIT ?", (limit,)
+                    "SELECT * FROM runs ORDER BY started_at DESC, rowid DESC LIMIT ?", (limit,)
                 ).fetchall()
         return [dict(r) for r in rows]
 
@@ -467,7 +470,7 @@ class ScheduleStore:
         with self._lock, self._connect() as conn:
             rows = conn.execute(
                 """SELECT * FROM runs WHERE status != 'running'
-                   AND finished_at > ? ORDER BY finished_at DESC""",
+                   AND finished_at > ? ORDER BY finished_at DESC, rowid DESC""",
                 (watermark,),
             ).fetchall()
         return [dict(r) for r in rows]

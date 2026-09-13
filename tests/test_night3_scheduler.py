@@ -410,7 +410,9 @@ def test_run_schedule_retries_then_succeeds(tmp_path, monkeypatch, fake_agent):
     assert rec["attempt"] == 2
     assert fake_agent["n"] == 2
     hist = st.history(sched.id)
-    assert [h["status"] for h in hist] == ["error", "ok"]
+    # history() is newest-first; the ok retry (attempt 2) sorts before the
+    # error (attempt 1) even when both share a 1-second timestamp.
+    assert [h["status"] for h in hist] == ["ok", "error"]
     assert st.get(sched.id).last_status == "ok"
 
 
