@@ -44,8 +44,8 @@ MODEL_PATH = MODEL_DIR / MODEL_FILENAME
 # ── Availability check ─────────────────────────────────────────────────
 
 _onnx_available: bool | None = None
-_session: InferenceSession | None = None  # type: ignore[name-defined]
-_tokenizer: AutoTokenizer | None = None  # type: ignore[name-defined]
+_session: InferenceSession | None = None
+_tokenizer: AutoTokenizer | None = None
 
 
 def is_available() -> bool:
@@ -205,7 +205,7 @@ def embed_all_memories(graph) -> int:
         entry = graph.memories.get(mem_id)
         if entry is not None:
             entry.embedding = emb
-            entry.embedding_model = MODEL_ID  # type: ignore[assignment]
+            entry.embedding_model = MODEL_ID
             count += 1
 
     return count

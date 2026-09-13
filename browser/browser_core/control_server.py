@@ -707,7 +707,8 @@ if _HAVE_QT:
                 done.set()
 
         def run(self, fn, timeout: float = 20.0):
-            box, done = {}, threading.Event()
+            box: dict = {}
+            done = threading.Event()
             self.invoke.emit((fn, box, done))
             if not done.wait(timeout):
                 raise TimeoutError("GUI thread did not respond in time")

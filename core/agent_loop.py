@@ -778,7 +778,7 @@ class CodingAgent:
             # Tool calls present — reset the no-tool-call counter
             self._no_tool_call_turns = 0
 
-            tool_results = []
+            tool_results: list = []
             for tc in tool_calls:
                 func = tc.get("function", {})
                 tool_name = func.get("name", "")

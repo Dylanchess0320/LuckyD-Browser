@@ -21,13 +21,13 @@ from .search_base import SearchProvider
 
 def _load_ddgs():
     try:
-        from ddgs import DDGS  # type: ignore
+        from ddgs import DDGS
 
         return DDGS
     except Exception:
         pass
     try:
-        from duckduckgo_search import DDGS  # type: ignore
+        from duckduckgo_search import DDGS
 
         return DDGS
     except Exception:

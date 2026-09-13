@@ -26,13 +26,13 @@ class MockProvider(LLMProvider):
     _is_mock = True
     provider_name = "mock"
 
-    def structured(self, role, system, user, schema, temperature=None):  # type: ignore[override]
+    def structured(self, role, system, user, schema, temperature=None):
         return self._sample(schema, user)
 
-    def text(self, role, system, user, temperature=None) -> str:  # type: ignore[override]
+    def text(self, role, system, user, temperature=None) -> str:
         return f"[mock {role}] synthesized answer for: {user[:80]}"
 
-    def grounded(self, role, system, user) -> tuple[str, list[EvidenceCard]]:  # type: ignore[override]
+    def grounded(self, role, system, user) -> tuple[str, list[EvidenceCard]]:
         ev = [
             EvidenceCard(
                 id="e0",

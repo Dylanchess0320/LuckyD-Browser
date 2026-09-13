@@ -67,7 +67,7 @@ BLOCKLIST = [
 ]
 
 # Patterns that are allowed (these override the blocklist)
-ALLOWLIST = [
+ALLOWLIST: list[str] = [
     # Allow deleting files in project dir (not system)
     # handled by path checks below
 ]

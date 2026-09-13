@@ -561,7 +561,7 @@ if __name__ == "__main__":
             await asyncio.sleep(self.delay)
             if self.fail:
                 raise RuntimeError(f"simulated failure for {self.cfg.name}")
-            user = next((m for m in reversed(messages) if m.get("role") == "user"), {})
+            user: dict = next((m for m in reversed(messages) if m.get("role") == "user"), {})
             text = (user.get("content") or "")[:60]
             return {
                 "role": "assistant",

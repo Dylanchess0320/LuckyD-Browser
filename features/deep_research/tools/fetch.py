@@ -19,7 +19,7 @@ try:
     )
 except Exception:  # tenacity optional; single attempt without it
 
-    def _retry_decorator(fn):  # type: ignore[no-redef]
+    def _retry_decorator(fn):
         return fn
 
 
@@ -48,7 +48,7 @@ def _get_html(url: str, timeout: float) -> str:
 def _extract_with_trafilatura(html: str) -> tuple[str, str]:
     """Return (text, title). Best-effort; returns ('','') on failure."""
     try:
-        import trafilatura  # type: ignore
+        import trafilatura
     except Exception:
         return "", ""
     try:
@@ -64,7 +64,7 @@ def _extract_with_trafilatura(html: str) -> tuple[str, str]:
 
 def _extract_with_bs4(html: str) -> tuple[str, str]:
     try:
-        from bs4 import BeautifulSoup  # type: ignore
+        from bs4 import BeautifulSoup
     except Exception:
         return "", ""
     try:

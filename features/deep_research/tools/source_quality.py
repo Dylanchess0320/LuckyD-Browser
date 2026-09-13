@@ -14,7 +14,7 @@ from urllib.parse import urlparse
 try:
     import tldextract
 except Exception:
-    tldextract = None  # type: ignore[assignment]
+    tldextract = None
 
 # Domains that tend to be high-quality primary or reputable sources.
 _HIGH_QUALITY = {

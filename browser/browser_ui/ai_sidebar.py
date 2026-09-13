@@ -479,7 +479,7 @@ class AiSidebar(QDockWidget):
         # Friendly onboarding: short steps, free rotation hint, keyboard tips
         free_hint = ""
         try:
-            free_pool = getattr(self.bridge, "free_top_models", lambda: [])()
+            free_pool: list[str] = getattr(self.bridge, "free_top_models", lambda: [])()
             if free_pool:
                 free_hint = f"Free top models (auto-rotating): {', '.join(free_pool[:3])}…"
         except Exception:

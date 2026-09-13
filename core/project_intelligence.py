@@ -567,7 +567,7 @@ class ProjectIntelligence:
     # ── framework parsers ─────────────────────────────────────────────
 
     def _frameworks_from_package_json(self, path: Path) -> list[FrameworkHit]:
-        hits = []
+        hits: list[FrameworkHit] = []
         try:
             data = json.loads(path.read_text(encoding="utf-8", errors="replace"))
         except Exception:
@@ -638,7 +638,7 @@ class ProjectIntelligence:
         return hits
 
     def _frameworks_from_composer(self, path: Path) -> list[FrameworkHit]:
-        hits = []
+        hits: list[FrameworkHit] = []
         try:
             data = json.loads(path.read_text(encoding="utf-8", errors="replace"))
         except Exception:
