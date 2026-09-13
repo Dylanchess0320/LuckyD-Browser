@@ -1,0 +1,14 @@
+# Keep text files LF everywhere so hashes and scripts behave the same
+# on Windows (autocrlf) and POSIX checkouts.
+* text=auto
+*.py text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.toml text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+*.js text eol=lf
+*.iss text eol=lf
+*.txt text eol=lf

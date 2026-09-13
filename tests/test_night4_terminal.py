@@ -69,7 +69,9 @@ def _fake_ws(path="", cookie=""):
 
 
 def test_expand_home(monkeypatch) -> None:
-    monkeypatch.setenv("HOME", "/fake/home")  # expanduser reads $HOME
+    # POSIX expanduser reads $HOME; Windows reads %USERPROFILE% instead.
+    monkeypatch.setenv("HOME", "/fake/home")
+    monkeypatch.setenv("USERPROFILE", "/fake/home")
     assert _expand("~/docs") == Path("/fake/home/docs")
 
 

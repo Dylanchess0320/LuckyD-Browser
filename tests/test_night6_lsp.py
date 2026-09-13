@@ -72,7 +72,9 @@ class TestNoJedi:
 
 class TestResolvePath:
     def test_expands_user_and_resolves(self, tmp_path, monkeypatch):
+        # POSIX expanduser reads $HOME; Windows reads %USERPROFILE% instead.
         monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.setenv("USERPROFILE", str(tmp_path))
         p = lsp_mod._resolve_path("~/sub/../x.py")
         assert p == (tmp_path / "x.py").resolve()
         assert str(p).startswith(str(tmp_path))

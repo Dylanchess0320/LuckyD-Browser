@@ -269,6 +269,9 @@ def load_skill_doc(skill: Skill, max_chars: int = DOC_BUDGET) -> str:
         data = (base / rel).read_bytes()
     except OSError:
         return ""
+    # Normalize CRLF: Windows checkouts (git autocrlf) rewrite LF, which
+    # would otherwise fail the registry hash and silently drop the doc.
+    data = data.replace(b"\r\n", b"\n")
     if skill.sha256 and hashlib.sha256(data).hexdigest() != skill.sha256:
         return ""
     return data.decode("utf-8", errors="replace")[:max_chars]

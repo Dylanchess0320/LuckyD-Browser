@@ -223,6 +223,10 @@ def test_routed_failure_still_falls_back(
         "a" * 200_000,
         "'; DROP TABLE users; --",
     ],
+    # Short ids: the raw values would make the test node ID huge, and
+    # pytest exports PYTEST_CURRENT_TEST as an env var — Windows caps env
+    # vars at 32767 chars and the run blows up in setup/teardown.
+    ids=["empty", "whitespace", "emoji-garbage", "long", "sql-injection"],
 )
 def test_route_task_handles_garbage(prompt: str) -> None:
     """The real route_task never raises on empty/garbage input."""
