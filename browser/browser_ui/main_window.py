@@ -116,7 +116,9 @@ class MainWindow(QMainWindow):
         self._shot_saved.connect(self._write_screenshot)
         self._shot_failed.connect(lambda msg: self.toast(msg, "error"))
         self._groups_done.connect(self._apply_ai_groups)
-        self._groups_failed.connect(lambda msg: self.toast(f"AI organizer: {msg}", "error"))
+        self._groups_failed.connect(
+            lambda msg: self.toast(f"Couldn't group your tabs: {msg} — try again", "error")
+        )
 
         self.new_tab()
         self._update_title()
@@ -132,7 +134,7 @@ class MainWindow(QMainWindow):
 
         self.tabs.tabCloseRequested.connect(self._on_tab_closed)
 
-        # Friendly hint toast on startup (only once per version)
+        # Friendly hint toast on startup (once per session)
         QTimer.singleShot(1800, self._show_welcome_hint)
 
         # ── silent update check shortly after startup ─────────────────
@@ -218,7 +220,7 @@ class MainWindow(QMainWindow):
         bar.addAction(self.reload_act)
 
         home_act = QAction("🏠", self)
-        home_act.setToolTip("Home (new tab dashboard)")
+        home_act.setToolTip("Home — opens your homepage")
         home_act.triggered.connect(self.go_home)
         bar.addAction(home_act)
 
@@ -366,7 +368,7 @@ class MainWindow(QMainWindow):
             self.downloads.hide()
             self.vtabs.hide()
             self.statusBar().hide()
-            self.toast("Focus mode — Ctrl+Shift+F brings the chrome back")
+            self.toast("Focus mode — press Ctrl+Shift+F to bring the toolbars back")
         else:
             self.statusBar().show()
             if self._focus_bm_was:
@@ -529,7 +531,7 @@ class MainWindow(QMainWindow):
         self._add(
             tools_menu, "Agent Mesh (4 parallel sessions)", self.open_agent_mesh, "Ctrl+Alt+M"
         )
-        self._add(tools_menu, "Agent Terminal", lambda: self.open_terminal("agent"), "Ctrl+`")
+        self._add(tools_menu, "Agent 1 Terminal", lambda: self.open_terminal("agent"), "Ctrl+`")
         self._add(tools_menu, "Agent 2 Terminal", lambda: self.open_terminal("agent2"))
         self._add(
             tools_menu,
@@ -690,7 +692,11 @@ class MainWindow(QMainWindow):
             harness.ensure_started()
             self.open_in_new_tab(QUrl(harness.url))
         else:
-            self.toasts.show("Coding agent backend unavailable", kind="error")
+            self.toasts.show(
+                "Coding agent backend unavailable — turn on 'Start the coding-agent "
+                "backend on launch' in Settings > General, then restart the browser",
+                kind="error",
+            )
 
     def open_terminal(self, shell: str = "agent") -> None:
         """Open a NEW independent terminal tab (agent CLI, PowerShell, or CMD).
@@ -1359,9 +1365,16 @@ class MainWindow(QMainWindow):
                     safe_name = path.rsplit("/", 1)[-1].rsplit("\\", 1)[-1]
                     self.toasts.show(f"Page saved to {safe_name}", kind="ok")
                 else:
-                    self.toasts.show("Could not save page", kind="error")
+                    self.toasts.show(
+                        "Couldn't save the page — check that the folder is writable and try again",
+                        kind="error",
+                    )
             except Exception as exc:
-                self.toasts.show(f"Save error: {exc}", kind="error")
+                self.toasts.show(
+                    f"Couldn't save the page: {exc} — check that the folder is "
+                    "writable and try again",
+                    kind="error",
+                )
 
         view.page().toHtml(_saved)
 
@@ -1396,7 +1409,9 @@ class MainWindow(QMainWindow):
             try:
                 payload = base64.b64decode(asyncio.run(capture_b64(url, jpeg_quality=85)))
             except Exception as exc:
-                self._shot_failed.emit(f"Screenshot failed: {exc}")
+                self._shot_failed.emit(
+                    f"Screenshot failed: {exc} — try reloading the page and capturing again"
+                )
                 return
             self._shot_saved.emit(payload, path)
 
@@ -1413,7 +1428,10 @@ class MainWindow(QMainWindow):
             name = Path(path).name
             self.toasts.show(f"Screenshot saved to {name}", kind="ok")
         except Exception as exc:
-            self.toasts.show(f"Screenshot failed: {exc}", kind="error")
+            self.toasts.show(
+                f"Screenshot failed: {exc} — try reloading the page and capturing again",
+                kind="error",
+            )
 
     def save_full_screenshot(self) -> None:
         """Capture the ENTIRE scrollable page (CDP captureBeyondViewport)."""
@@ -1442,7 +1460,9 @@ class MainWindow(QMainWindow):
             try:
                 payload = base64.b64decode(asyncio.run(capture_full_b64(url, jpeg_quality=85)))
             except Exception as exc:
-                self._shot_failed.emit(f"Screenshot failed: {exc}")
+                self._shot_failed.emit(
+                    f"Screenshot failed: {exc} — try reloading the page and capturing again"
+                )
                 return
             self._shot_saved.emit(payload, path)
 
@@ -1620,7 +1640,7 @@ class MainWindow(QMainWindow):
         if _tts.speak(text):
             self.toast("Reading aloud…", "ok")
         else:
-            self.toast("Read Aloud needs Windows Speech (SAPI)", "warn")
+            self.toast("Read Aloud isn't available on this system", "warn")
 
     def read_aloud_page(self) -> None:
         if _tts.is_speaking():
@@ -1798,7 +1818,7 @@ class MainWindow(QMainWindow):
         <tr><td><span class='kbd'>Ctrl+Shift+A</span></td><td>AI assistant</td></tr>
         <tr><td><span class='kbd'>Ctrl+Shift+H</span></td><td>Coding agent</td></tr>
         <tr><td><span class='kbd'>Ctrl+Alt+M</span></td><td>Agent Mesh (4 parallel sessions)</td></tr>
-        <tr><td><span class='kbd'>Ctrl+`</span></td><td>Agent terminal</td></tr>
+        <tr><td><span class='kbd'>Ctrl+`</span></td><td>Agent 1 terminal</td></tr>
         <tr><td><span class='kbd'>Ctrl+Shift+`</span></td><td>PowerShell terminal</td></tr>
         <tr><td><span class='kbd'>Ctrl+K</span></td><td>Command palette</td></tr>
         <tr><td><span class='kbd'>?</span></td><td>Omnibox prefix — ask the AI</td></tr>
@@ -1937,7 +1957,10 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(
                 self,
                 "Update Check Failed",
-                f"Could not check for updates:\n{message}",
+                f"Couldn't check for updates ({message or 'network error'}).\n\n"
+                "Check your internet connection, then try Help > Check for "
+                "Updates again. If it keeps failing, download the latest "
+                "release from github.com/Dylanchess0320/LuckyD-Browser/releases.",
             )
 
     def _show_update_badge(self, info: dict) -> None:
@@ -2089,7 +2112,11 @@ class MainWindow(QMainWindow):
                 )
                 self.open_in_new_tab(QUrl(release_page))
             else:
-                self.toast("Update asset missing download URL", "error")
+                self.toast(
+                    "Update download isn't available — try again later, or download "
+                    "the installer from the release page",
+                    "error",
+                )
             return
 
         from PySide6.QtWidgets import QProgressDialog
@@ -2121,7 +2148,11 @@ class MainWindow(QMainWindow):
 
         def _on_error(msg: str) -> None:
             progress.close()
-            self.toast(f"Update download failed: {msg}", "error")
+            self.toast(
+                f"Update download failed: {msg} — check your connection and "
+                "try Help > Check for Updates again",
+                "error",
+            )
 
         dl.progress.connect(_on_progress)
         dl.finished_ok.connect(_on_done)
@@ -2146,7 +2177,12 @@ class MainWindow(QMainWindow):
             # The Inno/.bat install flow is Windows-only — on other platforms
             # there is no installer to run. (This also avoids AttributeError:
             # subprocess.CREATE_NO_WINDOW only exists on Windows.)
-            self.toast("Automatic updates are only supported on Windows.", "info")
+            self.toast(
+                "Automatic updates are only supported on Windows — download the "
+                "latest release manually from "
+                "github.com/Dylanchess0320/LuckyD-Browser/releases",
+                "info",
+            )
             return
 
         current_exe = Path(sys.executable).resolve()

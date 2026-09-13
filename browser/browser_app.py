@@ -35,7 +35,7 @@ class BrowserApp:
     def __init__(self, argv):
         self.qapp = QApplication(argv)
         self.qapp.setApplicationName("luckyd-browser")
-        self.qapp.setApplicationDisplayName("LuckyD Browser")
+        self.qapp.setApplicationDisplayName("LuckyD")
         self.qapp.setOrganizationName("LuckyD")
 
         # Use the multi-resolution ICO for title bars, taskbar, Alt+Tab and
@@ -283,7 +283,7 @@ class BrowserApp:
             print(f"[browser] Harness up at {self.harness.url} ({tools} tools)")
             kind = "ok"
         else:
-            msg = f"Coding agent backend didn't start{': ' + err if err else ''}"
+            msg = f"Coding agent backend didn't start{': ' + err if err else ''} — try Tools > Coding Agent or restart the browser"
             print(f"[browser] Harness boot failed: {err}")
             kind = "warn"
         for win in list(self.windows):

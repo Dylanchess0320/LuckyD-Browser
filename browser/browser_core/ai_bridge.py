@@ -407,7 +407,7 @@ class AIBridge:
           3. OpenCode Zen (keyed since 2026-09 — only when OPENCODE_API_KEY set)
           4. Cloud keyed providers, in _PROVIDER_SPECS order
         """
-        for name in self._local_names:
+        for name, *_ in _LOCAL_SPECS:
             if name in self._configs:
                 return name
         if "cline-usage" in self._configs and self._cline_usable():
@@ -472,7 +472,11 @@ class AIBridge:
         (OpenCode Zen used to be in this pool when it had a $0 keyless
         tier; since 2026-09 it is a normal keyed cloud provider.)
         """
-        return [name for name in self._local_names if name in self._configs]
+        # _LOCAL_SPECS order (Ollama first) — not the _local_names set, whose
+        # iteration order is hash-randomized across processes and would flip
+        # the pool (and the chat default) between two healthy local servers
+        # from run to run.
+        return [name for name, *_ in _LOCAL_SPECS if name in self._configs]
 
     def fetch_models(self, provider: str) -> list[str]:
         """Model ids available on a provider — live catalog when it has one
@@ -537,7 +541,9 @@ class AIBridge:
         elif model not in models and self.is_opencode_zen(provider) and model in _ZEN_CATALOG:
             models.insert(0, model)
         if provider == "openrouter" and len(models) > 1:
-            models = sorted(models, key=lambda m: not m.endswith(":free"))
+            # The "openrouter/free" meta-router heads the curated list; keep
+            # it first, then the :free models, then anything else.
+            models = sorted(models, key=lambda m: (m != "openrouter/free", not m.endswith(":free")))
         # For Zen, pin top order: _ZEN_TOP_MODELS order first, then any extra
         if self.is_opencode_zen(provider):
             top_order = {m: i for i, m in enumerate(_ZEN_TOP_MODELS)}
@@ -636,6 +642,11 @@ class AIBridge:
         # chain runs exactly as before.
         routed = self._routed_provider(messages) if is_auto else None
         fast_path_ran = False
+        # Initialized before the free-pool fast path so a real failure there
+        # (e.g. Ollama connection refused) survives to the final error when
+        # the generic fallback has nothing left to try — otherwise it was
+        # swallowed and replaced by a misleading "no AI providers configured".
+        last_err: Exception | None = None
         if is_auto and routed is None:
             fast_path_ran = True
             # Prefer free unlimited pool (locals) before falling back to
@@ -695,7 +706,7 @@ class AIBridge:
             # Routed provider goes first; the rest of today's chain follows
             # as fallback (free pool included — still reachable on failure).
             order = [routed] + [p for p in order if p != routed]
-        last_err: Exception | None = None
+        # last_err already holds any free-pool fast-path failure (see above).
         for name in order:
             if provider is None and not self._is_viable_provider(name):
                 # Auto mode never burns a call on a provider that can't work

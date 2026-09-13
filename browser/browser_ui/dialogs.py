@@ -185,7 +185,12 @@ class BookmarksDialog(QDialog):
                 self, "Export Bookmarks", f"Exported {len(bookmarks)} bookmarks."
             )
         except Exception as exc:
-            QMessageBox.warning(self, "Export Error", f"Failed to export: {exc}")
+            QMessageBox.warning(
+                self,
+                "Export Error",
+                f"Couldn't export bookmarks: {exc} — check that the folder is "
+                "writable and try again",
+            )
 
     def _import(self) -> None:
         path, _ = QFileDialog.getOpenFileName(

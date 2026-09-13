@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+import re
 import sys
 import threading
 import time
@@ -314,8 +315,16 @@ class SwarmManager:
 
     def get_run(self, run_id: str) -> dict[str, Any]:
         """Load full details for a past research run."""
+        # Allowlist the id before joining it to runs_dir: the /research/run
+        # route hands this value straight off the query string, and an id
+        # like "../../foo" would otherwise read files outside the runs
+        # directory. Legit ids are the "run-YYYYMMDD-HHMMSS" stamp the
+        # manager writes plus whatever it finds on disk in list_runs().
+        rid = str(run_id or "")
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", rid):
+            return {"ok": False, "error": f"Run {rid} not found"}
         runs_dir = Path(drs_settings.runs_dir)
-        target = runs_dir / run_id
+        target = runs_dir / rid
         if not target.exists() or not target.is_dir():
             return {"ok": False, "error": f"Run {run_id} not found"}
 

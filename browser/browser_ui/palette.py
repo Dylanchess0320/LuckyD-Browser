@@ -4,13 +4,11 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QEvent, Qt, Signal
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QLineEdit, QListWidget, QListWidgetItem, QVBoxLayout, QWidget
 
 from .icons import letter_tile
-
-_SCORE = 60
 
 
 def _score(q: str, t: str) -> int:
@@ -47,9 +45,13 @@ class CommandPalette(QWidget):
         lay.setSpacing(8)
 
         self._e = QLineEdit(cont)
-        self._e.setPlaceholderText("Type… (Esc close)")
+        self._e.setPlaceholderText("Type…  (↑↓ navigate · Enter open · Esc close)")
         self._e.returnPressed.connect(self._activate)
         self._e.textChanged.connect(self._filter)
+        # Tab / Shift+Tab cycle the list WITHOUT moving keyboard focus out of
+        # the input — otherwise the first Tab traps focus in the list and
+        # typing goes nowhere (the classic palette focus trap).
+        self._e.installEventFilter(self)
         self._e.setFocus()
 
         self._lst = QListWidget(cont)
@@ -161,15 +163,27 @@ class CommandPalette(QWidget):
         )
 
     def _filter(self, text: str) -> None:
-        q = text.lower()
+        q = text.strip().lower()
         self._lst.clear()
+        scored = []
         for _kw, lbl, ico, act in self._items:
-            if q in lbl.lower():
-                it = QListWidgetItem(lbl)
-                it.setData(Qt.ItemDataRole.UserRole, act)
-                if ico:
-                    it.setIcon(ico)
-                self._lst.addItem(it)
+            if not q or q in lbl.lower():
+                # Fuzzy-rank so the best match sits on top for Enter.
+                scored.append((_score(q, lbl) if q else 0, lbl, ico, act))
+        scored.sort(key=lambda t: t[0], reverse=True)
+        for _s, lbl, ico, act in scored:
+            it = QListWidgetItem(lbl)
+            it.setData(Qt.ItemDataRole.UserRole, act)
+            if ico:
+                it.setIcon(ico)
+            self._lst.addItem(it)
+        if self._lst.count():
+            # Keep a live selection so Enter always activates the top match.
+            self._lst.setCurrentRow(0)
+        else:
+            ph = QListWidgetItem("No matches — keep typing, or Esc to close")
+            ph.setFlags(ph.flags() & ~Qt.ItemFlag.ItemIsEnabled & ~Qt.ItemFlag.ItemIsSelectable)
+            self._lst.addItem(ph)
 
     def _activate(self) -> None:
         it = self._lst.currentItem()
@@ -183,6 +197,16 @@ class CommandPalette(QWidget):
         self.closed.emit()
         self.hide()
 
+    def eventFilter(self, obj, e) -> bool:  # noqa: N802  # Qt virtual override
+        if obj is self._e and e.type() == QEvent.Type.KeyPress:
+            if e.key() == Qt.Key.Key_Tab:
+                self._lst.setCurrentRow(min(self._lst.currentRow() + 1, self._lst.count() - 1))
+                return True
+            if e.key() == Qt.Key.Key_Backtab:
+                self._lst.setCurrentRow(max(self._lst.currentRow() - 1, 0))
+                return True
+        return super().eventFilter(obj, e)
+
     def keyPressEvent(self, e) -> None:  # noqa: N802  # Qt virtual override
         if e.key() == Qt.Key.Key_Escape:
             self.close_palette()
@@ -192,5 +216,11 @@ class CommandPalette(QWidget):
             return
         if e.key() == Qt.Key.Key_Up:
             self._lst.setCurrentRow(max(self._lst.currentRow() - 1, 0))
+            return
+        if e.key() == Qt.Key.Key_Home:
+            self._lst.setCurrentRow(0)
+            return
+        if e.key() == Qt.Key.Key_End:
+            self._lst.setCurrentRow(max(self._lst.count() - 1, 0))
             return
         super().keyPressEvent(e)

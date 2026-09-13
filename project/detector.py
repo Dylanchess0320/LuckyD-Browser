@@ -137,6 +137,7 @@ class ProjectDetector:
         info.total_dirs = dirs_walked
 
         info.language = self._detect_language(root, all_files)
+        info.language_version = self._detect_lang_version(root, info.language)
         info.framework = self._detect_framework(root, info.language)
         info.build_system = self._detect_build_system(root)
         info.package_manager = self._detect_package_manager(root, info.language)
@@ -151,9 +152,12 @@ class ProjectDetector:
         info.has_docker = (root / "Dockerfile").exists() or (root / "docker-compose.yml").exists()
         info.has_ci = (
             any(f.startswith(".github/") for f in all_files[:50])
+            or (root / ".github").is_dir()
             or (root / ".gitlab-ci.yml").exists()
         )
         info.has_readme = any(f.lower().startswith("readme") for f in os.listdir(root))
+
+        return info
 
     def _detect_language(self, root: Path, files: list[str]) -> str:
         """Detect primary language from file extensions and manifest files."""
@@ -258,4 +262,147 @@ class ProjectDetector:
                 fp = root / fname
                 if fp.exists():
                     return fp.read_text().strip()[:20]
+        return ""
+
+    def _detect_package_manager(self, root: Path, language: str) -> str:
+        """Best-effort package manager from lockfiles / manifests."""
+        if language in ("JavaScript", "TypeScript"):
+            if (root / "pnpm-lock.yaml").exists():
+                return "pnpm"
+            if (root / "yarn.lock").exists():
+                return "yarn"
+            if (root / "package.json").exists():
+                return "npm"
+        elif language == "Python":
+            if (root / "Pipfile").exists() or (root / "Pipfile.lock").exists():
+                return "pipenv"
+            if (root / "poetry.lock").exists():
+                return "poetry"
+            if (root / "requirements.txt").exists() or (root / "pyproject.toml").exists():
+                return "pip"
+        elif language == "Rust":
+            if (root / "Cargo.toml").exists():
+                return "cargo"
+        elif language == "Go":
+            if (root / "go.mod").exists():
+                return "go mod"
+        return ""
+
+    def _detect_test_framework(self, root: Path, language: str) -> str:
+        """Best-effort test runner from manifests / config files."""
+        if language == "Python":
+            content = ""
+            for fname in ("requirements.txt", "pyproject.toml", "setup.cfg"):
+                fp = root / fname
+                if fp.exists():
+                    try:
+                        content += fp.read_text(encoding="utf-8", errors="replace").lower()
+                    except OSError:
+                        continue
+            for name in ("pytest", "nose", "tox"):
+                if name in content:
+                    return name
+            if (root / "pytest.ini").exists():
+                return "pytest"
+            return ""
+        if language in ("JavaScript", "TypeScript"):
+            pf = root / "package.json"
+            if pf.exists():
+                try:
+                    data = json.loads(pf.read_text(encoding="utf-8"))
+                    deps = {**data.get("dependencies", {}), **data.get("devDependencies", {})}
+                    keys = " ".join(deps.keys()).lower()
+                except (json.JSONDecodeError, OSError):
+                    keys = ""
+                for name in ("vitest", "jest", "mocha", "ava"):
+                    if name in keys:
+                        return name
+            return ""
+        if language == "Rust":
+            return "cargo test"
+        if language == "Go":
+            return "go test"
+        return ""
+
+    def _detect_lint_format(self, root: Path, language: str) -> tuple[str, str]:
+        """Return (linter, formatter) from config files present."""
+        linter, formatter = "", ""
+        if language == "Python":
+            pyproject = ""
+            pf = root / "pyproject.toml"
+            if pf.exists():
+                try:
+                    pyproject = pf.read_text(encoding="utf-8", errors="replace").lower()
+                except OSError:
+                    pyproject = ""
+            if (
+                (root / ".ruff.toml").exists()
+                or (root / "ruff.toml").exists()
+                or "[tool.ruff]" in pyproject
+            ):
+                linter, formatter = "ruff", "ruff"
+            elif (root / ".flake8").exists() or "flake8" in pyproject:
+                linter = "flake8"
+            if "[tool.black]" in pyproject:
+                formatter = "black"
+        elif language in ("JavaScript", "TypeScript"):
+            if any(
+                (root / f).exists()
+                for f in (".eslintrc", ".eslintrc.json", ".eslintrc.js", "eslint.config.js")
+            ):
+                linter = "eslint"
+            if any(
+                (root / f).exists()
+                for f in (".prettierrc", ".prettierrc.json", "prettier.config.js")
+            ):
+                formatter = "prettier"
+        return linter, formatter
+
+    _KEY_FILE_CANDIDATES = [
+        "README.md",
+        "readme.md",
+        "pyproject.toml",
+        "package.json",
+        "requirements.txt",
+        "Cargo.toml",
+        "go.mod",
+        "Makefile",
+        "Dockerfile",
+        "docker-compose.yml",
+    ]
+
+    def _find_key_files(self, root: Path, language: str) -> list[str]:
+        """Well-known manifest / doc / build files that exist, for orientation."""
+        return [name for name in self._KEY_FILE_CANDIDATES if (root / name).exists()][:12]
+
+    _ENTRY_POINT_CANDIDATES: dict[str, list[str]] = {
+        "Python": [
+            "main.py",
+            "app.py",
+            "__main__.py",
+            "manage.py",
+            "wsgi.py",
+            "src/main.py",
+            "src/app.py",
+        ],
+        "JavaScript": ["index.js", "src/index.js", "main.js", "app.js"],
+        "TypeScript": ["index.ts", "src/index.ts", "main.ts"],
+        "Rust": ["src/main.rs"],
+        "Go": ["main.go", "cmd/main.go"],
+    }
+
+    def _find_entry_point(self, root: Path, language: str) -> str:
+        """Likely program entry point, or '' when nothing matches."""
+        if language in ("JavaScript", "TypeScript"):
+            pf = root / "package.json"
+            if pf.exists():
+                try:
+                    main = json.loads(pf.read_text(encoding="utf-8")).get("main", "")
+                    if main and (root / main).exists():
+                        return main
+                except (json.JSONDecodeError, OSError):
+                    pass
+        for name in self._ENTRY_POINT_CANDIDATES.get(language, []):
+            if (root / name).exists():
+                return name
         return ""

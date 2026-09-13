@@ -104,8 +104,11 @@ class MemoryStore:
         for mem_id, node in self.graph.memories.items():
             text = f"{node.content} {' '.join(node.tags)}"
             docs[mem_id] = text
-        if docs:
-            self.bm25.index_documents(docs)
+        # Always rebuild from scratch: when the last memory is deleted the
+        # index must be cleared too, otherwise search_text iterates stale
+        # doc ids and raises KeyError.
+        self.bm25 = BM25Scorer()
+        self.bm25.index_documents(docs)
 
     def add(
         self,
@@ -116,6 +119,16 @@ class MemoryStore:
         expires_in_hours: float = 0,
     ) -> str:
         entry = self.graph.add_memory_raw(content, tags=tags or [], source=source)
+        # alias/expires were silently dropped before (get_context reads
+        # metadata["alias"]); persist them on the entry metadata.
+        if alias:
+            entry.metadata["alias"] = alias
+        if expires_in_hours:
+            from datetime import datetime, timedelta, timezone
+
+            entry.metadata["expires_at"] = (
+                datetime.now(timezone.utc) + timedelta(hours=expires_in_hours)
+            ).isoformat()
         self._rebuild_index()
         self._save()
 
@@ -134,7 +147,7 @@ class MemoryStore:
         if ok:
             self._rebuild_index()
             self._save()
-        return ok
+        return ok is not None
 
     def search_text(self, query: str, limit: int = 10) -> list[tuple]:
         """BM25 text search."""

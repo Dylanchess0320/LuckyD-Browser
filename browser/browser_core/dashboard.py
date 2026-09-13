@@ -15,6 +15,7 @@ Everything is one self-contained HTML string (no build step, no assets).
 
 from __future__ import annotations
 
+import html
 import json
 
 try:
@@ -91,8 +92,12 @@ _CSS = r"""  .search { display: flex; background: var(--card); border: 1px solid
     transition: border-color .15s, box-shadow .15s; }
   .search:focus-within { border-color: var(--accent);
     box-shadow: 0 0 0 3px rgba(91,157,255,.16); }
-  .search select { background: transparent; color: var(--muted); border: none; outline: none;
-    padding: 0 10px 0 16px; font-size: 13.5px; font-weight: 600; cursor: pointer; }
+  .search select { background: transparent;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238b93a7' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 8px center;
+    color: var(--muted); border: none; outline: none;
+    padding: 0 22px 0 16px; font-size: 13.5px; font-weight: 600; cursor: pointer;
+    appearance: none; -webkit-appearance: none; }
   .search select option { background: var(--ld-panel, #10151f); }
   .search input { flex: 1; background: transparent; border: none; outline: none;
     color: var(--text); font-size: 16px; font-weight: 500; letter-spacing: .005em;
@@ -103,8 +108,8 @@ _CSS = r"""  .search { display: flex; background: var(--card); border: 1px solid
     cursor: pointer; transition: filter .12s; }
   .search button:hover { filter: brightness(1.1); }
   .grid { margin-top: 24px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
-  .tile { display: flex; flex-direction: column; align-items: center; gap: 8px;
-    padding: 16px 6px 13px; background: var(--card); border: 1px solid var(--border);
+  .tile { display: flex; flex-direction: column; align-items: center; gap: 10px;
+    padding: 17px 4px 14px; background: var(--card); border: 1px solid var(--border);
     border-radius: 14px; text-decoration: none; color: var(--text); font-size: 12px;
     font-weight: 600; letter-spacing: .01em;
     position: relative; transition: transform .12s, border-color .12s, background .12s; }
@@ -114,9 +119,10 @@ _CSS = r"""  .search { display: flex; background: var(--card); border: 1px solid
   .tile .fav { width: 26px; height: 26px; border-radius: 7px; display: inline-flex;
     align-items: center; justify-content: center; color: #fff; font-size: 14px;
     font-weight: 700; text-shadow: 0 1px 2px rgba(0,0,0,.35); }
-  .tile .tname { color: var(--text); font-size: 12.5px; font-weight: 700; letter-spacing: .02em;
+  .tile .tname { color: var(--text); font-size: 13px; font-weight: 700; letter-spacing: .02em;
     text-shadow: 0 1px 3px rgba(0,0,0,.45); }
-  .tile .del { position: absolute; top: 3px; right: 6px; color: var(--muted); font-size: 13px; opacity: 0; cursor: pointer; }
+  .tile .del { position: absolute; top: 3px; right: 6px; color: var(--muted); font-size: 13px; opacity: 0; cursor: pointer; padding: 2px 4px; border-radius: 6px; }
+  .tile .del:hover, .tile .del:focus-visible { color: var(--err); background: rgba(255,255,255,.09); outline: none; }
   .tile:hover .del, .tile:focus-within .del { opacity: 1; }
   .tile.add { color: var(--muted); font-size: 24px; justify-content: center; cursor: pointer; }
   .tile.add span { font-size: 11px; font-weight: 600; letter-spacing: .05em; }
@@ -177,9 +183,13 @@ _DASH_SHORTCUTS = [
     ("Ctrl+Shift+S", "Save a screenshot of the visible page"),
 ]
 
+# _DASH_CSS holds the header/pills/clock chrome; _CSS holds the main
+# content (search, mode tabs, AI card, tiles, add-form). Both must reach
+# page_head as extra_css — _CSS was accidentally dropped from the assembly
+# in 27facf8, which left the dashboard's search/tiles/AI card unstyled.
 _HEAD = page_head(
     "New Tab",
-    _DASH_CSS,
+    _DASH_CSS + _CSS,
     css_vars_text=VARS_PLACEHOLDER,
     shortcuts=_DASH_SHORTCUTS,
 )
@@ -224,7 +234,7 @@ _BODY = r"""<body>
       <div class="title"><span>◈</span> <span>Lucky's answer</span></div>
       <div class="actions">
         <button type="button" class="ai-btn" onclick="copyAiAnswer()">📋 Copy</button>
-        <button type="button" class="ai-btn" onclick="location.href='luckyd://assistant'">↗️ Open Sidebar</button>
+        <button type="button" class="ai-btn" onclick="location.href='luckyd://assistant'">↗️ Open AI Assistant</button>
         <button type="button" class="ai-btn" onclick="closeAiCard()">✕</button>
       </div>
     </div>
@@ -237,8 +247,8 @@ _BODY = r"""<body>
   <div class="section">Shortcuts</div>
   <div class="grid" id="grid"></div>
   <div id="addform">
-    <input id="newname" placeholder="Name (e.g. Stack Overflow)">
-    <input id="newurl" placeholder="URL (e.g. https://stackoverflow.com)">
+    <input id="newname" placeholder="Name (e.g. Stack Overflow)" aria-label="Shortcut name">
+    <input id="newurl" placeholder="URL (e.g. https://stackoverflow.com)" aria-label="Shortcut URL">
     <button id="addbtn" type="button">Add</button>
   </div>
 </main>
@@ -373,7 +383,10 @@ async function refreshStatus() {
     document.getElementById('pill-ads').style.display = blocked ? '' : 'none';
     setPill('pill-ads', 'ok', '🛡 ' + blocked.toLocaleString() + ' blocked');
   } catch (e) {
+    // /status unreachable — don't leave pills stuck on their loading text.
     setPill('pill-harness', 'err', 'Status unavailable');
+    setPill('pill-ai', 'err', 'Status unavailable');
+    document.getElementById('pill-ads').style.display = 'none';
   }
 }
 refreshStatus(); setInterval(refreshStatus, 5000);
@@ -413,19 +426,30 @@ function render() {
     a.className = 'tile'; a.href = url;
     a.appendChild(tileFor(url));
     a.insertAdjacentHTML('beforeend', '<span class="tname"></span>' +
-      '<span class="del" title="Remove">&#10005;</span>');
+      '<span class="del" role="button" tabindex="0" aria-label="Remove shortcut" title="Remove">&#10005;</span>');
     a.querySelector('span').textContent = name;
-    a.querySelector('.del').addEventListener('click', ev => {
+    const delBtn = a.querySelector('.del');
+    const removeTile = ev => {
       ev.preventDefault(); ev.stopPropagation();
       shortcuts.splice(idx, 1); save(); render();
+    };
+    delBtn.addEventListener('click', removeTile);
+    delBtn.addEventListener('keydown', ev => {
+      if (ev.key === 'Enter' || ev.key === ' ') removeTile(ev);
     });
     grid.appendChild(a);
   });
   const add = document.createElement('div');
-  add.className = 'tile add'; add.innerHTML = '<div>+<span>Add</span></div>';
-  add.addEventListener('click', () => {
+  add.className = 'tile add'; add.tabIndex = 0; add.setAttribute('role', 'button');
+  add.setAttribute('aria-label', 'Add shortcut');
+  add.innerHTML = '<div>+<span>Add</span></div>';
+  const toggleAdd = () => {
     const f = document.getElementById('addform');
     f.style.display = f.style.display === 'flex' ? 'none' : 'flex';
+  };
+  add.addEventListener('click', toggleAdd);
+  add.addEventListener('keydown', ev => {
+    if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); toggleAdd(); }
   });
   grid.appendChild(add);
 }
@@ -469,7 +493,7 @@ async function askAI(query) {
     window.__lastAiAnswer = text;
   } catch (err) {
     body.textContent = 'Could not get an AI answer — ' + err.message +
-      '\n\nTip: open the AI Sidebar (Ctrl+Shift+A) or check your provider in Settings.';
+      '\n\nTip: open the AI Assistant (Ctrl+Shift+A) or check your provider in Settings.';
   }
 }
 
@@ -568,7 +592,7 @@ def hq_splash_html(harness_url: str, state: str, detail: str = "", settings=None
         body = (
             "<div class='ld-err-card'><div class='spin'>⚠️</div>"
             "<h2>Coding agent backend unavailable</h2>"
-            f"<p class='dim'>{detail}</p>"
+            f"<p class='dim'>{html.escape(str(detail), quote=True)}</p>"
             "<p class='dim'>Start it manually, then reload:<br>"
             "<code>luckyd-code.exe --web --port 8000</code></p>"
             "<p><a href='/hq'>↻ Retry</a> · <a href='/dashboard'>Dashboard</a></p></div>"

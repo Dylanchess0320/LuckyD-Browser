@@ -65,6 +65,8 @@ def origin_of(url: str) -> str:
     host = (parts.hostname or "").lower()
     if not host:
         return ""
+    if ":" in host and not host.startswith("["):
+        host = f"[{host}]"  # IPv6 literal — brackets are part of the origin
     try:
         port = parts.port
     except ValueError:

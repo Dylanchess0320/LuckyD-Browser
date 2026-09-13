@@ -136,11 +136,14 @@
   }
   .search select {
     background: transparent;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238b93a7' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
     color: var(--ld-muted);
     border: none;
     border-right: 1px solid var(--ld-border);
     outline: none;
-    padding: 0 10px 0 20px;
+    padding: 0 26px 0 20px;
     font-size: var(--fs-ui);
     font-weight: 600;
     letter-spacing: .02em;
@@ -163,7 +166,7 @@
     line-height: 1.4;
     padding: 18px 16px;
   }
-  .search input::placeholder { color: var(--ld-muted); opacity: .75; }
+  .search input::placeholder { color: var(--ld-muted); opacity: 1; }
   .search button {
     background: var(--ld-accent);
     border: none;
@@ -237,7 +240,7 @@
     padding: 2px 4px;
     border-radius: 6px;
   }
-  .tile .del:hover { color: var(--ld-danger); background: var(--ld-card); }
+  .tile .del:hover, .tile .del:focus-visible { color: var(--ld-danger); background: var(--ld-card); outline: none; }
   .tile:hover .del, .tile:focus-within .del { opacity: 1; }
   .tile.add {
     color: var(--ld-muted);
@@ -279,8 +282,6 @@
   }
   #addform button:hover { filter: brightness(1.1); }
 
-  footer { display: none; }
-
   @media (max-width: 640px) {
     header { padding: 18px 20px; }
     .grid { grid-template-columns: repeat(3, 1fr); }
@@ -320,8 +321,6 @@
     <button id="addbtn" type="button">Add</button>
   </div>
 </main>
-<footer>
-</footer>
 <script>
 const ENGINES = { google: 'https://www.google.com/search?q=', bing: 'https://www.bing.com/search?q=',
   ddg: 'https://duckduckgo.com/?q=', brave: 'https://search.brave.com/search?q=' };
@@ -368,11 +367,16 @@ function render() {
     let host = ''; try { host = new URL(url).hostname; } catch (e) {}
     a.innerHTML = '<img src="https://www.google.com/s2/favicons?domain=' + host +
       '&sz=64" alt="" onerror="this.style.visibility=\'hidden\'"><span class="tname"></span>' +
-      '<span class="del" title="Remove">&#10005;</span>';
+      '<span class="del" role="button" tabindex="0" aria-label="Remove shortcut" title="Remove">&#10005;</span>';
     a.querySelector('span').textContent = name;
-    a.querySelector('.del').addEventListener('click', ev => {
+    const delBtn = a.querySelector('.del');
+    const removeTile = ev => {
       ev.preventDefault(); ev.stopPropagation();
       shortcuts.splice(idx, 1); save(); render();
+    };
+    delBtn.addEventListener('click', removeTile);
+    delBtn.addEventListener('keydown', ev => {
+      if (ev.key === 'Enter' || ev.key === ' ') removeTile(ev);
     });
     grid.appendChild(a);
   });

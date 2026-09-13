@@ -380,7 +380,9 @@ class MemoryGraph:
 
     def get_or_create_tag(self, name: str, description: str | None = None) -> TagEntry:
         self._ensure_tag(name)
-        tag_id = f"tag:{name}"
+        # _ensure_tag normalizes ("My Tag" -> "my_tag"); use the normalized
+        # id here or the lookup raises KeyError on the raw name.
+        tag_id = f"tag:{name.strip().lower().replace(' ', '_')}"
         if description and self.tags[tag_id].description is None:
             self.tags[tag_id].description = description
         return self.tags[tag_id]
@@ -405,6 +407,14 @@ class MemoryGraph:
             self.reverse_edges[target].append(source)
 
     def add_edge(self, source: str, target: str, kind: EdgeKind, weight: float = 1.0) -> bool:
+        if isinstance(kind, str):
+            # store.link() and other callers pass plain strings like "related";
+            # accept the friendly aliases too.
+            kind = {"related": EdgeKind.RELATESTO.value}.get(kind, kind)
+            try:
+                kind = EdgeKind(kind)
+            except ValueError:
+                return False
         if source not in self.memories and source not in self.tags and source not in self.clusters:
             return False
         if target not in self.memories and target not in self.tags and target not in self.clusters:
@@ -510,7 +520,13 @@ _graph_instance: MemoryGraph | None = None
 
 
 def get_memory_graph() -> MemoryGraph:
+    """Return the process-wide memory graph, best-effort loaded from disk."""
     global _graph_instance
     if _graph_instance is None:
-        _graph_instance = MemoryGraph.load()
+        try:
+            from config import MEMORY_DIR
+
+            _graph_instance = MemoryGraph.load(Path(MEMORY_DIR) / "graph.json")
+        except Exception:
+            _graph_instance = MemoryGraph()
     return _graph_instance

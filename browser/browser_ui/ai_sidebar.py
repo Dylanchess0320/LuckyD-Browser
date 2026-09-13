@@ -22,7 +22,7 @@ from browser_core.skills import (
     skill_chip_label,
     skill_system_prompt,
 )
-from PySide6.QtCore import QBuffer, QIODevice, Qt, QThread, QTimer, Signal
+from PySide6.QtCore import QBuffer, QIODevice, Qt, QThread, QTimer, QUrl, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -313,14 +313,11 @@ class AiSidebar(QDockWidget):
         layout.addWidget(self.harness_status)
 
         if not self.bridge.providers():
-            warn = QLabel(
-                "No AI backend found. Free + no API key: install Ollama "
-                "(https://ollama.com) and run `ollama pull llama3.2:3b` "
-                "(the model this browser ships with), then restart — or add "
-                "cloud keys to the repo .env.",
-                body,
-            )
+            warn = QLabel(self._setup_hint_html(), body)
+            warn.setTextFormat(Qt.TextFormat.RichText)
             warn.setWordWrap(True)
+            # Setup links open as browser tabs — same as chat links.
+            warn.linkActivated.connect(lambda href: self._open_link(QUrl(href)))
             layout.addWidget(warn)
 
         actions = QHBoxLayout()
@@ -379,7 +376,7 @@ class AiSidebar(QDockWidget):
         self._skill_row = QHBoxLayout()
         self._skill_row.setContentsMargins(0, 2, 0, 2)
         self._skill_hint = QLabel("Skill:", body)
-        self._skill_hint.setStyleSheet(f"color: {_tok('muted')}; font-size: 11px;")
+        self._skill_hint.setStyleSheet(f"color: {_tok('muted')}; font-size: 12px;")
         self._skill_row.addWidget(self._skill_hint)
         self._skill_row.addStretch(1)
         self._skill_chip_buttons: list[QPushButton] = []
@@ -426,7 +423,7 @@ class AiSidebar(QDockWidget):
         layout.addWidget(self.vision_box)
 
         self.status = QLabel("", body)
-        self.status.setStyleSheet(f"color: {_tok('muted')}; font-size: 11px;")
+        self.status.setStyleSheet(f"color: {_tok('muted')}; font-size: 12px;")
         layout.addWidget(self.status)
 
         self.setWidget(body)
@@ -441,9 +438,60 @@ class AiSidebar(QDockWidget):
         _P = dict(_brand_tokens(getattr(self._mw, "settings", None)))
         muted = _tok("muted")
         if hasattr(self, "status"):
-            self.status.setStyleSheet(f"color: {muted}; font-size: 11px;")
+            self.status.setStyleSheet(f"color: {muted}; font-size: 12px;")
         if hasattr(self, "_blocks") and self._blocks:
             self._render()
+
+    def _setup_hint_html(self) -> str:
+        """Actionable next step when no AI backend is configured.
+
+        Tells the user exactly what's wrong — local server not running, local
+        server up but model-less, or nothing detected at all — with one
+        concrete action for each, instead of a dead "not set up"."""
+        muted = _tok("muted")
+        accent = _tok("accent")
+        text_c = _tok("text")
+        head = f"<b style='color:{text_c}'>⚠️ No AI backend set up yet.</b><br>"
+        try:
+            local = self.bridge.local_status()
+        except Exception:
+            local = {}
+        steps = []
+        for name, pretty, pull_cmd, start_hint in (
+            (
+                "ollama",
+                "Ollama",
+                "ollama pull llama3.2:3b",
+                "launch the Ollama app (or run <code>ollama serve</code>)",
+            ),
+            ("lmstudio", "LM Studio", None, "launch LM Studio and start its local server"),
+        ):
+            state = local.get(name)
+            if state == "not_running":
+                steps.append(
+                    f"• <b>{pretty} isn't running</b> — {start_hint}, then restart LuckyD."
+                )
+            elif state == "no_models":
+                pull = f" — run <code>{pull_cmd}</code>" if pull_cmd else ""
+                steps.append(
+                    f"• <b>{pretty} is up but has no models</b>{pull}, then restart LuckyD."
+                )
+        if not steps:
+            steps.append(
+                "• <b>Free, no key needed:</b> install "
+                "<a href='https://ollama.com' style='color:" + accent + "'>Ollama</a>, "
+                "run <code>ollama pull llama3.2:3b</code>, then restart LuckyD."
+            )
+            steps.append(
+                "• <b>Prefer cloud?</b> Add a key (e.g. <code>OPENAI_API_KEY</code>) "
+                "to the app's <code>.env</code> file and restart."
+            )
+        return (
+            f"<div style='color:{muted};padding:8px 10px;line-height:1.55'>"
+            + head
+            + "<br>".join(steps)
+            + "</div>"
+        )
 
     def _restore_provider(self) -> None:
         """Re-select the provider the user picked last session."""
@@ -462,7 +510,8 @@ class AiSidebar(QDockWidget):
 
     def _greet(self) -> None:
         providers = (
-            ", ".join(self._provider_label(p) for p in self.bridge.providers()) or "none set up"
+            ", ".join(self._provider_label(p) for p in self.bridge.providers())
+            or "not set up — see the setup steps above ↑"
         )
         muted = _tok("muted")
         text_c = _tok("text")
@@ -479,8 +528,10 @@ class AiSidebar(QDockWidget):
         # Friendly onboarding: short steps, free rotation hint, keyboard tips
         free_hint = ""
         try:
-            providers = getattr(self.bridge, "providers", lambda: [])()
-            if "opencode" in providers:
+            # NOTE: keep this in a separate name — `providers` above is the
+            # joined display string used in the greeting HTML below.
+            available = getattr(self.bridge, "providers", lambda: [])()
+            if "opencode" in available:
                 free_pool: list[str] = getattr(self.bridge, "free_top_models", lambda: [])()
                 if free_pool:
                     free_hint = f"Zen top models (auto-rotating): {', '.join(free_pool[:3])}…"
@@ -645,6 +696,18 @@ class AiSidebar(QDockWidget):
         current = self.bridge.model_for(provider)
         self.model_box.blockSignals(True)
         self.model_box.clear()
+        if not models:
+            # Empty catalog is a state, not a silent disabled box: say why
+            # and what fixes it.
+            self.model_box.addItem("No models found", None)
+            self.model_box.blockSignals(False)
+            self.model_box.setEnabled(False)
+            self.status.setText(
+                f"No models on {self._provider_label(provider)} — "
+                "install one, then reselect the provider"
+            )
+            self._sync_vision_default()
+            return
         for model in models:
             self.model_box.addItem(self._model_label(provider, model), model)
         index = self.model_box.findData(current)
@@ -768,6 +831,52 @@ class AiSidebar(QDockWidget):
         self.status.setText(f"Answered by {self._provider_label(provider)}")
         self._chat_worker = None
 
+    def _friendly_chat_error(self, error: str) -> str:
+        """Turn a raw provider exception into something the user can act on.
+
+        A bare "Connection refused" reads as a dead end; the mapping below
+        names the likely cause and the fix. Anything unrecognized passes
+        through untouched so no diagnostic detail is ever hidden."""
+        low = error.lower()
+        if any(
+            k in low
+            for k in (
+                "connection refused",
+                "failed to connect",
+                "max retries exceeded",
+                "name or service not known",
+                "temporary failure in name resolution",
+                "nodename nor servname",
+            )
+        ):
+            return (
+                "Couldn't reach the AI server — it may have stopped. "
+                "If you use Ollama or LM Studio, start it and try again."
+            )
+        if any(
+            k in low
+            for k in (
+                "401",
+                "unauthorized",
+                "invalid api key",
+                "incorrect api key",
+                "invalid_api_key",
+                "authentication",
+            )
+        ):
+            return (
+                "The AI provider rejected the request — the API key is missing "
+                "or wrong. Check the key in the app's .env file, restart, and "
+                "try again."
+            )
+        if "model" in low and any(k in low for k in ("404", "not found", "does not exist")):
+            return (
+                "That model wasn't found on the AI server. Pick a different "
+                "model above — or install it first (e.g. `ollama pull "
+                "llama3.2:3b`)."
+            )
+        return error
+
     def _chat_failed(self, error: str) -> None:
         # Drop the empty assistant placeholder left by _begin_assistant.
         if (
@@ -776,7 +885,7 @@ class AiSidebar(QDockWidget):
             and not self._blocks[-1].get("text")
         ):
             self._blocks.pop()
-        self._blocks.append({"role": "error", "text": error})
+        self._blocks.append({"role": "error", "text": self._friendly_chat_error(error)})
         self._render()
         self.status.setText("Request failed")
         self._chat_worker = None
