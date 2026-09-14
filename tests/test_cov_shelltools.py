@@ -114,7 +114,11 @@ async def test_execute_spawn_failure(monkeypatch) -> None:
     async def _boom(*a, **k):
         raise RuntimeError("spawn failed")
 
+    # BashTool.execute spawns via create_subprocess_shell on Windows and
+    # create_subprocess_exec("bash", "-c", ...) on POSIX — fake both so the
+    # spawn-failure handler is exercised on either platform.
     monkeypatch.setattr(bash_tool.asyncio, "create_subprocess_exec", _boom)
+    monkeypatch.setattr(bash_tool.asyncio, "create_subprocess_shell", _boom)
     out = await BashTool().execute(command="echo hi", description="d")
     assert out.error is True
     assert "Error executing command: spawn failed" in out.text
@@ -366,15 +370,36 @@ async def test_git_pr_push_failure(git_repo) -> None:
     assert out.error is True and out.text.startswith("Push failed:")
 
 
+def _patch_gh(
+    monkeypatch,
+    stdout: bytes = b"",
+    stderr: bytes = b"",
+    returncode: int = 0,
+    not_found: bool = False,
+) -> None:
+    """Route `gh ...` spawns to a fake proc; let everything else (git) run for real.
+
+    A fake `gh` shell script on PATH is not executable on Windows (extensionless
+    scripts don't run via CreateProcess, and CI runners may also have a real gh
+    earlier on PATH), so intercept the spawn instead. The gh success / failure /
+    not-found branches in GitPR are still exercised for real.
+    """
+    real_exec = git_tools.asyncio.create_subprocess_exec
+
+    async def _fake_exec(*args, **kwargs):
+        if args and os.path.basename(str(args[0])).lower() in ("gh", "gh.exe"):
+            if not_found:
+                raise FileNotFoundError("gh")
+            return _FakeProc(stdout, stderr, returncode)
+        return await real_exec(*args, **kwargs)
+
+    monkeypatch.setattr(git_tools.asyncio, "create_subprocess_exec", _fake_exec)
+
+
 async def test_git_pr_full_flow_with_fake_gh(git_repo, tmp_path, monkeypatch) -> None:
     _add_remote(git_repo, tmp_path)
     _commit(git_repo)
-    bindir = tmp_path / "bin"
-    bindir.mkdir()
-    gh = bindir / "gh"
-    gh.write_text('#!/bin/sh\necho "https://github.com/x/y/pull/1"\n')
-    gh.chmod(0o755)
-    monkeypatch.setenv("PATH", str(bindir) + os.pathsep + os.environ["PATH"])
+    _patch_gh(monkeypatch, stdout=b"https://github.com/x/y/pull/1\n")
     out = await git_tools.GitPR().execute(title="T", body="B")
     assert out.error is False
     assert "pull/1" in out.text and out.title == "PR: T"
@@ -383,12 +408,7 @@ async def test_git_pr_full_flow_with_fake_gh(git_repo, tmp_path, monkeypatch) ->
 async def test_git_pr_gh_failure(git_repo, tmp_path, monkeypatch) -> None:
     _add_remote(git_repo, tmp_path)
     _commit(git_repo)
-    bindir = tmp_path / "bin"
-    bindir.mkdir()
-    gh = bindir / "gh"
-    gh.write_text('#!/bin/sh\necho "denied" 1>&2\nexit 1\n')
-    gh.chmod(0o755)
-    monkeypatch.setenv("PATH", str(bindir) + os.pathsep + os.environ["PATH"])
+    _patch_gh(monkeypatch, stderr=b"denied\n", returncode=1)
     out = await git_tools.GitPR().execute(title="T")
     assert out.error is True and "gh CLI error: denied" in out.text
 
@@ -908,15 +928,10 @@ async def test_git_commit_not_a_repo(tmp_path, monkeypatch) -> None:
 
 
 async def test_git_pr_gh_not_found(git_repo, tmp_path, monkeypatch) -> None:
-    import shutil
-
     _add_remote(git_repo, tmp_path)
     _commit(git_repo)
-    # PATH with git but no `gh`: push succeeds, gh spawn raises FileNotFoundError.
-    bindir = tmp_path / "noghbin"
-    bindir.mkdir()
-    (bindir / "git").symlink_to(shutil.which("git"))
-    monkeypatch.setenv("PATH", str(bindir))
+    # gh spawn raises FileNotFoundError -> the "gh CLI not found" branch.
+    _patch_gh(monkeypatch, not_found=True)
     out = await git_tools.GitPR().execute(title="T")
     assert out.error is True and "gh CLI not found" in out.text
 
@@ -936,6 +951,12 @@ async def test_execute_sandbox_unsafe_blocks() -> None:
 
 
 async def test_execute_timeout_kills_tree(monkeypatch) -> None:
+    # Force the POSIX spawn branch: on Windows, execute() would take the
+    # create_subprocess_shell branch (running the real command, so no timeout)
+    # and _kill_process_tree would take the taskkill branch, which never calls
+    # proc.kill(). The Windows taskkill branch is covered separately by
+    # test_kill_process_tree_windows_taskkill.
+    monkeypatch.setattr(bash_tool, "IS_WINDOWS", False)
     proc = _FakeProc()
 
     async def _hang():
@@ -947,6 +968,7 @@ async def test_execute_timeout_kills_tree(monkeypatch) -> None:
         return proc
 
     monkeypatch.setattr(bash_tool.asyncio, "create_subprocess_exec", _fake_exec)
+    monkeypatch.setattr(bash_tool.asyncio, "create_subprocess_shell", _fake_exec)
     out = await BashTool().execute(command="echo hi", description="d", timeout=100)
     assert out.error is True
     assert "timed out after 0s" in out.text

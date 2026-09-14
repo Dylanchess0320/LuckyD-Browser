@@ -700,6 +700,9 @@ def test_spawn_pty_env_block_sanitizes_bad_entries(monkeypatch) -> None:
             "BAD=KEY": "x",
             "": "empty-key",
             "PLAIN": "ok",
+            # Path.home() on Windows reads USERPROFILE; without it expanduser()
+            # raises "Could not determine home directory".
+            "USERPROFILE": "C:\\Users\\test",
         },
     )
     _spawn_pty(shell="cmd")
