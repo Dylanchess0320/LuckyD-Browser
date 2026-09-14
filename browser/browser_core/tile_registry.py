@@ -223,6 +223,11 @@ def _expand(p: str) -> str:
             appdir = str(Path(__file__).resolve().parent.parent)
         out = out.replace("%APPDIR%", appdir)
         out = out.replace("{app}", appdir)
+    # Tile configs are authored with Windows separators ("%RESDIR%\studio").
+    # Normalize them so the path resolves on POSIX too (Linux CI / dev).
+    # On Windows os.sep == "\\", so this is a no-op where it matters.
+    if os.sep != "\\":
+        out = out.replace("\\", os.sep)
     return out
 
 
