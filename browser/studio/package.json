@@ -7,6 +7,9 @@
     "@marp-team/marp-cli": "^4.5.0",
     "puppeteer": "^23.0.0"
   },
+  "overrides": {
+    "@xmldom/xmldom": "0.9.12"
+  },
   "allowScripts": {
     "puppeteer@23.11.1": true
   }
