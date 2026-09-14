@@ -3,7 +3,7 @@
 
 pytest>=8.0,<10.0
 pytest-asyncio>=0.23,<2.0
-pytest-cov>=5.0,<6.0
+pytest-cov>=7.0,<8.0
 pytest-xdist>=3.5,<4.0
 pytest-timeout>=2.3,<3.0
 # tomllib is stdlib on 3.11+; the backport keeps the version-unification test green on 3.10.
