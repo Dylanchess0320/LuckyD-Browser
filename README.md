@@ -23,6 +23,18 @@
 
 </div>
 
+## 🎬 Episode 9 is live — "I Rebuilt My AI Browser in One Night"
+
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=isa_z1SdoO4">
+    <img src="docs/screenshots/episode9-thumbnail.png" alt="Watch LuckyD 9.0 Episode 9 on YouTube" width="720">
+  </a>
+</p>
+
+<p align="center">
+  <b><a href="https://www.youtube.com/watch?v=isa_z1SdoO4">▶ Watch Episode 9 on YouTube</a></b> — 1,855 tests passing · 24 bugs crushed · rebuilt in a single night
+</p>
+
 <p align="center">
   <img src="docs/screenshots/sidebar.png" alt="LuckyD dashboard, Agent Mesh tabs, and local AI sidebar" width="920">
 </p>
