@@ -1,3 +1,7 @@
+<div align="center">
+
+<img src="docs/screenshots/hero.svg" alt="LuckyD Browser" width="100%">
+
 # LuckyD Browser
 
 **The AI browser that runs *your* models — local, unlimited, offline — plus a full coding agent and real terminals in one window.**
