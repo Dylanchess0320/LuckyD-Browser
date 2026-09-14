@@ -178,3 +178,5 @@ archive/*.txt
 
 # ── Vendored third-party reference codebases ──────────────────────────
 external/
+
+browser/installer/compile_log.txt
