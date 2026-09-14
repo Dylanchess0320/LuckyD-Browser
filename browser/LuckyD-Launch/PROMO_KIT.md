@@ -1,6 +1,6 @@
 # 🚀 LuckyD Browser — Promo Kit
 
-Everything ready to paste. Assets: `docs/screenshots/sidebar.png` (hero), `docs/screenshots/hq.png`.
+Everything ready to paste. Assets: `docs/screenshots/dashboard.png` (hero), `docs/screenshots/hq.png`.
 Repo: https://github.com/Dylanchess0320/LuckyD-Browser
 
 ---
@@ -21,7 +21,7 @@ self-hosted, llm, agentic-browser, python, open-source, free, alternative-to-com
 
 **Website:** link the Releases page.
 **Pin the repo** on your profile. Add the hero screenshot as the repo social preview
-(Settings → General → Social preview → upload `sidebar.png` — this is what renders
+(Settings → General → Social preview → upload `dashboard.png` — this is what renders
 when the link is shared on X/Discord/Slack).
 
 ---
@@ -109,7 +109,7 @@ Local default: anything Ollama runs — llama3.2, qwen3, gemma3 (vision)…
 Repo + download: https://github.com/Dylanchess0320/LuckyD-Browser
 Stars appreciated ⭐
 ```
-(Attach `sidebar.png` to tweet 1, `hq.png` to tweet 3.)
+(Attach `dashboard.png` to tweet 1, `hq.png` to tweet 3.)
 
 ---
 

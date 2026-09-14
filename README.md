@@ -36,7 +36,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/sidebar.png" alt="LuckyD Browser — the Neon Night dashboard: AI status, tabs, and your tools in one window" width="920">
+  <img src="docs/screenshots/dashboard.png" alt="LuckyD Browser — the Neon Night dashboard: AI status, tabs, and your tools in one window" width="920">
 </p>
 
 ---

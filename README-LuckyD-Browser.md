@@ -13,7 +13,7 @@ LuckyD Browser is more than a browser — it's a **one-window AI platform**:
 > **Web browser + AI assistant + coding agent HQ + full developer terminal — all in a single window, all able to drive your real tabs.**
 
 <p align="center">
-  <img src="docs/screenshots/sidebar.png" alt="LuckyD Browser — the Neon Night dashboard: AI status, tabs, and your tools in one window" width="920"><br>
+  <img src="docs/screenshots/dashboard.png" alt="LuckyD Browser — the Neon Night dashboard: AI status, tabs, and your tools in one window" width="920"><br>
   <em>The LuckyD dashboard — one window for browsing, your models, and your tools.</em>
 </p>
 
