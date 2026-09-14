@@ -43,7 +43,6 @@ export const MESH_AGENTS: { id: string; label: string; emoji: string }[] = [
   { id: 'mesh-pi', label: 'Pi', emoji: '⚪' },
   { id: 'mesh-grok', label: 'Grok', emoji: '𝕏' },
   { id: 'mesh-muse', label: 'Muse Code', emoji: 'Ⓜ️' },
-  { id: 'mesh-muse-spark', label: 'Muse Spark', emoji: '✨' },
 ];
 
 export function terminalUrl(shell: string): string {

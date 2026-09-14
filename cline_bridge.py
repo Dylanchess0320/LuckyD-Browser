@@ -62,13 +62,55 @@ for _cand in (_HERE / "browser" / "browser_core", _HERE):
         sys.path.insert(0, str(_cand))
         break
 
+
+def _load_dotenv() -> None:
+    """Load repo .env so CLINEPASS_API_KEY works without exporting it first."""
+    path = _HERE / ".env"
+    try:
+        raw = path.read_text(encoding="utf-8-sig")
+    except OSError:
+        return
+    for line in raw.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, val = line.partition("=")
+        key = key.strip()
+        if not key or key in os.environ:
+            continue
+        os.environ[key] = val.strip().strip('"').strip("'")
+
+
+_load_dotenv()
+
 import cline_session
 
 UPSTREAM_BASE = os.environ.get("CLINE_BRIDGE_UPSTREAM", "https://api.cline.bot/api/v1")
-DEFAULT_MODEL = os.environ.get("CLINE_BRIDGE_MODEL", "cline-pass/kimi-k3")
+DEFAULT_MODEL = (
+    os.environ.get("CLINE_BRIDGE_MODEL", "").strip()
+    or os.environ.get("CODING_AGENT_MODEL", "").strip()
+    or os.environ.get("CLINE_USAGE_MODEL", "").strip()
+    or "deepseek/deepseek-v4.1-flash"
+)
+
+
+def _upstream_token() -> str:
+    """Bearer for api.cline.bot: long-lived CLINEPASS_API_KEY wins, else live session."""
+    key = os.environ.get("CLINEPASS_API_KEY", "").strip()
+    if key:
+        return key
+    return cline_session.fresh_token()
+
+
+def _auth_source() -> str:
+    return "api-key" if os.environ.get("CLINEPASS_API_KEY", "").strip() else "session"
 
 # Model ids verified live against the gateway (others 404 — dead slugs).
+# Includes the user's current Cline login model (cline/usage-billed) plus
+# the ClinePass flat-subscription ids.
 KNOWN_MODELS = [
+    "deepseek/deepseek-v4.1-flash",
+    "z-ai/glm-5.3-flash",
     "cline-pass/kimi-k3",
     "cline-pass/deepseek-v4-flash",
 ]
@@ -120,8 +162,10 @@ def _unwrap(payload: Any) -> Any:
 @app.get("/v1/health")
 async def health() -> JSONResponse:
     try:
-        tok = cline_session.fresh_token()
-        return JSONResponse({"ok": True, "model": DEFAULT_MODEL, "token_len": len(tok)})
+        tok = _upstream_token()
+        return JSONResponse(
+            {"ok": True, "model": DEFAULT_MODEL, "token_len": len(tok), "auth": _auth_source()}
+        )
     except Exception as e:  # pragma: no cover - diagnostic path
         return JSONResponse({"ok": False, "error": f"{type(e).__name__}: {e}"}, status_code=500)
 
@@ -143,7 +187,7 @@ async def models(request: Request) -> JSONResponse:
 
 def _forward_headers() -> dict[str, str]:
     return {
-        "Authorization": f"Bearer {cline_session.fresh_token()}",
+        "Authorization": f"Bearer {_upstream_token()}",
         "Content-Type": "application/json",
         "Accept": "application/json",
     }

@@ -276,8 +276,9 @@ from browser_core.settings import DEFAULTS
 _bad = [s.name for s in load_scripts() if "://" in wrapped_source(s).splitlines()[0]]
 check("userscript wrappers valid JS", not _bad, str(_bad))
 check(
-    "dark-mode userscript is opt-in",
-    "Dark Mode Everywhere" in DEFAULTS["userscript_disabled"],
+    "dark-mode userscript removed",
+    "Dark Mode Everywhere" not in DEFAULTS["userscript_disabled"]
+    and "Dark Mode Everywhere" not in [s.name for s in load_scripts()],
 )
 
 # masterpiece pass — secret theme, offline arcade, updater math

@@ -80,10 +80,10 @@ DEFAULTS = {
     "update_auto_check": True,
     # A version tag the user chose to skip (don't prompt for it again).
     "update_skipped_version": "",
-    # Userscripts disabled by name. "Dark Mode Everywhere" inverts EVERY page
-    # (images included) — powerful but strictly opt-in; the other built-ins
-    # (YouTube ad-block, video speed) are safe defaults.
-    "userscript_disabled": ["Dark Mode Everywhere"],
+    # Userscripts disabled by name (persisted in settings.json as
+    # "userscript_disabled": [names]). Built-ins (YouTube ad-block,
+    # video speed) are safe defaults, so nothing is disabled out of the box.
+    "userscript_disabled": [],
     # HTTPS-Only: upgrade public http:// navigations to https://. Localhost
     # and private LAN addresses are never rewritten.
     "https_only": True,

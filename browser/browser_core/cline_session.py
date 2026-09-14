@@ -32,6 +32,27 @@ _DEFAULT_CLIENT_ID = "client_01K3A541FN8TA3EPPHTD2325AR"
 _SESSION_PROVIDERS = ("cline-pass", "cline")
 
 
+def _preferred_order() -> tuple[str, ...]:
+    """Order session providers so the *current* Cline login wins.
+
+    1. ``CLINE_SESSION_PROVIDER`` env override (``cline`` | ``cline-pass``).
+    2. ``lastUsedProvider`` from the CLI's providers.json (what the Cline
+       UI/CLI is actually logged in as right now).
+    3. Fallback: legacy ("cline-pass", "cline") order.
+    """
+    override = os.environ.get("CLINE_SESSION_PROVIDER", "").strip().lower()
+    if override in _SESSION_PROVIDERS:
+        return (override, *[p for p in _SESSION_PROVIDERS if p != override])
+    try:
+        raw = _providers_path().read_text(encoding="utf-8")
+        last = str(json.loads(raw).get("lastUsedProvider", "")).strip().lower()
+        if last in _SESSION_PROVIDERS:
+            return (last, *[p for p in _SESSION_PROVIDERS if p != last])
+    except Exception:
+        pass
+    return _SESSION_PROVIDERS
+
+
 def _providers_path() -> Path:
     override = os.environ.get("CLINE_DATA_DIR", "").strip()
     base = Path(override) if override else Path.home() / ".cline" / "data"
@@ -54,7 +75,7 @@ def _iter_tokens(data: dict | None = None) -> list[tuple[str, str, int, str]]:
         data = _read_providers()
     providers = data.get("providers", {})
     out: list[tuple[str, str, int, str]] = []
-    for name in _SESSION_PROVIDERS:
+    for name in _preferred_order():
         settings = (providers.get(name) or {}).get("settings") or {}
         auth = settings.get("auth") or {}
         token = str(auth.get("accessToken", "")).strip()
@@ -73,7 +94,7 @@ def has_session() -> bool:
 
 
 def load_session() -> tuple[str, int]:
-    """Return (access_token, expires_at_ms) — prefers cline-pass over cline."""
+    """Return (access_token, expires_at_ms) — prefers the current login."""
     tokens = _iter_tokens()
     if not tokens:
         raise RuntimeError("no Cline session token found — run `cline auth` once")
