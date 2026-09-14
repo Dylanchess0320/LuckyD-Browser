@@ -14,9 +14,7 @@ small = src.resize((512, 512), Image.Resampling.LANCZOS)
 small.save(ASSETS / "luckyd-browser-icon-v2.png")
 
 # Windows ICO: clamp to 256px (ICO max frame) and save multi-size frames.
-ico_src = small if max(small.size) <= 256 else small.resize(
-    (256, 256), Image.Resampling.LANCZOS
-)
+ico_src = small if max(small.size) <= 256 else small.resize((256, 256), Image.Resampling.LANCZOS)
 ico_src.save(
     ASSETS / "professional_icon.ico",
     sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)],

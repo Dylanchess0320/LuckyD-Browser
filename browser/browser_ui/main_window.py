@@ -152,7 +152,6 @@ class MainWindow(QMainWindow):
         # GitHub releases page — Help > Check for Updates opens it in a tab.
         self._release_page_url = RELEASES_PAGE_URL
 
-
     def _show_welcome_hint(self) -> None:
         """One friendly toast per session: shortcuts + free AI hint."""
         with contextlib.suppress(Exception):
@@ -241,14 +240,11 @@ class MainWindow(QMainWindow):
         self.omnibox.navigate.connect(self.load_in_current_tab)
         bar.addWidget(self.omnibox)
 
-
         # Update badge: retained for API compat with _show_pending_update(). It
         # now always points at the GitHub releases page — the in-app update
         # checker that drove it was removed as unreliable.
         self._update_act = QAction("⬆", self)
-        self._update_act.setToolTip(
-            "Get the latest LuckyD — opens the releases page on GitHub"
-        )
+        self._update_act.setToolTip("Get the latest LuckyD — opens the releases page on GitHub")
         self._update_act.setVisible(True)
         self._update_act.triggered.connect(self._open_releases_page)
         bar.addAction(self._update_act)

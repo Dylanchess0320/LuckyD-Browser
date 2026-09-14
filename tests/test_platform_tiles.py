@@ -119,6 +119,7 @@ def test_cwd_fallback_ignores_a_folder_without_the_script(tmp_path):
     # unchanged and the failure is logged with the resolved cmd/cwd.
     assert _resolve_cwd(tile) == str(tmp_path / "gone")
 
+
 # ── autostart still launches ─────────────────────────────────────────
 
 
