@@ -15,7 +15,7 @@ security vulnerability, please **do not** open a public issue.
 
 **Instead, report it privately:**
 
-1. **Email**: security@luckyd.ai
+1. **Email**: dylanchess03@gmail.com
 2. **PGP Key**: Available on request
 3. **Response Time**: We aim to respond within 48 hours
 
