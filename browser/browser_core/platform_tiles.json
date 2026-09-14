@@ -30,7 +30,7 @@
       "autostart": true,
       "enabled": true,
       "command": ["node", "studio-server.js", "8770"],
-      "cwd": "%APPDIR%\\studio"
+      "cwd": "%RESDIR%\\studio"
     },
     {
       "id": "luckyd-chat",

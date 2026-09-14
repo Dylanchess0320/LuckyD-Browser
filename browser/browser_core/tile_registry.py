@@ -1,4 +1,4 @@
-"""TileRegistry — config-driven platform tiles for the LuckyD dashboard.
+r"""TileRegistry — config-driven platform tiles for the LuckyD dashboard.
 
 Phase 2 of the platform plan: "adding a tool = adding one config entry,
 zero Python changes." This module is deliberately dependency-free (stdlib
@@ -13,6 +13,13 @@ the running browser. Wiring it into dashboard.py is a 3-line change:
 Config: platform_tiles.json next to this file.
     { "tiles": [ { id, name, icon, url, health_url, autostart, enabled } ] }
 
+Path tokens usable in url/command/cwd:
+    %APPDIR% / {app}    -> folder holding the exe (dev: browser package root)
+    %RESDIR% / {resdir} -> folder bundled *data* lives in (frozen: _MEIPASS,
+                           which is <app>/_internal for a onedir build)
+Use %RESDIR% for anything the PyInstaller spec ships: %APPDIR% is only the
+exe's own folder, so %APPDIR%\studio does not exist in an installed build.
+
 A tile with enabled=false is hidden but remembered — flipping it on later
 is a JSON edit, not a code change.
 """
@@ -24,6 +31,7 @@ import contextlib
 import html
 import json
 import os
+import shutil
 import subprocess
 import sys
 import threading
@@ -95,8 +103,117 @@ class Tile:
     cwd: str = ""
 
 
+def _app_dir() -> str:
+    """Folder holding the running exe (frozen) or the browser package root (dev).
+
+    This is what %APPDIR% / {app} expand to. PyInstaller onedir builds keep
+    nothing here but the exe and _internal, so bundled payloads are reached
+    through _resource_dir() instead.
+    """
+    if getattr(sys, "frozen", False):
+        return str(Path(sys.executable).resolve().parent)
+    return str(Path(__file__).resolve().parent.parent)
+
+
+def _resource_dir() -> str:
+    """Folder the app's bundled *data* files land in.
+
+    Frozen: sys._MEIPASS -- for a PyInstaller onedir build that is
+    <app>/_internal, exactly where the spec's datas entries (studio/,
+    assets/, project/, ...) are collected. Dev: the browser package root,
+    which holds the same payloads, so one config entry serves both layouts.
+    """
+    meipass = getattr(sys, "_MEIPASS", None)
+    if meipass:
+        return str(Path(meipass))
+    return str(Path(__file__).resolve().parent.parent)
+
+
+# Runtimes the frozen app may need but not have on its inherited PATH.
+_RUNTIME_HINTS = (
+    r"%ProgramFiles%\nodejs",
+    r"%ProgramFiles(x86)%\nodejs",
+    r"%LOCALAPPDATA%\Programs\nodejs",
+    r"%LOCALAPPDATA%\Programs\node",
+    r"%APPDATA%\npm",
+)
+
+
+def _resolve_exe(name: str) -> str:
+    """Best-effort absolute path for a tile command's executable.
+
+    A GUI app inherits the PATH its launcher had at logon, so a runtime
+    installed afterwards (node, python, a CLI) can be invisible even though
+    it works in a fresh terminal. Look past PATH at the usual Windows install
+    locations before handing the bare name to the OS. Never raises.
+    """
+    if not name or os.path.dirname(name):
+        return name  # empty, or an explicit path: trust the config as-is
+    found = shutil.which(name)
+    if found:
+        return found
+    exe = name if name.lower().endswith(".exe") else f"{name}.exe"
+    for hint in _RUNTIME_HINTS:
+        cand = Path(os.path.expandvars(hint)) / exe
+        with contextlib.suppress(OSError):
+            if cand.is_file():
+                return str(cand)
+    return name
+
+
+def _script_arg(command: tuple[str, ...]) -> str:
+    """The script a tile command runs (e.g. studio-server.js in
+    ``node studio-server.js 8770``), used to validate a fallback cwd."""
+    for arg in command[1:]:
+        if not arg.startswith("-") and Path(arg).suffix:
+            return arg
+    return ""
+
+
+def _resolve_cwd(tile: Tile) -> str | None:
+    """Working directory to launch a tile command in.
+
+    Prefers the configured cwd. When it does not exist -- the frozen case is
+    ``cwd: "%APPDIR%\\studio"`` while PyInstaller collected the payload into
+    ``<app>\\_internal\\studio``, which made Popen die with
+    NotADirectoryError(winerror 267) so the tile never came up -- fall back to
+    the bundled-data folder (then the app folder) whenever the command's
+    script actually lives there.
+    """
+    if tile.cwd:
+        if Path(tile.cwd).is_dir():
+            return tile.cwd
+        _debug_log(f"{tile.id}: cwd missing {tile.cwd!r} - trying bundle fallbacks")
+    script = _script_arg(tile.command)
+    script_is_path = bool(script) and Path(script).is_absolute()
+    roots = (Path(_resource_dir()), Path(_app_dir()), Path(_app_dir()) / "_internal")
+    base = Path(tile.cwd).name if tile.cwd else ""
+    candidates: list[Path] = []
+    for root in roots:
+        candidates.append(root)
+        # An older config may point at a payload subfolder that moved with the
+        # bundle (e.g. %APPDIR%\studio whose files now live in _internal\).
+        if base and base not in ("", ".", ".."):
+            candidates.append(root / base)
+    for cand in dict.fromkeys(candidates):  # dedupe, keep order
+        if not cand.is_dir():
+            continue
+        if script and not script_is_path and not (cand / script).is_file():
+            continue
+        _debug_log(f"{tile.id}: cwd -> {str(cand)!r} (script={script or '-'})")
+        return str(cand)
+    return tile.cwd or None
+
+
 def _expand(p: str) -> str:
-    out = os.path.expandvars(os.path.expanduser(p or ""))
+    out = (p or "").strip()
+    if not out:
+        return ""
+    # Tokens first: expandvars would otherwise swallow a %RESDIR%-shaped name
+    # if the machine happened to export an env var called that.
+    if "%RESDIR%" in out or "{resdir}" in out.lower():
+        out = out.replace("%RESDIR%", _resource_dir()).replace("{resdir}", _resource_dir())
+    out = os.path.expandvars(os.path.expanduser(out))
     # %APPDIR% = folder containing the running exe (frozen) or the browser
     # package root (dev) — lets tiles reference files bundled with the app.
     if "%APPDIR%" in out or "{app}" in out.lower():
@@ -136,7 +253,7 @@ def load_tiles(config_path: Path | None = None) -> list[Tile]:
                 autostart=bool(e.get("autostart", False)),
                 enabled=True,
                 extra_class=str(e.get("extra_class", "")),
-                command=tuple(str(c) for c in e.get("command", []) or []),
+                command=tuple(_expand(str(c)) for c in e.get("command", []) or []),
                 cwd=_expand(str(e.get("cwd", "") or "")),
             )
         )
@@ -237,16 +354,18 @@ def ensure_autostart(tiles: list[Tile] | None = None) -> None:
                 continue  # our own child is still running
             if probe_tile(t)["up"]:
                 continue  # something else already serves it
+            cmd = [_resolve_exe(t.command[0]), *t.command[1:]]
+            cwd = _resolve_cwd(t)
             try:
-                kwargs: dict = {"cwd": t.cwd or None}
+                kwargs: dict = {"cwd": cwd}
                 if os.name == "nt":
                     kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
                 _launched[t.id] = subprocess.Popen(  # nosec B603 — config-owned argv
-                    list(t.command), **kwargs
+                    cmd, **kwargs
                 )
-                _debug_log(f"launched {t.id}: cmd={list(t.command)} cwd={t.cwd!r}")
+                _debug_log(f"launched {t.id}: cmd={cmd} cwd={cwd!r}")
             except Exception as exc:
-                _debug_log(f"launch FAILED {t.id}: {exc!r}")
+                _debug_log(f"launch FAILED {t.id}: cmd={cmd} cwd={cwd!r} {exc!r}")
 
 
 def tile_anchor(tile: Tile, status: dict | None = None) -> str:
