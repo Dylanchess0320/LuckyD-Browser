@@ -6,9 +6,7 @@ import asyncio
 import base64
 import contextlib
 import json
-import subprocess
 import sys
-import tempfile
 import threading
 from pathlib import Path
 
@@ -16,7 +14,19 @@ from browser_core import tts as _tts
 from browser_core.permissions import ALLOW, ASK, DENY, feature_key, feature_label, origin_of
 from browser_core.profile import incognito_profile
 from browser_core.session import tab_record, window_record
-from browser_core.updater import ReleaseDownloader, UpdateChecker
+
+# Kept importable: other modules (About dialog, selftest) import from
+# browser_core.updater, so the module stays — these two names are just no
+# longer used by this file.
+from browser_core.updater import (  # noqa: F401
+    ReleaseDownloader,
+    UpdateChecker,
+)
+
+#: Updates now live on the public GitHub releases page. The in-app
+#: download-and-install flow was unreliable (API rate limits, proxies/VPNs,
+#: timing), so every update path below just opens this page in a tab.
+RELEASES_PAGE_URL = "https://github.com/Dylanchess0320/LuckyD-Browser/releases"
 from browser_core.zoom import clamp_zoom, origin_key, remember, zoom_for
 from PySide6.QtCore import QSize, Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QAction, QGuiApplication, QIcon, QImage, QKeySequence, QShortcut
@@ -137,9 +147,11 @@ class MainWindow(QMainWindow):
         # Friendly hint toast on startup (once per session)
         QTimer.singleShot(1800, self._show_welcome_hint)
 
-        # ── silent update check shortly after startup ─────────────────
-        if self.settings.get("update_auto_check", True):
-            QTimer.singleShot(8000, lambda: self.check_for_updates(silent=True))
+        # Auto-update checks are permanently disabled: they were unreliable
+        # (GitHub API rate limits, proxies/VPNs, timing). Updates live on the
+        # GitHub releases page — Help > Check for Updates opens it in a tab.
+        self._release_page_url = RELEASES_PAGE_URL
+
 
     def _show_welcome_hint(self) -> None:
         """One friendly toast per session: shortcuts + free AI hint."""
@@ -229,11 +241,16 @@ class MainWindow(QMainWindow):
         self.omnibox.navigate.connect(self.load_in_current_tab)
         bar.addWidget(self.omnibox)
 
-        # ── Quiet update badge (hidden until a silent check finds one) ──
+
+        # Update badge: retained for API compat with _show_pending_update(). It
+        # now always points at the GitHub releases page — the in-app update
+        # checker that drove it was removed as unreliable.
         self._update_act = QAction("⬆", self)
-        self._update_act.setToolTip("Update available — click to review")
-        self._update_act.setVisible(False)
-        self._update_act.triggered.connect(self._show_pending_update)
+        self._update_act.setToolTip(
+            "Get the latest LuckyD — opens the releases page on GitHub"
+        )
+        self._update_act.setVisible(True)
+        self._update_act.triggered.connect(self._open_releases_page)
         bar.addAction(self._update_act)
 
         # Legacy toolbar buttons (star/AI/coding-agent/mesh/summarize/read)
@@ -1847,10 +1864,6 @@ class MainWindow(QMainWindow):
         __version__ = current_version()
 
         channel = "Standalone build" if getattr(sys, "frozen", False) else "Source (dev)"
-        last_checked = str(self.settings.get("update_last_checked", "") or "").strip()
-        skipped = str(self.settings.get("update_skipped_version", "") or "").strip()
-        # Trim ISO timestamp to a friendlier "YYYY-MM-DD HH:MM" form.
-        last_checked = last_checked.replace("T", " ")[:16] if last_checked else "Never"
 
         dlg = QDialog(self)
         dlg.setWindowTitle(f"About {APP_DISPLAY}")
@@ -1860,8 +1873,7 @@ class MainWindow(QMainWindow):
             f"<h3>🍀 {APP_DISPLAY}</h3>"
             f"<p><b>Version:</b> {__version__}<br>"
             f"<b>Channel:</b> {channel}<br>"
-            f"<b>Last checked for updates:</b> {last_checked}</p>"
-            + (f"<p><i>Update to version {skipped} was skipped.</i></p>" if skipped else "")
+            f"<b>Updates:</b> github.com/Dylanchess0320/LuckyD-Browser/releases</p>"
             + "<p>LuckyD — a trust-first AI browser. Chat-first AI sidebar with "
             "contextual skills, a deep research swarm, and local-first Ollama for $0 AI.</p>"
             "<p>Free, open source, no telemetry.</p>",
@@ -1885,7 +1897,17 @@ class MainWindow(QMainWindow):
         dlg.resize(440, dlg.sizeHint().height())
         dlg.exec()
 
-    # ── self-updater ────────────────────────────────────────────────────
+    # ── updates: GitHub releases page ─────────────────────────────────
+    # The in-app download-and-install updater was unreliable (API rate limits,
+    # proxies/VPNs, timing), so every update path here just opens the public
+    # releases page in a tab. Thin shims keep the old call sites working.
+
+    def _release_page(self) -> str:
+        return getattr(self, "_release_page_url", None) or RELEASES_PAGE_URL
+
+    def _open_releases_page(self) -> None:
+        self.toast("Opening the releases page — grab the latest setup exe", "info")
+        self.open_in_new_tab(QUrl(self._release_page()))
 
     def _current_version(self) -> str:
         from browser_core.updater import current_version
@@ -1893,331 +1915,37 @@ class MainWindow(QMainWindow):
         return current_version()
 
     def check_for_updates(self, silent: bool = False) -> None:
-        """Check GitHub for a newer release; offer to download + install.
-
-        Works both frozen and from-source. Frozen builds download + apply the
-        installer; source checkouts report the newer version and point at
-        ``git pull`` / the release page (there is no installer to apply).
-        Silent (startup) checks never show a modal — they raise the quiet
-        toolbar badge + toast instead.
-        """
-
-        if self._update_checker is not None and self._update_checker.isRunning():
-            return  # a check is already in flight
-
-        # Defensive: silent (startup) checks honor the settings toggle.
-        if silent:
-            try:
-                if not bool(self.settings.get("update_auto_check", True)):
-                    return
-            except Exception:
-                pass
-
-        # Record the attempt so "last checked" is always fresh.
-        with contextlib.suppress(Exception):
-            self.settings.set(
-                "update_last_checked",
-                __import__("datetime").datetime.now().isoformat(timespec="seconds"),
-            )
-
-        checker = UpdateChecker(parent=self)
-        self._update_checker = checker
-        checker.update_available.connect(lambda info: self._on_update_available(info, silent))
-        checker.up_to_date.connect(lambda: self._on_no_update(silent))
-        checker.failed.connect(lambda msg: self._on_update_failed(msg, silent))
-        checker.finished.connect(self._on_update_checker_finished)
-        checker.start()
+        """Open the GitHub releases page in a tab (the auto-updater is retired)."""
+        del silent  # the badge + menu item share this entry point
+        self._open_releases_page()
 
     def _on_update_checker_finished(self) -> None:
-        """Release the checker reference once its thread has finished."""
-        checker = self.sender()
-        if self._update_checker is checker:
-            self._update_checker = None
-        with contextlib.suppress(Exception):
-            checker.deleteLater()
+        """Legacy shim: the UpdateChecker thread no longer runs."""
 
     def _on_no_update(self, silent: bool) -> None:
-        self._pending_update = None
-        with contextlib.suppress(Exception):
-            if getattr(self, "_update_act", None) is not None:
-                self._update_act.setVisible(False)
-        if not silent:
-            from PySide6.QtWidgets import QMessageBox
-
-            QMessageBox.information(
-                self,
-                "No Updates",
-                f"You're running the latest version (v{self._current_version()}).",
-            )
+        del silent  # no-op shim
 
     def _on_update_failed(self, message: str, silent: bool) -> None:
-        if not silent:
-            from PySide6.QtWidgets import QMessageBox
-
-            QMessageBox.warning(
-                self,
-                "Update Check Failed",
-                f"Couldn't check for updates ({message or 'network error'}).\n\n"
-                "Check your internet connection, then try Help > Check for "
-                "Updates again. If it keeps failing, download the latest "
-                "release from github.com/Dylanchess0320/LuckyD-Browser/releases.",
-            )
+        del message, silent  # no-op shim
 
     def _show_update_badge(self, info: dict) -> None:
-        """Reveal the quiet toolbar update badge for a pending release."""
-        version = str(info.get("version") or "?")
-        act = getattr(self, "_update_act", None)
-        if act is not None:
-            with contextlib.suppress(Exception):
-                act.setToolTip(
-                    f"Update to v{version} available "
-                    f"(you have v{self._current_version()}) — click to review"
-                )
-                act.setVisible(True)
+        del info  # no-op shim: the badge always links to the releases page
 
     def _show_pending_update(self) -> None:
-        """Toolbar badge clicked: re-present the pending update modally."""
-        info = dict(getattr(self, "_pending_update", None) or {})
-        if not info:
-            self.check_for_updates(silent=False)
-            return
-        self._on_update_available(info, silent=False)
+        self._open_releases_page()
 
     def _on_update_available(self, info: dict, silent: bool) -> None:
-        from PySide6.QtWidgets import QMessageBox
-
-        version = str(info.get("version") or "?")
-
-        # If the user previously skipped this version, don't nag again.
-        try:
-            skipped = str(self.settings.get("update_skipped_version", "") or "")
-        except Exception:
-            skipped = ""
-        if skipped and skipped == str(version):
-            return
-
-        from_source = not getattr(sys, "frozen", False)
-
-        # ── From-source: report, don't install. ──────────────────────
-        if from_source:
-            self._pending_update = dict(info)
-            if silent:
-                self.toast(
-                    f"Version {version} available "
-                    f"(you have v{self._current_version()}, running from source) — "
-                    "see Help > Check for Updates",
-                    "info",
-                )
-                return
-            from PySide6.QtWidgets import QMessageBox
-
-            box = QMessageBox(self)
-            box.setWindowTitle("Update Available")
-            box.setIcon(QMessageBox.Icon.Information)
-            box.setText(
-                f"<b>Version {version}</b> is available "
-                f"(you have v{self._current_version()}, running from source).<br><br>"
-                "Update with:<br>&nbsp;&nbsp;<tt>git pull</tt><br><br>"
-                "Or grab the installer from the release page."
-            )
-            btn_page = box.addButton("Open Release Page", QMessageBox.ButtonRole.AcceptRole)
-            box.addButton("Close", QMessageBox.ButtonRole.RejectRole)
-            box.exec()
-            if box.clickedButton() is btn_page:
-                page = str(info.get("url") or info.get("installer_url") or "")
-                if page:
-                    self.open_in_new_tab(QUrl(page))
-            return
-
-        # ── Frozen + silent (startup): quiet badge, never a modal. ───
-        if silent:
-            self._pending_update = dict(info)
-            self._show_update_badge(info)
-            self.toast(
-                f"Version {version} available — click ⬆ to update "
-                f"(you have v{self._current_version()})",
-                "info",
-            )
-            return
-
-        size_mb = float(info.get("installer_size") or 0) / (1024 * 1024)
-        size_line = f"Download size: {size_mb:.1f} MB<br><br>" if size_mb else ""
-        # Show a taste of the release notes so the update feels real.
-        notes = str(info.get("notes") or "").strip()
-        notes_html = ""
-        if notes:
-            import html as _html
-
-            snippet = _html.escape(notes[:600]).replace("\n", "<br>")
-            if len(notes) > 600:
-                snippet += "…"
-            notes_html = (
-                f"<div style='color:#8b93a7; font-size:11px; max-height:140px;'>{snippet}</div><br>"
-            )
-
-        box = QMessageBox(self)
-        box.setWindowTitle("Update Available")
-        box.setIcon(QMessageBox.Icon.Question)
-        box.setTextFormat(Qt.TextFormat.RichText)
-        box.setText(
-            f"<b>Version {version}</b> is available "
-            f"(you have v{self._current_version()}).<br><br>"
-            f"{size_line}"
-            f"{notes_html}"
-            "Download and install now? The browser will restart to "
-            "apply the update."
-        )
-        btn_update = box.addButton("Update Now", QMessageBox.ButtonRole.AcceptRole)
-        box.addButton("Remind Me Later", QMessageBox.ButtonRole.RejectRole)
-        btn_skip = box.addButton("Skip This Version", QMessageBox.ButtonRole.DestructiveRole)
-        box.setDefaultButton(btn_update)
-        box.exec()
-
-        clicked = box.clickedButton()
-        if clicked is btn_update:
-            self._start_update_download(info)
-        elif clicked is btn_skip:
-            try:
-                self.settings.set("update_skipped_version", str(version))
-                self.toast(f"Will skip version {version}", "info")
-            except Exception:
-                pass
-            self._pending_update = None
-            with contextlib.suppress(Exception):
-                if getattr(self, "_update_act", None) is not None:
-                    self._update_act.setVisible(False)
+        del info, silent  # no-op shim: availability lives on GitHub, not in-app
 
     def _start_update_download(self, info: dict) -> None:
-        # Source checkouts have no installer to apply — open the page.
-        if not getattr(sys, "frozen", False):
-            page = str(info.get("url") or info.get("installer_url") or "")
-            if page:
-                self.toast("Running from source — opening the release page", "info")
-                self.open_in_new_tab(QUrl(page))
-            else:
-                self.toast("Update with: git pull", "info")
-            return
-
-        url = str(info.get("installer_url") or "")
-        if not url:
-            # No direct installer asset attached to the release (e.g. the
-            # build/upload step was skipped). Fall back to opening the
-            # human-readable release page so the user can grab it manually,
-            # instead of dead-ending on an error toast.
-            release_page = str(info.get("url") or "")
-            if release_page:
-                self.toast(
-                    "No installer attached — opening the release page instead",
-                    "info",
-                )
-                self.open_in_new_tab(QUrl(release_page))
-            else:
-                self.toast(
-                    "Update download isn't available — try again later, or download "
-                    "the installer from the release page",
-                    "error",
-                )
-            return
-
-        from PySide6.QtWidgets import QProgressDialog
-
-        progress = QProgressDialog("Downloading update…", "Cancel", 0, 100, self)
-        progress.setWindowTitle(f"Updating {APP_DISPLAY}")
-        progress.setWindowModality(Qt.WindowModality.WindowModal)
-        progress.setMinimumDuration(0)
-        progress.setValue(0)
-
-        version = str(info.get("version") or "latest")
-        dest = Path(tempfile.gettempdir()) / f"{APP_DISPLAY}-update-{version}.exe"
-        dl = ReleaseDownloader(
-            url,
-            dest,
-            int(info.get("installer_size") or 0),
-            str(info.get("installer_sha256") or ""),
-            parent=self,
-        )
-        self._release_dl = dl
-
-        def _on_progress(received: int, total: int) -> None:
-            if total:
-                progress.setValue(int(received * 100 / total))
-
-        def _on_done(path: str) -> None:
-            progress.close()
-            self._apply_update(path, version)
-
-        def _on_error(msg: str) -> None:
-            progress.close()
-            self.toast(
-                f"Update download failed: {msg} — check your connection and "
-                "try Help > Check for Updates again",
-                "error",
-            )
-
-        dl.progress.connect(_on_progress)
-        dl.finished_ok.connect(_on_done)
-        dl.failed.connect(_on_error)
-        progress.canceled.connect(dl.cancel)
-        dl.cancelled.connect(progress.close)
-        dl.start()
+        del info  # retired: the auto-download flow was replaced by the releases page
+        self._open_releases_page()
 
     def _apply_update(self, installer_path: str, version: str) -> None:
-        """Run the downloaded Inno installer silently, then relaunch.
+        del installer_path, version  # retired: same as above
+        self._open_releases_page()
 
-        The download is LuckyDBrowserSetup-x.y.z.exe (Inno Setup, per-user) —
-        NOT a bare exe to swap over the running one (an earlier version of
-        this function did exactly that, which would have replaced the app
-        with the installer binary). A tiny .bat waits for this process to
-        exit, runs the installer silently, relaunches the app, and deletes
-        itself.
-        """
-        from PySide6.QtWidgets import QMessageBox
-
-        if sys.platform != "win32":
-            # The Inno/.bat install flow is Windows-only — on other platforms
-            # there is no installer to run. (This also avoids AttributeError:
-            # subprocess.CREATE_NO_WINDOW only exists on Windows.)
-            self.toast(
-                "Automatic updates are only supported on Windows — download the "
-                "latest release manually from "
-                "github.com/Dylanchess0320/LuckyD-Browser/releases",
-                "info",
-            )
-            return
-
-        current_exe = Path(sys.executable).resolve()
-        installer = Path(installer_path).resolve()
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".bat", delete=False, encoding="utf-8"
-        ) as script:
-            script.write(
-                "@echo off\r\n"
-                "rem Wait for the browser process to fully exit.\r\n"
-                "timeout /t 2 /nobreak >nul\r\n"
-                f'"{installer}" /VERYSILENT /NORESTART\r\n'
-                f'start "" "{current_exe}"\r\n'
-                'del "%~f0"\r\n'
-            )
-
-        box = QMessageBox(self)
-        box.setWindowTitle("Ready to Update")
-        box.setIcon(QMessageBox.Icon.Information)
-        box.setText(
-            f"Version {version} has been downloaded.\n\n"
-            "Restart now to install it? The browser closes, installs,\n"
-            "and reopens itself — your tabs come back with session restore."
-        )
-        btn_restart = box.addButton("Restart && Update", QMessageBox.ButtonRole.AcceptRole)
-        box.addButton("Later", QMessageBox.ButtonRole.RejectRole)
-        box.setDefaultButton(btn_restart)
-        box.exec()
-        if box.clickedButton() is not btn_restart:
-            return  # "Later" — the installer stays in %TEMP% for a manual run
-        subprocess.Popen(
-            ["cmd", "/c", script.name],
-            # CREATE_NO_WINDOW is Windows-only; getattr keeps this from
-            # raising AttributeError if the flow ever runs elsewhere.
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-            close_fds=True,
-        )
-        self.close()
+    # NOTE: the old in-app updater chain that used to follow here (checker
+    # thread, download dialog, silent install) was removed: Help > Check for
+    # Updates and the toolbar arrow both land on the public GitHub releases
+    # page via _open_releases_page() above.
