@@ -50,6 +50,7 @@ cred_in.txt
 # ── LuckyD Code Specific ──────────────────────────────────────────────
 .luckyd_history
 .luckyd-code/
+.cline-bridge-token
 graphify-out/
 data/
 .model_cache.json

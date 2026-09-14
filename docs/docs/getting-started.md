@@ -8,7 +8,7 @@
 
 ## Install the browser
 
-1. Download [**LuckyDBrowserSetup-9.0.0.exe**](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v8.0.0/LuckyDBrowserSetup-9.0.0.exe)
+1. Download [**LuckyDBrowserSetup-9.0.0.exe**](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.0.0/LuckyDBrowserSetup-9.0.0.exe)
 2. Run it — installs to `%LOCALAPPDATA%\Programs\LuckyDBrowser`
 3. Leave **"Set up free unlimited local AI"** checked to get Ollama + `llama3.2:3b` in one shot
 

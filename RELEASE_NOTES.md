@@ -1,9 +1,9 @@
-# LuckyD Browser v8.0.0 — Release Notes
+# LuckyD Browser v9.0.0 — Release Notes
 
 > **The AI browser that doesn't need an API key.** Free, unlimited, offline AI built in —
 > plus a full coding agent and developer terminal living in your tabs.
 
-**[⬇ Download `LuckyDBrowserSetup-8.0.0.exe`](../../releases)** — Windows 10/11 x64 · per-user install · no admin needed
+**[⬇ Download `LuckyDBrowserSetup-9.0.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.0.0/LuckyDBrowserSetup-9.0.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed
 
 ---
 
@@ -15,7 +15,18 @@
 
 The installer sets up [Ollama](https://ollama.com) and a fast local model (`llama3.2:3b`) for you.
 Your prompts never leave your machine. Prefer the cloud? Bring your own keys for
-Gemini, Groq, DeepSeek, OpenAI, Anthropic, Z.ai, OpenRouter, or log in with Cline.
+Gemini, Groq, DeepSeek, OpenAI, Anthropic, Z.ai, OpenRouter, Cline, or OpenCode (via `OPENCODE_API_KEY`).
+
+## What's new in 9.0.0 — Reliability release
+
+- **Proxy-proof local AI** — Ollama/LM Studio are found even with a proxy/VPN set (localhost bypasses the proxy on both the dashboard check and the chat path).
+- **Honest AI status** — the dashboard pill says exactly what's wrong: `Ollama not running`, `no models pulled`, or the working providers.
+- **OpenCode Zen keyed** — Zen's old keyless $0 tier is gone; it registers with `OPENCODE_API_KEY` and serves its current platform catalog.
+- **DeepSeek Harness boots** — Agent Mesh spawns `dsh web` (the old `--profile web --no-open` invocation is no longer valid).
+- **Ctrl+K palette fixed** — the command palette takes keyboard focus again (Tab trap, fuzzy ranking, Home/End nav).
+- **Readable home page** — shortcut labels get brighter type with text shadow.
+- **Correct video color** — `--force-color-profile=srgb` on the software video path.
+- **1,855 tests passing**, coverage **52% → 81%**, **24 production bugs fixed**.
 
 ## What's inside
 
@@ -42,7 +53,7 @@ no keys shipped in the bundle.
   and a Settings > Apps uninstall entry.
 - The AI bootstrap runs after setup in a small console window (one-time ~2 GB model download).
   Uncheck it if you only want cloud providers — you can run it later from the install folder.
-- Silent install: `LuckyDBrowserSetup-8.0.0.exe /VERYSILENT /NORESTART`
+- Silent install: `LuckyDBrowserSetup-9.0.0.exe /VERYSILENT /NORESTART`
 
 ## Upgrade tips
 
@@ -54,9 +65,9 @@ no keys shipped in the bundle.
 
 | File | Size | SHA-256 |
 |---|---|---|
-| `LuckyDBrowserSetup-8.0.0.exe` | 303,944,825 bytes | `09E6920253C4ED46897C2E286B5705E8945BB6F6D600E9DFF22A760B2ECFBACD` |
+| `LuckyDBrowserSetup-9.0.0.exe` | 303,971,333 bytes | `4F5503801D6F41EB39F0454A4E71E2C747725F79DFA229E108C8FF894095CD9B` |
 
-> Hash computed 2026-09-13 from `browser/installer/output/LuckyDBrowserSetup-8.0.0.exe`. Recompute after any rebuild: `Get-FileHash browser\installer\output\LuckyDBrowserSetup-8.0.0.exe -Algorithm SHA256`.
+> Hash verified 2026-09-14: local `browser/installer/output/LuckyDBrowserSetup-9.0.0.exe` matches the `v9.0.0` GitHub Release asset digest byte-for-byte. Recompute after any rebuild: `Get-FileHash browser\installer\output\LuckyDBrowserSetup-9.0.0.exe -Algorithm SHA256`.
 
 ---
 

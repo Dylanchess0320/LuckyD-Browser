@@ -55,13 +55,13 @@ see [AI Providers](#ai-providers). Your own keys, your choice.
 
 ## 📦 Download & install
 
-**[⬇ Download Latest Release](https://github.com/Dylanchess0320/LuckyD-Browser/releases/latest)** (`LuckyDBrowserSetup-8.0.0.exe`)
+**[⬇ Download Latest Release](https://github.com/Dylanchess0320/LuckyD-Browser/releases/latest)** (`LuckyDBrowserSetup-9.0.0.exe`)
 
 - Windows 10/11 x64 · per-user install · **no admin rights needed**
 - Installs to `%LOCALAPPDATA%\Programs\LuckyDBrowser`
 - Start Menu shortcut, optional desktop icon, **Settings > Apps** uninstall entry
 - Everything is bundled (Chromium runtime + coding-agent backend) — nothing else required
-- Silent install for scripting: `LuckyDBrowserSetup-8.0.0.exe /VERYSILENT /NORESTART`
+- Silent install for scripting: `LuckyDBrowserSetup-9.0.0.exe /VERYSILENT /NORESTART`
 
 ---
 
@@ -71,17 +71,17 @@ see [AI Providers](#ai-providers). Your own keys, your choice.
 |---|---|---|
 | **AI Sidebar** | Chat (Markdown bubbles), per-provider model picker, page-aware Q&A, 📷 visual Q&A, and an **autonomous agent that drives your real tab** — orange highlight ring, step narration, Stop button | `Ctrl+Shift+A` |
 | **Coding Agent HQ** | The full `luckyd-code` workspace as a browser tab: 70+ tools, memory graph, sessions, orchestration, background tasks — auto-starts with the browser | ⚡ button or `Ctrl+Shift+H` |
-| **In-browser Terminal** | Real terminals on Windows ConPTY via xterm.js — the `luckyd-code` agent CLI **and** plain PowerShell/CMD, each tab its own independent session | `Ctrl+`` ` / `Ctrl+Shift+`` ` |
+| **In-browser Terminal** | Real terminals on Windows ConPTY via xterm.js — the `luckyd-code` agent CLI **and** plain PowerShell/CMD, each tab its own independent session | `` Ctrl+` `` / `Ctrl+Shift+`` ` |
 | **Workflows** | Record Control-API actions into named automations and replay them with self-healing element matching | Tools → Workflows… |
 | **Live Dashboard** | New-tab hub: status pills, **Ask LuckyD** box, one-tap tiles, speed dial, time-aware greetings | New tab |
 
 **Harness mode (default ON):** sidebar agent tasks run on the coding-agent backend, which can drive
 your **live, visible tabs** through the Control API — exe brain, browser hands.
 
-> 🚀 **Trust-first stack, shipping in the latest release:** a **Trust dashboard** (`/trust`) with permission scopes,
+> 🛡 **Trust-first stack, shipping in this release:** a **Trust dashboard** (`/trust`) with permission scopes,
 > an approval queue, and an append-only audit log; **WebMCP** for site-exposed agent tools;
 > **scheduled background agents** with a morning digest; Lucky apprentice personality; and an open **Skills marketplace**
-> (install/update/remove/publish). See [CHANGELOG.md](CHANGELOG.md).
+> (install/update/remove/publish). See [Changelog](changelog.md).
 
 <p align="center">
   <img src="docs/screenshots/hq.png" alt="LuckyD Code HQ — the full coding-agent workspace running as a browser tab" width="920"><br>
@@ -116,7 +116,7 @@ The assistant auto-detects providers at launch, in this priority order:
 | 1 — **Local** | **Ollama** | ❌ | Free, unlimited, offline — **auto-installed by setup** |
 | 1 — Local | LM Studio | ❌ | Auto-detected on `127.0.0.1:1234` |
 | 2 | Cline free tier | Cline login | Free-tier models, rate-limited |
-| 3 | **OpenCode Zen** ($0 gateway) | ❌ | Always registered — the no-server, no-key fallback when nothing local is available |
+| 3 | **OpenCode Zen** (keyed gateway) | `OPENCODE_API_KEY` | Registered when the key is set — serves the current platform catalog |
 | 4 | ClinePass | Cline login | Flat-subscription gateway |
 | 4 | Google Gemini | ✔ | Free tier available |
 | 4 | Groq | ✔ | Free tier available |

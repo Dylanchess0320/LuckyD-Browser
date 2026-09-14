@@ -105,6 +105,7 @@ def _upstream_token() -> str:
 def _auth_source() -> str:
     return "api-key" if os.environ.get("CLINEPASS_API_KEY", "").strip() else "session"
 
+
 # Model ids verified live against the gateway (others 404 — dead slugs).
 # Includes the user's current Cline login model (cline/usage-billed) plus
 # the ClinePass flat-subscription ids.

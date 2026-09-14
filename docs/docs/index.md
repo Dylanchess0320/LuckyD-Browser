@@ -5,7 +5,7 @@
 <p class="tagline">The AI browser that runs <em>your</em> models — local, unlimited, offline — plus a full coding agent and real terminals in one window.</p>
 
 <div class="cta-row" markdown>
-[⬇ Download v8.0.0](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v8.0.0/LuckyDBrowserSetup-9.0.0.exe){ .luckyd-btn }
+[⬇ Download v9.0.0](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.0.0/LuckyDBrowserSetup-9.0.0.exe){ .luckyd-btn }
 [Getting started](getting-started.md){ .luckyd-btn-ghost }
 [What's new](release-notes.md){ .luckyd-btn-ghost }
 </div>
@@ -76,7 +76,7 @@
 
 ## Install in 10 seconds
 
-1. Get [**LuckyDBrowserSetup-9.0.0.exe**](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v8.0.0/LuckyDBrowserSetup-9.0.0.exe)
+1. Get [**LuckyDBrowserSetup-9.0.0.exe**](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.0.0/LuckyDBrowserSetup-9.0.0.exe)
 2. Run it — per-user, **no admin**, installs to `%LOCALAPPDATA%\Programs\LuckyDBrowser`
 3. Leave **"Set up free unlimited local AI"** checked → Ollama + `llama3.2:3b` (~2 GB, one time)
 4. `Ctrl+Shift+A` → chat offline. Or bring your own keys (Gemini, Groq, DeepSeek, OpenAI, Anthropic, Z.ai, OpenRouter, Cline, OpenCode)
@@ -87,7 +87,7 @@ Windows 10/11 x64 only. Silent install: `LuckyDBrowserSetup-9.0.0.exe /VERYSILEN
 
 Most "AI browsers" rent you a chatbot behind an account. LuckyD is a **real Chromium daily driver** with a **local assistant**, a **coding-agent HQ**, and **ConPTY terminals** living in your tabs.
 
-|  | LuckyD 6.0 | Comet / Dia | Edge Copilot | Chrome Gemini |
+|  | LuckyD 9.0 | Comet / Dia | Edge Copilot | Chrome Gemini |
 |---|:---:|:---:|:---:|:---:|
 | Free AI with **no account / no key** | ✅ local Ollama | ❌ | ❌ | ❌ |
 | Works **fully offline** | ✅ | ❌ | ❌ | ❌ |
@@ -97,6 +97,19 @@ Most "AI browsers" rent you a chatbot behind an account. LuckyD is a **real Chro
 | Open source MIT · no admin to install | ✅ | ❌ | ❌ | ❌ |
 
 > The others rent you their AI. **LuckyD runs yours.**
+
+## New in 9.0.0 — Reliability release
+
+Proxy-proof local AI, honest AI status, keyed OpenCode Zen, working DeepSeek Harness boot, focused Ctrl+K, readable shortcuts, and correct video color — shipped with the 9.0.0 installer built from this source.
+
+- **🔌 Proxy-proof local AI** — Ollama/LM Studio stay reachable with a proxy/VPN set; localhost bypasses the proxy
+- **🤖 Honest AI status** — the dashboard pill says `Ollama not running` / `no models pulled` instead of a dead `not set up`
+- **🔑 OpenCode Zen keyed** — Zen's old keyless $0 tier is gone; it registers with `OPENCODE_API_KEY` and serves its current platform catalog
+- **🖥 DeepSeek Harness boots** — Agent Mesh spawns `dsh web`
+- **⌨ Ctrl+K overhaul** — Tab focus trap, Enter activates the top result, fuzzy ranking, Home/End navigation, plus keyboard-operable dashboard with ARIA
+- **Official Windows installer** — `LuckyDBrowserSetup-9.0.0.exe`, built on a real Windows runner with Inno Setup 6; per-user, no admin, silent-install flags
+
+*Verified: 1,855 tests passed, coverage 81%, `ruff` clean.*
 
 ## New in 8.0.0 — The Cleanup, phase one
 
@@ -144,6 +157,6 @@ A hardened foundation: every local service now authenticates with HttpOnly sessi
 
 <p align="center">
   <b>MIT © LuckyD</b> · Chromium · Ollama · Qt · xterm.js · pywinpty · PyInstaller · Inno Setup<br>
-  <a href="https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v8.0.0/LuckyDBrowserSetup-9.0.0.exe">Download v8.0.0</a>
+  <a href="https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.0.0/LuckyDBrowserSetup-9.0.0.exe">Download v9.0.0</a>
   · <a href="https://www.youtube.com/@LuckyDYoutube">YouTube</a>
 </p>

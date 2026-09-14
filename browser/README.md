@@ -191,7 +191,7 @@ browser/
 │   ├── icon.png / icon.ico   ← app icons
 │   ├── newtab.html           ← new-tab page (live clock, shortcuts, search)
 │   ├── adblock.txt           ← domain blocklist (1.2k+ domains)
-│   └── userscripts/          ← built-in userscripts (Dark Mode, Video Speed)
+│   └── userscripts/          ← built-in userscripts (YouTube Ad-Block, Video Speed)
 │
 ├── data/                     ← runtime user data (git-ignored)
 │   ├── settings.json         ← persistent settings

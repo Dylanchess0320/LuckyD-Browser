@@ -48,19 +48,37 @@ Most “AI browsers” rent you a chatbot behind an account. LuckyD is a **real 
 
 ## Latest release
 
-**v8.0.0 — The Cleanup, phase one**: skills in the sidebar, smart model routing, and a Neon Night home — on top of the agentic stack, shipped with an official installer:
+**v9.0.0 — Reliability release**: Ollama detection fixed (local AI works even with a proxy/VPN set), honest AI status on the dashboard, OpenCode Zen updated for its keyed platform, DeepSeek Harness boots from Agent Mesh, Ctrl+K palette takes focus again, readable home-page shortcuts, and correct sRGB video — on top of everything from 8.0.0, shipped with an official installer:
 
 | | |
 |---|---|
-| **⬇ Windows installer** | [`LuckyDBrowserSetup-8.0.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases) — built on a real Windows runner with Inno Setup 6. Per-user, no admin, silent-install flags. |
+| **⬇ Windows installer** | [`LuckyDBrowserSetup-9.0.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.0.0/LuckyDBrowserSetup-9.0.0.exe) — built on a real Windows runner with Inno Setup 6. Per-user, no admin, silent-install flags. |
 | **🧩 Skills in sidebar** | The 5 bundled skills (`ai-news-brief`, `chess`, `graphify`, `movie-picker`, `top-picks`) surface as ✨ chips above the AI sidebar input as you type; one tap attaches the skill as chat context. |
 | **🧠 Smart model routing** | Auto mode picks the provider per question — explicit picks always win, non-viable picks fall back gracefully. |
 | **🌙 Neon Night home** | `/dashboard` and the new-tab fallback share one refined typographic system: tabular clock, small-caps labels, system-only font stack, offline-safe, `prefers-reduced-motion` support. |
 | **🏷 Honest provider labels** | Sidebar provider chips say `· free tier` / `· credit-billed ⚠` — no more guessing what a request costs. |
-| **💸 $0 OpenCode Zen fallback** | With no Ollama and no keys, chat falls back to the free Zen gateway instead of an empty-token provider. |
+| **🤖 Honest AI status** | The dashboard pill tells you exactly why AI isn't connected (`Ollama not running`, `no models pulled`) instead of a dead `not set up`. |
+| **🔌 Proxy-proof local AI** | Localhost is never routed through the proxy — Ollama/LM Studio stay reachable with a VPN or corporate proxy set. |
 | **🔔 Quiet update badge** | A silent check runs at startup — when a new release exists, a small toolbar badge lights up. No modal, no interruption. |
 
-> **9.0 in development** — `main` now carries an overnight hardening pass: **1,855 tests passing** (1,389 added overnight), coverage **52% → 81%** with the 60% CI gate enforced, **24 production bugs fixed**, and a UX overhaul (Ctrl+K palette: Tab focus trap, Enter activates the top result, fuzzy ranking, Home/End nav; keyboard-operable dashboard with ARIA; AI sidebar honest provider/error states; clearer error copy), plus Windows CI fixes. No 9.0 installer yet — grab v8.0.0 above, or run from source.
+<details>
+<summary>New in 9.0.0 — Reliability release</summary>
+
+Proxy-proof local AI, honest AI status, keyed OpenCode Zen, working DeepSeek Harness boot, focused Ctrl+K, readable shortcuts, and correct video color.
+
+| | |
+|---|---|
+| **🔌 Proxy-proof local AI** | Ollama/LM Studio stay reachable with a proxy/VPN set — localhost never routes through the proxy, on the dashboard check and the chat path. |
+| **🤖 Honest AI status** | The dashboard pill says exactly what's wrong: `Ollama not running`, `no models pulled`, or the working providers. |
+| **🔑 OpenCode Zen keyed** | Zen's old keyless $0 tier is gone — it now registers with `OPENCODE_API_KEY` and serves its current platform catalog. |
+| **🖥 DeepSeek Harness boots** | Agent Mesh spawns `dsh web` (the old `--profile web --no-open` invocation is no longer valid). |
+| **⌨ Ctrl+K focus** | The command palette takes keyboard focus again, with Tab trap, fuzzy ranking, and Home/End nav. |
+| **🔤 Readable shortcuts** | Home-page shortcut labels get brighter type with text shadow. |
+| **🎨 Correct video color** | `--force-color-profile=srgb` on the software video path (was wrong BT.601 colorimetry). |
+
+*Verified: 1,855 tests passed, coverage 81%, `ruff` clean.*
+
+</details>
 
 <details>
 <summary>New in 8.0.0 — The Cleanup, phase one</summary>
@@ -174,14 +192,14 @@ Also in this lineage: Deep Research swarm (`Ctrl+Shift+R`), Agent Mesh, self-hea
 
 ## Install in 10 seconds
 
-1. Get **[LuckyDBrowserSetup-8.0.0.exe](https://github.com/Dylanchess0320/LuckyD-Browser/releases/latest)**
+1. Get **[LuckyDBrowserSetup-9.0.0.exe](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.0.0/LuckyDBrowserSetup-9.0.0.exe)**
 2. Run it — per-user, **no admin**, installs to `%LOCALAPPDATA%\Programs\LuckyDBrowser`
 3. Leave **“Set up free unlimited local AI”** checked → Ollama + `llama3.2:3b` (~2 GB, one time)
 4. `Ctrl+Shift+A` → chat offline. Or bring your own keys (Gemini, Groq, DeepSeek, OpenAI, Anthropic, Z.ai, OpenRouter, Cline, OpenCode)
 
-No local model yet? The **$0 OpenCode Zen gateway** is the built-in fallback — no local server, no key, the sidebar just works.
+No local model yet? With no Ollama and no keys, chat falls back to the OpenCode Zen gateway (`OPENCODE_API_KEY`) — no local server needed.
 
-Silent: `LuckyDBrowserSetup-8.0.0.exe /VERYSILENT /NORESTART`
+Silent: `LuckyDBrowserSetup-9.0.0.exe /VERYSILENT /NORESTART`
 
 Windows 10/11 x64 only.
 
@@ -222,7 +240,7 @@ browser\run_browser.bat
 
 # Shareable installer (needs Inno Setup 6)
 powershell -NoProfile -ExecutionPolicy Bypass -File browser\installer\build_installer.ps1
-# → browser\installer\output\LuckyDBrowserSetup-8.0.0.exe
+# → browser\installer\output\LuckyDBrowserSetup-9.0.0.exe
 ```
 
 ---

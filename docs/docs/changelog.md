@@ -5,7 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [9.0.0] - 2026-09-14
+
+Reliability release, shipped: **`LuckyDBrowserSetup-9.0.0.exe`** (303,971,333 bytes,
+SHA-256 `4F5503801D6F41EB39F0454A4E71E2C747725F79DFA229E108C8FF894095CD9B`)
+from the [v9.0.0 release](https://github.com/Dylanchess0320/LuckyD-Browser/releases/tag/v9.0.0).
+
+Overnight hardening pass: **1,855 tests passing** (1,389 added), coverage
+**52% → 81%** with the 60% CI gate enforced, and **24 production bugs fixed**
+across `browser_core`, `core`, `tools`, and `memory` — plus the reliability
+fixes below (proxy-proof local AI, honest AI status, keyed OpenCode Zen,
+DeepSeek Harness boot, Ctrl+K focus, readable shortcuts, sRGB video).
+
+**Added**
+
+- **Ctrl+K palette overhaul** — Tab focus trap, Enter activates the top result,
+  fuzzy ranking, Home/End navigation.
+- **Dashboard keyboard + ARIA** — fully keyboard-operable dashboard with ARIA
+  landmarks and labels.
+- **AI sidebar honest states** — provider and error states say what is actually
+  happening; clearer error copy throughout.
+
+**Fixed**
+
+- **Ollama proxy-bypass** — local AI is found even with a proxy/VPN set.
+- **Honest AI status** — the dashboard pill reports `Ollama not running` /
+  `no models pulled` instead of a dead `not set up`.
+- **OpenCode Zen keyed** — Zen's old keyless $0 tier is gone; it registers with
+  `OPENCODE_API_KEY` and serves its current platform catalog.
+- **DeepSeek Harness boot** — Agent Mesh spawns `dsh web`.
+- **Ctrl+K focus, readable shortcuts, sRGB video**.
+- **Windows CI jobs stabilized** for the 9.0 cycle.
+
 ## [Unreleased]
+
+> Post-9.0: DeepSeek mesh/terminal aliases removed (Muse Code kept); AI sidebar
+> Quick Start intentionally blank; `browser/README.md` documents the shipped
+> userscripts (YouTube Ad-Block, Video Speed).
 
 ### Changed
 - **Research page humanized** — "swarm" jargon retired across the Deep Research

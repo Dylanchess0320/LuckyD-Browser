@@ -1,8 +1,8 @@
 # LuckyD Browser — Release Notes
 
-## [9.0.0] — Reliability release
+## [9.0.0] — Reliability release — 2026-09-14
 
-**`LuckyDBrowserSetup-9.0.0.exe`** — Windows 10/11 x64 · per-user install · no admin needed
+**[`LuckyDBrowserSetup-9.0.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.0.0/LuckyDBrowserSetup-9.0.0.exe)** (303,971,333 bytes, SHA-256 `4F5503801D6F41EB39F0454A4E71E2C747725F79DFA229E108C8FF894095CD9B`) — Windows 10/11 x64 · per-user install · no admin needed
 
 - **Ollama detection fixed** — local AI is found even when a proxy/VPN is set
   (localhost no longer routed through the proxy), and the chat path bypasses
@@ -19,7 +19,10 @@
 - **YouTube colors fixed** — `--force-color-profile=srgb` on the software
   video path (was rendering with wrong BT.601 colorimetry).
 
-On top of everything from 8.0.0.
+On top of everything from 8.0.0. Verified: **1,855 tests passing**, coverage
+**52% → 81%**, **24 production bugs fixed**. Installer hash verified
+2026-09-14: the `v9.0.0` Release asset matches the local
+`browser/installer/output/LuckyDBrowserSetup-9.0.0.exe` byte-for-byte.
 
 ---
 

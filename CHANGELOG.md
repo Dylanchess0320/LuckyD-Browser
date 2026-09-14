@@ -5,7 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [9.0.0] — in development
+## [9.0.0] - 2026-09-14
+
+Reliability release, shipped: **`LuckyDBrowserSetup-9.0.0.exe`** (303,971,333 bytes,
+SHA-256 `4F5503801D6F41EB39F0454A4E71E2C747725F79DFA229E108C8FF894095CD9B`)
+from the [v9.0.0 release](https://github.com/Dylanchess0320/LuckyD-Browser/releases/tag/v9.0.0).
 
 Overnight hardening pass on `main`: **1,855 tests passing** (1,389 added
 overnight), coverage **52% → 81%** with the 60% CI gate (`--cov-fail-under=60`)
@@ -21,17 +25,28 @@ now enforced, and **24 production bugs fixed** across `browser_core`, `core`,
   happening; clearer error copy throughout.
 
 ### Fixed
+- **Ollama proxy-bypass** — local AI is found even with a proxy/VPN set
+  (localhost bypasses the proxy on the dashboard check and the chat path).
+- **Honest AI status** — the dashboard pill reports `Ollama not running` /
+  `no models pulled` instead of a dead `not set up`.
+- **OpenCode Zen keyed** — Zen's old keyless $0 tier is gone; it registers with
+  `OPENCODE_API_KEY` and serves its current platform catalog.
+- **DeepSeek Harness boot** — Agent Mesh spawns `dsh web`.
+- **Ctrl+K focus, readable shortcuts, sRGB video** — palette takes focus again,
+  home-page labels are readable, software video renders with correct colorimetry.
 - **24 production bugs** — across `browser_core`, `core`, `tools`, and `memory`.
 - **Windows CI fixes** — Windows CI jobs stabilized for the 9.0 cycle.
 
 ## [Unreleased]
 
+> Post-9.0: `browser/README.md` documents the shipped userscripts
+> (YouTube Ad-Block, Video Speed); the ruff-format gate is green.
+> DeepSeek mesh/terminal aliases were removed from the product (Muse Code kept);
+> the AI sidebar Quick Start is intentionally blank.
+
 ### Added
-- **DeepSeek terminal aliases** — `deepseek` / `dsh` / `mesh-deepseek` shells in the
-  Agent Mesh terminal, all booting the `web` profile like `mesh-dsh`
-  (`browser/browser_core/terminal_server.py`, `terminal_page.py`).
 - **`opencode` restored to the coding-agent provider stack** — `core/providers.py`
-  keeps the `$0` OpenCode Zen gateway (`OPENCODE_API_KEY` optional) so the CLI,
+  keeps the keyed OpenCode Zen gateway (`OPENCODE_API_KEY`) so the CLI,
   docs, and `providers_config.json` agree again.
 - **Research page humanized** — "swarm" jargon retired across the Deep Research
   page: `Research depth` / `Search backend` labels with friendlier option text,
@@ -40,6 +55,7 @@ now enforced, and **24 production bugs fixed** across `browser_core`, `core`,
   runs`, `Live activity`, `Past research`, a `LuckyD Deep Research` page title,
   and de-swarmed JS messages (`browser/browser_core/research_page.py`).
 - **Release notes carry the installer hash** — `RELEASE_NOTES.md` records the
+  SHA-256 + size of the shipped 9.0.0 installer.
 
 ### Changed
 - **Ollama defaults corrected** — `core/providers.py` now defaults to
@@ -53,12 +69,12 @@ now enforced, and **24 production bugs fixed** across `browser_core`, `core`,
 - **CI is a hard gate again** — `mypy` runs without `|| true` /
   `continue-on-error`, and pytest enforces `--cov-fail-under=60`.
 - **Release notes carry the installer hash** — `RELEASE_NOTES.md` records the
-  SHA-256 + size of `LuckyDBrowserSetup-8.0.0.exe`.
+  SHA-256 + size of `LuckyDBrowserSetup-9.0.0.exe`.
 
 ### Fixed
-- **Version strings re-unified to 8.0.0** — `main.py` help/`--version` text and
+- **Version strings re-unified to 9.0.0** — `main.py` help/`--version` text and
   `build_nuitka.py` no longer claim `v3.6.0`; the Nuitka sidecar is
-  `luckyd-code-v8.0.exe`.
+  `luckyd-code-v9.0.exe`.
 - **Strict-typing cleanup** — `core/providers.py`, `tools/base.py`, and
   `model_resolver.py` pass `mypy --ignore-missing-imports` (typed
   `ProviderDefaults`, no `Any`-leaking cache helpers).
