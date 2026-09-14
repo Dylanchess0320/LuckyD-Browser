@@ -544,11 +544,8 @@ class AiSidebar(QDockWidget):
                     f"<div style='color:{muted};padding:6px 2px;line-height:1.5'>"
                     f"<b style='color:{text_c};font-size:14px'>🍀 {headline}</b><br>"
                     f"<span>Ask about this page, or give the agent below a task — it drives the current tab while you watch.</span><br>"
+                    # Dylan 2026-09-14: Quick Start was outdated — left blank.
                     f"<div style='margin:6px 0;padding:8px 10px;background:rgba(255,255,255,.04);border:1px solid {_tok('border')};border-radius:10px'>"
-                    f"<b style='color:{accent}'>Quick start:</b><br>"
-                    f"• <b>Summarize</b> or <b>📷 Look at page</b> — one-tap page help<br>"
-                    f"• Type a question below — tick <b>Page context</b> to include this page<br>"
-                    f"• Agent box below: “Search this site for X, report back”<br>"
                     f"</div>"
                     f"<span style='font-size:11px'>AI: {html.escape(providers)}</span><br>"
                     f"<span style='font-size:11px;color:{accent}'>{html.escape(free_hint)}</span><br>"

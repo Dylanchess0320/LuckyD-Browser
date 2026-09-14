@@ -173,32 +173,27 @@ def test_antigravity_cli_integration(monkeypatch, tmp_path: Path) -> None:
     assert len(cmd) == 1 and cmd[0].lower().endswith("agy.exe")
 
 
-def test_dsh_shell_boots_web_profile(monkeypatch, tmp_path: Path) -> None:
-    """mesh-dsh must spawn `dsh web`, never a bare `dsh`.
+def test_deepseek_removed_from_mesh(monkeypatch, tmp_path: Path) -> None:
+    """DeepSeek was removed from the Agent Mesh (Dylan, 2026-09-14).
 
-    Modern dsh (0.1.x) launches its web UI with the `web` subcommand; a bare
-    invocation exits immediately, which showed up as an instantly dead
-    terminal pane when the DeepSeek chip was clicked.
+    The dock chip and the shell allowlist must NOT offer mesh-dsh,
+    mesh-deepseek, deepseek, or dsh. Native Muse Code is unchanged.
     """
-    from browser.browser_core.terminal_server import _mesh_shell_command
+    from browser.browser_core.terminal_page import _MESH_AGENTS, _SHELL_LABELS
+    from browser.browser_core.terminal_server import MESH_SHELLS, SHELLS
 
-    mock_dsh = tmp_path / "dsh.cmd"
-    mock_dsh.touch()
-    monkeypatch.setattr(
-        "browser.browser_core.terminal_server._find_mesh_exe",
-        lambda exe: str(mock_dsh) if exe == "dsh" else None,
-    )
-    cmd = _mesh_shell_command("mesh-dsh")
-    assert cmd[0].lower().endswith("dsh.cmd")
-    assert cmd[1:] == ["web"]
+    for shell in ("mesh-dsh", "mesh-deepseek", "deepseek", "dsh"):
+        assert shell not in SHELLS
+        assert shell not in MESH_SHELLS
+        assert shell not in _MESH_AGENTS
+        assert shell not in _SHELL_LABELS
 
 
 def test_hermes_shell_boots_chat(monkeypatch, tmp_path: Path) -> None:
     """mesh-hermes must spawn `hermes chat`, never a bare `hermes`.
 
     A bare hermes exits immediately on a closed stdin, which showed up as
-    an instantly dead terminal pane when the Hermes chip was clicked
-    (same class of bug as mesh-dsh before it pinned the web profile).
+    an instantly dead terminal pane when the Hermes chip was clicked.
     """
     from browser.browser_core.terminal_page import _MESH_AGENTS, _SHELL_LABELS
     from browser.browser_core.terminal_server import SHELLS, _mesh_shell_command

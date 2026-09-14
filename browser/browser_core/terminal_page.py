@@ -28,10 +28,6 @@ _SHELL_LABELS = {
     "agy": "Antigravity",
     "antigravity": "Antigravity",
     "mesh-hermes": "Hermes",
-    "mesh-dsh": "DeepSeek",
-    "mesh-deepseek": "DeepSeek",
-    "deepseek": "DeepSeek",
-    "dsh": "DeepSeek",
     "mesh-grok": "Grok",
     "grok": "Grok",
     "mesh-muse": "Muse Code",
@@ -41,6 +37,7 @@ _SHELL_LABELS = {
 
 # Agent Mesh dock — the CLIs wired in via terminal_server.MESH_SHELLS, shown
 # as an agent picker in the terminal tab. (shell, label, emoji, accent, blurb)
+# Dylan 2026-09-14: DeepSeek (mesh-dsh) and Muse Spark removed — Muse Code stays.
 _MESH_AGENTS = {
     "mesh-agy": ("Antigravity", "🛸", "#38bdf8", "Google DeepMind · AGY"),
     "mesh-claude": ("Claude", "🟠", "#d97706", "Anthropic · architect"),
@@ -50,7 +47,6 @@ _MESH_AGENTS = {
     "mesh-opencode": ("OpenCode", "🔵", "#3b82f6", "Anomaly · implementer"),
     "mesh-cline": ("Cline", "🟡", "#eab308", "autonomous builder"),
     "mesh-openclaw": ("OpenClaw", "🦞", "#ef4444", "100+ skills"),
-    "mesh-dsh": ("DeepSeek", "🐋", "#06b6d4", "DeepSeek harness"),
     "mesh-hermes": ("Hermes", "⚕", "#fb923c", "Nous Research · self-improving"),
     "mesh-pi": ("Pi", "⚪", "#94a3b8", "minimal toolkit"),
     "mesh-grok": ("Grok", "𝕏", "#f1f5f9", "xAI · builder"),

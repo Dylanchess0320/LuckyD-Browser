@@ -300,6 +300,8 @@ def _agent2_command(cli2_path: str = "") -> list[str]:
 # first-class terminal shells — each spawns the real agent CLI on its own
 # ConPTY. Availability is probed with shutil.which() so agents that aren't
 # installed simply don't render in the terminal page's dock.
+# Dylan 2026-09-14: DeepSeek (mesh-dsh/mesh-deepseek/deepseek/dsh) and
+# Muse Spark removed from the mesh — Muse Code (mesh-muse/muse) stays.
 SHELLS = (
     "agent",
     "agent2",
@@ -314,10 +316,6 @@ SHELLS = (
     "mesh-opencode",
     "mesh-cline",
     "mesh-openclaw",
-    "mesh-dsh",
-    "mesh-deepseek",
-    "deepseek",
-    "dsh",
     "mesh-hermes",
     "mesh-pi",
     "mesh-grok",
@@ -341,10 +339,6 @@ MESH_SHELLS = {
     "mesh-opencode": "opencode",
     "mesh-cline": "cline",
     "mesh-openclaw": "openclaw",
-    "mesh-dsh": "dsh",
-    "mesh-deepseek": "dsh",
-    "deepseek": "dsh",
-    "dsh": "dsh",
     "mesh-hermes": "hermes",
     "mesh-pi": "pi",
     "mesh-grok": "grok",
@@ -352,18 +346,10 @@ MESH_SHELLS = {
 }
 
 # Extra default args per mesh shell (appended after the resolved executable).
-# dsh (DeepSeek Harness 0.1.x) launches its web UI with `dsh web`. The old
-# `--profile web` flag form this used is no longer the launch command, and
-# `--no-open` was never a real dsh flag — the pane died on it. (A bare `dsh`
-# with no args exits immediately, which is why args are needed at all.)
-# hermes likewise needs its explicit `chat` subcommand — a bare `hermes`
+# hermes needs its explicit `chat` subcommand — a bare `hermes`
 # exits immediately on a closed stdin, which showed up as an instantly dead
-# terminal pane (same class of bug as the dsh one above).
+# terminal pane.
 MESH_SHELL_ARGS: dict[str, list[str]] = {
-    "mesh-dsh": ["web"],
-    "mesh-deepseek": ["web"],
-    "deepseek": ["web"],
-    "dsh": ["web"],
     "mesh-hermes": ["chat"],
 }
 

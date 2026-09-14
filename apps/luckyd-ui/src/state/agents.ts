@@ -29,6 +29,7 @@ export interface MeshPing {
 export const BRIDGE_URL = 'http://127.0.0.1:9885';
 
 // All allowlisted shells from browser_core/terminal_server.py
+// Dylan 2026-09-14: DeepSeek + Muse Spark removed — Muse Code stays.
 export const MESH_AGENTS: { id: string; label: string; emoji: string }[] = [
   { id: 'mesh-agy', label: 'Antigravity', emoji: '🛸' },
   { id: 'mesh-claude', label: 'Claude', emoji: '🟠' },
@@ -38,7 +39,6 @@ export const MESH_AGENTS: { id: string; label: string; emoji: string }[] = [
   { id: 'mesh-opencode', label: 'OpenCode', emoji: '🔵' },
   { id: 'mesh-cline', label: 'Cline', emoji: '🟡' },
   { id: 'mesh-openclaw', label: 'OpenClaw', emoji: '🦞' },
-  { id: 'mesh-dsh', label: 'DeepSeek', emoji: '🐋' },
   { id: 'mesh-hermes', label: 'Hermes', emoji: '⚕' },
   { id: 'mesh-pi', label: 'Pi', emoji: '⚪' },
   { id: 'mesh-grok', label: 'Grok', emoji: '𝕏' },
