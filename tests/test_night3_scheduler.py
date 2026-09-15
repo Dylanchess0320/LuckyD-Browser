@@ -210,11 +210,14 @@ def test_compute_next_run_every():
 
 def test_compute_next_run_daily_before_and_after():
     sched = _sched(kind="daily", daily_at="18:00")
-    morning = datetime(2026, 9, 13, 8, 0, tzinfo=timezone.utc)
-    evening = datetime(2026, 9, 13, 20, 0, tzinfo=timezone.utc)
+    # Build the reference times in the *local* timezone: daily_at means local
+    # wall-clock time, so the test must not assume the machine runs on UTC.
+    local_tz = datetime.now().astimezone().tzinfo
+    morning = datetime(2026, 9, 13, 8, 0, tzinfo=local_tz)
+    evening = datetime(2026, 9, 13, 20, 0, tzinfo=local_tz)
     nxt = compute_next_run(sched, morning)
     assert (nxt - morning) < timedelta(days=1)
-    assert nxt.replace(tzinfo=timezone.utc).astimezone().hour == 18
+    assert nxt.hour == 18
     nxt2 = compute_next_run(sched, evening)
     assert (nxt2 - evening) < timedelta(days=1, hours=1)
     assert (nxt2 - evening) > timedelta(hours=12)
