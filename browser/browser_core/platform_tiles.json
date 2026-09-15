@@ -8,7 +8,7 @@
       "url": "http://127.0.0.1:9777/research",
       "health_url": "http://127.0.0.1:9777/research/status",
       "autostart": false,
-      "enabled": true,
+      "enabled": false,
       "extra_class": "research"
     },
     {
