@@ -60,11 +60,16 @@ Most “AI browsers” rent you a chatbot behind an account. LuckyD is a **real 
 
 ## Latest release
 
-**v9.0.0 — Reliability release**: Ollama detection fixed (local AI works even with a proxy/VPN set), honest AI status on the dashboard, OpenCode Zen updated for its keyed platform, DeepSeek Harness boots from Agent Mesh, Ctrl+K palette takes focus again, readable home-page shortcuts, and correct sRGB video — on top of everything from 8.0.0, shipped with an official installer:
+**v9.3.0** — 9.1's look, with the good stuff from the messy days folded back in, plus a fixed installer:
 
 | | |
 |---|---|
 | **⬇ Windows installer** | [`LuckyDBrowserSetup-9.3.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.3.0/LuckyDBrowserSetup-9.3.0.exe) — built on a real Windows runner with Inno Setup 6. Per-user, no admin, silent-install flags. |
+| **📋 AI provider list** | `lucky-code providers`, `/providers` in the REPL, and `GET /api/providers` — all 13 providers with live status (ready / needs key), cost tier (free / paid), and the active provider marked. No more guessing which keys are set. |
+| **📡 Offline-proof model resolver** | The model catalog falls back to last-known-good models when the fetch fails (offline, no key, revoked key) instead of silently dropping to hardcoded defaults. |
+| **💰 Honest cost tracking** | DeepSeek v4 at real rates; every free-tier route correctly reports $0. |
+| **🧩 Dashboard fix** | The Deep Research tile no longer renders twice. |
+| **🔧 Installer fix** | The frozen app bundles pydantic/pydantic_core correctly — no more startup crash. |
 | **🧩 Skills in sidebar** | The 5 bundled skills (`ai-news-brief`, `chess`, `graphify`, `movie-picker`, `top-picks`) surface as ✨ chips above the AI sidebar input as you type; one tap attaches the skill as chat context. |
 | **🧠 Smart model routing** | Auto mode picks the provider per question — explicit picks always win, non-viable picks fall back gracefully. |
 | **🌙 Neon Night home** | `/dashboard` and the new-tab fallback share one refined typographic system: tabular clock, small-caps labels, system-only font stack, offline-safe, `prefers-reduced-motion` support. |
@@ -72,6 +77,19 @@ Most “AI browsers” rent you a chatbot behind an account. LuckyD is a **real 
 | **🤖 Honest AI status** | The dashboard pill tells you exactly why AI isn't connected (`Ollama not running`, `no models pulled`) instead of a dead `not set up`. |
 | **🔌 Proxy-proof local AI** | Localhost is never routed through the proxy — Ollama/LM Studio stay reachable with a VPN or corporate proxy set. |
 | **🔔 Quiet update badge** | A silent check runs at startup — when a new release exists, a small toolbar badge lights up. No modal, no interruption. |
+
+<details>
+<summary>New in 9.1.0 — Agent terminals upgrade</summary>
+
+Gemini CLI and Cline CLI first-class in the agent terminals, and every free model in `/model`.
+
+| | |
+|---|---|
+| **✨ Gemini CLI first-class** | `gemini` / `mesh-gemini` shells in both Agent 1 (v3.6) and Agent 2 (v2.2) terminals. |
+| **🖥 Cline CLI first-class** | `cline` shell alongside `mesh-cline`. |
+| **🆓 Every free model in /model** | Gemini free tier, Cline free tier (12 models), new ClinePass models (glm-5.3, glm-5.2, qwen3.8-max). |
+
+</details>
 
 <details>
 <summary>New in 9.0.0 — Reliability release</summary>
