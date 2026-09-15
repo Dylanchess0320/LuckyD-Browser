@@ -13,6 +13,22 @@
 
 from PyInstaller.utils.hooks import collect_all
 
+# pydantic v2 loads most of itself lazily (PEP 562 __getattr__ in
+# pydantic/__init__.py via _migration.py), so modulegraph never sees the real
+# import graph — and the compiled Rust core (pydantic_core._pydantic_core.pyd)
+# gets dropped from the frozen exe. web_server.py pulls in FastAPI, which
+# needs pydantic, so the headless backend would die the same way. Collect
+# both packages wholesale, same as the Rust .pyd packages below.
+_pd_datas, _pd_binaries, _pd_hidden = [], [], []
+for _pkg in ('pydantic', 'pydantic_core'):
+    try:
+        _d, _b, _h = collect_all(_pkg)
+        _pd_datas += _d
+        _pd_binaries += _b
+        _pd_hidden += _h
+    except Exception:
+        pass
+
 # LangGraph's transitive chain (langchain_core -> uuid_utils Rust .pyd,
 # langsmith, xxhash, ...) is imported lazily by the Deep Research swarm. The
 # frozen importer needs the whole tree bundled, otherwise the swarm dies with
@@ -56,7 +72,7 @@ block_cipher = None
 a = Analysis(
     ['web_server.py'],
     pathex=[],
-    binaries=_swarm_binaries,
+    binaries=_swarm_binaries + _pd_binaries,
     datas=[
         ('core', 'core'),
         ('llm', 'llm'),
@@ -74,7 +90,7 @@ a = Analysis(
         ('browser/browser_core/cline_session.py', '.'),
         # Never embed a developer's real .env/API keys in a distributable harness.
         ('.env.example', '.env.example'),
-    ] + _swarm_datas,
+    ] + _swarm_datas + _pd_datas,
     hiddenimports=[
         'httpx', 'httpcore', 'h11', 'certifi', 'idna', 'sniffio', 'anyio',
         'cline_session',
@@ -90,7 +106,7 @@ a = Analysis(
         'features.deep_research.models.luckyd',
         'features.deep_research.models.mock',
         'features.deep_research.models.gemini',
-    ] + _swarm_hidden,
+    ] + _swarm_hidden + _pd_hidden,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

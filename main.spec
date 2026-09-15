@@ -16,12 +16,29 @@
 # luckyd-cli.exe is what browser/browser_core/terminal_server.py's "agent"
 # shell actually spawns for the Terminal tab.
 
+from PyInstaller.utils.hooks import collect_all
+
+# pydantic v2 loads most of itself lazily (PEP 562 __getattr__ in
+# pydantic/__init__.py via _migration.py), so modulegraph never sees the real
+# import graph — and the compiled Rust core (pydantic_core._pydantic_core.pyd)
+# gets dropped from the frozen exe. The CLI bundles features/ (deep research
+# schemas use pydantic), so collect both packages wholesale.
+_pd_datas, _pd_binaries, _pd_hidden = [], [], []
+for _pkg in ('pydantic', 'pydantic_core'):
+    try:
+        _d, _b, _h = collect_all(_pkg)
+        _pd_datas += _d
+        _pd_binaries += _b
+        _pd_hidden += _h
+    except Exception:
+        pass
+
 block_cipher = None
 
 a = Analysis(
     ['main.py'],
     pathex=[],
-    binaries=[],
+    binaries=_pd_binaries,
     datas=[
         ('core', 'core'),
         ('llm', 'llm'),
@@ -39,7 +56,7 @@ a = Analysis(
         ('browser/browser_core/cline_session.py', '.'),
         # Never embed a developer's real .env/API keys in a distributable CLI.
         ('.env.example', '.env.example'),
-    ],
+    ] + _pd_datas,
     hiddenimports=[
         'httpx', 'httpcore', 'h11', 'certifi', 'idna', 'sniffio', 'anyio',
         'cline_session',
@@ -52,7 +69,7 @@ a = Analysis(
         'rich', 'rich.console', 'rich.live', 'rich.markdown', 'rich.spinner',
         'rich.table', 'rich.text', 'rich.theme', 'rich.status', 'rich.prompt',
         'rich._spinners',
-    ],
+    ] + _pd_hidden,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

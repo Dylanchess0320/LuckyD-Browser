@@ -11,6 +11,22 @@ from PyInstaller.utils.hooks import collect_all, collect_submodules
 wp_datas, wp_binaries, wp_hiddenimports = collect_all('winpty')
 ws_hiddenimports = collect_submodules('websockets')
 
+# pydantic v2 loads most of itself lazily (PEP 562 __getattr__ in
+# pydantic/__init__.py via _migration.py), so modulegraph never sees the real
+# import graph — and the compiled Rust core (pydantic_core._pydantic_core.pyd)
+# gets dropped from the frozen app. The browser then dies on startup with
+# "ModuleNotFoundError: No module named 'pydantic_core._pydantic_core'".
+# Collect both packages wholesale, same as the Rust .pyd packages below.
+_pd_datas, _pd_binaries, _pd_hidden = [], [], []
+for _pkg in ('pydantic', 'pydantic_core'):
+    try:
+        _d, _b, _h = collect_all(_pkg)
+        _pd_datas += _d
+        _pd_binaries += _b
+        _pd_hidden += _h
+    except Exception:
+        pass
+
 # The Deep Research swarm imports langgraph lazily; its transitive chain
 # (langchain_core -> uuid_utils Rust .pyd, langsmith, xxhash, ...) must be
 # bundled wholesale or the frozen swarm dies with "module
@@ -54,7 +70,7 @@ for _pkg in (
 a = Analysis(
     ['main.py'],
     pathex=[],
-    binaries=wp_binaries + _swarm_binaries,
+    binaries=wp_binaries + _swarm_binaries + _pd_binaries,
     # Bundle the coding-agent backend beside LuckyDBrowser.exe so the frozen
     # app can auto-start the harness anywhere (portable or installed) —
     # browser_core.harness_bridge._find_exe() checks the exe's own folder.
@@ -97,11 +113,11 @@ a = Analysis(
             # the exe's own folder and made the spawn die with winerror 267;
             # ai.js falls back to the app-injected GOOGLE_API_KEY, so no
             # secret ships in here.
-            ('studio', 'studio')] + wp_datas + _swarm_datas,
+            ('studio', 'studio')] + wp_datas + _swarm_datas + _pd_datas,
     # websockets + winpty are imported lazily (CDP driver / screenshots /
     # terminal bridge) - pin them. assets/ ships recursively, including
     # assets/terminal/ (the vendored xterm.js page the /terminal tab needs).
-    hiddenimports=ws_hiddenimports + wp_hiddenimports + _swarm_hidden + [
+    hiddenimports=ws_hiddenimports + wp_hiddenimports + _swarm_hidden + _pd_hidden + [
         'features.deep_research',
         'features.deep_research.models.openai_compat',
         'features.deep_research.models.router',
