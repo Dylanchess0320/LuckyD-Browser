@@ -18,11 +18,17 @@
 
 from PyInstaller.utils.hooks import collect_all
 
-# pydantic v2 loads most of itself lazily (PEP 562 __getattr__ in
-# pydantic/__init__.py via _migration.py), so modulegraph never sees the real
-# import graph — and the compiled Rust core (pydantic_core._pydantic_core.pyd)
-# gets dropped from the frozen exe. The CLI bundles features/ (deep research
-# schemas use pydantic), so collect both packages wholesale.
+# pydantic v2 is imported at module level by features/deep_research (schemas,
+# models, workers) which the frozen interactive CLI pulls in via
+# main.py -> agent -> features. It must be INSTALLED in the
+# build env (see browser/requirements.txt); when it isn't, the frozen app
+# dies at launch with "ModuleNotFoundError: No module named 'pydantic...".
+# Even when installed, pydantic v2 resolves most of its own submodules lazily
+# (PEP 562 __getattr__ + import_module in pydantic/__init__.py: BaseModel,
+# Field, _internal, ...), which is invisible to modulegraph -- so collect the
+# whole package explicitly. Same for pydantic_core: its compiled Rust
+# extension (_pydantic_core.pyd) must be bundled or every BaseModel
+# definition fails. Without these the browser dies on startup.
 _pd_datas, _pd_binaries, _pd_hidden = [], [], []
 for _pkg in ('pydantic', 'pydantic_core'):
     try:

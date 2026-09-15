@@ -11,12 +11,17 @@ from PyInstaller.utils.hooks import collect_all, collect_submodules
 wp_datas, wp_binaries, wp_hiddenimports = collect_all('winpty')
 ws_hiddenimports = collect_submodules('websockets')
 
-# pydantic v2 loads most of itself lazily (PEP 562 __getattr__ in
-# pydantic/__init__.py via _migration.py), so modulegraph never sees the real
-# import graph — and the compiled Rust core (pydantic_core._pydantic_core.pyd)
-# gets dropped from the frozen app. The browser then dies on startup with
-# "ModuleNotFoundError: No module named 'pydantic_core._pydantic_core'".
-# Collect both packages wholesale, same as the Rust .pyd packages below.
+# pydantic v2 is imported at module level by features/deep_research (schemas,
+# models, workers) which the frozen browser pulls in at startup via
+# browser_core.research_page -> control_server. It must be INSTALLED in the
+# build env (see browser/requirements.txt); when it isn't, the frozen app
+# dies at launch with "ModuleNotFoundError: No module named 'pydantic...".
+# Even when installed, pydantic v2 resolves most of its own submodules lazily
+# (PEP 562 __getattr__ + import_module in pydantic/__init__.py: BaseModel,
+# Field, _internal, ...), which is invisible to modulegraph -- so collect the
+# whole package explicitly. Same for pydantic_core: its compiled Rust
+# extension (_pydantic_core.pyd) must be bundled or every BaseModel
+# definition fails. Without these the browser dies on startup.
 _pd_datas, _pd_binaries, _pd_hidden = [], [], []
 for _pkg in ('pydantic', 'pydantic_core'):
     try:

@@ -2,3 +2,4 @@ PySide6>=6.6
 httpx>=0.27
 websockets>=12
 pywinpty>=2.0; sys_platform == "win32"  # ConPTY for the in-browser terminal
+pydantic==2.13.5  # required at runtime: features/deep_research imports it at module level (startup path)
