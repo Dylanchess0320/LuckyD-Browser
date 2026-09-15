@@ -21,6 +21,12 @@
 - **Agent Mesh 1.0.1** — Gemini CLI retired from the mesh (it migrated to Antigravity);
   use the `agy` Antigravity agent for plan/build stages.
 
+### Verify
+
+| File | Size | SHA-256 |
+|---|---|---|
+| `LuckyDBrowserSetup-9.2.0.exe` | 332,455,396 bytes | `70D3783DF10A9590B9C193F97DB8FBBA450D8797E468995E8BB8C1DC92294166` |
+
 On top of everything from 9.1.0 below.
 
 ---
