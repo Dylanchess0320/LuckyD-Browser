@@ -1,6 +1,14 @@
 # LuckyD Browser — Release Notes
 
-## [9.1.0] — Agent terminals upgrade — 2026-09-15
+## [9.3.0] — Re-release of 9.1.0 — 2026-09-15
+
+**[`LuckyDBrowserSetup-9.3.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.3.0/LuckyDBrowserSetup-9.3.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed
+
+Identical product to 9.1.0 (below) — only the version number changed.
+
+---
+
+## [9.1.0] — Agent terminals upgrade — 2026-09-15 (archive)
 
 **[`LuckyDBrowserSetup-9.1.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.1.0/LuckyDBrowserSetup-9.1.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed
 

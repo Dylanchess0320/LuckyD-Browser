@@ -146,7 +146,7 @@ def test_no_stale_5x_for_current_release():
 def test_current_release_docs_say_6x():
     for page in ("index.md", "getting-started.md", "release-notes.md"):
         text = (DOCS_SITE / page).read_text(encoding="utf-8")
-        assert "9.1.0" in text, f"docs/docs/{page} never mentions 9.1.0"
+        assert "9.3.0" in text, f"docs/docs/{page} never mentions 9.3.0"
 
 
 # ---------------------------------------------------------------------------

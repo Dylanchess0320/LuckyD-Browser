@@ -1,4 +1,26 @@
-# LuckyD Browser v9.1.0 — Release Notes
+# LuckyD Browser v9.3.0 — Release Notes
+
+> **The AI browser that doesn't need an API key.** Free, unlimited, offline AI built in —
+> plus a full coding agent and developer terminal living in your tabs.
+
+**[⬇ Download `LuckyDBrowserSetup-9.3.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.3.0/LuckyDBrowserSetup-9.3.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed
+
+---
+
+## What's new in 9.3.0
+
+9.3.0 is the 9.1.0 product re-released under a new version number —
+identical features, only the version strings changed:
+
+- **Gemini CLI first-class** — `gemini` / `mesh-gemini` shells in both Agent 1 (v3.6) and Agent 2 (v2.2) terminals.
+- **Cline CLI first-class** — `cline` shell alongside `mesh-cline`.
+- **Every free model in /model** — Gemini free tier, Cline free tier (12 models), new ClinePass models (glm-5.3, glm-5.2, qwen3.8-max).
+
+On top of everything from 9.0.0 below.
+
+---
+
+# LuckyD Browser v9.1.0 — Release Notes (archive)
 
 > **The AI browser that doesn't need an API key.** Free, unlimited, offline AI built in —
 > plus a full coding agent and developer terminal living in your tabs.

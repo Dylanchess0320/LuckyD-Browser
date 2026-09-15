@@ -181,3 +181,4 @@ archive/*.txt
 external/
 
 browser/installer/compile_log.txt
+coverage.json
