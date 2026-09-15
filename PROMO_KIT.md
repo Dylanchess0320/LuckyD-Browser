@@ -1,4 +1,4 @@
-# 🚀 LuckyD Browser — Promo Kit
+﻿# 🚀 LuckyD Browser — Promo Kit
 
 Everything ready to paste. Assets: `docs/screenshots/dashboard-v2.png` (hero), `docs/screenshots/hq.png`.
 Repo: https://github.com/Dylanchess0320/LuckyD-Browser
@@ -136,3 +136,4 @@ feature list. Launch Tuesday–Thursday.
 
 **Reality check:** virality is probability × attempts. Every asset here maximizes
 the probability — the attempts are yours. Ship them. 🚀
+

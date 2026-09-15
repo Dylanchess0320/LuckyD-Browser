@@ -111,12 +111,17 @@
       "env_key": "GOOGLE_API_KEY",
       "free_models": [
         "gemma-4-26b-a4b-it",
-        "gemma-4-31b-it"
+        "gemma-4-31b-it",
+        "gemini-2.5-flash",
+        "gemini-2.5-flash-lite",
+        "gemini-2.0-flash",
+        "gemini-3.5-flash-lite",
+        "gemini-3.5-flash"
       ],
-      "recommended": "gemma-4-31b-it",
+      "recommended": "gemini-2.5-flash",
       "requires_key": true,
       "free_tier": true,
-      "note": "Gemini flash models are free-tier-quota (rate limited), not $0/token; gemma-4 entries are $0."
+      "note": "Gemini flash models are free-tier-quota (rate limited: 250 req/day API-key Flash-only, 1000 req/day Google login); gemma-4 entries are $0."
     },
     "groq": {
       "name": "Groq",
@@ -171,6 +176,39 @@
       "requires_key": true,
       "free_tier": true,
       "note": "Free tier available, check current status"
+    },
+    "clinepass": {
+      "name": "ClinePass",
+      "base_url": "https://api.cline.bot/api/v1",
+      "env_key": "CLINEPASS_API_KEY",
+      "free_models": [],
+      "recommended": "cline-pass/kimi-k3",
+      "requires_key": false,
+      "free_tier": false,
+      "note": "Flat $9.99/mo subscription — 2-5x usage on open coding models; works with $0 credit balance. Reuses logged-in Cline CLI session when no key set."
+    },
+    "cline-usage": {
+      "name": "Cline (usage)",
+      "base_url": "https://api.cline.bot/api/v1",
+      "env_key": "CLINEPASS_API_KEY",
+      "free_models": [
+        "minimax/minimax-m2.5",
+        "deepseek/deepseek-chat",
+        "deepseek/deepseek-r1",
+        "meta-llama/llama-3.2-3b-instruct",
+        "google/gemini-2.0-flash",
+        "qwen/qwen3-8b",
+        "kwaipilot/kat-coder-pro",
+        "z-ai/glm-5",
+        "deepseek/deepseek-v4-flash",
+        "z-ai/glm-5.3-flash",
+        "poolside/laguna-s-2.1:free",
+        "cline-free/longcat-2.0"
+      ],
+      "recommended": "minimax/minimax-m2.5",
+      "requires_key": false,
+      "free_tier": true,
+      "note": "Rotating FREE promotions in Cline CLI/IDE (Cline account, quota-limited, rate-limited). Same auth as ClinePass."
     }
   },
   "default_provider": "opencode",
@@ -178,6 +216,7 @@
     "ollama",
     "opencode",
     "openrouter",
+    "cline-usage",
     "google",
     "zai",
     "groq"

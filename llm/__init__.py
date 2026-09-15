@@ -44,7 +44,11 @@ class LLMConfig:
                 temperature=float(os.environ.get("CODING_AGENT_TEMP", "0.0")),
                 max_tokens=int(os.environ.get("CODING_AGENT_MAX_TOKENS", "8192")),
             )
-        if explicit == "google" or (not explicit and os.environ.get("GOOGLE_API_KEY")):
+        if (
+            explicit == "google"
+            or explicit == "gemini"
+            or (not explicit and os.environ.get("GOOGLE_API_KEY"))
+        ):
             return cls(
                 api_key=os.environ.get("GOOGLE_API_KEY", ""),
                 base_url=os.environ.get(
@@ -93,7 +97,7 @@ class LLMConfig:
                 temperature=float(os.environ.get("CODING_AGENT_TEMP", "0.0")),
                 max_tokens=int(os.environ.get("CODING_AGENT_MAX_TOKENS", "8192")),
             )
-        if explicit == "cline-usage":
+        if explicit == "cline-usage" or explicit == "cline":
             from core.providers import resolve_provider_config
 
             cfg = resolve_provider_config("cline-usage")
@@ -289,7 +293,7 @@ class LLMClient(ABC):
             from .anthropic_client import AnthropicClient
 
             return AnthropicClient(config)
-        elif config.provider == "google":
+        elif config.provider in ("google", "gemini"):
             from .google_client import GoogleClient
 
             return GoogleClient(config)
@@ -297,7 +301,7 @@ class LLMClient(ABC):
             from .ollama_client import OllamaClient
 
             return OllamaClient(config)
-        elif config.provider in ("zai", "openrouter", "clinepass", "cline-usage"):
+        elif config.provider in ("zai", "openrouter", "clinepass", "cline-usage", "cline"):
             from .openai_client import OpenAIClient
 
             return OpenAIClient(config)

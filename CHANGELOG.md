@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [9.1.0] - 2026-09-15
+
+Agent-terminals upgrade.
+
+### Added
+- **Gemini CLI first-class** — `gemini` / `mesh-gemini` shells in both Agent 1
+  (v3.6) and Agent 2 (v2.2) terminals (`terminal_server.SHELLS` /
+  `MESH_SHELLS`, `terminal_page` dock + labels, `mesh.ps1` registry).
+  Free tier: 1000 req/day (Google login) / 250 req/day (API key, Flash only).
+- **Cline CLI first-class** — plain `cline` shell alongside `mesh-cline`.
+- **Every free model in /model (both agents)** — Gemini free tier
+  (gemini-2.5-flash, gemini-2.5-flash-lite, gemini-2.0-flash,
+  gemini-3.5-flash-lite, gemini-3.5-flash, gemma-4-*), Cline free tier
+  (12 models incl. kat-coder-pro, glm-5, deepseek-v4-flash, glm-5.3-flash,
+  laguna-s-2.1:free, longcat-2.0), new ClinePass models (glm-5.3, glm-5.2,
+  qwen3.8-max). `providers_config.json` gains clinepass/cline-usage sections;
+  `google` free_models expanded; `gemini`/`cline` provider aliases work
+  everywhere (`core/providers.py`, `llm/__init__.py`, `main.py`).
+- **Version unification to 9.1.0** — pyproject, browser `__version__`,
+  Inno Setup script, version_info, AI bridge User-Agent, docs, and
+  version-pinned tests.
+
 ## [9.0.0] - 2026-09-14
 
 Reliability release, shipped: **`LuckyDBrowserSetup-9.0.0.exe`** (303,971,333 bytes,

@@ -32,20 +32,27 @@ _SHELL_LABELS = {
     "grok": "Grok",
     "mesh-muse": "Muse Code",
     "muse": "Muse Code",
+    "mesh-gemini": "Gemini",
+    "gemini": "Gemini",
+    "mesh-cline": "Cline",
+    "cline": "Cline",
 }
 
 
 # Agent Mesh dock — the CLIs wired in via terminal_server.MESH_SHELLS, shown
 # as an agent picker in the terminal tab. (shell, label, emoji, accent, blurb)
 # Dylan 2026-09-14: DeepSeek (mesh-dsh) and Muse Spark removed — Muse Code stays.
+# 9.1: Gemini CLI added (free 1000 req/day Google login / 250 req/day API key),
+# Cline CLI kept (free rotating FREE models) — both work in Agent 1 + Agent 2.
 _MESH_AGENTS = {
     "mesh-agy": ("Antigravity", "🛸", "#38bdf8", "Google DeepMind · AGY"),
+    "mesh-gemini": ("Gemini", "✨", "#4285f4", "Google · 1000 req/day free"),
     "mesh-claude": ("Claude", "🟠", "#d97706", "Anthropic · architect"),
     "mesh-codex": ("Codex", "🟢", "#10b981", "OpenAI · builder"),
     "mesh-copilot": ("Copilot", "⚫", "#8b9bb4", "GitHub · reviewer"),
     "mesh-qwen": ("Qwen", "🟣", "#a855f7", "Qwen · test writer"),
     "mesh-opencode": ("OpenCode", "🔵", "#3b82f6", "Anomaly · implementer"),
-    "mesh-cline": ("Cline", "🟡", "#eab308", "autonomous builder"),
+    "mesh-cline": ("Cline", "🟡", "#eab308", "autonomous builder · free tier"),
     "mesh-openclaw": ("OpenClaw", "🦞", "#ef4444", "100+ skills"),
     "mesh-hermes": ("Hermes", "⚕", "#fb923c", "Nous Research · self-improving"),
     "mesh-pi": ("Pi", "⚪", "#94a3b8", "minimal toolkit"),
@@ -210,7 +217,7 @@ __MESH_DOCK__
 <script>
 const WS_URL = "__WS_URL__";
 let SHELL = "__SHELL__";
-const S_CORE = {agent:'Agent 1 (v3.6)', agent2:'Agent 2 (v2.2)', powershell:'PowerShell', cmd:'CMD'};
+const S_CORE = {agent:'Agent 1 (v3.6)', agent2:'Agent 2 (v2.2)', powershell:'PowerShell', cmd:'CMD', gemini:'Gemini', cline:'Cline'};
 const MESH_META = __MESH_META__;
 const SHELL_LABELS = Object.assign({}, S_CORE, MESH_META);
 const dot = document.getElementById('dot');

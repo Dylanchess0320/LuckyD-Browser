@@ -48,6 +48,7 @@ _PROVIDER_DISPLAY_NAMES = {
     "openai": "OpenAI",
     "anthropic": "Anthropic",
     "google": "Google",
+    "gemini": "Google Gemini",
     "ollama": "Ollama",
     "zai": "Z.ai",
     "groq": "Groq",
@@ -55,6 +56,7 @@ _PROVIDER_DISPLAY_NAMES = {
     "opencode": "OpenCode Zen",
     "clinepass": "ClinePass",
     "cline-usage": "Cline (usage)",
+    "cline": "Cline (usage)",
 }
 
 # ── Cline model catalogs ───────────────────────────────────────────────
@@ -64,7 +66,11 @@ _PROVIDER_DISPLAY_NAMES = {
 
 # ClinePass flat-subscription models — these work with a $0 (even negative)
 # credit balance; usage counts against the subscription quota.
+# Source: https://docs.cline.bot/getting-started/clinepass (2026-09, v9.1:
+# added glm-5.3, glm-5.2, qwen3.8-max from live docs).
 _CLINEPASS_CATALOG = [
+    "cline-pass/glm-5.3",
+    "cline-pass/glm-5.2",
     "cline-pass/kimi-k3",
     "cline-pass/deepseek-v4-flash",
     "cline-pass/kimi-k2.7-code",
@@ -73,6 +79,7 @@ _CLINEPASS_CATALOG = [
     "cline-pass/mimo-v2.5",
     "cline-pass/mimo-v2.5-pro",
     "cline-pass/minimax-m3",
+    "cline-pass/qwen3.8-max",
     "cline-pass/qwen3.7-max",
     "cline-pass/qwen3.7-plus",
 ]
@@ -80,6 +87,9 @@ _CLINEPASS_CATALOG = [
 # Cline Usage (credit-billed / free tier) — same gateway, usage-based billing.
 # Free-tier models work at $0.00 but are rate-limited; credit models deduct
 # from your Cline Credits balance.
+# Sources: https://docs.cline.bot/api/models + /getting-started/free-models
+# (2026-09, v9.1: added kat-coder-pro, glm-5, deepseek-v4-flash, glm-5.3-flash,
+# laguna-s-2.1:free, longcat-2.0 — all FREE in CLI/IDE with Cline account).
 _CLINE_USAGE_CATALOG = [
     # ── Free tier (rate-limited, $0.00 — needs non-negative credit balance)
     "minimax/minimax-m2.5",
@@ -88,6 +98,12 @@ _CLINE_USAGE_CATALOG = [
     "meta-llama/llama-3.2-3b-instruct",
     "google/gemini-2.0-flash",
     "qwen/qwen3-8b",
+    "kwaipilot/kat-coder-pro",
+    "z-ai/glm-5",
+    "deepseek/deepseek-v4-flash",
+    "z-ai/glm-5.3-flash",
+    "poolside/laguna-s-2.1:free",
+    "cline-free/longcat-2.0",
     # ── Credit-billed — deduct from Cline Credits balance
     "google/gemini-2.5-pro",
     "anthropic/claude-sonnet-4-6",
@@ -96,7 +112,7 @@ _CLINE_USAGE_CATALOG = [
     "mistral/mistral-large",
 ]
 
-_CLINE_USAGE_FREE_TIER = frozenset(_CLINE_USAGE_CATALOG[:6])
+_CLINE_USAGE_FREE_TIER = frozenset(_CLINE_USAGE_CATALOG[:12])
 
 # ClinePass has no free-tier model — every ClinePass model counts against the
 # flat-subscription quota.
@@ -140,6 +156,7 @@ _OPENCODE_FREE_CATALOG = [
 _PROVIDER_ALIASES = {
     "cline-pass": "clinepass",
     "cline": "cline-usage",
+    "gemini": "google",
 }
 
 
@@ -272,8 +289,16 @@ def model_catalog(free_only: bool = False) -> list[dict]:
                     ],
                 },
                 {
-                    "provider": "Google",
-                    "models": ["gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"],
+                    "provider": "Google Gemini",
+                    "models": [
+                        "gemini-2.5-flash",
+                        "gemini-2.5-flash-lite",
+                        "gemini-2.0-flash",
+                        "gemini-3.5-flash-lite",
+                        "gemini-3.5-flash",
+                        "gemini-1.5-pro",
+                        "gemini-1.5-flash",
+                    ],
                 },
                 {
                     "provider": "DeepSeek",

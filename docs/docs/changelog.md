@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [9.1.0] - 2026-09-15
+
+Agent-terminals upgrade: Gemini CLI + Cline CLI first-class in both Agent 1
+(v3.6) and Agent 2 (v2.2) terminals, every free model in `/model`
+(Gemini free tier, Cline free tier x12, new ClinePass glm-5.3/glm-5.2/
+qwen3.8-max), `gemini`/`cline` provider aliases. Shipped as
+`LuckyDBrowserSetup-9.1.0.exe`.
+
 ## [9.0.0] - 2026-09-14
 
 Reliability release, shipped: **`LuckyDBrowserSetup-9.0.0.exe`** (303,971,333 bytes,

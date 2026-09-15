@@ -24,6 +24,7 @@ VALID_PROVIDERS = {
     "openai",
     "anthropic",
     "google",
+    "gemini",
     "ollama",
     "deepseek",
     "zai",
@@ -32,6 +33,7 @@ VALID_PROVIDERS = {
     "opencode",
     "clinepass",
     "cline-usage",
+    "cline",
 }
 
 PROVIDER_NAMES = {
@@ -39,6 +41,7 @@ PROVIDER_NAMES = {
     "openai": "OpenAI",
     "anthropic": "Anthropic",
     "google": "Google",
+    "gemini": "Google Gemini",
     "ollama": "Ollama",
     "zai": "Z.ai (GLM)",
     "groq": "Groq",
@@ -46,6 +49,7 @@ PROVIDER_NAMES = {
     "opencode": "OpenCode Zen",
     "clinepass": "ClinePass",
     "cline-usage": "Cline (usage)",
+    "cline": "Cline (usage)",
 }
 
 PROVIDER_DEFAULTS: dict[str, ProviderDefaults] = {
@@ -69,6 +73,13 @@ PROVIDER_DEFAULTS: dict[str, ProviderDefaults] = {
         "env_model": "GOOGLE_MODEL",
         "default_base": "https://generativelanguage.googleapis.com/v1beta",
         "default_model": "gemini-2.0-flash",
+    },
+    "gemini": {
+        "env_key": "GOOGLE_API_KEY",
+        "env_base": "GOOGLE_BASE_URL",
+        "env_model": "GOOGLE_MODEL",
+        "default_base": "https://generativelanguage.googleapis.com/v1beta",
+        "default_model": "gemini-2.5-flash",
     },
     "ollama": {
         "env_key": None,
@@ -129,6 +140,13 @@ PROVIDER_DEFAULTS: dict[str, ProviderDefaults] = {
     # session), but model ids are provider-prefixed (e.g. deepseek/deepseek-chat)
     # and usage is billed per-request. Free-tier models cost $0 (rate-limited).
     "cline-usage": {
+        "env_key": "CLINEPASS_API_KEY",
+        "env_base": "CLINEPASS_BASE_URL",
+        "env_model": "CLINE_USAGE_MODEL",
+        "default_base": "https://api.cline.bot/api/v1",
+        "default_model": "deepseek/deepseek-chat",
+    },
+    "cline": {
         "env_key": "CLINEPASS_API_KEY",
         "env_base": "CLINEPASS_BASE_URL",
         "env_model": "CLINE_USAGE_MODEL",
@@ -380,6 +398,7 @@ def detect_api_format(provider: str) -> str:
         "openai": "openai",  # OpenAI-compatible chat completions
         "anthropic": "anthropic",  # Anthropic Messages API
         "google": "google",  # Google Generative AI
+        "gemini": "google",  # alias of google
         "ollama": "openai",  # Ollama uses OpenAI-compatible
         "deepseek": "openai",  # DeepSeek uses OpenAI-compatible
         "zai": "openai",  # Z.ai GLM uses OpenAI-compatible endpoint
@@ -388,5 +407,6 @@ def detect_api_format(provider: str) -> str:
         "opencode": "openai",  # OpenCode Zen is OpenAI-compatible
         "clinepass": "openai",  # ClinePass gateway is OpenAI-compatible
         "cline-usage": "openai",  # same gateway, usage-billed model ids
+        "cline": "openai",  # alias of cline-usage
     }
     return formats.get(provider, "openai")

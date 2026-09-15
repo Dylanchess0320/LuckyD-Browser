@@ -132,10 +132,13 @@ _CLINEPASS_MODEL = "cline-pass/deepseek-v4-pro"
 
 # Curated fallback for api.cline.bot — the gateway has no public model
 # catalog endpoint (only /chat/completions). Sources: ClinePass docs model
-# table (subscription) + Cline API docs (credit-billed), 2026-07.
+# table (subscription) + Cline API docs (credit-billed), 2026-09 (v9.1:
+# added glm-5.3, glm-5.2, qwen3.8-max from live docs).
 _CLINEPASS_CATALOG = [
     # ── Included in the ClinePass flat subscription — these work with a
     # $0 (even negative) credit balance; usage counts against the sub quota.
+    "cline-pass/glm-5.3",
+    "cline-pass/glm-5.2",
     "cline-pass/kimi-k3",
     "cline-pass/deepseek-v4-flash",  # fast + cheapest — great agent model
     "cline-pass/kimi-k2.7-code",
@@ -144,6 +147,7 @@ _CLINEPASS_CATALOG = [
     "cline-pass/mimo-v2.5",
     "cline-pass/mimo-v2.5-pro",
     "cline-pass/minimax-m3",
+    "cline-pass/qwen3.8-max",
     "cline-pass/qwen3.7-max",
     "cline-pass/qwen3.7-plus",
 ]
@@ -239,7 +243,9 @@ _ZEN_TOP_MODELS_SET = set(_ZEN_TOP_MODELS)
 
 # Cline Usage (credit-billed / free tier) — same gateway, usage-based billing.
 # Free-tier models work at $0.00 but are rate-limited; credit models deduct
-# from your Cline Credits balance.   Sources: Cline API docs, 2026-07.
+# from your Cline Credits balance.   Sources: Cline API docs, 2026-09 (v9.1:
+# added kat-coder-pro, glm-5, deepseek-v4-flash, glm-5.3-flash,
+# laguna-s-2.1:free, longcat-2.0 — all FREE in CLI/IDE).
 _CLINE_USAGE_MODEL = "deepseek/deepseek-chat"
 _CLINE_USAGE_CATALOG = [
     # ── Free tier (rate-limited, $0.00 — needs non-negative credit balance)
@@ -249,6 +255,12 @@ _CLINE_USAGE_CATALOG = [
     "meta-llama/llama-3.2-3b-instruct",  # Small Llama, quick responses
     "google/gemini-2.0-flash",  # Google Gemini free tier
     "qwen/qwen3-8b",  # Qwen 3 small, CPU-friendly
+    "kwaipilot/kat-coder-pro",  # free coding model
+    "z-ai/glm-5",  # Z-AI free tier
+    "deepseek/deepseek-v4-flash",  # fast DeepSeek free
+    "z-ai/glm-5.3-flash",  # Z-AI flash free
+    "poolside/laguna-s-2.1:free",  # poolside free
+    "cline-free/longcat-2.0",  # Cline promo free
     # ── Credit-billed — deduct from Cline Credits balance
     "google/gemini-2.5-pro",
     "anthropic/claude-sonnet-4-6",
@@ -785,7 +797,7 @@ class AIBridge:
             )
         )
         body["model"] = model
-        headers = {"User-Agent": "LuckyDBrowser/9.0"}
+        headers = {"User-Agent": "LuckyDBrowser/9.1"}
 
         if kind == "gemini":
             url = f"{base_url}/models/{model}:streamGenerateContent?key={api_key}&alt=sse"

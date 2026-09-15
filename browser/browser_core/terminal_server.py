@@ -302,6 +302,10 @@ def _agent2_command(cli2_path: str = "") -> list[str]:
 # installed simply don't render in the terminal page's dock.
 # Dylan 2026-09-14: DeepSeek (mesh-dsh/mesh-deepseek/deepseek/dsh) and
 # Muse Spark removed from the mesh — Muse Code (mesh-muse/muse) stays.
+# 9.1: Gemini CLI (mesh-gemini/gemini) + Cline CLI (cline, alongside
+# mesh-cline) added — both Agent 1 (v3.6) and Agent 2 (v2.2) terminals can
+# spawn them. Gemini free tier: 1000 req/day (Google login) / 250 req/day
+# (API-key, Flash only); Cline free tier: rotating FREE models in CLI/IDE.
 SHELLS = (
     "agent",
     "agent2",
@@ -315,6 +319,9 @@ SHELLS = (
     "mesh-qwen",
     "mesh-opencode",
     "mesh-cline",
+    "cline",
+    "mesh-gemini",
+    "gemini",
     "mesh-openclaw",
     "mesh-hermes",
     "mesh-pi",
@@ -338,6 +345,9 @@ MESH_SHELLS = {
     "mesh-qwen": "qwen",
     "mesh-opencode": "opencode",
     "mesh-cline": "cline",
+    "cline": "cline",
+    "mesh-gemini": "gemini",
+    "gemini": "gemini",
     "mesh-openclaw": "openclaw",
     "mesh-hermes": "hermes",
     "mesh-pi": "pi",
@@ -398,6 +408,28 @@ def _find_mesh_exe(exe_name: str) -> str | None:
         for cand in (
             Path.home() / ".grok" / "bin" / "grok.exe",
             Path.home() / ".grok" / "bin" / "agent.exe",
+        ):
+            if cand.is_file():
+                return str(cand)
+    if exe_name == "gemini":
+        # Gemini CLI: npm i -g @google/gemini-cli drops gemini.cmd in the
+        # npm prefix (usually %APPDATA%\npm). shutil.which usually finds it,
+        # but frozen browsers / stale PATHs may not — probe directly.
+        # Free tier: 1000 req/day (Google login) / 250 req/day API-key Flash.
+        for cand in (
+            Path.home() / "AppData" / "Roaming" / "npm" / "gemini.cmd",
+            Path.home() / "AppData" / "Roaming" / "npm" / "gemini.exe",
+            Path.home() / ".npm-global" / "bin" / "gemini",
+        ):
+            if cand.is_file():
+                return str(cand)
+    if exe_name == "cline":
+        # Cline CLI: npm i -g cline. Same PATH caveat as gemini above.
+        # Free tier: rotating FREE models in CLI/IDE (account quota-limited).
+        for cand in (
+            Path.home() / "AppData" / "Roaming" / "npm" / "cline.cmd",
+            Path.home() / "AppData" / "Roaming" / "npm" / "cline.exe",
+            Path.home() / ".npm-global" / "bin" / "cline",
         ):
             if cand.is_file():
                 return str(cand)

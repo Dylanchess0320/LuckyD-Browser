@@ -1,5 +1,18 @@
 # LuckyD Browser — Release Notes
 
+## [9.1.0] — Agent terminals upgrade — 2026-09-15
+
+**[`LuckyDBrowserSetup-9.1.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.1.0/LuckyDBrowserSetup-9.1.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed
+
+- **Gemini CLI first-class** — `gemini` / `mesh-gemini` shells in both Agent 1 (v3.6) and Agent 2 (v2.2) terminals (free 1000 req/day Google login / 250 req/day API key, Flash models).
+- **Cline CLI first-class** — `cline` shell alongside `mesh-cline` (free rotating FREE models, quota-limited).
+- **Every free model in /model** — Gemini free tier (gemini-2.5-flash, gemini-2.5-flash-lite, gemini-2.0-flash, gemini-3.5-flash-lite, gemma-4-*), Cline free tier (12 models incl. kat-coder-pro, glm-5, deepseek-v4-flash, laguna-s-2.1:free, longcat-2.0), plus new ClinePass models (glm-5.3, glm-5.2, qwen3.8-max).
+- **`gemini` / `cline` provider aliases** — `CODING_AGENT_PROVIDER=gemini` (= google) and `=cline` (= cline-usage) work everywhere.
+
+On top of everything from 9.0.0.
+
+---
+
 ## [9.0.0] — Reliability release — 2026-09-14
 
 **[`LuckyDBrowserSetup-9.0.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.0.0/LuckyDBrowserSetup-9.0.0.exe)** (303,971,333 bytes, SHA-256 `4F5503801D6F41EB39F0454A4E71E2C747725F79DFA229E108C8FF894095CD9B`) — Windows 10/11 x64 · per-user install · no admin needed
