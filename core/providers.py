@@ -410,3 +410,100 @@ def detect_api_format(provider: str) -> str:
         "cline": "openai",  # alias of cline-usage
     }
     return formats.get(provider, "openai")
+
+
+# ── Provider listing ────────────────────────────────────────────────
+
+# Providers with a usable $0 tier: local servers, the OpenCode Zen / OpenRouter
+# free catalogs, Groq's free tier, and the Cline gateways (flat subscription
+# or usage-billed free models). Everything else bills per token.
+FREE_TIER_PROVIDERS = frozenset(
+    {"opencode", "openrouter", "ollama", "groq", "clinepass", "cline-usage", "cline"}
+)
+
+# Stable display order for the provider list (local first, then free, then paid).
+PROVIDER_ORDER = (
+    "ollama",
+    "opencode",
+    "openrouter",
+    "clinepass",
+    "cline-usage",
+    "cline",
+    "groq",
+    "deepseek",
+    "zai",
+    "google",
+    "gemini",
+    "openai",
+    "anthropic",
+)
+
+
+def list_providers() -> list[dict[str, object]]:
+    """List every known AI provider with its live configuration status.
+
+    Each entry has: ``id``, ``name``, ``base_url``, ``model`` (effective default
+    or env override), ``env_key`` (or None for keyless local), ``key_present``,
+    ``local``, ``free_tier``, ``configured`` (usable right now: local, or key /
+    session auth present), and ``current`` (the active provider).
+
+    No network calls — availability is derived from env vars only.
+    """
+    explicit = os.environ.get("CODING_AGENT_PROVIDER", "").lower().strip()
+    current = explicit if explicit in VALID_PROVIDERS else detect_provider() or "deepseek"
+
+    providers: list[dict[str, object]] = []
+    _cline_session_ok: bool | None = None
+    for pid in PROVIDER_ORDER:
+        defaults = PROVIDER_DEFAULTS.get(pid)
+        if defaults is None:
+            continue
+        env_key = defaults.get("env_key")
+        base_url = os.environ.get(defaults["env_base"], defaults["default_base"])
+        model = os.environ.get(defaults["env_model"], defaults["default_model"])
+        local = pid == "ollama"
+        if pid in ("clinepass", "cline-usage", "cline"):
+            # Auth may come from the logged-in Cline CLI session instead of a key.
+            key_present = bool((os.environ.get(env_key or "", "") or "").strip())
+            if not key_present:
+                if _cline_session_ok is None:
+                    try:
+                        import sys
+                        from pathlib import Path
+
+                        try:
+                            import cline_session  # type: ignore
+                        except ImportError:
+                            bc = str(
+                                Path(__file__).resolve().parent.parent / "browser" / "browser_core"
+                            )
+                            if bc not in sys.path:
+                                sys.path.insert(0, bc)
+                            import cline_session  # type: ignore
+
+                        _cline_session_ok = bool((cline_session.fresh_token() or "").strip())
+                    except Exception:
+                        _cline_session_ok = False
+                key_present = _cline_session_ok
+            configured = key_present
+        elif local:
+            configured = True
+            key_present = False
+        else:
+            key_present = bool((os.environ.get(env_key or "", "") or "").strip())
+            configured = key_present
+        providers.append(
+            {
+                "id": pid,
+                "name": PROVIDER_NAMES.get(pid, pid.title()),
+                "base_url": base_url,
+                "model": model,
+                "env_key": env_key,
+                "key_present": key_present,
+                "local": local,
+                "free_tier": pid in FREE_TIER_PROVIDERS,
+                "configured": configured,
+                "current": pid == current,
+            }
+        )
+    return providers

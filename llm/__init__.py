@@ -153,9 +153,29 @@ class LLMResult:
 # ── Cost tracking ────────────────────────────────────────────────────
 
 MODEL_COSTS: dict[str, dict[str, float]] = {
-    # DeepSeek
+    # DeepSeek (per 1M tokens, USD)
     "deepseek-chat": {"input": 0.27, "output": 1.10},
     "deepseek-reasoner": {"input": 0.55, "output": 2.19},
+    # Current DeepSeek v4 IDs (billed like chat/reasoner; adjust when priced)
+    "deepseek-v4-flash": {"input": 0.27, "output": 1.10},
+    "deepseek-v4-pro": {"input": 0.55, "output": 2.19},
+    # OpenCode Zen / OpenRouter free-tier models ($0 marginal cost)
+    "nemotron-3-ultra-free": {"input": 0.0, "output": 0.0},
+    "nemotron-3.5-lightning-free": {"input": 0.0, "output": 0.0},
+    "nvidia/nemotron-3-ultra-550b-a55b:free": {"input": 0.0, "output": 0.0},
+    "nvidia/nemotron-3.5-lightning:free": {"input": 0.0, "output": 0.0},
+    "x-ai/grok-4.3": {"input": 0.0, "output": 0.0},  # via free-tier key; verify on-platform
+    "qwen/qwen3-8b": {"input": 0.0, "output": 0.0},
+    "deepseek/deepseek-chat": {"input": 0.0, "output": 0.0},  # Cline usage-billed free tier
+    # ClinePass flat-subscription gateway ($0 marginal per request)
+    "cline-pass/kimi-k3": {"input": 0.0, "output": 0.0},
+    "cline-pass/deepseek-v4-pro": {"input": 0.0, "output": 0.0},
+    # Google
+    "gemini-2.0-flash": {"input": 0.10, "output": 0.40},
+    "gemini-2.0-pro": {"input": 2.00, "output": 8.00},
+    "gemini-2.5-flash": {"input": 0.10, "output": 0.40},  # verify on-platform
+    "gemini-3-flash-preview": {"input": 0.10, "output": 0.40},  # verify on-platform
+    "gemma-4-26b-a4b-it": {"input": 0.0, "output": 0.0},  # free-tier preview
     # OpenAI
     "gpt-4o": {"input": 2.50, "output": 10.00},
     "gpt-4o-mini": {"input": 0.15, "output": 0.60},
@@ -167,9 +187,6 @@ MODEL_COSTS: dict[str, dict[str, float]] = {
     "claude-3-5-sonnet-20241022": {"input": 3.00, "output": 15.00},
     "claude-3-opus-20240229": {"input": 15.00, "output": 75.00},
     "claude-3-haiku-20240307": {"input": 0.25, "output": 1.25},
-    # Google
-    "gemini-2.0-flash": {"input": 0.10, "output": 0.40},
-    "gemini-2.0-pro": {"input": 2.00, "output": 8.00},
     # Z.ai GLM (reference, verify on-platform)
     "glm-4.6": {"input": 0.60, "output": 2.20},
     "glm-4.5": {"input": 0.60, "output": 2.20},

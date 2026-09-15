@@ -13,7 +13,7 @@
 ; -----------------------------------------------------------------------------
 
 #define AppName      "LuckyD Browser"
-#define AppVersion   "9.1.0"
+#define AppVersion   "9.2.0"
 #define AppPublisher "LuckyD"
 #define AppExeName   "LuckyDBrowser.exe"
 #define AppURL       "https://github.com/Dylanchess0320/LuckyD-Browser"
@@ -27,11 +27,11 @@ AppPublisher={#AppPublisher}
 AppPublisherURL={#AppURL}
 AppSupportURL={#AppURL}
 AppUpdatesURL={#AppURL}
-VersionInfoVersion=9.1.0.0
+VersionInfoVersion=9.2.0.0
 VersionInfoCompany={#AppPublisher}
 VersionInfoDescription={#AppName} Setup
 VersionInfoProductName={#AppName}
-VersionInfoProductVersion=9.1.0.0
+VersionInfoProductVersion=9.2.0.0
 ; Per-user install — no admin rights required (admin users may opt into all-users).
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
@@ -42,7 +42,7 @@ MinVersion=10.0
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir=output
-OutputBaseFilename=LuckyDBrowserSetup-9.1.0
+OutputBaseFilename=LuckyDBrowserSetup-9.2.0
 SetupIconFile=..\assets\professional_icon.ico
 CloseApplications=yes
 RestartApplications=no

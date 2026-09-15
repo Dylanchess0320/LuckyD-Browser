@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [9.2.0] - 2026-09-15
+
+Provider-list release.
+
+### Added
+- **AI provider list** — `lucky-code providers` CLI, `/providers` + `/provider`
+  REPL commands, and `GET /api/providers` on the Harness HQ server
+  (`core/providers.py:list_providers`, `ui.py:show_providers` incl. WebUI emit,
+  `tests/test_providers_list.py` with 9 tests). All 13 providers with live
+  status, cost tier, and current-provider marker.
+- **Version unification to 9.2.0** — pyproject, browser `__version__` +
+  `WHATS_NEW`, Inno Setup script, version_info (strings + FFI tuples), AI bridge
+  User-Agent, Nuitka script, CLI help/`--version` text, docs, and
+  version-pinned tests.
+
+### Fixed
+- **Model resolver stale-cache fallback** — a failed catalog fetch (no key,
+  offline, revoked key) now reuses the last-known-good cached models instead of
+  dropping to hardcoded defaults (`model_resolver.py`).
+- **Cost table gaps** — `deepseek-v4-flash`/`pro` bill at real chat/reasoner
+  rates; Nemotron, Grok, OpenRouter `:free`, Cline gateways, and Gemma preview
+  correctly report $0 (`llm/__init__.py`).
+
 ## [9.1.0] - 2026-09-15
 
 Agent-terminals upgrade.

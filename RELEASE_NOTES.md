@@ -1,11 +1,31 @@
-# LuckyD Browser v9.1.0 — Release Notes
+# LuckyD Browser v9.2.0 — Release Notes
 
 > **The AI browser that doesn't need an API key.** Free, unlimited, offline AI built in —
 > plus a full coding agent and developer terminal living in your tabs.
 
-**[⬇ Download `LuckyDBrowserSetup-9.1.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.1.0/LuckyDBrowserSetup-9.1.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed
+**[⬇ Download `LuckyDBrowserSetup-9.2.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.2.0/LuckyDBrowserSetup-9.2.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed
 
 ---
+
+## What's new in 9.2.0 — AI provider list
+
+- **AI provider list** — `lucky-code providers` in the terminal, `/providers` in the
+  REPL, and `GET /api/providers` on the Harness HQ server. All 13 providers with
+  live status (ready / needs key), cost tier (free / paid), and the active provider
+  marked. No more guessing which keys are set.
+- **Offline-proof model resolver** — the DeepSeek model cache now falls back to its
+  last-known-good models when the catalog fetch fails (no key, offline, revoked key)
+  instead of silently dropping to hardcoded defaults.
+- **Honest cost tracking** — `deepseek-v4-flash`/`pro` now bill at real rates and every
+  free-tier model (Nemotron, Grok, Cline gateways, Gemma preview) correctly reports $0.
+- **Agent Mesh 1.0.1** — Gemini CLI retired from the mesh (it migrated to Antigravity);
+  use the `agy` Antigravity agent for plan/build stages.
+
+On top of everything from 9.1.0 below.
+
+---
+
+# LuckyD Browser v9.1.0 — Release Notes (archive)
 
 ## What's new in 9.1.0 — Agent terminals upgrade
 

@@ -28,18 +28,27 @@ _FAST_KEYWORDS = ("flash", "fast", "lite", "mini", "turbo", "instant")
 _PRO_KEYWORDS = ("pro", "reasoner", "thinking", "ultra", "expert", "max")
 
 
-def _cache_get() -> dict[str, object] | None:
-    """Read cached model list if still fresh."""
+def _cache_get_raw() -> dict[str, object] | None:
+    """Read the cached model list regardless of age (None if missing/corrupt)."""
     if not CACHE_FILE.exists():
         return None
     try:
         data = json.loads(CACHE_FILE.read_text())
-        if not isinstance(data, dict):
-            return None
+        return data if isinstance(data, dict) else None
+    except (json.JSONDecodeError, KeyError, OSError):
+        return None
+
+
+def _cache_get() -> dict[str, object] | None:
+    """Read cached model list if still fresh."""
+    data = _cache_get_raw()
+    if data is None:
+        return None
+    try:
         ts = data.get("_timestamp", 0)
         if isinstance(ts, (int, float)) and time.time() - ts < CACHE_TTL:
             return data
-    except (json.JSONDecodeError, KeyError):
+    except (KeyError, TypeError):
         pass
     return None
 
@@ -151,8 +160,25 @@ def resolve_model(
         lgp = cached.get("_last_good_pro")
         last_good_pro = lgp if isinstance(lgp, str) else None
     else:
+        # No fresh cache: keep the stale list as a fallback so a failed
+        # refresh (no key, offline, revoked key) still resolves to the
+        # last-known-good models instead of the hardcoded defaults.
+        stale = _cache_get_raw()
+        stale_ids: list[str] = []
+        if stale:
+            raw_stale = stale.get("models", [])
+            stale_ids = (
+                [m for m in raw_stale if isinstance(m, str)] if isinstance(raw_stale, list) else []
+            )
+            lgf = stale.get("_last_good_fast")
+            last_good_fast = lgf if isinstance(lgf, str) else None
+            lgp = stale.get("_last_good_pro")
+            last_good_pro = lgp if isinstance(lgp, str) else None
         model_ids = _fetch_models(api_key, base_url)
-        if model_ids:
+        if not model_ids and stale_ids:
+            logger.debug("Model catalog fetch failed — using stale cache")
+            model_ids = stale_ids
+        if model_ids and model_ids != stale_ids:
             _cache_set({"models": model_ids})
 
     fast, pro = _classify_models(model_ids) if model_ids else (None, None)
@@ -166,10 +192,11 @@ def resolve_model(
     if fast != FALLBACK_MODEL or pro != FALLBACK_PRO_MODEL:
         logger.debug("Resolved models — fast: %s, pro: %s", fast, pro)
 
-    # Store last-known-good for next time
+    # Store last-known-good for next time (merge over the raw cache so a
+    # stale entry's fallbacks survive the refresh).
     if model_ids and (fast or pro):
         try:
-            cache_data: dict[str, object] = _cache_get() or {}
+            cache_data: dict[str, object] = _cache_get_raw() or {}
             cache_data["models"] = model_ids
             cache_data["_last_good_fast"] = fast
             cache_data["_last_good_pro"] = pro

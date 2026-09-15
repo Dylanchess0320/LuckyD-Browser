@@ -1,5 +1,18 @@
 # LuckyD Browser — Release Notes
 
+## [9.2.0] — AI provider list — 2026-09-15
+
+**[`LuckyDBrowserSetup-9.2.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.2.0/LuckyDBrowserSetup-9.2.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed
+
+- **AI provider list** — `lucky-code providers`, `/providers` in the REPL, and `GET /api/providers`: all 13 providers with live status, cost tier, and current marker.
+- **Offline-proof model resolver** — stale cache fallback when the catalog fetch fails.
+- **Honest cost tracking** — deepseek-v4 rates plus $0 free-tier entries.
+- **Agent Mesh 1.0.1** — Gemini CLI retired from the mesh (migrated to Antigravity).
+
+On top of everything from 9.1.0.
+
+---
+
 ## [9.1.0] — Agent terminals upgrade — 2026-09-15
 
 **[`LuckyDBrowserSetup-9.1.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.1.0/LuckyDBrowserSetup-9.1.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed

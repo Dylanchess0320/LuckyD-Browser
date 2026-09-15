@@ -376,6 +376,10 @@ class HQHandler(BaseHTTPRequestHandler):
                 return self._send_json(
                     {"models": [cfg.get("model", "")], "provider": cfg.get("provider", "")}
                 )
+            if path == "/api/providers":
+                from core.providers import list_providers
+
+                return self._send_json({"providers": list_providers()})
             if path == "/api/files":
                 files = sorted(
                     str(p.relative_to(PROJECT_DIR))

@@ -64,7 +64,7 @@ Most “AI browsers” rent you a chatbot behind an account. LuckyD is a **real 
 
 | | |
 |---|---|
-| **⬇ Windows installer** | [`LuckyDBrowserSetup-9.1.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.1.0/LuckyDBrowserSetup-9.1.0.exe) — built on a real Windows runner with Inno Setup 6. Per-user, no admin, silent-install flags. |
+| **⬇ Windows installer** | [`LuckyDBrowserSetup-9.2.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.2.0/LuckyDBrowserSetup-9.2.0.exe) — built on a real Windows runner with Inno Setup 6. Per-user, no admin, silent-install flags. |
 | **🧩 Skills in sidebar** | The 5 bundled skills (`ai-news-brief`, `chess`, `graphify`, `movie-picker`, `top-picks`) surface as ✨ chips above the AI sidebar input as you type; one tap attaches the skill as chat context. |
 | **🧠 Smart model routing** | Auto mode picks the provider per question — explicit picks always win, non-viable picks fall back gracefully. |
 | **🌙 Neon Night home** | `/dashboard` and the new-tab fallback share one refined typographic system: tabular clock, small-caps labels, system-only font stack, offline-safe, `prefers-reduced-motion` support. |
@@ -204,14 +204,14 @@ Also in this lineage: Deep Research swarm (`Ctrl+Shift+R`), Agent Mesh, self-hea
 
 ## Install in 10 seconds
 
-1. Get **[LuckyDBrowserSetup-9.1.0.exe](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.1.0/LuckyDBrowserSetup-9.1.0.exe)**
+1. Get **[LuckyDBrowserSetup-9.2.0.exe](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.2.0/LuckyDBrowserSetup-9.2.0.exe)**
 2. Run it — per-user, **no admin**, installs to `%LOCALAPPDATA%\Programs\LuckyDBrowser`
 3. Leave **“Set up free unlimited local AI”** checked → Ollama + `llama3.2:3b` (~2 GB, one time)
 4. `Ctrl+Shift+A` → chat offline. Or bring your own keys (Gemini, Groq, DeepSeek, OpenAI, Anthropic, Z.ai, OpenRouter, Cline, OpenCode)
 
 No local model yet? With no Ollama and no keys, chat falls back to the OpenCode Zen gateway (`OPENCODE_API_KEY`) — no local server needed.
 
-Silent: `LuckyDBrowserSetup-9.1.0.exe /VERYSILENT /NORESTART`
+Silent: `LuckyDBrowserSetup-9.2.0.exe /VERYSILENT /NORESTART`
 
 Windows 10/11 x64 only.
 
@@ -252,7 +252,7 @@ browser\run_browser.bat
 
 # Shareable installer (needs Inno Setup 6)
 powershell -NoProfile -ExecutionPolicy Bypass -File browser\installer\build_installer.ps1
-# → browser\installer\output\LuckyDBrowserSetup-9.1.0.exe
+# → browser\installer\output\LuckyDBrowserSetup-9.2.0.exe
 ```
 
 ---

@@ -5,7 +5,7 @@
 <p class="tagline">The AI browser that runs <em>your</em> models — local, unlimited, offline — plus a full coding agent and real terminals in one window.</p>
 
 <div class="cta-row" markdown>
-[⬇ Download v9.1.0](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.1.0/LuckyDBrowserSetup-9.1.0.exe){ .luckyd-btn }
+[⬇ Download v9.2.0](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.2.0/LuckyDBrowserSetup-9.2.0.exe){ .luckyd-btn }
 [Getting started](getting-started.md){ .luckyd-btn-ghost }
 [What's new](release-notes.md){ .luckyd-btn-ghost }
 </div>
@@ -76,12 +76,12 @@
 
 ## Install in 10 seconds
 
-1. Get [**LuckyDBrowserSetup-9.1.0.exe**](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.1.0/LuckyDBrowserSetup-9.1.0.exe)
+1. Get [**LuckyDBrowserSetup-9.2.0.exe**](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.2.0/LuckyDBrowserSetup-9.2.0.exe)
 2. Run it — per-user, **no admin**, installs to `%LOCALAPPDATA%\Programs\LuckyDBrowser`
 3. Leave **"Set up free unlimited local AI"** checked → Ollama + `llama3.2:3b` (~2 GB, one time)
 4. `Ctrl+Shift+A` → chat offline. Or bring your own keys (Gemini, Groq, DeepSeek, OpenAI, Anthropic, Z.ai, OpenRouter, Cline, OpenCode)
 
-Windows 10/11 x64 only. Silent install: `LuckyDBrowserSetup-9.1.0.exe /VERYSILENT /NORESTART`
+Windows 10/11 x64 only. Silent install: `LuckyDBrowserSetup-9.2.0.exe /VERYSILENT /NORESTART`
 
 ## Why LuckyD
 
@@ -98,7 +98,11 @@ Most "AI browsers" rent you a chatbot behind an account. LuckyD is a **real Chro
 
 > The others rent you their AI. **LuckyD runs yours.**
 
-## New in 9.1.0 — Agent terminals upgrade
+## New in 9.2.0 — AI provider list
+
+`lucky-code providers` / `/providers` shows all 13 AI providers with live status and cost tier, the model resolver survives offline or revoked keys, and cost tracking covers deepseek-v4 plus every free-tier model — shipped with the 9.2.0 installer built from this source.
+
+## [9.1.0] — Agent terminals upgrade (archive)
 
 Gemini CLI + Cline CLI are now first-class shells in both Agent 1 (v3.6) and Agent 2 (v2.2) terminals, and `/model` picks up every free model — shipped with the 9.1.0 installer built from this source.
 
@@ -106,7 +110,7 @@ Gemini CLI + Cline CLI are now first-class shells in both Agent 1 (v3.6) and Age
 - **🟡 Cline CLI** — `cline` shell alongside `mesh-cline` (free rotating FREE models)
 - **🆓 Every free model** — Gemini free tier, Cline free tier (12 models), new ClinePass models (glm-5.3, glm-5.2, qwen3.8-max)
 
-## New in 9.0.0 — Reliability release
+## [9.0.0] — Reliability release (archive)
 
 Proxy-proof local AI, honest AI status, keyed OpenCode Zen, working DeepSeek Harness boot, focused Ctrl+K, readable shortcuts, and correct video color — shipped with the 9.0.0 installer built from this source.
 
@@ -119,7 +123,7 @@ Proxy-proof local AI, honest AI status, keyed OpenCode Zen, working DeepSeek Har
 
 *Verified: 1,855 tests passed, coverage 81%, `ruff` clean.*
 
-## New in 8.0.0 — The Cleanup, phase one
+## [8.0.0] — The Cleanup, phase one (archive)
 
 Contextual skills move into the AI sidebar, the model router gets smart, and the home page gets the Neon Night treatment. Ships with the 8.0.0 installer built from this source.
 
@@ -129,7 +133,7 @@ Contextual skills move into the AI sidebar, the model router gets smart, and the
 - **Honest AI labels + $0 fallback** — provider chips say `· free tier` / `· credit-billed ⚠`; with no Ollama and no keys, chat falls back to the free OpenCode Zen gateway
 - **Antigravity decluttered** — redundant Tools-menu/palette launchers removed (it's already in the terminal); full copy-freshness pass across README, docs, and in-app text
 
-## New in 7.0.0 — Agentic
+## [7.0.0] — Agentic (archive)
 
 The agentic frontier, shipped: an AI browser you can trust with real agency. [Read the release notes →](release-notes.md)
 
@@ -165,6 +169,6 @@ A hardened foundation: every local service now authenticates with HttpOnly sessi
 
 <p align="center">
   <b>MIT © LuckyD</b> · Chromium · Ollama · Qt · xterm.js · pywinpty · PyInstaller · Inno Setup<br>
-  <a href="https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.1.0/LuckyDBrowserSetup-9.1.0.exe">Download v9.1.0</a>
+  <a href="https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.2.0/LuckyDBrowserSetup-9.2.0.exe">Download v9.2.0</a>
   · <a href="https://www.youtube.com/@LuckyDYoutube">YouTube</a>
 </p>
