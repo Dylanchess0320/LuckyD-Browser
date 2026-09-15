@@ -1076,6 +1076,12 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
         if hit2:
             _switch_model(agent, provider=hit2[0], model_name=hit2[1])
 
+    elif cmd in ("providers", "provider"):
+        # ── Provider list (status, cost tier, current) ──
+        from core.providers import list_providers
+
+        ui.show_providers(list_providers())
+
     elif cmd == "refresh":
         invalidate_cache()
         _switch_model(agent, model_name="auto")
@@ -1134,7 +1140,7 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
             ui.warn("MCP not configured or no servers connected")
 
     elif cmd == "version":
-        agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v9.0.0")
+        agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v9.3.0")
         agent_name = os.environ.get("LUCKYD_AGENT_NAME", "Agent 1")
         ui.info(f"LuckyD Code {agent_version} ({agent_name})")
 
@@ -1477,6 +1483,30 @@ def _cli_model(args):
     print("Restart the terminal (or /model inside the REPL) for the change to take effect.")
 
 
+def _cli_providers(args):
+    """lucky-code providers — list every AI provider with live status.
+
+    No API key needed. Availability is derived from env vars only (no network).
+    """
+    from core.providers import list_providers
+
+    if args and args[0] in ("-h", "--help", "help"):
+        print(
+            """
+lucky-code providers — list AI providers and their status
+
+Shows every provider (local, free-tier, paid) with its default model,
+cost tier, and whether it is usable right now (key present / local /
+logged-in session). The active provider is marked ◀.
+
+Switch providers with:  lucky-code model <provider> <name>
+                        (or /model <provider> <name> inside the REPL)
+"""
+        )
+        return
+    ui.show_providers(list_providers())
+
+
 # ── Entry point ────────────────────────────────────────────────────────
 
 
@@ -1550,6 +1580,11 @@ def main():
         _cli_model(args[1:])
         return
 
+    # Dispatch "providers" subcommand early (no API key needed)
+    if args and args[0] in ("providers", "provider"):
+        _cli_providers(args[1:])
+        return
+
     # Dispatch "schedule" subcommand early (6.0 — background agents)
     if args and args[0] == "schedule":
         _cli_schedule(args[1:])
@@ -1616,10 +1651,10 @@ def main():
             else:
                 os.environ["LUCKYD_AGENT_SLOT"] = "1"
                 os.environ["LUCKYD_AGENT_NAME"] = "Agent 1"
-                os.environ["LUCKYD_AGENT_VERSION"] = "v9.0.0"
+                os.environ["LUCKYD_AGENT_VERSION"] = "v9.3.0"
             i += 2
         elif args[i] in ("-v", "--version"):
-            agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v9.0.0")
+            agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v9.3.0")
             agent_name = os.environ.get("LUCKYD_AGENT_NAME", "")
             label = f"LuckyD Code {agent_version}" + (f" ({agent_name})" if agent_name else "")
             print(label)
@@ -1630,16 +1665,19 @@ def main():
 LuckyD Code — AI Coding Agent
 
 Usage:
-  lucky-code                       Interactive REPL (Agent 1 · v9.0.0)
+  lucky-code                       Interactive REPL (Agent 1 · v9.3.0)
   lucky-code --agent 2             Interactive REPL (Agent 2 · v2.2.0)
+  lucky-code providers           List AI providers — status, cost tier, current
   lucky-code "your query"          One-shot mode
   lucky-code -c                    Continue last session
   lucky-code --resume <id>         Resume specific session
 
 Options:
-  --agent 1|2        Select agent slot (1 = v9.0 Nuitka, 2 = v2.2)
+  --agent 1|2        Select agent slot (1 = v9.3 Nuitka, 2 = v2.2)
   --model NAME       Model: auto (default), flash, pro, or specific name
-  --provider NAME    Set provider: opencode, openrouter, deepseek, google, ollama, zai, groq
+  --provider NAME    Set provider (see: lucky-code providers): ollama, opencode,
+                     openrouter, clinepass, cline-usage, cline, groq, deepseek,
+                     zai, google, gemini, openai, anthropic
   --thinking         Use the thinking/reasoning model
   --temp FLOAT       Temperature (default: 0.0)
   -y, --yes, --yolo  Auto-approve all tool calls (non-interactive / yolo mode)

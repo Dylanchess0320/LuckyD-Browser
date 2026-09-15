@@ -7,9 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [9.3.0] - 2026-09-15
 
-Re-release of the 9.1.0 codebase under a fresh version number — identical
-product, only version strings moved to 9.3.0. Shipped as
-`LuckyDBrowserSetup-9.3.0.exe`.
+Everything from 9.1.0, plus: **AI provider list** (`lucky-code providers` /
+`/providers` / `GET /api/providers` — all 13 providers with live status and
+cost tier), **offline-proof model resolver** (stale cache fallback instead of
+hardcoded defaults), **honest cost tracking** (deepseek-v4 at real rates,
+every free-tier model at $0), and the **duplicate Deep Research tile fix**.
+Shipped as `LuckyDBrowserSetup-9.3.0.exe`.
 
 ## [9.1.0] - 2026-09-15
 

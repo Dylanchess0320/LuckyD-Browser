@@ -98,13 +98,14 @@ Most "AI browsers" rent you a chatbot behind an account. LuckyD is a **real Chro
 
 > The others rent you their AI. **LuckyD runs yours.**
 
-## New in 9.3.0 — same product as 9.1.0, fresh version number
+## New in 9.3.0 — AI provider list + reliability
 
-Gemini CLI + Cline CLI are now first-class shells in both Agent 1 (v3.6) and Agent 2 (v2.2) terminals, and `/model` picks up every free model — shipped with the 9.3.0 installer built from this source.
+`lucky-code providers` (or `/providers`, or `GET /api/providers`) shows all 13 AI providers with live status and cost tier, the model resolver now survives offline or revoked keys via its stale cache, cost tracking is honest (deepseek-v4 at real rates, free-tier models at $0), and the dashboard no longer duplicates the Deep Research tile — shipped with the 9.3.0 installer built from this source.
 
-- **✨ Gemini CLI** — `gemini` / `mesh-gemini` shells (free 1000 req/day Google login / 250 req/day API key)
-- **🟡 Cline CLI** — `cline` shell alongside `mesh-cline` (free rotating FREE models)
-- **🆓 Every free model** — Gemini free tier, Cline free tier (12 models), new ClinePass models (glm-5.3, glm-5.2, qwen3.8-max)
+- **📋 Provider list** — every provider, its default model, cost tier (free/paid), and whether it's usable right now
+- **🛡️ Offline-proof resolver** — failed catalog fetches fall back to last-known-good models
+- **💲 Honest costs** — real deepseek-v4 rates, $0 for all free-tier models
+- **✨ Gemini CLI + 🟡 Cline CLI** — still first-class in both agent terminals, every free model in `/model`
 
 ## New in 9.0.0 — Reliability release
 

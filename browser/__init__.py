@@ -4,10 +4,10 @@ __version__ = "9.3.0"
 
 # Shown once after an update (first launch with a new version).
 WHATS_NEW = (
-    "LuckyD v9.3.0 - Agent terminals upgrade: Gemini CLI + Cline CLI are now "
-    "first-class shells in both Agent 1 (v3.6) and Agent 2 (v2.2) terminals, "
-    "and /model picks up every free model — Gemini free tier (1000 req/day "
-    "Google login / 250 req/day API key), Cline rotating FREE models, plus "
-    "new ClinePass models (glm-5.3, glm-5.2, qwen3.8-max). On top of "
-    "everything from 9.0.0."
+    "LuckyD v9.3.0 - AI provider list: `lucky-code providers` / `/providers` "
+    "shows all 13 providers with live status and cost tier, the model resolver "
+    "now survives offline or revoked keys via its stale cache, cost tracking "
+    "covers deepseek-v4 plus every free-tier model at honest $0, and the "
+    "dashboard no longer duplicates the Deep Research tile. On top of "
+    "everything from 9.1.0."
 )

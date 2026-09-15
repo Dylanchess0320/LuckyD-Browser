@@ -9,14 +9,18 @@
 
 ## What's new in 9.3.0
 
-9.3.0 is the 9.1.0 product re-released under a new version number —
-identical features, only the version strings changed:
+- **AI provider list** — `lucky-code providers` in the terminal, `/providers` in the
+  REPL, and `GET /api/providers` on the Harness HQ server. All 13 providers with
+  live status (ready / needs key), cost tier (free / paid), and the active provider
+  marked. No more guessing which keys are set.
+- **Offline-proof model resolver** — the model cache now falls back to its
+  last-known-good models when the catalog fetch fails (no key, offline, revoked key)
+  instead of silently dropping to hardcoded defaults.
+- **Honest cost tracking** — `deepseek-v4-flash`/`pro` now bill at real rates and every
+  free-tier model (Nemotron, Grok, Cline gateways, Gemma preview) correctly reports $0.
+- **Duplicate Deep Research tile fixed** — the dashboard no longer renders it twice.
 
-- **Gemini CLI first-class** — `gemini` / `mesh-gemini` shells in both Agent 1 (v3.6) and Agent 2 (v2.2) terminals.
-- **Cline CLI first-class** — `cline` shell alongside `mesh-cline`.
-- **Every free model in /model** — Gemini free tier, Cline free tier (12 models), new ClinePass models (glm-5.3, glm-5.2, qwen3.8-max).
-
-On top of everything from 9.0.0 below.
+On top of everything from 9.1.0 below.
 
 ---
 

@@ -395,7 +395,11 @@ _JS2 = r"""// Platform tiles from browser_core/platform_tiles.json (TileRegistry
 const PLATFORM_TILES = __PLATFORM_TILES__;
 function renderApps() {
   const g = document.getElementById('apps');
-  APPS.concat(PLATFORM_TILES).forEach(([ico, name, href], i) => {
+  // A registry tile must never duplicate a built-in app (e.g. Deep Research
+  // lives in APPS and in platform_tiles.json) — skip platform tiles whose
+  // name already renders above, case-insensitively.
+  const seen = new Set(APPS.map(([, name]) => name.toLowerCase()));
+  APPS.concat(PLATFORM_TILES.filter(([, name]) => !seen.has(name.toLowerCase()))).forEach(([ico, name, href], i) => {
     const a = document.createElement('a');
     a.className = 'tile' + (i === 0 ? ' hq' : ''); a.href = href;
     a.innerHTML = '<span class="ico">' + ico + '</span><span class="tname"></span>';

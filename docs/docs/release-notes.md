@@ -1,10 +1,15 @@
 # LuckyD Browser — Release Notes
 
-## [9.3.0] — Re-release of 9.1.0 — 2026-09-15
+## [9.3.0] — AI provider list + reliability — 2026-09-15
 
 **[`LuckyDBrowserSetup-9.3.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.3.0/LuckyDBrowserSetup-9.3.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed
 
-Identical product to 9.1.0 (below) — only the version number changed.
+- **AI provider list** — `lucky-code providers`, `/providers`, `GET /api/providers`: all 13 providers with live status and cost tier.
+- **Offline-proof model resolver** — stale cache fallback when the catalog fetch fails.
+- **Honest cost tracking** — deepseek-v4 at real rates, free-tier models at $0.
+- **Duplicate Deep Research tile fixed.**
+
+On top of everything from 9.1.0 below.
 
 ---
 

@@ -7,10 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [9.3.0] - 2026-09-15
 
-Re-release of the 9.1.0 codebase under a fresh version number. Product is
-identical to 9.1.0 (agent-terminals upgrade: Gemini CLI + Cline CLI
-first-class, every free model in `/model`) — only the version strings
-moved to 9.3.0.
+Everything from 9.1.0, plus Dylan's late-night improvements, cleaned up and
+green across CI:
+
+### Added
+- **AI provider list** — `lucky-code providers` in the terminal, `/providers`
+  in the REPL, and `GET /api/providers` on the Harness HQ server. All 13
+  providers with live status (ready / needs key), cost tier (free / paid),
+  and the active provider marked. No more guessing which keys are set
+  (`core/providers.py::list_providers`, `ui.show_providers`).
+
+### Fixed
+- **Offline-proof model resolver** — the model cache now falls back to its
+  last-known-good models when the catalog fetch fails (no key, offline,
+  revoked key) instead of silently dropping to hardcoded defaults; stale
+  fallbacks survive refreshes (`model_resolver.py`).
+- **Honest cost tracking** — `deepseek-v4-flash`/`pro` now bill at real rates
+  and every free-tier model (Nemotron, Grok, Cline gateways, Gemma preview)
+  correctly reports $0 (`llm/__init__.py::MODEL_COSTS`).
+- **Duplicate Deep Research tile** — the dashboard no longer renders the Deep
+  Research tile twice (registry tile disabled, `renderApps` dedups by name).
+
+Replaces the 9.1.0 codebase; 9.1.0's entry is preserved below as history.
 
 ## [9.1.0] - 2026-09-15
 
