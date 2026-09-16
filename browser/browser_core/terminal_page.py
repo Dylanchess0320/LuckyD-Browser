@@ -214,7 +214,7 @@ __MESH_DOCK__
 <script>
 const WS_URL = "__WS_URL__";
 let SHELL = "__SHELL__";
-const S_CORE = {agent:'Agent 1 (v3.6)', agent2:'Agent 2 (v2.2)', powershell:'PowerShell', cmd:'CMD', gemini:'Gemini', cline:'Cline'};
+const S_CORE = {agent:'Agent 1 (v3.6)', agent2:'Agent 2 (v2.2)', powershell:'PowerShell', cmd:'CMD', cline:'Cline'};
 const MESH_META = __MESH_META__;
 const SHELL_LABELS = Object.assign({}, S_CORE, MESH_META);
 const dot = document.getElementById('dot');
