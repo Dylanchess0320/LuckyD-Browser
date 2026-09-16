@@ -1,13 +1,11 @@
 """LuckyD Browser - a full-featured Chromium-based web browser for Windows."""
 
-__version__ = "9.3.0"
+__version__ = "9.4.0"
 
 # Shown once after an update (first launch with a new version).
 WHATS_NEW = (
-    "LuckyD v9.3.0 - AI provider list: `lucky-code providers` / `/providers` "
-    "shows all 13 providers with live status and cost tier, the model resolver "
-    "now survives offline or revoked keys via its stale cache, cost tracking "
-    "covers deepseek-v4 plus every free-tier model at honest $0, and the "
-    "dashboard no longer duplicates the Deep Research tile. On top of "
-    "everything from 9.1.0."
+    "LuckyD v9.4.0 - Antigravity (agy) replaces Gemini CLI in the Agent Mesh: "
+    "`agy` / `mesh-agy` covers the plan/build stages, the stale Gemini "
+    "fallbacks are gone, and Cline CLI stays first-class. On top of "
+    "everything from 9.3.0."
 )

@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [9.4.0] - 2026-09-16
+
+Antigravity replaces Gemini in the Agent Mesh, on top of everything from 9.3.0.
+
+### Changed
+- **Antigravity (agy) replaces Gemini CLI** — `agy` / `mesh-agy` covers the
+  agent-mesh plan/build stages (`terminal_server.SHELLS` / `MESH_SHELLS`,
+  `terminal_page` dock + labels, `_find_mesh_exe` PATH plus
+  `%LOCALAPPDATA%\agy\bin` fallback). `gemini` / `mesh-gemini` shells, dock
+  chips, and fallback probing are removed.
+- **Version unification to 9.4.0** — pyproject, browser `__version__`,
+  Inno Setup script, version_info, AI bridge User-Agent, docs, and
+  version-pinned tests.
+
 ## [9.3.0] - 2026-09-15
 
 Everything from 9.1.0, plus Dylan's late-night improvements, cleaned up and

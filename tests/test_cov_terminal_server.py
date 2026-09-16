@@ -462,16 +462,6 @@ def test_find_mesh_exe_grok_user_install_fallback(monkeypatch, tmp_path) -> None
     assert _find_mesh_exe("grok") == str(exe)
 
 
-def test_find_mesh_exe_agy_late_candidate(monkeypatch, tmp_path) -> None:
-    """Only the last agy fallback exists — the loop must keep probing."""
-    exe = tmp_path / ".gemini" / "antigravity-cli" / "bin" / "agy.exe"
-    exe.parent.mkdir(parents=True)
-    exe.touch()
-    monkeypatch.setattr(shutil, "which", lambda name: None)
-    _home_to(monkeypatch, tmp_path)
-    assert _find_mesh_exe("agy") == str(exe)
-
-
 def test_find_mesh_exe_agy_no_candidates(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr(shutil, "which", lambda name: None)
     _home_to(monkeypatch, tmp_path)

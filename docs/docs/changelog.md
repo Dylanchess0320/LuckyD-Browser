@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [9.4.0] - 2026-09-16
+
+Antigravity replaces Gemini in the Agent Mesh: `agy` / `mesh-agy` covers the
+plan/build stages (PATH plus `%LOCALAPPDATA%\agy\bin` fallback), `gemini` /
+`mesh-gemini` shells, dock chips, and fallback probing are removed, and Cline
+CLI (`cline` alongside `mesh-cline`) stays first-class in both agent
+terminals. On top of everything from 9.3.0.
+Shipped as `LuckyDBrowserSetup-9.4.0.exe`.
+
 ## [9.3.0] - 2026-09-15
 
 Everything from 9.1.0, plus: **AI provider list** (`lucky-code providers` /

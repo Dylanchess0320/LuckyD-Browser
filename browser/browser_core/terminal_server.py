@@ -302,10 +302,11 @@ def _agent2_command(cli2_path: str = "") -> list[str]:
 # installed simply don't render in the terminal page's dock.
 # Dylan 2026-09-14: DeepSeek (mesh-dsh/mesh-deepseek/deepseek/dsh) and
 # Muse Spark removed from the mesh — Muse Code (mesh-muse/muse) stays.
-# 9.1: Gemini CLI (mesh-gemini/gemini) + Cline CLI (cline, alongside
-# mesh-cline) added — both Agent 1 (v3.6) and Agent 2 (v2.2) terminals can
-# spawn them. Gemini free tier: 1000 req/day (Google login) / 250 req/day
-# (API-key, Flash only); Cline free tier: rotating FREE models in CLI/IDE.
+# 9.4: Cline CLI (cline, alongside mesh-cline) kept — both Agent 1 and
+# Agent 2 terminals can spawn it. Cline free tier: rotating FREE
+# models in CLI/IDE.
+# NOTE: Gemini CLI (mesh-gemini/gemini) was dropped from the mesh in favor of
+# Antigravity (agy) for the plan/build stages (see ~/agent-mesh, v1.0.1).
 SHELLS = (
     "agent",
     "agent2",
@@ -320,8 +321,6 @@ SHELLS = (
     "mesh-opencode",
     "mesh-cline",
     "cline",
-    "mesh-gemini",
-    "gemini",
     "mesh-openclaw",
     "mesh-hermes",
     "mesh-pi",
@@ -346,8 +345,6 @@ MESH_SHELLS = {
     "mesh-opencode": "opencode",
     "mesh-cline": "cline",
     "cline": "cline",
-    "mesh-gemini": "gemini",
-    "gemini": "gemini",
     "mesh-openclaw": "openclaw",
     "mesh-hermes": "hermes",
     "mesh-pi": "pi",
@@ -391,10 +388,12 @@ def _find_mesh_exe(exe_name: str) -> str | None:
     if found:
         return found
     if exe_name in ("agy", "antigravity"):
+        # Antigravity (agy) installs to %LOCALAPPDATA%\agy\bin. (It used to also
+        # be discoverable via the Gemini CLI extension layout under
+        # ~/.gemini/antigravity-cli — dropped once Gemini CLI left the mesh.)
         for cand in (
             Path.home() / "AppData" / "Local" / "agy" / "bin" / f"{exe_name}.exe",
             Path.home() / "AppData" / "Local" / "agy" / "bin" / "agy.exe",
-            Path.home() / ".gemini" / "antigravity-cli" / "bin" / "agy.exe",
         ):
             if cand.is_file():
                 return str(cand)
@@ -411,20 +410,9 @@ def _find_mesh_exe(exe_name: str) -> str | None:
         ):
             if cand.is_file():
                 return str(cand)
-    if exe_name == "gemini":
-        # Gemini CLI: npm i -g @google/gemini-cli drops gemini.cmd in the
-        # npm prefix (usually %APPDATA%\npm). shutil.which usually finds it,
-        # but frozen browsers / stale PATHs may not — probe directly.
-        # Free tier: 1000 req/day (Google login) / 250 req/day API-key Flash.
-        for cand in (
-            Path.home() / "AppData" / "Roaming" / "npm" / "gemini.cmd",
-            Path.home() / "AppData" / "Roaming" / "npm" / "gemini.exe",
-            Path.home() / ".npm-global" / "bin" / "gemini",
-        ):
-            if cand.is_file():
-                return str(cand)
     if exe_name == "cline":
-        # Cline CLI: npm i -g cline. Same PATH caveat as gemini above.
+        # Cline CLI: npm i -g cline. shutil.which usually finds it, but
+        # frozen browsers / stale PATHs may not — probe directly.
         # Free tier: rotating FREE models in CLI/IDE (account quota-limited).
         for cand in (
             Path.home() / "AppData" / "Roaming" / "npm" / "cline.cmd",

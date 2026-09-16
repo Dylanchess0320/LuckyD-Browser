@@ -32,8 +32,6 @@ _SHELL_LABELS = {
     "grok": "Grok",
     "mesh-muse": "Muse Code",
     "muse": "Muse Code",
-    "mesh-gemini": "Gemini",
-    "gemini": "Gemini",
     "mesh-cline": "Cline",
     "cline": "Cline",
 }
@@ -42,11 +40,10 @@ _SHELL_LABELS = {
 # Agent Mesh dock — the CLIs wired in via terminal_server.MESH_SHELLS, shown
 # as an agent picker in the terminal tab. (shell, label, emoji, accent, blurb)
 # Dylan 2026-09-14: DeepSeek (mesh-dsh) and Muse Spark removed — Muse Code stays.
-# 9.1: Gemini CLI added (free 1000 req/day Google login / 250 req/day API key),
+# 9.4: Gemini CLI dropped in favor of Antigravity (agy) for plan/build stages;
 # Cline CLI kept (free rotating FREE models) — both work in Agent 1 + Agent 2.
 _MESH_AGENTS = {
     "mesh-agy": ("Antigravity", "🛸", "#38bdf8", "Google DeepMind · AGY"),
-    "mesh-gemini": ("Gemini", "✨", "#4285f4", "Google · 1000 req/day free"),
     "mesh-claude": ("Claude", "🟠", "#d97706", "Anthropic · architect"),
     "mesh-codex": ("Codex", "🟢", "#10b981", "OpenAI · builder"),
     "mesh-copilot": ("Copilot", "⚫", "#8b9bb4", "GitHub · reviewer"),

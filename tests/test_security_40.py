@@ -376,25 +376,25 @@ class TestVersionUnification:
 
         import browser
 
-        assert browser.__version__ == "9.3.0"
+        assert browser.__version__ == "9.4.0"
 
         with open(_REPO_ROOT / "pyproject.toml", "rb") as f:
-            assert tomllib.load(f)["project"]["version"] == "9.3.0"
+            assert tomllib.load(f)["project"]["version"] == "9.4.0"
 
         ai_bridge = (_BROWSER_DIR / "browser_core" / "ai_bridge.py").read_text(encoding="utf-8")
-        assert "LuckyDBrowser/9.3" in ai_bridge
+        assert "LuckyDBrowser/9.4" in ai_bridge
         assert "LuckyDBrowser/1.0" not in ai_bridge
 
         version_info = (_BROWSER_DIR / "version_info.txt").read_text(encoding="utf-8")
-        assert "9.3.0.0" in version_info
+        assert "9.4.0.0" in version_info
         assert "5.0.0" not in version_info
         # FFI numeric tuples must match the release (regression: 6.0.0 shipped
         # with stale 3.9.0.0 filevers/prodvers while the strings said 6.0.0.0).
-        assert "filevers=(9, 1, 0, 0)" in version_info
-        assert "prodvers=(9, 1, 0, 0)" in version_info
+        assert "filevers=(9, 4, 0, 0)" in version_info
+        assert "prodvers=(9, 4, 0, 0)" in version_info
 
         iss = (_BROWSER_DIR / "installer" / "LuckyDBrowser.iss").read_text(encoding="utf-8")
-        assert '#define AppVersion   "9.3.0"' in iss
+        assert '#define AppVersion   "9.4.0"' in iss
 
 
 # ── cline_bridge: inbound bearer auth ───────────────────────────────────────

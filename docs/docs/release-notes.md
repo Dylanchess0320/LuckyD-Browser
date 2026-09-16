@@ -1,6 +1,18 @@
 # LuckyD Browser — Release Notes
 
-## [9.3.0] — AI provider list + reliability — 2026-09-15
+## [9.4.0] — Antigravity replaces Gemini — 2026-09-16
+
+**[`LuckyDBrowserSetup-9.4.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.4.0/LuckyDBrowserSetup-9.4.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed
+
+- **Antigravity (agy) mesh agent** — `agy` / `mesh-agy` covers the agent-mesh plan/build stages, probed via PATH plus `%LOCALAPPDATA%\agy\bin`.
+- **Gemini CLI removed** — `gemini` / `mesh-gemini` shells, dock chips, and fallback probing are gone.
+- **Cline CLI stays first-class** — `cline` alongside `mesh-cline` in both agent terminals.
+
+On top of everything from 9.3.0 below.
+
+---
+
+## [9.3.0] — AI provider list + reliability — 2026-09-15 (archive)
 
 **[`LuckyDBrowserSetup-9.3.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.3.0/LuckyDBrowserSetup-9.3.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed
 

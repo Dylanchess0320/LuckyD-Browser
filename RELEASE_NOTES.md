@@ -1,4 +1,29 @@
-# LuckyD Browser v9.3.0 — Release Notes
+# LuckyD Browser v9.4.0 — Release Notes
+
+> **The AI browser that doesn't need an API key.** Free, unlimited, offline AI built in —
+> plus a full coding agent and developer terminal living in your tabs.
+
+**[⬇ Download `LuckyDBrowserSetup-9.4.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.4.0/LuckyDBrowserSetup-9.4.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed
+
+---
+
+## What's new in 9.4.0
+
+- **Antigravity (agy) replaces Gemini CLI in the Agent Mesh** — `agy` /
+  `mesh-agy` covers the plan/build stages (Google DeepMind). The exe is
+  probed via PATH plus the standard `%LOCALAPPDATA%\agy\bin` fallback.
+- **Gemini CLI removed** — `gemini` / `mesh-gemini` shells, dock chips, and
+  the npm fallback probing are gone, so the terminal dock no longer shows
+  dead panes.
+- **Cline CLI stays first-class** — `cline` alongside `mesh-cline` in both
+  Agent 1 and Agent 2 terminals, with direct npm-path probing for frozen
+  builds.
+
+On top of everything from 9.3.0 below.
+
+---
+
+# LuckyD Browser v9.3.0 — Release Notes (archive)
 
 > **The AI browser that doesn't need an API key.** Free, unlimited, offline AI built in —
 > plus a full coding agent and developer terminal living in your tabs.
