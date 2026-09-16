@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [9.5.0] - 2026-09-16
+
+Terminal crash fix: a null/non-string Bash `command` used to raise
+`AttributeError` out of the tool and kill the agent's terminal session — the
+shell tools now validate input and return an error result instead, and the
+timeout kill path is regression-tested (`tests/test_95_terminal_crash.py`).
+On top of everything from 9.4.0.
+Shipped as `LuckyDBrowserSetup-9.5.0.exe`.
+
 ## [9.4.0] - 2026-09-16
 
 Antigravity replaces Gemini in the Agent Mesh: `agy` / `mesh-agy` covers the

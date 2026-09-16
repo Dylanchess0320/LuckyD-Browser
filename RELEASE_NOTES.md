@@ -1,4 +1,31 @@
-# LuckyD Browser v9.4.0 — Release Notes
+# LuckyD Browser v9.5.0 — Release Notes
+
+> **The AI browser that doesn't need an API key.** Free, unlimited, offline AI built in —
+> plus a full coding agent and developer terminal living in your tabs.
+
+*9.5.0 is on `main` — the installer below publishes with Dylan's 9.5.0 release.*
+
+**[⬇ Download `LuckyDBrowserSetup-9.5.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.5.0/LuckyDBrowserSetup-9.5.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed
+
+---
+
+## What's new in 9.5.0
+
+- **Fixed: agent terminal crash on malformed Bash calls** — when the agent issued
+  a Bash tool call with a missing/null `command`, `BashTool.execute` raised
+  `AttributeError` out of the tool and killed the whole terminal session. The
+  shell tools now validate their input and return an error result instead, so a
+  bad tool call can never crash the agent again. Same guard added to the
+  PowerShell tool.
+- **Timeout path re-verified** — new regression tests
+  (`tests/test_95_terminal_crash.py`) prove a timed-out command comes back as a
+  timeout error result and the entire process tree is reaped.
+
+On top of everything from 9.4.0 below.
+
+---
+
+# LuckyD Browser v9.4.0 — Release Notes (archive)
 
 > **The AI browser that doesn't need an API key.** Free, unlimited, offline AI built in —
 > plus a full coding agent and developer terminal living in your tabs.

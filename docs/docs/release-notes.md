@@ -1,6 +1,20 @@
 # LuckyD Browser — Release Notes
 
-## [9.4.0] — Antigravity replaces Gemini — 2026-09-16
+## [9.5.0] — Terminal crash fix — 2026-09-16
+
+**[`LuckyDBrowserSetup-9.5.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.5.0/LuckyDBrowserSetup-9.5.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed
+
+- **Agent terminal crash fixed** — a Bash tool call with a missing/null `command`
+  raised `AttributeError` and killed the terminal session. The shell tools now
+  validate input and return an error result instead.
+- **Timeout kill path regression-tested** — timed-out commands return a timeout
+  error result and the whole process tree is reaped.
+
+On top of everything from 9.4.0 below.
+
+---
+
+## [9.4.0] — Antigravity replaces Gemini — 2026-09-16 (archive)
 
 **[`LuckyDBrowserSetup-9.4.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.4.0/LuckyDBrowserSetup-9.4.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed
 

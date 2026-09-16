@@ -177,6 +177,12 @@ class BashTool(ToolBase):
     }
 
     def _is_safe(self, cmd: str) -> tuple[bool, str]:
+        # 9.5: a null/non-string command (e.g. the agent emitting
+        # `"command": null`) used to blow up in sandbox.is_safe with
+        # AttributeError and take down the whole terminal session. Reject it
+        # here so execute() returns an error result instead of raising.
+        if not isinstance(cmd, str) or not cmd.strip():
+            return False, "no command provided (expected a non-empty string)"
         # Single-source blocklist + path-escape checks live in sandbox.py.
         if _sandbox_is_safe is not None:
             safe, reason = _sandbox_is_safe(cmd)
@@ -314,6 +320,13 @@ class PowerShellTool(ToolBase):
     async def execute(
         self, command: str, description: str = "", timeout: int = 120000
     ) -> ToolOutput:
+        # 9.5: null/non-string command must come back as an error result,
+        # never a raised TypeError from the subprocess spawn.
+        if not isinstance(command, str) or not command.strip():
+            return ToolOutput(
+                text="PowerShell tool needs a command string (got empty/missing command).",
+                error=True,
+            )
         timeout_sec = min(timeout, 600000) / 1000
         try:
             proc = await asyncio.create_subprocess_exec(

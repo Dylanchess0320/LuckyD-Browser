@@ -1,5 +1,8 @@
 # Getting Started
 
+> **New in 9.5.0:** agent terminal crash fix — a malformed Bash tool call can no
+> longer kill the terminal session (error result instead).
+
 ## Requirements
 
 - **Windows 10/11 x64** — LuckyD Browser is a Windows desktop app
@@ -8,14 +11,14 @@
 
 ## Install the browser
 
-1. Download [**LuckyDBrowserSetup-9.4.0.exe**](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.4.0/LuckyDBrowserSetup-9.4.0.exe)
+1. Download [**LuckyDBrowserSetup-9.5.0.exe**](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.5.0/LuckyDBrowserSetup-9.5.0.exe)
 2. Run it — installs to `%LOCALAPPDATA%\Programs\LuckyDBrowser`
 3. Leave **"Set up free unlimited local AI"** checked to get Ollama + `llama3.2:3b` in one shot
 
 Silent install for scripts and fleets:
 
 ```powershell
-LuckyDBrowserSetup-9.4.0.exe /VERYSILENT /NORESTART
+LuckyDBrowserSetup-9.5.0.exe /VERYSILENT /NORESTART
 ```
 
 ## First launch in 60 seconds
@@ -47,11 +50,11 @@ browser\run_browser.bat
 
 # Shareable installer (needs Inno Setup 6)
 powershell -NoProfile -ExecutionPolicy Bypass -File browser\installer\build_installer.ps1
-# → browser\installer\output\LuckyDBrowserSetup-9.4.0.exe
+# → browser\installer\output\LuckyDBrowserSetup-9.5.0.exe
 ```
 
 ## Upgrading
 
-Install the new `LuckyDBrowserSetup-9.4.0.exe` right over your existing install — profile, settings, and workspaces carry over. The browser also checks for updates itself and can install them in-app with one click.
+Install the new `LuckyDBrowserSetup-9.5.0.exe` right over your existing install — profile, settings, and workspaces carry over. The browser also checks for updates itself and can install them in-app with one click.
 
 Next: [Features →](features.md)

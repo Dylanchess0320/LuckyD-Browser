@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [9.5.0] - 2026-09-16
+
+Terminal crash fix, on top of everything from 9.4.0.
+Shipped as `LuckyDBrowserSetup-9.5.0.exe`.
+
+### Fixed
+- **Agent terminal crash on null/non-string Bash `command`** — `BashTool._is_safe`
+  passed the command straight into `sandbox.is_safe`, so a tool call with
+  `"command": null` raised `AttributeError` out of `execute()` and took down
+  the agent's whole terminal session. Input is now validated up front and every
+  failure mode returns an error `ToolOutput` instead of raising; the same guard
+  was added to `PowerShellTool.execute`.
+- **Timeout kill path re-verified** — new regression tests in
+  `tests/test_95_terminal_crash.py` prove a timed-out command returns a timeout
+  error result (never a raise) and the whole process tree is reaped.
+
+### Changed
+- **Version unification to 9.5.0** — pyproject, browser `__version__`, Inno
+  Setup script, version_info, AI bridge User-Agent, docs, and version-pinned
+  tests.
+
 ## [9.4.0] - 2026-09-16
 
 Antigravity replaces Gemini in the Agent Mesh, on top of everything from 9.3.0.

@@ -60,11 +60,20 @@ Most “AI browsers” rent you a chatbot behind an account. LuckyD is a **real 
 
 ## Latest release
 
-**v9.4.0** — Antigravity replaces Gemini in the Agent Mesh, on top of everything from 9.3.0:
+**v9.5.0** — Terminal crash fix, on top of everything from 9.4.0:
 
 | | |
 |---|---|
-| **⬇ Windows installer** | [`LuckyDBrowserSetup-9.4.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.4.0/LuckyDBrowserSetup-9.4.0.exe) — built on a real Windows runner with Inno Setup 6. Per-user, no admin, silent-install flags. |
+| **⬇ Windows installer** | [`LuckyDBrowserSetup-9.5.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.5.0/LuckyDBrowserSetup-9.5.0.exe) — built on a real Windows runner with Inno Setup 6. Per-user, no admin, silent-install flags. |
+| **🛠 Terminal crash fixed** | A Bash tool call with a missing/null `command` raised `AttributeError` and killed the agent's terminal session — the shell tools now validate input and return an error result instead, and the timeout kill path is regression-tested. |
+
+<details>
+<summary>New in 9.4.0 — Antigravity replaces Gemini</summary>
+
+Antigravity replaces Gemini in the Agent Mesh, on top of everything from 9.3.0:
+
+| | |
+|---|---|
 | **🛸 Antigravity (agy) mesh agent** | `agy` / `mesh-agy` shell covers the agent-mesh plan/build stages (Google DeepMind). Probed via PATH plus `%LOCALAPPDATA%\agy\bin` fallback. |
 | **🧹 Gemini CLI removed** | `gemini` / `mesh-gemini` shells, dock chips, and fallback probing are gone — no more dead panes when Gemini isn't the plan/build driver. |
 | **🖥 Cline CLI stays first-class** | `cline` shell alongside `mesh-cline` in both Agent 1 and Agent 2 terminals, with npm-fallback probing for frozen builds. |
@@ -72,6 +81,8 @@ Most “AI browsers” rent you a chatbot behind an account. LuckyD is a **real 
 | **📡 Offline-proof model resolver** | The model catalog falls back to last-known-good models when the fetch fails instead of silently dropping to hardcoded defaults. |
 | **💰 Honest cost tracking** | DeepSeek v4 at real rates; every free-tier route correctly reports $0. |
 | **🔔 Quiet update badge** | A silent check runs at startup — when a new release exists, a small toolbar badge lights up. No modal, no interruption. |
+
+</details>
 
 <details>
 <summary>New in 9.3.0 — AI provider list + reliability</summary>
@@ -232,14 +243,14 @@ Also in this lineage: Deep Research swarm (`Ctrl+Shift+R`), Agent Mesh, self-hea
 
 ## Install in 10 seconds
 
-1. Get **[LuckyDBrowserSetup-9.4.0.exe](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.4.0/LuckyDBrowserSetup-9.4.0.exe)**
+1. Get **[LuckyDBrowserSetup-9.5.0.exe](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.5.0/LuckyDBrowserSetup-9.5.0.exe)**
 2. Run it — per-user, **no admin**, installs to `%LOCALAPPDATA%\Programs\LuckyDBrowser`
 3. Leave **“Set up free unlimited local AI”** checked → Ollama + `llama3.2:3b` (~2 GB, one time)
 4. `Ctrl+Shift+A` → chat offline. Or bring your own keys (Gemini, Groq, DeepSeek, OpenAI, Anthropic, Z.ai, OpenRouter, Cline, OpenCode)
 
 No local model yet? With no Ollama and no keys, chat falls back to the OpenCode Zen gateway (`OPENCODE_API_KEY`) — no local server needed.
 
-Silent: `LuckyDBrowserSetup-9.4.0.exe /VERYSILENT /NORESTART`
+Silent: `LuckyDBrowserSetup-9.5.0.exe /VERYSILENT /NORESTART`
 
 Windows 10/11 x64 only.
 
@@ -280,7 +291,7 @@ browser\run_browser.bat
 
 # Shareable installer (needs Inno Setup 6)
 powershell -NoProfile -ExecutionPolicy Bypass -File browser\installer\build_installer.ps1
-# → browser\installer\output\LuckyDBrowserSetup-9.4.0.exe
+# → browser\installer\output\LuckyDBrowserSetup-9.5.0.exe
 ```
 
 ---
