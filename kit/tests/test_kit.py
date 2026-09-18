@@ -69,8 +69,13 @@ def test_redact_args_truncates_long_values():
 
 def test_audit_log_roundtrip(tmp_policy):
     audit = AuditLog()
-    entry = audit.record("Bash", {"command": "ls", "api_key": "secret"},
-                         decision="denied", ok=False, summary="blocked by policy")
+    entry = audit.record(
+        "Bash",
+        {"command": "ls", "api_key": "secret"},
+        decision="denied",
+        ok=False,
+        summary="blocked by policy",
+    )
     assert entry["scope"] == "shell"
     assert entry["risk"] == "high"
     assert entry["args"]["api_key"] == "***"
@@ -114,9 +119,9 @@ def test_approval_engine_run_fail_closed(tmp_policy):
 
 def test_approval_engine_run_approved(tmp_policy):
     engine = ApprovalEngine()
-    result, out = engine.run("Bash", {"command": "ls"},
-                            execute=lambda: "ok",
-                            ask_user=lambda desc: True)
+    result, out = engine.run(
+        "Bash", {"command": "ls"}, execute=lambda: "ok", ask_user=lambda desc: True
+    )
     assert result.decision == "allow"
     assert out == "ok"
 
@@ -124,7 +129,10 @@ def test_approval_engine_run_approved(tmp_policy):
 def test_site_policy(tmp_policy):
     engine = ApprovalEngine()
     engine.policy.set_site_policy("example.com", "allow")
-    r = engine.decide("BrowserNavigate", {"url": "https://example.com/a"}, )
+    r = engine.decide(
+        "BrowserNavigate",
+        {"url": "https://example.com/a"},
+    )
     assert r.decision == "allow"
     engine.policy.set_site_policy("evil.test", "deny")
     r = engine.decide("BrowserClick", {"selector": "#x"}, site_host="evil.test")

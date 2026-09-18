@@ -27,12 +27,12 @@ cp -r kit/lucky_kit /your/project/
 ```python
 from lucky_kit import ApprovalEngine, AuditLog, CircuitBreaker
 
-engine = ApprovalEngine()      # allow / ask / deny per tool call
-audit = AuditLog()             # every call, redacted, append-only JSONL
-breaker = CircuitBreaker()     # trips after 4 all-failure turns
+engine = ApprovalEngine()  # allow / ask / deny per tool call
+audit = AuditLog()  # every call, redacted, append-only JSONL
+breaker = CircuitBreaker()  # trips after 4 all-failure turns
 
 result = engine.decide("Bash", {"command": "rm -rf /"})
-print(result.decision, "-", result.reason)   # ask - scope 'shell' requires approval
+print(result.decision, "-", result.reason)  # ask - scope 'shell' requires approval
 ```
 
 ## The philosophy

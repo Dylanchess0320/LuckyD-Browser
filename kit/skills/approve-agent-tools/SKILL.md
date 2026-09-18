@@ -33,6 +33,7 @@ import time
 engine = ApprovalEngine()
 audit = AuditLog()
 
+
 def guarded_call(tool, args, execute, ask_user):
     t0 = time.time()
     result, _ = engine.decide(tool, args), None
@@ -47,8 +48,7 @@ def guarded_call(tool, args, execute, ask_user):
             output = execute()
         except Exception as e:
             ok, output = False, str(e)
-    audit.record(tool, args, decision=decision,
-                 duration_ms=(time.time() - t0) * 1000, ok=ok)
+    audit.record(tool, args, decision=decision, duration_ms=(time.time() - t0) * 1000, ok=ok)
     return output
 ```
 

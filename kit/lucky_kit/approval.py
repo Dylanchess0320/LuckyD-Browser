@@ -8,8 +8,9 @@ tool, call ``ApprovalEngine.decide``. If it returns ``ask``, present
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable, Literal
+from typing import Any, Literal
 
 from .trust import TrustPolicy, describe_decision, host_of_url, scope_of
 

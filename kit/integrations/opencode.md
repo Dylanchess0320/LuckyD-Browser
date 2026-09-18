@@ -30,8 +30,8 @@ LuckyD's gates. Recommended setup:
 ```python
 from lucky_kit import ApprovalEngine, AuditLog
 
-engine = ApprovalEngine()   # reads ~/.lucky-kit/trust/policy.json
-audit = AuditLog()          # appends to ~/.lucky-kit/audit/audit.jsonl
+engine = ApprovalEngine()  # reads ~/.lucky-kit/trust/policy.json
+audit = AuditLog()  # appends to ~/.lucky-kit/audit/audit.jsonl
 ```
 
 ## Publish back
