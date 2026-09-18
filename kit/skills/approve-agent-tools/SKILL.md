@@ -1,9 +1,9 @@
 ---
-name: trust-guard
-description: Wrap any agent's tool calls with LuckyD's trust layer — permission scopes, approval policy, secret redaction, and an append-only audit log. Use when building or hardening an AI agent that executes tools.
+name: approve-agent-tools
+description: Approve, deny, and audit every tool call your AI agent makes — permission scopes, user approvals, secret redaction, and an append-only log. Use when your agent executes tools and you want a human in the loop with receipts.
 ---
 
-# Trust Guard — agentic with receipts
+# Approve Agent Tools — agentic with receipts
 
 Give any tool-calling agent LuckyD's trust foundation in ~20 lines. No LuckyD install required; the `lucky_kit` package in this repo is stdlib-only.
 

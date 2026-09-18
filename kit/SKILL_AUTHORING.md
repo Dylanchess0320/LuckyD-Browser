@@ -42,7 +42,7 @@ description: One line — what it does and when to use it. This is what
 
 ## What makes a skill spread
 
-1. **One job.** `security-audit` audits. It doesn't also deploy.
+1. **One job.** `find-security-vulnerabilities` audits. It doesn't also deploy.
 2. **Verifiable output.** Findings cite file + line + evidence. Advice
    cites commands the user can run. No vibes.
 3. **Fail-closed defaults.** If the skill touches shell, files, or
@@ -60,5 +60,5 @@ description: One line — what it does and when to use it. This is what
 3. Write the description like a headline — it's the only marketing the
    skill gets.
 
-The three skills in this kit (`trust-guard`, `security-audit`,
-`safe-shell`) are the reference implementations. Steal their structure.
+The three skills in this kit (`approve-agent-tools`, `find-security-vulnerabilities`,
+`run-shell-commands-safely`) are the reference implementations. Steal their structure.

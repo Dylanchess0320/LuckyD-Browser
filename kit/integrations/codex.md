@@ -8,9 +8,9 @@ Codex CLI discovers skills on its path — copy them where yours live:
 
 ```bash
 mkdir -p ~/.codex/skills
-cp -r kit/skills/trust-guard ~/.codex/skills/
-cp -r kit/skills/security-audit ~/.codex/skills/
-cp -r kit/skills/safe-shell ~/.codex/skills/
+cp -r kit/skills/approve-agent-tools ~/.codex/skills/
+cp -r kit/skills/find-security-vulnerabilities ~/.codex/skills/
+cp -r kit/skills/run-shell-commands-safely ~/.codex/skills/
 ```
 
 Point Codex at them from `~/.codex/config.toml` or your project's
@@ -18,9 +18,9 @@ Point Codex at them from `~/.codex/config.toml` or your project's
 
 ```markdown
 ## Skills
-- `trust-guard`: gate every tool call through scopes + approvals + audit log
-- `security-audit`: multi-phase security audit with verifiable findings
-- `safe-shell`: allowlisted, dry-run, redacted shell execution
+- `approve-agent-tools`: gate every tool call through scopes + approvals + audit log
+- `find-security-vulnerabilities`: multi-phase security audit with verifiable findings
+- `run-shell-commands-safely`: allowlisted, dry-run, redacted shell execution
 ```
 
 ## Pair with Codex's sandbox

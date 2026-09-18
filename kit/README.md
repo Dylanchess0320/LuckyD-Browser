@@ -10,9 +10,9 @@ code running in LuckyD Browser v9.5 — so any project can use it:
   breaker. Copy the folder, `import lucky_kit`, done.
 - **`skills/`** — installable agent skills (`SKILL.md` format) that work in
   LuckyD, Claude Code, OpenCode, and Codex CLI:
-  - `trust-guard` — gate any agent's tool calls: scopes + approvals + receipts
-  - `security-audit` — multi-phase security audit with verifiable findings
-  - `safe-shell` — allowlisted, dry-run, redacted shell execution
+  - `approve-agent-tools` — gate any agent's tool calls: scopes + approvals + receipts
+  - `find-security-vulnerabilities` — multi-phase security audit with verifiable findings
+  - `run-shell-commands-safely` — allowlisted, dry-run, redacted shell execution
 - **`integrations/`** — setup guides: [Claude Code](integrations/claude-code.md),
   [OpenCode](integrations/opencode.md), [Codex CLI](integrations/codex.md),
   [WebMCP](integrations/webmcp.md) (expose your site to agents)
@@ -45,11 +45,11 @@ user can see it. That's LuckyD's trust model, and now it's yours.
 
 ```bash
 # Claude Code
-cp -r kit/skills/trust-guard ~/.claude/skills/
+cp -r kit/skills/approve-agent-tools ~/.claude/skills/
 # OpenCode
-cp -r kit/skills/trust-guard ~/.config/opencode/skills/
+cp -r kit/skills/approve-agent-tools ~/.config/opencode/skills/
 # Codex CLI
-cp -r kit/skills/trust-guard ~/.codex/skills/
+cp -r kit/skills/approve-agent-tools ~/.codex/skills/
 ```
 
 ## Tests

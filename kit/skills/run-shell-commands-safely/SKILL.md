@@ -1,9 +1,9 @@
 ---
-name: safe-shell
-description: Execute shell commands safely inside an agent loop — allowlists, dry-run previews, output redaction, and failure budgets. Use whenever an agent runs Bash or PowerShell on a user's machine.
+name: run-shell-commands-safely
+description: Run shell commands safely inside an agent loop — allowlists, dry-run previews, output redaction, and failure budgets. Use whenever an agent runs Bash or PowerShell on a user's machine.
 ---
 
-# Safe Shell — commands without regrets
+# Run Shell Commands Safely — commands without regrets
 
 Shell is the highest-risk scope most agents have. Treat every command as
 guilty until proven innocent.
@@ -56,4 +56,4 @@ Command output lands in logs and model context. Scrub it:
   doesn't need them. Pass them as one-shot stdin or files with 0600
   permissions, then delete.
 - Log the command that ran (redacted), its exit code, and duration —
-  into the audit log (`trust-guard`), not just the terminal scrollback.
+  into the audit log (`approve-agent-tools`), not just the terminal scrollback.

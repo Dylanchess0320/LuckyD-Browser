@@ -6,13 +6,13 @@ Use LuckyD's trust layer and skills inside Claude Code.
 
 ```bash
 mkdir -p ~/.claude/skills
-cp -r kit/skills/trust-guard ~/.claude/skills/
-cp -r kit/skills/security-audit ~/.claude/skills/
-cp -r kit/skills/safe-shell ~/.claude/skills/
+cp -r kit/skills/approve-agent-tools ~/.claude/skills/
+cp -r kit/skills/find-security-vulnerabilities ~/.claude/skills/
+cp -r kit/skills/run-shell-commands-safely ~/.claude/skills/
 ```
 
 Claude Code picks up `SKILL.md` files automatically — no config needed.
-Invoke with `/trust-guard`, or let Claude apply them when relevant.
+Invoke with `/approve-agent-tools`, or let Claude apply them when relevant.
 
 ## Use the trust layer in hooks
 

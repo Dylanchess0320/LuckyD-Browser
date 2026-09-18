@@ -8,9 +8,9 @@ OpenCode loads skills from your config directory:
 
 ```bash
 mkdir -p ~/.config/opencode/skills
-cp -r kit/skills/trust-guard ~/.config/opencode/skills/
-cp -r kit/skills/security-audit ~/.config/opencode/skills/
-cp -r kit/skills/safe-shell ~/.config/opencode/skills/
+cp -r kit/skills/approve-agent-tools ~/.config/opencode/skills/
+cp -r kit/skills/find-security-vulnerabilities ~/.config/opencode/skills/
+cp -r kit/skills/run-shell-commands-safely ~/.config/opencode/skills/
 ```
 
 Reference them in `~/.config/opencode/opencode.json` under your agent's

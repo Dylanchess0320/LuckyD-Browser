@@ -61,11 +61,11 @@ Most “AI browsers” rent you a chatbot behind an account. LuckyD is a **real 
 Don't rebuild agent trust plumbing — build *with* ours. The [`kit/`](kit/) ships LuckyD's trust layer as a stdlib-only Python package plus installable skills that work in LuckyD, Claude Code, OpenCode, and Codex CLI:
 
 - **`lucky_kit`** — permission scopes, approval engine (allow/ask/deny), secret redaction, append-only audit log, agent-loop circuit breaker. Copy the folder, `import lucky_kit`, done.
-- **Skills** — `trust-guard` (gate any agent's tools), `security-audit` (multi-phase audits with verifiable findings), `safe-shell` (allowlisted shell execution).
+- **Skills** — `approve-agent-tools` (gate any agent's tools), `find-security-vulnerabilities` (multi-phase audits with verifiable findings), `run-shell-commands-safely` (allowlisted shell execution).
 - **Guides** — integrate with [Claude Code](kit/integrations/claude-code.md), [OpenCode](kit/integrations/opencode.md), [Codex CLI](kit/integrations/codex.md), or expose your site to agents via [WebMCP](kit/integrations/webmcp.md).
 
 ```bash
-cp -r kit/skills/trust-guard ~/.claude/skills/   # install the skill anywhere
+cp -r kit/skills/approve-agent-tools ~/.claude/skills/   # install the skill anywhere
 python -m pytest kit/tests/ -q                    # 15 tests, zero dependencies
 ```
 

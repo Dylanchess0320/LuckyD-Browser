@@ -1,9 +1,9 @@
 ---
-name: security-audit
-description: Multi-phase security audit of a codebase or project — secrets scan, dependency review, injection surfaces, and agent-tool permissions. Produces independently verifiable, machine-readable findings. Use when asked to audit, review for security, or harden a project.
+name: find-security-vulnerabilities
+description: Find security vulnerabilities in a codebase or project — secrets scan, dependency review, injection surfaces, and agent-tool permissions. Produces independently verifiable, machine-readable findings. Use when asked to audit, review for security, or harden a project.
 ---
 
-# Security Audit — multi-phase, verifiable findings
+# Find Security Vulnerabilities — multi-phase, verifiable findings
 
 Run the phases in order. Each phase must produce findings the user can
 independently verify — file, line, and evidence quote. No vibes.
@@ -40,7 +40,7 @@ Map the attack surface before judging it:
 - Web: unescaped HTML (XSS), unvalidated redirects, missing CSP.
 - Deserialization: `pickle`, `yaml.load`, `eval` on untrusted input.
 - Agents: tools the agent can call without approval — overly broad
-  permissions are a vulnerability (see `trust-guard`).
+  permissions are a vulnerability (see `approve-agent-tools`).
 
 ## Phase 5 — Findings report
 
