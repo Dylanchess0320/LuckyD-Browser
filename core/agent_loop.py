@@ -698,9 +698,20 @@ class CodingAgent:
                     "nemotron-3.5-lightning-free",
                     "deepseek-v4-flash-free",
                     "mimo-v2.5-free",
-                    "muse-spark-1.2-contributor-free",
                     "big-pickle",
                 ]
+                # Contributor-tier fallbacks only appear after explicit opt-in.
+                try:
+                    from core.contributor import (
+                        contributor_enabled,
+                        contributor_models_enabled_only,
+                    )
+
+                    _free_fallbacks = contributor_models_enabled_only(_free_fallbacks)
+                    if contributor_enabled():
+                        _free_fallbacks.append("muse-spark-1.2-contributor-free")
+                except Exception:
+                    pass
                 for _alt_model in _free_fallbacks:
                     if _alt_model == self.model:
                         continue

@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+import os
 import re
 import sys
 import threading
@@ -46,10 +47,183 @@ class SwarmManager:
         self._active_run: dict[str, Any] | None = None
         self._cancel_requested = False
         self._thread: threading.Thread | None = None
+        self._thread_run_id: str | None = None
         # Set when the background worker finishes (completed or failed), so
         # callers can wait deterministically instead of polling on a timer.
         self._done = threading.Event()
         self._done.set()  # no run active at construction
+
+    # Backends that only work with an API key — selecting one explicitly
+    # without the key must fail fast with a plain message, never silently
+    # fall back to keyless DDG ("doesn't feel like it works" liability).
+    _KEYED_BACKENDS = {
+        "tavily": ("TAVILY_API_KEY", "Tavily AI Search"),
+        "brave": ("BRAVE_API_KEY", "Brave Search"),
+        "gemini": ("GEMINI_API_KEY or GOOGLE_API_KEY", "Gemini grounding"),
+    }
+
+    @classmethod
+    def validate_backend_keys(cls, backend: str) -> None:
+        """Raise ValueError with a plain-language message when an explicitly
+        selected keyed backend has no API key configured."""
+        need = cls._KEYED_BACKENDS.get((backend or "").lower())
+        if not need:
+            return
+        env_names, label = need
+        for name in env_names.split(" or "):
+            if (os.getenv(name.strip(), "") or "").strip():
+                return
+        raise ValueError(
+            f"{label} needs an API key ({env_names}) — no API key configured. "
+            "Add the key, or pick 'Auto' / 'DuckDuckGo (free, no key)'."
+        )
+
+    def _handle_event(self, run_id: str, ev: RunEvent) -> None:
+        """Append a streamed event to the matching active run (stale-safe)."""
+        with self._lock:
+            if not self._active_run or self._active_run.get("id") != run_id:
+                return
+            node = (ev.node or "").lower()
+            msg = ev.message or ""
+            if node in ("init", "planner"):
+                self._active_run["stage"] = "planning"
+            elif node in ("researcher", "research"):
+                self._active_run["stage"] = "researching"
+                if "search" in msg.lower():
+                    self._active_run["searches_count"] += 1
+                if "evidence" in msg.lower() or "passage" in msg.lower():
+                    self._active_run["evidence_count"] += 1
+            elif node in ("synthesizer", "synthesize"):
+                self._active_run["stage"] = "synthesizing"
+            elif node in ("critic", "critique"):
+                self._active_run["stage"] = "critiquing"
+            elif node in ("verifier", "verify"):
+                self._active_run["stage"] = "verifying"
+            elif node in ("finalizer", "finalize"):
+                self._active_run["stage"] = "finalizing"
+            self._active_run["elapsed"] = round(time.time() - self._active_run["start_time"], 1)
+            self._active_run["events"].append(
+                {
+                    "ts": round(ev.ts, 2),
+                    "node": ev.node,
+                    "message": ev.message,
+                    "level": ev.level,
+                }
+            )
+
+    @staticmethod
+    def _newest_run_dir(runs_dir: str) -> Path | None:
+        try:
+            base = Path(runs_dir)
+            if not base.exists():
+                return None
+            candidates = [p for p in base.iterdir() if p.is_dir()]
+            if not candidates:
+                return None
+            return max(candidates, key=lambda p: p.stat().st_mtime)
+        except Exception:
+            return None
+
+    @staticmethod
+    def _load_evidence(run_dir: Path | None) -> list:
+        if not run_dir:
+            return []
+        try:
+            raw = json.loads((run_dir / "evidence.json").read_text(encoding="utf-8"))
+            return raw if isinstance(raw, list) else []
+        except Exception:
+            return []
+
+    @staticmethod
+    def _resolve_engine(provider: str, backend: str, dry_run: bool) -> dict[str, str]:
+        """Resolved engine for the pipeline chip (display-only, never raises).
+
+        Shows the concrete provider + model + backend instead of "auto".
+        """
+        try:
+            if dry_run or (provider or "").lower() == "mock":
+                label = "mock · mock (offline) · gemini (offline cards)"
+                return {
+                    "resolved_provider": "mock",
+                    "resolved_model": "mock (offline)",
+                    "resolved_backend": "gemini (offline cards)",
+                    "resolved_engine": label,
+                    "engine_label": label,
+                }
+            pname = (provider or "auto").lower()
+            rprovider = pname
+            rmodel = ""
+            if pname in ("auto", "luckyd"):
+                try:
+                    from core.providers import resolve_provider_config
+
+                    cfg = resolve_provider_config()
+                    rprovider = str(cfg.get("provider", pname) or pname)
+                    rmodel = str(cfg.get("model", "") or "")
+                except Exception:
+                    rprovider = pname
+            elif pname == "gemini":
+                rprovider = "gemini"
+                rmodel = drs_settings.model_worker
+            elif pname in ("opencode", "openrouter", "ollama"):
+                try:
+                    from features.deep_research.models.openai_compat import _BACKEND_DEFAULTS
+
+                    spec = _BACKEND_DEFAULTS.get(pname, {})
+                    rmodel = str(os.getenv(str(spec.get("model_env", "")), "") or "")
+                    if not rmodel:
+                        pool = spec.get("pool", [])
+                        rmodel = str(pool[0] if pool else pname)
+                except Exception:
+                    rmodel = pname
+            if (backend or "auto").lower() != "auto":
+                rbackend = backend
+            else:
+                try:
+                    rbackend = drs_settings.effective_search_backend(rprovider)
+                except Exception:
+                    rbackend = "ddg"
+            engine = f"{rprovider} · {rmodel or 'default'} · {rbackend}".strip()
+            return {
+                "resolved_provider": rprovider,
+                "resolved_model": rmodel,
+                "resolved_backend": rbackend,
+                "resolved_engine": engine,
+                "engine_label": engine,
+            }
+        except Exception:
+            engine = f"{provider or 'auto'} · {backend or 'auto'}"
+            return {
+                "resolved_provider": provider or "auto",
+                "resolved_model": "",
+                "resolved_backend": backend or "auto",
+                "resolved_engine": engine,
+                "engine_label": engine,
+            }
+
+    @staticmethod
+    def _plain_failure(err: Exception) -> str:
+        """Map cryptic backend errors to plain-language user messages."""
+        raw = str(err) or "Unknown error"
+        low = raw.lower()
+        if "no api key configured" in low or "needs an api key" in low:
+            return raw
+        if "gemini_api_key" in low or "google_api_key" in low:
+            return (
+                "No API key configured for Gemini grounding "
+                "(GEMINI_API_KEY or GOOGLE_API_KEY). Add the key, pick "
+                "'Browser's active AI provider', or use a Test run (offline)."
+            )
+        if "google-genai is not installed" in low:
+            return (
+                "Gemini grounding needs the google-genai package "
+                "(pip install google-genai>=1.0.0) or pick another backend."
+            )
+        if "tavily" in low and ("key" in low or "401" in low or "403" in low):
+            return "Tavily search failed — check TAVILY_API_KEY, or pick 'Auto'."
+        if "brave" in low and ("key" in low or "401" in low or "403" in low):
+            return "Brave search failed — check BRAVE_API_KEY, or pick 'Auto'."
+        return raw
 
     def start_research(
         self,
@@ -65,10 +239,28 @@ class SwarmManager:
         if not query:
             raise ValueError("Research question is required")
 
-        with self._lock:
-            if self._active_run and self._active_run.get("status") == "running":
-                raise RuntimeError("Research is already running — check the live activity panel")
+        # Fail fast: an explicitly-picked keyed backend without its key must
+        # never silently fall back to keyless DDG.
+        self.validate_backend_keys(backend)
 
+        with self._lock:
+            active = self._active_run
+            if active and active.get("status") == "running":
+                raise RuntimeError("Research is already running — check the live activity panel")
+            old_thread = self._thread
+            if old_thread is not None and not old_thread.is_alive():
+                old_thread = None
+
+        # Honest cancel: never overlap a still-live worker thread. Join
+        # outside the lock so the worker's own lock use can proceed.
+        if old_thread is not None and old_thread.is_alive():
+            old_thread.join(timeout=10.0)
+            if old_thread.is_alive():
+                raise RuntimeError(
+                    "The previous research run is still stopping — wait a few seconds and try again"
+                )
+
+        with self._lock:
             run_id = f"run-{time.strftime('%Y%m%d-%H%M%S')}"
             self._cancel_requested = False
             self._done.clear()  # a new run is starting
@@ -78,6 +270,11 @@ class SwarmManager:
                 "depth": depth,
                 "backend": backend,
                 "provider": provider,
+                "resolved_provider": "",
+                "resolved_model": "",
+                "resolved_backend": "",
+                "resolved_engine": "",
+                "engine_label": "",
                 "context": context,
                 "dry_run": bool(dry_run),
                 "status": "running",
@@ -86,6 +283,7 @@ class SwarmManager:
                 "end_time": None,
                 "elapsed": 0.0,
                 "events": [],
+                "evidence": [],
                 "evidence_count": 0,
                 "searches_count": 0,
                 "report_markdown": "",
@@ -97,39 +295,7 @@ class SwarmManager:
         emitter = EventEmitter()
 
         def _on_event(ev: RunEvent) -> None:
-            with self._lock:
-                if not self._active_run or self._active_run["id"] != run_id:
-                    return
-                node = ev.node.lower()
-                msg = ev.message
-
-                # Map node to high-level stage
-                if node in ("init", "planner"):
-                    self._active_run["stage"] = "planning"
-                elif node in ("researcher", "research"):
-                    self._active_run["stage"] = "researching"
-                    if "search" in msg.lower():
-                        self._active_run["searches_count"] += 1
-                    if "evidence" in msg.lower() or "passage" in msg.lower():
-                        self._active_run["evidence_count"] += 1
-                elif node in ("synthesizer", "synthesize"):
-                    self._active_run["stage"] = "synthesizing"
-                elif node in ("critic", "critique"):
-                    self._active_run["stage"] = "critiquing"
-                elif node in ("verifier", "verify"):
-                    self._active_run["stage"] = "verifying"
-                elif node in ("finalizer", "finalize"):
-                    self._active_run["stage"] = "finalizing"
-
-                self._active_run["elapsed"] = round(time.time() - self._active_run["start_time"], 1)
-                self._active_run["events"].append(
-                    {
-                        "ts": round(ev.ts, 2),
-                        "node": ev.node,
-                        "message": ev.message,
-                        "level": ev.level,
-                    }
-                )
+            self._handle_event(run_id, ev)
 
         emitter.subscribe(_on_event)
 
@@ -149,6 +315,7 @@ class SwarmManager:
                 drs_settings.max_iterations,
                 drs_settings.max_parallel,
                 drs_settings.search_backend,
+                drs_settings.max_seconds,
                 drs_settings.provider,
             )
 
@@ -169,6 +336,13 @@ class SwarmManager:
                 if dry_run:
                     drs_settings.provider = "mock"
 
+                # Publish the resolved engine NOW so the pipeline chip shows
+                # the concrete provider + model + backend, not "auto".
+                engine = self._resolve_engine(provider, backend, dry_run)
+                with self._lock:
+                    if self._active_run and self._active_run.get("id") == run_id:
+                        self._active_run.update(engine)
+
                 # Run swarm
                 report = asyncio.run(
                     run_swarm(
@@ -182,45 +356,76 @@ class SwarmManager:
 
                 with self._lock:
                     if self._active_run and self._active_run["id"] == run_id:
-                        self._active_run["status"] = "completed"
-                        self._active_run["stage"] = "done"
+                        # Honest cancel: a mid-flight cancel stays cancelled
+                        # even though the worker ran to completion.
+                        if self._cancel_requested or self._active_run.get("status") == "cancelled":
+                            self._active_run["status"] = "cancelled"
+                            self._active_run["stage"] = "cancelled"
+                        else:
+                            self._active_run["status"] = "completed"
+                            self._active_run["stage"] = "done"
                         self._active_run["report_markdown"] = report or ""
                         self._active_run["end_time"] = time.time()
                         self._active_run["elapsed"] = round(
                             time.time() - self._active_run["start_time"], 1
                         )
+                        # Dead Evidence tab fix: report RunStore.dir back into
+                        # the active run and load evidence.json now.
+                        newest = self._newest_run_dir(drs_settings.runs_dir)
+                        if newest is not None:
+                            self._active_run["run_dir"] = str(newest)
+                            ev = self._load_evidence(newest)
+                            self._active_run["evidence"] = ev
+                            self._active_run["evidence_count"] = len(ev)
 
             except Exception as e:
                 with self._lock:
                     if self._active_run and self._active_run["id"] == run_id:
-                        self._active_run["status"] = "failed"
-                        self._active_run["stage"] = "error"
-                        self._active_run["error"] = str(e)
+                        if self._cancel_requested or self._active_run.get("status") == "cancelled":
+                            self._active_run["status"] = "cancelled"
+                            self._active_run["stage"] = "cancelled"
+                        else:
+                            self._active_run["status"] = "failed"
+                            self._active_run["stage"] = "error"
+                            self._active_run["error"] = self._plain_failure(e)
                         self._active_run["end_time"] = time.time()
                         self._active_run["elapsed"] = round(
                             time.time() - self._active_run["start_time"], 1
                         )
             finally:
-                # Restore settings
-                with contextlib.suppress(Exception):
-                    (
-                        drs_settings.research_rounds,
-                        drs_settings.searches_per_round,
-                        drs_settings.max_urls_per_round,
-                        drs_settings.max_passages_per_worker,
-                        drs_settings.max_iterations,
-                        drs_settings.max_parallel,
-                        drs_settings.search_backend,
-                        drs_settings.provider,
-                    ) = saved
+                # Restore settings — guarded by run id: a newer run owns the
+                # settings now, so an older worker must not clobber them.
+                with self._lock:
+                    if self._thread_run_id == run_id or self._thread_run_id is None:
+                        with contextlib.suppress(Exception):
+                            (
+                                drs_settings.research_rounds,
+                                drs_settings.searches_per_round,
+                                drs_settings.max_urls_per_round,
+                                drs_settings.max_passages_per_worker,
+                                drs_settings.max_iterations,
+                                drs_settings.max_parallel,
+                                drs_settings.search_backend,
+                                drs_settings.max_seconds,
+                                drs_settings.provider,
+                            ) = saved
+                    if self._thread_run_id == run_id:
+                        self._thread_run_id = None
                 # Wake any waiter: the run reached a terminal state.
                 self._done.set()
 
-        self._thread = threading.Thread(target=_worker, daemon=True)
-        self._thread.start()
+        thread = threading.Thread(target=_worker, daemon=True)
+        with self._lock:
+            self._thread = thread
+            self._thread_run_id = run_id
+        thread.start()
         return run_id
 
     def cancel_run(self) -> bool:
+        # Cooperative + honest: flag the worker, mark cancelled for the UI
+        # immediately, and wake waiters. start_research joins the old thread
+        # before launching the next run, so cancel can never silently
+        # overlap the following run.
         with self._lock:
             if not self._active_run or self._active_run.get("status") != "running":
                 return False
@@ -229,6 +434,7 @@ class SwarmManager:
             self._active_run["stage"] = "cancelled"
             self._active_run["end_time"] = time.time()
             self._active_run["elapsed"] = round(time.time() - self._active_run["start_time"], 1)
+            self._done.set()
             return True
 
     def wait_for_completion(self, timeout: float = 120.0) -> bool:
@@ -638,6 +844,18 @@ def research_html() -> str:
     border-color: var(--success);
     color: var(--success);
   }}
+  .engine-chip {{
+    margin: 2px 0 8px;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 999px;
+    border: 1px solid var(--accent);
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }}
   .metrics-strip {{
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -889,10 +1107,10 @@ def research_html() -> str:
       <div class="form-group">
         <label for="depth-select">Research depth</label>
         <select id="depth-select">
-          <option value="quick">⚡ Quick — one pass, minutes</option>
-          <option value="standard" selected>🎯 Standard — two passes, balanced</option>
-          <option value="deep">🔬 Deep — three passes, thorough</option>
-          <option value="max">🧠 Max — four passes, exhaustive</option>
+          <option value="quick">⚡ Quick — 1 round, minutes</option>
+          <option value="standard" selected>🎯 Standard — 3 rounds, balanced</option>
+          <option value="deep">🔬 Deep — 4 rounds, thorough</option>
+          <option value="max">🧠 Max — 5 rounds, exhaustive</option>
         </select>
       </div>
       <div class="form-group">
@@ -900,9 +1118,9 @@ def research_html() -> str:
         <select id="backend-select">
           <option value="auto" selected>✨ Auto (smart engine)</option>
           <option value="ddg">🦆 DuckDuckGo (free, no key)</option>
-          <option value="gemini">🌐 Gemini grounding</option>
-          <option value="tavily">🔍 Tavily AI Search</option>
-          <option value="brave">🦁 Brave Search</option>
+          <option value="gemini">🌐 Gemini grounding (needs API key)</option>
+          <option value="tavily">🔍 Tavily AI Search (needs API key)</option>
+          <option value="brave">🦁 Brave Search (needs API key)</option>
         </select>
       </div>
     </div>
@@ -940,12 +1158,14 @@ def research_html() -> str:
     <!-- Swarm pipeline visualizer -->
     <div class="pipeline-card">
       <label>How the research runs</label>
+      <div class="engine-chip" id="engine-chip" title="Resolved provider + model + search backend">Engine: resolving…</div>
       <div class="stages">
         <div class="stage-step" id="st-plan">1. Plan</div>
         <div class="stage-step" id="st-res">2. Research</div>
         <div class="stage-step" id="st-syn">3. Synthesize</div>
         <div class="stage-step" id="st-crit">4. Review</div>
-        <div class="stage-step" id="st-fin">5. Report</div>
+        <div class="stage-step" id="st-ver">5. Verify</div>
+        <div class="stage-step" id="st-fin">6. Report</div>
       </div>
       <div class="metrics-strip">
         <div class="metric-item"><div class="metric-val" id="m-elapsed">0s</div><div class="metric-lbl">Elapsed</div></div>
@@ -1161,9 +1381,19 @@ async function checkStatus() {{
     }}
 
     $('m-elapsed').textContent = (st.elapsed || 0) + 's';
-    $('m-evidence').textContent = st.evidence_count || 0;
+    // Sources = evidence cards (dedupe not needed — backend reports the
+    // run's evidence.json length). Queries = search calls, not events.
+    $('m-evidence').textContent = (st.evidence && st.evidence.length) || st.evidence_count || 0;
     $('m-searches').textContent = st.searches_count || 0;
     $('m-status').textContent = st.stage || '—';
+
+    // Resolved engine chip — shows the concrete provider + model + backend
+    // instead of "auto", killing the #1 "which engine ran?" confusion.
+    if (st.engine_label || st.resolved_engine) {{
+      $('engine-chip').textContent = 'Engine: ' + (st.engine_label || st.resolved_engine);
+    }} else if (st.status === 'running') {{
+      $('engine-chip').textContent = 'Engine: resolving…';
+    }}
 
     // Status pill
     const pill = $('status-pill');
@@ -1194,6 +1424,10 @@ async function checkStatus() {{
       if (st.report_markdown) {{
         renderReport(st.report_markdown);
       }}
+      if (st.evidence && st.evidence.length) {{
+        currentEvidence = st.evidence;
+        renderEvidence(currentEvidence);
+      }}
       loadRuns();
     }} else if (st.status === 'failed' || st.status === 'cancelled') {{
       clearInterval(pollTimer);
@@ -1209,15 +1443,15 @@ async function checkStatus() {{
 }}
 
 function updatePipelineStage(stage) {{
-  const stages = ['st-plan', 'st-res', 'st-syn', 'st-crit', 'st-fin'];
+  const stages = ['st-plan', 'st-res', 'st-syn', 'st-crit', 'st-ver', 'st-fin'];
   const stageMap = {{
     'planning': 0,
     'researching': 1,
     'synthesizing': 2,
     'critiquing': 3,
-    'verifying': 3,
-    'finalizing': 4,
-    'done': 5
+    'verifying': 4,
+    'finalizing': 5,
+    'done': 6
   }};
 
   const idx = stageMap[stage] !== undefined ? stageMap[stage] : -1;
@@ -1313,11 +1547,38 @@ function copyReport() {{
     alert('No report to copy.');
     return;
   }}
-  navigator.clipboard.writeText(currentMarkdown);
-  const btn = $('btn-copy');
-  const orig = btn.textContent;
-  btn.textContent = '✅ Copied!';
-  setTimeout(() => btn.textContent = orig, 1800);
+  const done = () => {{
+    const btn = $('btn-copy');
+    const orig = btn.textContent;
+    btn.textContent = '✅ Copied!';
+    setTimeout(() => btn.textContent = orig, 1800);
+  }};
+  // Await the clipboard write: the old fire-and-forget call reported
+  // success even when the copy failed. Fall back to a textarea select
+  // when the async clipboard API is unavailable (non-secure contexts).
+  if (navigator.clipboard && navigator.clipboard.writeText) {{
+    navigator.clipboard.writeText(currentMarkdown).then(done).catch(() => {{
+      fallbackCopy(currentMarkdown) ? done() : alert('Copy failed — select the Raw Markdown tab instead.');
+    }});
+  }} else {{
+    fallbackCopy(currentMarkdown) ? done() : alert('Copy failed — select the Raw Markdown tab instead.');
+  }}
+}}
+
+function fallbackCopy(text) {{
+  try {{
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return ok;
+  }} catch (e) {{
+    return false;
+  }}
 }}
 
 function saveReport() {{

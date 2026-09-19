@@ -28,6 +28,26 @@ except Exception:  # pragma: no cover - import guard
 ENV_PATH = Path(__file__).resolve().parent.parent.parent / ".env"
 _HAS_STREAM_END = re.compile(r"\[DONE\]")
 
+
+def _contributor_enabled() -> bool:
+    """Contributor-tier models are opt-in only (training-data trade-off).
+
+    Reads LUCKYD_CONTRIBUTOR_TIER from the env/.env; a missing or false value
+    means the cheaper muse-spark contributor model is never offered.
+    """
+    raw = (os.environ.get("LUCKYD_CONTRIBUTOR_TIER", "") or "").strip().lower()
+    if raw in ("1", "true", "yes", "on"):
+        return True
+    try:
+        return bool(_load_env().get("LUCKYD_CONTRIBUTOR_TIER", "").strip().lower() in ("1", "true", "yes", "on"))
+    except Exception:
+        return False
+
+
+def _is_contributor_model(model: str) -> bool:
+    m = (model or "").strip().lower()
+    return bool(m) and m.startswith("muse-spark") and "contributor" in m
+
 _PROVIDER_SPECS = [
     (
         "google",
@@ -201,6 +221,10 @@ _ZEN_CATALOG = [
     "claude-opus-5",
     "claude-fable-5",
     "claude-fable-5-1",
+    # Muse Spark 1.3 — standard tier; the cheaper "-contributor" variant is
+    # only offered after an explicit opt-in (see _contributor_enabled below).
+    "muse-spark-1.3",
+    "muse-spark-1.2",
 ]
 
 # OpenRouter free fallback — the :free chat models plus the auto free-router,
@@ -560,6 +584,10 @@ class AIBridge:
         if self.is_opencode_zen(provider):
             top_order = {m: i for i, m in enumerate(_ZEN_TOP_MODELS)}
             models = sorted(models, key=lambda m: top_order.get(m, 999))
+        # Contributor tier is opt-in only: never silently offer a model whose
+        # cheap price is paid for with your prompts as training data.
+        if not _contributor_enabled():
+            models = [m for m in models if not _is_contributor_model(m)]
         self._model_cache[provider] = models
         return models
 
@@ -797,7 +825,7 @@ class AIBridge:
             )
         )
         body["model"] = model
-        headers = {"User-Agent": "LuckyDBrowser/9.5"}
+        headers = {"User-Agent": "LuckyDBrowser/9.6"}
 
         if kind == "gemini":
             url = f"{base_url}/models/{model}:streamGenerateContent?key={api_key}&alt=sse"

@@ -3,7 +3,7 @@
 Don't build your own trust plumbing. Build *with* LuckyD.
 
 This kit packages LuckyD's battle-tested agent infrastructure — the same
-code running in LuckyD Browser v9.5 — so any project can use it:
+code running in LuckyD Browser v9.6 — so any project can use it:
 
 - **`lucky_kit/`** — stdlib-only Python package: permission scopes, approval
   policy engine, secret redaction, append-only audit log, agent-loop circuit

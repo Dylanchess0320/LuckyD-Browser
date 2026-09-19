@@ -142,7 +142,9 @@ _OPENCODE_FREE_CATALOG = [
     "minimax-m2.1-free",
     "minimax-m2.5-free",
     "minimax-m3-free",
-    "muse-spark-1.2-contributor-free",
+    # NOTE: the gateway's "muse-spark-*-contributor-*" ids are contributor-tier
+    # (prompts may be used for training) and are filtered out below unless the
+    # user explicitly opted in — never a silent default.
     "nemotron-3-ultra-free",
     "nemotron-3.5-lightning-free",
     "north-mini-code-free",
@@ -158,6 +160,29 @@ _PROVIDER_ALIASES = {
     "cline": "cline-usage",
     "gemini": "google",
 }
+
+
+def _contributor_on() -> bool:
+    """Contributor tier is opt-in only (see core/contributor.py)."""
+    try:
+        from core.contributor import contributor_enabled
+
+        return contributor_enabled()
+    except Exception:
+        return (os.environ.get("LUCKYD_CONTRIBUTOR_TIER", "") or "").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+            "on",
+        )
+
+
+def _is_contributor_model(model: str) -> bool:
+    m = (model or "").strip().lower()
+    return bool(m) and m.startswith("muse-spark") and "contributor" in m
+
+
+_CONTRIBUTOR_MODELS = ["muse-spark-1.3-contributor"]
 
 
 def _load_free_providers() -> dict:
@@ -232,6 +257,12 @@ def model_catalog(free_only: bool = False) -> list[dict]:
                 continue
             for m in deduped:
                 seen_models.add(m.lower())
+            # Contributor-tier models (prompts may be used for training) are
+            # only listed after an explicit opt-in — never a silent default.
+            if not _contributor_on():
+                deduped = [m for m in deduped if not _is_contributor_model(m)]
+                if not deduped:
+                    continue
             # Also include Cline free tier inline if this is cline-usage alias (handled below)
             name = pinfo.get("name", pid)
             # Mark availability in provider label for UI: "✓" if key present
@@ -312,6 +343,14 @@ def model_catalog(free_only: bool = False) -> list[dict]:
                         "anthropic/claude-sonnet-4",
                         "google/gemini-2.0-flash-001",
                     ],
+                },
+                {
+                    "provider": "OpenCode Zen (Muse Spark)",
+                    "models": (
+                        ["muse-spark-1.3"]
+                        + (_CONTRIBUTOR_MODELS if _contributor_on() else [])
+                    ),
+                    "provider_key": "opencode",
                 },
                 {"provider": "ClinePass (subscription)", "models": clinepass_paid},
                 {"provider": "Cline Usage (credit-billed)", "models": cline_paid},
@@ -1076,6 +1115,41 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
         if hit2:
             _switch_model(agent, provider=hit2[0], model_name=hit2[1])
 
+    elif cmd.startswith("contributor"):
+        # ── Contributor tier (explicit opt-in; never a silent default) ──
+        from core.contributor import (
+            CONTRIBUTOR_MODEL,
+            CONTRIBUTOR_WARNING,
+            contributor_enabled,
+            contributor_models_enabled_only,
+            set_contributor_enabled,
+        )
+
+        arg = cmd[len("contributor") :].strip().lower()
+        if arg in ("on", "enable", "yes", "1", "true"):
+            set_contributor_enabled(True)
+            ui.warn(CONTRIBUTOR_WARNING)
+            ui.success(
+                f"Contributor tier enabled for this session and saved to .env "
+                f"({CONTRIBUTOR_MODEL}: $0.10 in / $0.20 out, $0.002 cached)."
+            )
+            ui.info("Run /model muse-spark-1.3-contributor to use it. /contributor off disables it.")
+            return False
+        if arg in ("off", "disable", "no", "0", "false"):
+            set_contributor_enabled(False)
+            ui.success("Contributor tier disabled — training-data models are hidden again.")
+            return False
+        state = "ON" if contributor_enabled() else "OFF"
+        ui.markdown(
+            f"**Contributor tier:** {state}\n\n"
+            f"- Models: `{CONTRIBUTOR_MODEL}` (standard `muse-spark-1.3` is "
+            f"$1.25 in / $4.25 out, $0.15 cached)\n"
+            f"- Warning: {CONTRIBUTOR_WARNING}\n\n"
+            "Turn it on with `/contributor on` (explicit opt-in only)."
+        )
+        vis = contributor_models_enabled_only([CONTRIBUTOR_MODEL])
+        ui.info(f"Models currently offered: {', '.join(vis) if vis else 'none (hidden)'}")
+
     elif cmd in ("providers", "provider"):
         # ── Provider list (status, cost tier, current) ──
         from core.providers import list_providers
@@ -1140,7 +1214,7 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
             ui.warn("MCP not configured or no servers connected")
 
     elif cmd == "version":
-        agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v9.5.0")
+        agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v9.6.0")
         agent_name = os.environ.get("LUCKYD_AGENT_NAME", "Agent 1")
         ui.info(f"LuckyD Code {agent_version} ({agent_name})")
 
@@ -1651,10 +1725,10 @@ def main():
             else:
                 os.environ["LUCKYD_AGENT_SLOT"] = "1"
                 os.environ["LUCKYD_AGENT_NAME"] = "Agent 1"
-                os.environ["LUCKYD_AGENT_VERSION"] = "v9.5.0"
+                os.environ["LUCKYD_AGENT_VERSION"] = "v9.6.0"
             i += 2
         elif args[i] in ("-v", "--version"):
-            agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v9.5.0")
+            agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v9.6.0")
             agent_name = os.environ.get("LUCKYD_AGENT_NAME", "")
             label = f"LuckyD Code {agent_version}" + (f" ({agent_name})" if agent_name else "")
             print(label)
@@ -1665,7 +1739,7 @@ def main():
 LuckyD Code — AI Coding Agent
 
 Usage:
-  lucky-code                       Interactive REPL (Agent 1 · v9.5.0)
+  lucky-code                       Interactive REPL (Agent 1 · v9.6.0)
   lucky-code --agent 2             Interactive REPL (Agent 2 · v2.2.0)
   lucky-code providers           List AI providers — status, cost tier, current
   lucky-code "your query"          One-shot mode
@@ -1673,7 +1747,7 @@ Usage:
   lucky-code --resume <id>         Resume specific session
 
 Options:
-  --agent 1|2        Select agent slot (1 = v9.5 Nuitka, 2 = v2.2)
+  --agent 1|2        Select agent slot (1 = v9.6 Nuitka, 2 = v2.2)
   --model NAME       Model: auto (default), flash, pro, or specific name
   --provider NAME    Set provider (see: lucky-code providers): ollama, opencode,
                      openrouter, clinepass, cline-usage, cline, groq, deepseek,

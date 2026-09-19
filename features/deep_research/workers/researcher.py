@@ -94,24 +94,43 @@ def _collect_urls_ddg(query: str) -> list[EvidenceCard]:
 
 
 def _collect_urls_premium(query: str, backend: str) -> list[EvidenceCard]:
-    """Tavily/Brave search with budget accounting; [] on missing key/error."""
+    """Tavily/Brave search with budget accounting; [] on missing key/error.
+
+    An explicitly-picked premium backend with no API key raises with a
+    plain-language message — never silently falls back to DDG.
+    """
     from ..runtime.budget import get_budget
 
     try:
         get_budget().record_search()
     except Exception:
         return []
-    try:
-        if backend == "tavily":
-            from ..tools.search_premium import TavilySearch
+    if backend == "tavily":
+        from ..tools.search_premium import TavilySearch, _tavily_key
 
+        if not _tavily_key():
+            raise RuntimeError(
+                "No API key configured for Tavily (TAVILY_API_KEY). "
+                "Add the key or pick 'Auto' / 'DuckDuckGo (free, no key)'."
+            )
+        try:
             return TavilySearch().search(query)
-        if backend == "brave":
-            from ..tools.search_premium import BraveSearch
+        except Exception:
+            pass
+        return []
+    if backend == "brave":
+        from ..tools.search_premium import BraveSearch, _brave_key
 
+        if not _brave_key():
+            raise RuntimeError(
+                "No API key configured for Brave (BRAVE_API_KEY). "
+                "Add the key or pick 'Auto' / 'DuckDuckGo (free, no key)'."
+            )
+        try:
             return BraveSearch().search(query)
-    except Exception:
-        pass
+        except Exception:
+            pass
+        return []
     return []
 
 
@@ -134,8 +153,9 @@ def _search_round(llm: LLMProvider, queries: list[str], worker_id: str) -> list[
         if backend == "gemini":
             out.extend(_collect_urls_via_grounding(llm, q, worker_id))
         elif backend in ("tavily", "brave"):
-            cards = _collect_urls_premium(q, backend)
-            out.extend(cards if cards else _collect_urls_ddg(q))
+            # Explicit premium pick: missing-key errors propagate with a
+            # plain message (never silently fall back to DDG).
+            out.extend(_collect_urls_premium(q, backend))
         elif backend in ("ddg", "luckyd", "auto"):
             # Keyless DDG search (no per-query LLM draft call); deep-read
             # fetches full pages afterwards for text-backed quotes.

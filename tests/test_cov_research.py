@@ -343,6 +343,128 @@ def test_list_runs_bare_dir_and_nonlist_evidence(tmp_runs) -> None:
     assert rows["run-bare"]["sources"] == 0
 
 
+# ── 9.6: engine chip / evidence propagation / honest cancel ─────────────
+
+
+def test_research_html_has_engine_chip_and_key_hints() -> None:
+    html = research_page.research_html()
+    assert "engine-chip" in html
+    assert "st-ver" in html
+    assert "needs API key" in html
+    assert "1 round" in html and "3 rounds" in html
+
+
+def test_resolved_engine_published_and_evidence_propagated(monkeypatch, tmp_runs) -> None:
+    captured: dict = {}
+    _fake_swarm(monkeypatch, captured=captured)
+    # Seed a run dir like RunStore would: the worker must report it back
+    # into run_dir and load evidence.json on completion.
+    seed = tmp_runs / "run-20200102-000000"
+    seed.mkdir()
+    import json as _json
+
+    cards = [
+        {"id": "e0", "url": "https://example.com/a", "title": "A"},
+        {"id": "e1", "url": "https://example.com/b", "title": "B"},
+    ]
+    (seed / "evidence.json").write_text(_json.dumps(cards), encoding="utf-8")
+    mgr = SwarmManager()
+    run_id = mgr.start_research("engine question", provider="mock", dry_run=True)
+    assert mgr.wait_for_completion(timeout=30)
+    run = mgr._active_run
+    assert run["id"] == run_id
+    assert "mock" in (run.get("engine_label") or "")
+    assert run.get("run_dir") == str(seed), "worker must report RunStore.dir back into run_dir"
+    assert run.get("evidence") == cards
+    assert run.get("evidence_count") == 2
+    st = mgr.get_status(run_id)
+    assert "engine_label" in st
+
+
+def test_keyed_backend_without_key_fails_fast(monkeypatch, tmp_runs) -> None:
+    import pytest
+
+    for var in ("TAVILY_API_KEY", "BRAVE_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY"):
+        monkeypatch.delenv(var, raising=False)
+    mgr = SwarmManager()
+    with pytest.raises(ValueError, match="no API key configured"):
+        mgr.start_research("q", backend="tavily")
+    with pytest.raises(ValueError, match="no API key configured"):
+        mgr.start_research("q", backend="brave")
+    with pytest.raises(ValueError, match="no API key configured"):
+        mgr.start_research("q", backend="gemini")
+
+
+def test_premium_worker_missing_key_is_plain_language(monkeypatch) -> None:
+    from features.deep_research.workers import researcher as rmod
+
+    for var in ("TAVILY_API_KEY", "BRAVE_API_KEY"):
+        monkeypatch.delenv(var, raising=False)
+    try:
+        rmod._collect_urls_premium("q", "tavily")
+        raise AssertionError("tavily without key must raise")
+    except RuntimeError as e:
+        assert "No API key configured" in str(e)
+    try:
+        rmod._collect_urls_premium("q", "brave")
+        raise AssertionError("brave without key must raise")
+    except RuntimeError as e:
+        assert "No API key configured" in str(e)
+
+
+def test_cancel_marks_cancelled_and_blocks_overlap(monkeypatch, tmp_runs) -> None:
+    import threading
+
+    started = threading.Event()
+    release = threading.Event()
+
+    async def _slow(query, **kwargs):
+        started.set()
+        release.wait(timeout=30)
+        return "# slow report"
+
+    monkeypatch.setattr(research_page, "run_swarm", _slow)
+    mgr = SwarmManager()
+    mgr.start_research("slow question")
+    assert started.wait(timeout=30)
+    assert mgr.cancel_run() is True
+    st = mgr.get_status()
+    assert st["status"] == "cancelled"
+    # A new start must not overlap the still-live worker: it joins first.
+    release.set()
+    assert mgr.wait_for_completion(timeout=30)
+    run_id2 = mgr.start_research("next question", provider="mock", dry_run=True)
+    assert run_id2
+    assert mgr.wait_for_completion(timeout=30)
+
+
+def test_cancelled_worker_stays_cancelled(monkeypatch, tmp_runs) -> None:
+    import threading
+
+    started = threading.Event()
+    release = threading.Event()
+
+    async def _slow(query, **kwargs):
+        started.set()
+        release.wait(timeout=30)
+        return "# slow report"
+
+    monkeypatch.setattr(research_page, "run_swarm", _slow)
+    mgr = SwarmManager()
+    mgr.start_research("slow question")
+    assert started.wait(timeout=30)
+    assert mgr.cancel_run() is True
+    release.set()
+    assert mgr.wait_for_completion(timeout=30)
+    assert mgr._active_run["status"] == "cancelled"
+
+
+def test_plain_failure_mapping() -> None:
+    mgr = SwarmManager()
+    assert "No API key configured" in mgr._plain_failure(RuntimeError("missing GEMINI_API_KEY"))
+    assert "google-genai" in mgr._plain_failure(RuntimeError("google-genai is not installed"))
+
+
 def test_reimport_frozen_without_internal_dir(monkeypatch, tmp_path) -> None:
     """Frozen layout with no _internal dir: the exists() guard skips the insert."""
     import importlib

@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [9.6.0] - 2026-09-19
+
+Honest research + opt-in contributor tier, on top of everything from 9.5.0.
+Shipped as `LuckyDBrowserSetup-9.6.0.exe`.
+
+### Added
+- **Contributor tier is opt-in only** — `muse-spark-1.3` (standard, $1.25 in /
+  $4.25 out) and `muse-spark-1.3-contributor` ($0.10 in / $0.20 out, cheaper
+  because the provider may train on prompts) via `core/contributor.py`.
+  Contributor models stay hidden unless `/contributor on` or
+  `LUCKYD_CONTRIBUTOR_TIER=1`; `/contributor` shows pricing + warning.
+- **Honest cost tracking with cached tokens** — `CostTracker` splits cached
+  prompt tokens at the model's `cached_input` rate (`llm/__init__.py`).
+- **Deep Research engine chip** — `research_page.py` resolves and publishes
+  `provider + model + backend` live (`engine_label`), 6-stage pipeline
+  (Plan/Research/Synthesize/Review/Verify/Report), depth labels
+  (1/3/4/5 rounds), key hints on keyed backends.
+- **Fail-fast keyed backends** — Tavily/Brave/Gemini selected without a key
+  raise plain `no API key configured` instead of silently falling back to DDG.
+- **Honest cancel + evidence** — cancel marks `cancelled` immediately, next
+  `start_research` joins the old worker (no overlap), completed runs report
+  `RunStore.dir` back into `run_dir` and load `evidence.json`.
+
+### Changed
+- **Version unification to 9.6.0** — pyproject, browser `__version__`, Inno
+  Setup script, version_info, AI bridge User-Agent, docs, and version-pinned
+  tests.
+
 ## [9.5.0] - 2026-09-16
 
 Terminal crash fix, on top of everything from 9.4.0.

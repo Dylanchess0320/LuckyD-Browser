@@ -191,6 +191,12 @@ MODEL_COSTS: dict[str, dict[str, float]] = {
     "glm-4.6": {"input": 0.60, "output": 2.20},
     "glm-4.5": {"input": 0.60, "output": 2.20},
     "glm-4.5-air": {"input": 0.20, "output": 1.10},
+    # Muse Spark 1.3 (OpenCode Zen) — Standard tier. The contributor tier is
+    # cheaper BECAUSE the provider may train on your prompts, so it is listed
+    # here for honest cost accounting but is only ever offered after an
+    # explicit opt-in (core/contributor.py).
+    "muse-spark-1.3": {"input": 1.25, "output": 4.25, "cached_input": 0.15},
+    "muse-spark-1.3-contributor": {"input": 0.10, "output": 0.20, "cached_input": 0.002},
 }
 
 
@@ -200,6 +206,7 @@ class CostTracker:
     def __init__(self):
         self.total_input_tokens = 0
         self.total_output_tokens = 0
+        self.total_cached_tokens = 0
         self.total_cost = 0.0
         self._model = ""
 
@@ -209,27 +216,43 @@ class CostTracker:
         # so the running totals never blow up with TypeError.
         inp = usage.get("prompt_tokens", usage.get("input_tokens", 0)) or 0
         out = usage.get("completion_tokens", usage.get("output_tokens", 0)) or 0
+        details = usage.get("prompt_tokens_details") or {}
+        cached = 0
+        if isinstance(details, dict):
+            cached = details.get("cached_tokens", 0) or 0
+        cached = min(cached, inp)  # never bill more cached than input
         self.total_input_tokens += inp
         self.total_output_tokens += out
+        self.total_cached_tokens += cached
 
         costs = MODEL_COSTS.get(self._model, {})
         if costs:
-            self.total_cost += (inp / 1_000_000) * costs.get("input", 0)
+            # Cached prompt tokens bill at the model's cached rate when it
+            # publishes one (muse-spark, etc.); otherwise they bill as input.
+            cached_rate = costs.get("cached_input")
+            if cached_rate is not None:
+                self.total_cost += (cached / 1_000_000) * cached_rate
+                self.total_cost += ((inp - cached) / 1_000_000) * costs.get("input", 0)
+            else:
+                self.total_cost += (inp / 1_000_000) * costs.get("input", 0)
             self.total_cost += (out / 1_000_000) * costs.get("output", 0)
 
     def summary(self) -> str:
         cost_str = f"${self.total_cost:.4f}" if self.total_cost > 0 else "free"
-        return f"Model: {self._model} | Tokens: {self.total_input_tokens:,} in / {self.total_output_tokens:,} out | Cost: {cost_str}"
+        cached_str = f" ({self.total_cached_tokens:,} cached)" if self.total_cached_tokens else ""
+        return f"Model: {self._model} | Tokens: {self.total_input_tokens:,} in / {self.total_output_tokens:,} out{cached_str} | Cost: {cost_str}"
 
     def reset(self):
         self.total_input_tokens = 0
         self.total_output_tokens = 0
+        self.total_cached_tokens = 0
         self.total_cost = 0.0
 
     def to_dict(self) -> dict:
         return {
             "input_tokens": self.total_input_tokens,
             "output_tokens": self.total_output_tokens,
+            "cached_tokens": self.total_cached_tokens,
             "cost": round(self.total_cost, 6),
             "model": self._model,
         }

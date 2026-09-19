@@ -1,6 +1,19 @@
 # LuckyD Browser — Release Notes
 
-## [9.5.0] — Terminal crash fix — 2026-09-16
+## [9.6.0] — Honest research + opt-in contributor tier — 2026-09-19
+
+**[`LuckyDBrowserSetup-9.6.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.6.0/LuckyDBrowserSetup-9.6.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed
+
+- **Deep Research tells the truth** — live engine chip, fail-fast keyed
+  backends, evidence from `evidence.json`, honest cancel.
+- **Contributor tier opt-in only** — `muse-spark-1.3` vs `-contributor`,
+  hidden unless `/contributor on`, honest cached-token costs.
+
+On top of everything from 9.5.0 below.
+
+---
+
+## [9.5.0] — Terminal crash fix — 2026-09-16 (archive)
 
 **[`LuckyDBrowserSetup-9.5.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.5.0/LuckyDBrowserSetup-9.5.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed
 

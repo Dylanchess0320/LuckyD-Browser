@@ -1,15 +1,36 @@
-# LuckyD Browser v9.5.0 — Release Notes
+# LuckyD Browser v9.6.0 — Release Notes
 
 > **The AI browser that doesn't need an API key.** Free, unlimited, offline AI built in —
 > plus a full coding agent and developer terminal living in your tabs.
 
-*9.5.0 is on `main` — the installer below publishes with Dylan's 9.5.0 release.*
+*9.6.0 is on `main` — the installer below publishes with Dylan's 9.6.0 release.*
 
-**[⬇ Download `LuckyDBrowserSetup-9.5.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.5.0/LuckyDBrowserSetup-9.5.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed
+**[⬇ Download `LuckyDBrowserSetup-9.6.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.6.0/LuckyDBrowserSetup-9.6.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed
 
 ---
 
-## What's new in 9.5.0
+## What's new in 9.6.0
+
+- **Contributor tier is opt-in only** — `muse-spark-1.3` standard vs
+  `muse-spark-1.3-contributor` (cheaper because the provider may train on your
+  prompts). Hidden unless `/contributor on` or `LUCKYD_CONTRIBUTOR_TIER=1`,
+  with honest cost tracking including cached tokens.
+- **Deep Research tells the truth** — live engine chip (resolved provider +
+  model + backend), keyed backends fail fast with `no API key configured`
+  instead of silently falling back, evidence loads from `evidence.json`, and
+  cancel is honest (no overlap with the next run).
+
+On top of everything from 9.5.0 below.
+
+## Checksums
+
+| File | Size | SHA-256 |
+|---|---|---|
+| `LuckyDBrowserSetup-9.6.0.exe` | 332,274,625 bytes | `49A7E419D574B5C28906276A0C67510F2984323ECFD968D80F7AC1BB590C04F3` |
+
+---
+
+# LuckyD Browser v9.5.0 — Release Notes (archive)
 
 - **Fixed: agent terminal crash on malformed Bash calls** — when the agent issued
   a Bash tool call with a missing/null `command`, `BashTool.execute` raised
