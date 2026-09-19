@@ -39,7 +39,10 @@ def _contributor_enabled() -> bool:
     if raw in ("1", "true", "yes", "on"):
         return True
     try:
-        return bool(_load_env().get("LUCKYD_CONTRIBUTOR_TIER", "").strip().lower() in ("1", "true", "yes", "on"))
+        return bool(
+            _load_env().get("LUCKYD_CONTRIBUTOR_TIER", "").strip().lower()
+            in ("1", "true", "yes", "on")
+        )
     except Exception:
         return False
 
@@ -47,6 +50,7 @@ def _contributor_enabled() -> bool:
 def _is_contributor_model(model: str) -> bool:
     m = (model or "").strip().lower()
     return bool(m) and m.startswith("muse-spark") and "contributor" in m
+
 
 _PROVIDER_SPECS = [
     (

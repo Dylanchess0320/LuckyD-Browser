@@ -347,8 +347,7 @@ def model_catalog(free_only: bool = False) -> list[dict]:
                 {
                     "provider": "OpenCode Zen (Muse Spark)",
                     "models": (
-                        ["muse-spark-1.3"]
-                        + (_CONTRIBUTOR_MODELS if _contributor_on() else [])
+                        ["muse-spark-1.3"] + (_CONTRIBUTOR_MODELS if _contributor_on() else [])
                     ),
                     "provider_key": "opencode",
                 },
@@ -1133,7 +1132,9 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
                 f"Contributor tier enabled for this session and saved to .env "
                 f"({CONTRIBUTOR_MODEL}: $0.10 in / $0.20 out, $0.002 cached)."
             )
-            ui.info("Run /model muse-spark-1.3-contributor to use it. /contributor off disables it.")
+            ui.info(
+                "Run /model muse-spark-1.3-contributor to use it. /contributor off disables it."
+            )
             return False
         if arg in ("off", "disable", "no", "0", "false"):
             set_contributor_enabled(False)
