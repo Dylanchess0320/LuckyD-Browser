@@ -15,10 +15,10 @@
 ## The pitch in 10 seconds
 
 1. Run the installer.
-2. Leave **"Set up free unlimited local AI"** checked.
+2. Optional: run `ollama_setup.ps1` from the install folder for free offline AI.
 3. Open the sidebar and chat — **no account, no key, no cost, ever.**
 
-The installer sets up [Ollama](https://ollama.com) and a fast local model (`llama3.2:3b`) for you.
+Running `ollama_setup.ps1` sets up [Ollama](https://ollama.com) and a fast local model (`llama3.2:3b`) for you.
 Your prompts never leave your machine. Prefer the cloud? Bring your own keys for
 Gemini, Groq, DeepSeek, OpenAI, Anthropic, Z.ai, OpenRouter, or log in with Cline.
 

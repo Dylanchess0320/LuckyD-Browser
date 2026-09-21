@@ -23,10 +23,15 @@ PCs, code-signing wired into the build, and a fully green CI. Shipped as
   returns to the Inno script; assert signing + portable ZIP stay wired in.
 
 ### Changed
-- **No more `-ExecutionPolicy Bypass` in the installer** — the post-install
-  step now runs PowerShell with `-ExecutionPolicy RemoteSigned`
-  (`browser/installer/LuckyDBrowser.iss`), removing the biggest behavioral
-  red flag for endpoint protection (e.g. Halcyon anti-ransomware).
+- **No more `-ExecutionPolicy Bypass` anywhere in the installer sources** —
+  `browser/installer/` is fully Bypass-free (Inno script and all `.ps1`
+  helpers use `-ExecutionPolicy RemoteSigned`), removing the biggest
+  behavioral red flag for endpoint protection (e.g. Halcyon
+  anti-ransomware).
+- **Ollama bootstrap is opt-in, never automatic** — the installer no longer
+  downloads/installs Ollama post-setup (a post-install third-party download
+  is exactly what behavioral engines flag). `ollama_setup.ps1` still ships
+  in the install folder for one-click manual setup.
 - **Version unification to 9.9.0** — pyproject, browser `__version__`, Inno
   Setup script, version_info, AI bridge User-Agent, docs, and version-pinned
   tests.

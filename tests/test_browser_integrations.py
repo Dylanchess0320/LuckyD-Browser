@@ -300,7 +300,29 @@ def test_installer_has_no_execution_policy_bypass() -> None:
     installer_dir = Path(__file__).parents[1] / "browser" / "installer"
     iss = (installer_dir / "LuckyDBrowser.iss").read_text(encoding="utf-8-sig")
     assert "-ExecutionPolicy Bypass" not in iss
-    assert "-ExecutionPolicy RemoteSigned" in iss
+    for script in installer_dir.glob("*.ps1"):
+        text = script.read_text(encoding="utf-8-sig")
+        assert "-ExecutionPolicy Bypass" not in text, script.name
+
+
+def test_installer_never_auto_runs_ollama_bootstrap() -> None:
+    """9.9 anti-block: the installer must never download/install Ollama on its
+    own — a post-install step that fetches third-party software is a
+    behavioral flag for Halcyon/Defender. The script stays bundled for
+    manual opt-in only."""
+    installer_dir = Path(__file__).parents[1] / "browser" / "installer"
+    iss = (installer_dir / "LuckyDBrowser.iss").read_text(encoding="utf-8-sig")
+    run_section = iss.split("[Run]", 1)[1].split("[", 1)[0]
+    # only executable entries count — comments may explain the policy
+    run_entries = "\n".join(
+        line
+        for line in run_section.splitlines()
+        if line.strip() and not line.strip().startswith(";")
+    )
+    assert "ollama" not in run_entries.lower(), "installer auto-runs the Ollama bootstrap in [Run]"
+    assert "powershell.exe" not in run_entries.lower(), "installer auto-runs PowerShell in [Run]"
+    # still shipped so users can opt in manually
+    assert 'Source: "ollama_setup.ps1"' in iss
 
 
 def test_build_script_signs_binaries_and_builds_portable_zip() -> None:

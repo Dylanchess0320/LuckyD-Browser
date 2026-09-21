@@ -1,7 +1,7 @@
 # LuckyD Browser -- one-command release: bump version, build, install locally,
 # publish to GitHub Releases, and make sure existing installs auto-update.
 #
-#   powershell -NoProfile -ExecutionPolicy Bypass -File browser\installer\release.ps1
+#   powershell -NoProfile -ExecutionPolicy RemoteSigned -File browser\installer\release.ps1
 #
 # Optional:
 #   -Bump major|minor|patch   (default: patch)

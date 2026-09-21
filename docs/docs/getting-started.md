@@ -31,7 +31,7 @@
 
 1. Download [**LuckyDBrowserSetup-9.9.0.exe**](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.9.0/LuckyDBrowserSetup-9.9.0.exe)
 2. Run it — installs to `%LOCALAPPDATA%\Programs\LuckyDBrowser`
-3. Leave **"Set up free unlimited local AI"** checked to get Ollama + `llama3.2:3b` in one shot
+3. Optional: run `ollama_setup.ps1` from the install folder for free offline AI (Ollama + `llama3.2:3b`, ~2 GB one-time download)
 
 Silent install for scripts and fleets:
 

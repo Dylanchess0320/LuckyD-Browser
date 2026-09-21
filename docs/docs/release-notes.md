@@ -5,7 +5,7 @@
 **[`LuckyDBrowserSetup-9.9.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.9.0/LuckyDBrowserSetup-9.9.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed.
 **[`LuckyDBrowser-Portable-9.9.0.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.9.0/LuckyDBrowser-Portable-9.9.0.zip)** — unzip and run, for locked-down PCs.
 
-- **Anti-block hardening** — installer no longer uses `-ExecutionPolicy Bypass` (now `RemoteSigned`).
+- **Anti-block hardening** — no `-ExecutionPolicy Bypass` anywhere in the installer; the Ollama bootstrap no longer auto-runs post-install (manual opt-in only).
 - **Portable ZIP** on every release — no installer heuristics fire at all.
 - **Code signing wired in** — signs binaries + installer when a cert is configured (unsigned until then; free for open source via SignPath).
 - **CI green** — fixed the 3 mypy errors that kept 9.8 red.

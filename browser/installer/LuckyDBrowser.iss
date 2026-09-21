@@ -58,8 +58,10 @@ Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription
 ; Everything PyInstaller produced — LuckyDBrowser.exe plus the _internal
 ; folder (Qt WebEngine runtime, assets, bundled luckyd-code.exe backend).
 Source: "..\dist\LuckyDBrowser\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-; Free local AI bootstrap — run post-install (see [Run]) so every user gets
-; Ollama + a default model without lifting a finger.
+; Free local AI bootstrap — bundled for MANUAL opt-in only (double-click it in
+; the install folder or run it from PowerShell). It is never executed by the
+; installer itself: silent post-install downloads that install third-party
+; software are a classic behavioral anti-ransomware flag.
 Source: "ollama_setup.ps1"; DestDir: "{app}"; Flags: ignoreversion
 
 [InstallDelete]
@@ -79,14 +81,10 @@ Name: "{group}\Uninstall {#AppName}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: desktopicon
 
 [Run]
-; Free, unlimited local AI: installs Ollama (if missing) and pulls the default
-; model (~3 GB one-time download). Checked by default; runs detached in a
-; console window so the download progress stays visible after Setup closes.
-; NOTE (9.9): intentionally NOT using the Bypass execution policy. Bypass is a
-; classic living-off-the-land flag that behavioral anti-ransomware engines
-; (Halcyon, Defender) treat as hostile on sight. RemoteSigned runs this local,
-; installer-written script identically with no reputation penalty.
-Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy RemoteSigned -File ""{app}\ollama_setup.ps1"""; Description: "Set up free unlimited local AI (Ollama + llama3.2:3b, one-time download)"; Flags: nowait postinstall skipifsilent
+; NOTE (9.9): the Ollama bootstrap is intentionally NOT auto-run here.
+; A post-install step that downloads and installs third-party software is a
+; classic behavioral anti-ransomware flag (Halcyon/Defender). Users who want
+; free local AI can run {app}\ollama_setup.ps1 manually at any time.
 Filename: "{app}\{#AppExeName}"; Description: "Launch {#AppName}"; Flags: nowait postinstall skipifsilent
 
 [Code]

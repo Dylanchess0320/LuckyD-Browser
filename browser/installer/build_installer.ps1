@@ -1,6 +1,6 @@
 # LuckyD Browser -- one-command release build.
 #
-#   powershell -NoProfile -ExecutionPolicy Bypass -File browser\installer\build_installer.ps1
+#   powershell -NoProfile -ExecutionPolicy RemoteSigned -File browser\installer\build_installer.ps1
 #
 # Steps:
 #   1. PyInstaller  -> repoRoot\dist\luckyd-code.exe  (headless HQ/harness

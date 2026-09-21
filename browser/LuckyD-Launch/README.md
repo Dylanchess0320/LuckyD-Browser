@@ -41,10 +41,10 @@ Most "AI browsers" need an API key, an account, or a subscription before the ass
 LuckyD doesn't:
 
 1. Run the installer.
-2. Leave **"Set up free unlimited local AI"** checked (default).
+2. Optional: run `ollama_setup.ps1` from the install folder for free offline AI.
 3. Open the sidebar and chat — that's it.
 
-The setup automatically installs **[Ollama](https://ollama.com)** (per-user, no admin) and pulls a fast,
+Running `ollama_setup.ps1` installs **[Ollama](https://ollama.com)** (per-user, no admin) and pulls a fast,
 tool-capable local model (`llama3.2:3b`, ~2 GB one-time download). From then on the assistant runs
 **100% locally** — unlimited, offline, and private. Your prompts never leave your machine.
 

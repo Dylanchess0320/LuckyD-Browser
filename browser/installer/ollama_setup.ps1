@@ -14,8 +14,8 @@
 # soft (warnings only) so they never break the browser install itself.
 #
 # Usage:
-#   powershell -NoProfile -ExecutionPolicy Bypass -File ollama_setup.ps1
-#   powershell -NoProfile -ExecutionPolicy Bypass -File ollama_setup.ps1 -Model qwen3:8b
+#   powershell -NoProfile -ExecutionPolicy RemoteSigned -File ollama_setup.ps1
+#   powershell -NoProfile -ExecutionPolicy RemoteSigned -File ollama_setup.ps1 -Model qwen3:8b
 
 param(
     # default: fastest TOOL-CAPABLE model that reliably finishes agent loops
