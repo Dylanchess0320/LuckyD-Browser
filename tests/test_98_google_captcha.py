@@ -197,6 +197,39 @@ def test_dialogs_default_falls_back_to_ddg() -> None:
     assert 'settings.get("search_engine", "DuckDuckGo")' in text
 
 
+def test_desktop_ua_falls_back_to_constant_when_engine_query_fails() -> None:
+    """desktop_ua() never raises and returns a Chrome UA.
+
+    With Qt mocked, qWebEngineChromiumVersion() is a MagicMock whose
+    majorVersion() is not an int >= 100, so the fallback fires.
+    """
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "profile_under_test2", _BROWSER_DIR / "browser_core" / "profile.py"
+    )
+    assert spec is not None and spec.loader is not None
+    profile_mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(profile_mod)  # type: ignore[union-attr]
+
+    ua = profile_mod.desktop_ua()
+    assert isinstance(ua, str)
+    assert "Chrome/" in ua and "Safari/537.36" in ua
+    # mocked Qt → fallback to the last known-good constant
+    assert ua == profile_mod.DESKTOP_UA
+
+
+def test_is_google_sorry_url() -> None:
+    from browser_ui.web_view import _is_google_sorry_url as is_sorry
+
+    assert is_sorry("https://www.google.com/sorry/index?continue=...")
+    assert is_sorry("https://sorry.google.com/sorry/index")
+    assert is_sorry("HTTPS://WWW.GOOGLE.COM/SORRY/INDEX")
+    assert not is_sorry("https://www.google.com/search?q=hello")
+    assert not is_sorry("https://www.bing.com/")
+    assert not is_sorry("")
+
+
 def test_omnibox_uses_settings_search_url_for() -> None:
     text = (_BROWSER_DIR / "browser_ui" / "omnibox.py").read_text(encoding="utf-8")
     assert "self._settings.search_url_for(text)" in text

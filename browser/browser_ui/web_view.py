@@ -75,6 +75,15 @@ _RETRY_DELAYS_MS = (1200, 2500, 4000)
 _MAX_ATTEMPTS = 3
 
 
+def _is_google_sorry_url(url_str: str) -> bool:
+    """True when the URL is Google's "unusual traffic" bot-challenge page.
+
+    Module-level so it is unit-testable without a Qt runtime.
+    """
+    lowered = (url_str or "").lower()
+    return "google.com/sorry" in lowered or "sorry/index" in lowered
+
+
 def _connecting_html(p: dict, attempt: int) -> str:
     """The transient "Connecting…" placeholder, tinted to the active palette."""
     return Template(
@@ -203,6 +212,7 @@ class WebView(QWebEngineView):
             if self._connecting_for != url:
                 self._load_attempts.pop(url.toString(), None)
             self._connecting_for = None
+            self._maybe_warn_google_sorry(url)
             return
         if url.scheme() not in ("http", "https"):
             return
@@ -237,6 +247,31 @@ class WebView(QWebEngineView):
                 self.load(url)
         except RuntimeError:
             pass  # view torn down between scheduling and firing — nothing to do
+
+    def _maybe_warn_google_sorry(self, url) -> None:
+        """Toast once per session when Google serves its "unusual traffic" bot page.
+
+        Some of Google's risk scoring is IP/reputation-based and no browser
+        code can fully defeat it — so when the challenge page does appear,
+        point the user at the escape hatch (switch the default search
+        provider) instead of leaving them stuck on an unsolvable page.
+        """
+        try:
+            url_str = url.toString()
+        except Exception:
+            return
+        if not _is_google_sorry_url(url_str):
+            return
+        if getattr(self._mw, "_google_sorry_warned", False):
+            return
+        self._mw._google_sorry_warned = True
+        toast = getattr(self._mw, "toast", None)
+        if callable(toast):
+            toast(
+                "Google flagged this as automated traffic. You can switch the "
+                "default search engine in Settings (DuckDuckGo, Bing, Brave).",
+                "warning",
+            )
 
     # ── popups ───────────────────────────────────────────────────────
     # target=_blank / window.open -> open as a new tab in this window.

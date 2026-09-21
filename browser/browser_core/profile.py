@@ -12,10 +12,37 @@ from PySide6.QtWebEngineCore import QWebEngineProfile, QWebEngineSettings
 # unsolvable sorry-image CAPTCHA. Qt profiles set UA globally (no per-host
 # override without a request interceptor), so we set a real-Chrome UA for
 # all sites: it matches genuine Chrome and drops Google's risk score.
+#
+# The Chrome MAJOR is read from the real engine at runtime
+# (qWebEngineChromiumVersion): a hardcoded UA goes stale (Chrome/126 in
+# 2026), and claiming a version NEWER than the engine is itself a bot
+# signal Google can spot via feature detection. DESKTOP_UA keeps the last
+# known-good value as the fallback when the version query is unavailable.
 DESKTOP_UA = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
 )
+
+
+def desktop_ua() -> str:
+    """Chrome UA whose major version matches the real QtWebEngine engine.
+
+    Never raises: falls back to DESKTOP_UA when the version query fails
+    (mocked Qt in tests, old builds, headless imports).
+    """
+    try:
+        from PySide6.QtWebEngineCore import qWebEngineChromiumVersion
+
+        major = int(qWebEngineChromiumVersion().majorVersion())
+        if major >= 100:
+            return (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                f"(KHTML, like Gecko) Chrome/{major}.0.0.0 Safari/537.36"
+            )
+    except Exception:
+        pass
+    return DESKTOP_UA
+
 
 # Accept-Language sent on every request. QtWebEngine sends none by default,
 # which makes consent.google.com bounce in a redirect loop (no language →
@@ -73,12 +100,13 @@ def _enable_desktop_ua(profile: Any) -> None:
     """Set a desktop Chrome UA so Google's risk-score drops.
 
     Qt's default UA flags automation → unsolvable sorry-image CAPTCHA.
+    The UA's Chrome major matches the real engine (desktop_ua()).
     Guarded with hasattr/try-except so old Qt never breaks startup.
     """
     try:
         setter = getattr(profile, "setHttpUserAgent", None)
         if callable(setter):
-            setter(DESKTOP_UA)
+            setter(desktop_ua())
     except Exception:
         pass  # UA spoof is a nicety, never a startup blocker
 
