@@ -31,6 +31,7 @@ export const BRIDGE_URL = 'http://127.0.0.1:9885';
 // All allowlisted shells from browser_core/terminal_server.py
 // Dylan 2026-09-14: DeepSeek + Muse Spark removed — Muse Code stays.
 // OpenCode (mesh-opencode) restored alongside MiniMax Code (mcode) + media (mmx).
+// 10.1: Google Jules (mesh-jules) joins the mesh — async cloud coder.
 export const MESH_AGENTS: { id: string; label: string; emoji: string }[] = [
   { id: 'mesh-agy', label: 'Antigravity', emoji: '🛸' },
   { id: 'mesh-claude', label: 'Claude', emoji: '🟠' },
@@ -46,6 +47,7 @@ export const MESH_AGENTS: { id: string; label: string; emoji: string }[] = [
   { id: 'mesh-pi', label: 'Pi', emoji: '⚪' },
   { id: 'mesh-grok', label: 'Grok', emoji: '𝕏' },
   { id: 'mesh-muse', label: 'Muse Code', emoji: 'Ⓜ️' },
+  { id: 'mesh-jules', label: 'Jules', emoji: '☁️' },
 ];
 
 export function terminalUrl(shell: string): string {

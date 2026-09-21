@@ -49,6 +49,17 @@ The full `luckyd-code` workspace lives in a tab: the agent loop, 70+ tools (file
 
 Four terminal panes in one dock. Run agents side by side — the mesh ships chips for the agent CLI, PowerShell, and popular agent CLIs (availability probed via PATH). A `doctor` command validates each backend before launch.
 
+### Google Jules (new in 10.1)
+
+The mesh dock also includes **Jules**, Google's async coding agent. Kick off a task from a terminal, close the tab, and Jules works it on a Google cloud VM and returns a pull request — it is **not** a local REPL and **not** free/unlimited.
+
+- **Install:** `npm install -g @google/jules` (needs Node.js), then `jules login` (one-time Google OAuth in your browser)
+- **Alternate auth:** `jules auth login --api-key "$JULES_API_KEY"` · check with `jules --version` · sign out with `jules logout`
+- **Start a task:** `jules remote new --repo owner/repo --session "do the thing"` — or just run `jules` for the interactive dashboard
+- **Follow along:** `jules remote list --session`, `jules remote list --repo`, `jules remote pull --session <id>`
+- **GitHub:** the Jules GitHub App must be installed/authorized on your account or org for repo access (private repos need explicit access granted)
+- **Quotas:** Free 15 tasks/day + 3 concurrent · Google AI Pro 100/day + 15 concurrent · Ultra 300/day + 60 concurrent. Limits can change — check [jules.google.com](https://jules.google.com).
+
 ## Cline bridge — `127.0.0.1:8317`
 
 A ClinePass-compatible proxy (`/v1/models`, `/v1/chat/completions`) so Cline-style clients can use your configured providers. `/v1/health` stays public for diagnostics.

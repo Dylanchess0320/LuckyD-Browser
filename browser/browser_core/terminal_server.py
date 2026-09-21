@@ -308,7 +308,9 @@ def _agent2_command(cli2_path: str = "") -> list[str]:
 # NOTE: Gemini CLI (mesh-gemini/gemini) was dropped from the mesh in favor of
 # Antigravity (agy) for the plan/build stages (see ~/agent-mesh, v1.0.1).
 # OpenCode (mesh-opencode/opencode) rides alongside MiniMax Code CLI
-# (mesh-mcode/mcode) + media CLI (mesh-mmx/mmx).
+# (mesh-mcode/mcode) + media CLI (mesh-mmx/mmx) — and Google Jules
+# (mesh-jules/jules), the async cloud coder that works repos and returns
+# pull requests, rides alongside them too.
 SHELLS = (
     "agent",
     "agent2",
@@ -330,12 +332,14 @@ SHELLS = (
     "mesh-pi",
     "mesh-grok",
     "mesh-muse",
+    "mesh-jules",
     "agy",
     "antigravity",
     "grok",
     "muse",
     "mcode",
     "mmx",
+    "jules",
 )
 
 # Agent Mesh shells: shell name -> executable resolved on PATH.
@@ -360,6 +364,8 @@ MESH_SHELLS = {
     "mesh-pi": "pi",
     "mesh-grok": "grok",
     "grok": "grok",
+    "mesh-jules": "jules",
+    "jules": "jules",
 }
 
 # Extra default args per mesh shell (appended after the resolved executable).

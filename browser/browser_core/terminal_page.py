@@ -34,6 +34,8 @@ _SHELL_LABELS = {
     "muse": "Muse Code",
     "mesh-cline": "Cline",
     "cline": "Cline",
+    "mesh-jules": "Jules",
+    "jules": "Jules",
 }
 
 
@@ -43,6 +45,7 @@ _SHELL_LABELS = {
 # 9.4: Gemini CLI dropped in favor of Antigravity (agy) for plan/build stages;
 # Cline CLI kept (free rotating FREE models) — both work in Agent 1 + Agent 2.
 # OpenCode (mesh-opencode) rides alongside MiniMax Code (mcode) + media (mmx).
+# 10.1: Google Jules (mesh-jules) joins them — async cloud coder.
 _MESH_AGENTS = {
     "mesh-agy": ("Antigravity", "🛸", "#38bdf8", "Google DeepMind · AGY"),
     "mesh-claude": ("Claude", "🟠", "#d97706", "Anthropic · architect"),
@@ -58,6 +61,7 @@ _MESH_AGENTS = {
     "mesh-pi": ("Pi", "⚪", "#94a3b8", "minimal toolkit"),
     "mesh-grok": ("Grok", "𝕏", "#f1f5f9", "xAI · builder"),
     "mesh-muse": ("Muse Code", "Ⓜ️", "#0082fb", "Meta · native via WSL Ubuntu"),
+    "mesh-jules": ("Jules", "☁️", "#34a853", "Google · async coder"),
 }
 
 
