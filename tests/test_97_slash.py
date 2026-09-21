@@ -15,7 +15,7 @@ def test_discover_commands_finds_md_files():
 
 def test_commands_dir_points_at_repo_root():
     assert sc.COMMANDS_DIR.name == "slash_commands"
-    assert sc.COMMANDS_DIR.parent.name == "LuckyD-Browser"
+    assert (sc.COMMANDS_DIR.parent / "core").is_dir()  # Verify it points to the repo root
     assert sc.COMMANDS_DIR.is_dir()
 
 

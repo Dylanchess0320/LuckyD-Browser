@@ -179,17 +179,23 @@ class TestFulfillHandler:
 
 
 class TestGetPlaywright:
-    async def test_missing_playwright_raises(self, clean_browser):
-        assert "playwright" not in sys.modules
+    async def test_missing_playwright_raises(self, clean_browser, monkeypatch):
+        monkeypatch.setitem(sys.modules, "playwright", None)
+        monkeypatch.setitem(sys.modules, "playwright.async_api", None)
+        # assert "playwright" not in sys.modules
         with pytest.raises(RuntimeError, match="Playwright not installed"):
             await bt._get_playwright()
 
-    async def test_navigate_errors_without_playwright(self, clean_browser):
+    async def test_navigate_errors_without_playwright(self, clean_browser, monkeypatch):
+        monkeypatch.setitem(sys.modules, "playwright", None)
+        monkeypatch.setitem(sys.modules, "playwright.async_api", None)
         r = await _tool("BrowserNavigate").execute(url="https://example.com")
         assert not _ok(r)
         assert "Playwright not installed" in r.text
 
-    async def test_click_type_snapshot_evaluate_errors_without_playwright(self, clean_browser):
+    async def test_click_type_snapshot_evaluate_errors_without_playwright(self, clean_browser, monkeypatch):
+        monkeypatch.setitem(sys.modules, "playwright", None)
+        monkeypatch.setitem(sys.modules, "playwright.async_api", None)
         for name, kw in [
             ("BrowserClick", {"selector": "#x"}),
             ("BrowserType", {"selector": "#x", "text": "hi"}),
