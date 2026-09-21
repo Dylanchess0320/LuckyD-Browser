@@ -576,7 +576,7 @@ def test_call_openai_streaming_success(
     assert method == "POST"
     assert url == "https://api.openai.com/v1/chat/completions"
     assert headers["Authorization"] == "Bearer k"
-    assert headers["User-Agent"] == "LuckyDBrowser/9.6"
+    assert headers["User-Agent"] == "LuckyDBrowser/9.7"
     assert body["model"] == "gpt-4o"
     assert body["stream"] is True
 

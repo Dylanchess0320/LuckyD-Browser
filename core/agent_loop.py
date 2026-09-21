@@ -12,18 +12,24 @@ Replaces agent.py's run() method with a modular architecture using:
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import functools
 import json
+import logging
 import os
 import time
 import traceback
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
+import httpx
+
 from config import PROJECT_DIR, get_config
 from llm import CostTracker
 from memory.store import get_memory
 from tools.registry import registry
 
+from .compaction import maybe_compact
 from .hooks import get_hooks
 from .llm_client import LLMClient
 from .message_builder import MessageBuilder
@@ -38,6 +44,104 @@ from .types import (
 
 if TYPE_CHECKING:
     from llm import LLMConfig
+
+
+log = logging.getLogger(__name__)
+
+
+#: Valid ``permission_mode`` values for CodingAgent (LuckyD 9.7).
+PERMISSION_MODES = ("default", "acceptEdits", "bypassPermissions", "auto", "off")
+
+#: Conservative read-only tool-name prefixes for the 'off' permission mode.
+#: A tool whose lowercase name starts with one of these is treated as
+#: read-only and stays available when every state-modifying tool is blocked.
+READONLY_NAME_PREFIXES = (
+    "read",
+    "get",
+    "list",
+    "search",
+    "glob",
+    "grep",
+    "diff",
+    "show",
+    "fetch",
+    "find",
+    "status",
+    "history",
+    "info",
+    "view",
+)
+
+#: Tool-name substrings marking file-editing tools for 'acceptEdits' mode.
+EDIT_TOOL_KEYWORDS = ("edit", "write", "apply")
+
+
+# ── Classified retry for the provider HTTP layer (LuckyD 9.7) ───────────
+# Policy: retryable = HTTP 429 / 5xx / timeouts / connection errors;
+# fatal (fail fast) = 400 / 401 / 403 and other client errors.
+#
+# NOTE: these helpers live here because this change is scoped to
+# core/agent_loop.py. Wiring _with_retry around LLMClient._http_post (the
+# method that POSTs to {base_url}/chat/completions) needs an edit to
+# core/llm_client.py — which already retries inline via retryable_codes,
+# max_retries, and Retry-After support — so that wiring is left as a
+# follow-up.
+
+
+def _is_retryable(exc: Exception) -> bool:
+    """True when a provider-call exception is worth retrying.
+
+    Retryable: HTTP 429, any 5xx, timeouts, connection errors.
+    Fatal (fail fast): 400/401/403 and other client errors.
+    """
+    if isinstance(exc, httpx.HTTPStatusError):
+        status = exc.response.status_code if exc.response is not None else 0
+        return status == 429 or 500 <= status <= 599
+    return isinstance(exc, (httpx.TimeoutException, httpx.ConnectError))
+
+
+def _monotonic() -> float:
+    """Clock indirection for the retry budget, so tests can time-travel
+    without patching the global time module (which the event loop also uses)."""
+    return time.monotonic()
+
+
+def _with_retry(fn, max_retries: int = 5):
+    """Wrap an async provider-call callable with classified retry.
+
+    Exponential backoff 1s -> 30s (1, 2, 4, 8, 16, then capped at 30s),
+    with a total elapsed budget of 120s. Each retry is logged at INFO.
+    The wrapped callable keeps its public signature.
+    """
+
+    @functools.wraps(fn)
+    async def _wrapper(*args, **kwargs):
+        start = _monotonic()
+        attempt = 0  # retries used so far
+        while True:
+            try:
+                return await fn(*args, **kwargs)
+            except Exception as exc:
+                if not _is_retryable(exc) or attempt >= max_retries:
+                    raise
+                delay = min(2.0**attempt, 30.0)
+                if _monotonic() - start + delay > 120.0:
+                    log.warning(
+                        "retry budget exhausted (120s elapsed cap); not retrying %s",
+                        type(exc).__name__,
+                    )
+                    raise
+                log.info(
+                    "retryable provider error %s; retry %d/%d in %.0fs",
+                    type(exc).__name__,
+                    attempt + 1,
+                    max_retries,
+                    delay,
+                )
+                await asyncio.sleep(delay)
+                attempt += 1
+
+    return _wrapper
 
 
 MEMORY_EXTRACTION_PROMPT = """Analyze the conversation above and extract KEY facts, decisions,
@@ -72,6 +176,7 @@ class CodingAgent:
         max_tokens: int = 8192,
         timeout_sec: int = 120,
         callbacks: AgentCallbacks | None = None,
+        permission_mode: str = "auto",
     ):
         cfg = get_config()
         self.api_key = api_key or cfg["api_key"]
@@ -86,6 +191,13 @@ class CodingAgent:
         self.messages: list[dict] = []
         self.conversation_id = datetime.now(timezone.utc).strftime("conv_%Y%m%d_%H%M%S")
         self.callbacks = callbacks or AgentCallbacks()
+
+        # Permission mode (9.7): gates tool execution before the approval hook.
+        if permission_mode not in PERMISSION_MODES:
+            raise ValueError(
+                f"permission_mode must be one of {PERMISSION_MODES}, got {permission_mode!r}"
+            )
+        self.permission_mode = permission_mode
 
         # Retry state
         self.max_retries = 3
@@ -271,6 +383,57 @@ class CodingAgent:
             project_rules=rules,
         )
 
+    def _permission_mode_decision(self, tool, tool_name: str) -> tuple[str, str]:
+        """Permission-mode gate for _execute_tool; evaluated BEFORE the approval hook.
+
+        Returns (decision, reason) where decision is one of:
+          - "allow": the mode pre-approved the call; the approval hook is skipped.
+          - "defer": the mode has no opinion; before_tool hooks (incl. approval) run.
+          - "block": the mode denied the call; _execute_tool returns an error.
+        """
+        mode = self.permission_mode
+        level = getattr(tool, "permission_level", "NORMAL")
+        level = level.value.upper() if hasattr(level, "value") else str(level or "NORMAL").upper()
+        lname = (tool_name or "").lower()
+
+        if level == "BLOCKED":
+            return "block", "tool is BLOCKED"
+
+        if mode == "bypassPermissions":
+            return "allow", "bypassPermissions allows everything except BLOCKED tools"
+
+        if mode == "acceptEdits":
+            if level in ("ALWAYS_ALLOW", "NORMAL"):
+                return "allow", "ALWAYS_ALLOW/NORMAL tools are auto-allowed"
+            if any(keyword in lname for keyword in EDIT_TOOL_KEYWORDS):
+                return "allow", "file-editing tool auto-allowed in acceptEdits mode"
+            return "block", "not a file-editing tool; blocked in acceptEdits mode"
+
+        if mode == "auto":
+            if level in ("ALWAYS_ALLOW", "NORMAL"):
+                return "allow", "ALWAYS_ALLOW/NORMAL tools are auto-allowed"
+            return "defer", "REQUIRES_APPROVAL tools defer to the approval hook"
+
+        if mode == "off":
+            if level == "ALWAYS_ALLOW":
+                return "allow", "ALWAYS_ALLOW tools stay available in off mode"
+            if lname.startswith(READONLY_NAME_PREFIXES):
+                return "allow", "read-only tool name"
+            return "block", "off mode blocks every state-modifying tool"
+
+        # 'default': current behavior — everything defers to the approval hook.
+        return "defer", "deferred to the approval hook"
+
+    @staticmethod
+    def _is_approval_hook(hook) -> bool:
+        """True when a before_tool hook entry is the ApprovalHook.
+
+        Plugins register the bound method ``self.before_tool``, so unwrap to
+        the plugin instance before checking its name.
+        """
+        target = getattr(hook, "__self__", hook)
+        return getattr(target, "name", "") == "approval"
+
     async def _execute_tool(self, tool_name: str, tool_args: dict) -> dict:
         """Execute a tool with hook support and approval checks."""
         from tools.registry import registry
@@ -286,9 +449,27 @@ class CodingAgent:
                 "content": f"Error: Unknown tool '{tool_name}'. Available: {known}",
             }
 
+        # Permission-mode gate (9.7): enforced BEFORE the approval hook.
+        # "allow" pre-approves the call (the approval hook is skipped, other
+        # before_tool hooks still run); "defer" runs the hooks as usual;
+        # "block" returns an error immediately.
+        decision, mode_reason = self._permission_mode_decision(tool, tool_name)
+        if decision == "block":
+            return {
+                "role": "tool",
+                "tool_call_id": call_id,
+                "content": (
+                    f"Error: Tool '{tool_name}' blocked by permission mode "
+                    f"'{self.permission_mode}': {mode_reason}."
+                ),
+            }
+
         # Run before_tool hooks (approval, checkpoint, etc.)
         ctx = HookContext(turn=self.turn_count, messages=self.messages)
-        for hook in self.hooks.before_tool:
+        before_hooks = self.hooks.before_tool
+        if decision == "allow":
+            before_hooks = [h for h in before_hooks if not self._is_approval_hook(h)]
+        for hook in before_hooks:
             try:
                 result = await asyncio.to_thread(hook, tool_name, tool_args, ctx)
                 if result is not None:
@@ -644,6 +825,15 @@ class CodingAgent:
                             self._emit_event(AgentEventType.MEMORY_REFRESH, {})
                 except Exception:
                     pass
+
+            # Context compaction (9.7): summarize stale history when the
+            # conversation grows long. Never raises.
+            await maybe_compact(self)
+
+            # Session autosave (9.7): checkpoint the session every 5 turns.
+            if self.turn_count % 5 == 0:
+                with contextlib.suppress(Exception):
+                    self.save_session()
 
             # Run before_model hooks
             ctx = HookContext(turn=self.turn_count, messages=self.messages)

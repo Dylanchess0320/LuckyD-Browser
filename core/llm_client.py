@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+import time
 from collections.abc import Callable
 
 import httpx
@@ -47,8 +48,9 @@ class LLMClient:
         temperature: float = 0.0,
         max_tokens: int = 8192,
         timeout_sec: int = 120,
-        max_retries: int = 3,
+        max_retries: int = 5,
         base_delay: float = 1.0,
+        retry_time_cap: float = 120.0,
         context_manager: ContextManager | None = None,
         token_resolver: Callable[[], str | None] | None = None,
     ):
@@ -60,7 +62,12 @@ class LLMClient:
         self.timeout_sec = timeout_sec
         self.max_retries = max_retries
         self.base_delay = base_delay
+        # Total wall-clock budget for all retries of one call (9.7, minimax
+        # port: classified retry). Once exceeded, no further retry is started.
+        self.retry_time_cap = retry_time_cap
         self.retryable_codes = {429, 500, 502, 503, 504}
+        # Fail fast on these — retrying never helps (bad request / bad key).
+        self.fatal_codes = {400, 401, 403}
         self.context_manager = context_manager or ContextManager()
         # Optional callable that returns a fresh bearer token before each
         # request. Wired in for providers whose auth is backed by a live
@@ -78,6 +85,21 @@ class LLMClient:
             except Exception:
                 pass  # fall back to whatever key we already have
         return (self.api_key or "").strip()
+
+    def _retry_allowed(self, attempt: int, started_at: float | None) -> bool:
+        """True if another retry attempt may start.
+
+        Classified retry (9.7, minimax port): attempts remain AND the total
+        retry wall-clock budget (``retry_time_cap``, default 120s) is not
+        exceeded. Fatal codes (400/401/403) never reach this — they fail fast
+        because they are not in ``retryable_codes``. ``started_at=None``
+        means a fresh budget.
+        """
+        if started_at is None:
+            started_at = time.monotonic()
+        return attempt < self.max_retries and (time.monotonic() - started_at) < (
+            self.retry_time_cap
+        )
 
     def _retry_delay(self, resp, attempt: int) -> float:
         """Seconds to wait before retrying a retryable HTTP error.
@@ -251,6 +273,7 @@ class LLMClient:
         url = f"{base}/models/{self.model}:{verb}{key}"
         body = self._google_body(messages, tools)
 
+        started_at = time.monotonic()
         for attempt in range(self.max_retries + 1):
             try:
                 timeout = httpx.Timeout(connect=30.0, read=self.timeout_sec, write=30.0, pool=30.0)
@@ -351,7 +374,7 @@ class LLMClient:
             except httpx.HTTPStatusError as e:
                 code = e.response.status_code
                 detail = self._extract_error_detail(e.response)
-                if code in self.retryable_codes and attempt < self.max_retries:
+                if code in self.retryable_codes and self._retry_allowed(attempt, started_at):
                     delay = self._retry_delay(e.response, attempt)
                     print(
                         f"\n  [RETRY] HTTP {code} in {delay:.1f}s "
@@ -371,7 +394,7 @@ class LLMClient:
                 httpx.ReadTimeout,
                 httpx.ConnectTimeout,
             ) as e:
-                if attempt < self.max_retries:
+                if self._retry_allowed(attempt, started_at):
                     delay = self._retry_delay(None, attempt)
                     print(f"\n  [RETRY] {type(e).__name__}: {e} in {delay:.1f}s")
                     await asyncio.sleep(delay)
@@ -446,13 +469,20 @@ class LLMClient:
         payload = self._build_payload(messages, tools, stream=True)
         self._log_payload_size(payload)
 
+        started_at = time.monotonic()
         for attempt in range(self.max_retries + 1):
             try:
                 return await self._try_stream(
-                    payload, url, headers, attempt, stream_callback, think_callback
+                    payload,
+                    url,
+                    headers,
+                    attempt,
+                    stream_callback,
+                    think_callback,
+                    started_at,
                 )
             except httpx.HTTPStatusError as e:
-                result = self._handle_http_error(e, attempt)
+                result = self._handle_http_error(e, attempt, started_at)
                 if result is not None:
                     return result
             except (
@@ -462,7 +492,7 @@ class LLMClient:
                 httpx.ReadTimeout,
                 httpx.ConnectTimeout,
             ) as e:
-                if attempt < self.max_retries:
+                if self._retry_allowed(attempt, started_at):
                     delay = self._retry_delay(None, attempt)
                     print(
                         f"\n  [RETRY] {type(e).__name__}: {e} in {delay:.1f}s ({attempt + 2}/{self.max_retries + 1})"
@@ -516,7 +546,7 @@ class LLMClient:
         )
 
     async def _try_stream(
-        self, payload, url, headers, attempt, stream_callback, think_callback
+        self, payload, url, headers, attempt, stream_callback, think_callback, started_at=None
     ) -> dict | None:
         """Execute one streaming attempt."""
         timeout = httpx.Timeout(connect=30.0, read=self.timeout_sec, write=30.0, pool=30.0)
@@ -524,7 +554,9 @@ class LLMClient:
             httpx.AsyncClient(timeout=timeout) as client,
             client.stream("POST", url, headers=headers, json=payload) as resp,
         ):
-            if resp.status_code in self.retryable_codes and attempt < self.max_retries:
+            if resp.status_code in self.retryable_codes and self._retry_allowed(
+                attempt, started_at
+            ):
                 delay = self._retry_delay(resp, attempt)
                 print(
                     f"\n  [RETRY] HTTP {resp.status_code} in {delay:.1f}s ({attempt + 2}/{self.max_retries + 1})"
@@ -650,8 +682,12 @@ class LLMClient:
         except Exception:
             return ""
 
-    def _handle_http_error(self, e: httpx.HTTPStatusError, attempt: int) -> dict | None:
-        if e.response.status_code in self.retryable_codes and attempt < self.max_retries:
+    def _handle_http_error(
+        self, e: httpx.HTTPStatusError, attempt: int, started_at: float | None = None
+    ) -> dict | None:
+        if e.response.status_code in self.retryable_codes and self._retry_allowed(
+            attempt, started_at
+        ):
             delay = self._retry_delay(e.response, attempt)
             print(
                 f"\n  [RETRY] HTTP {e.response.status_code} in {delay:.1f}s ({attempt + 2}/{self.max_retries + 1})"
@@ -739,12 +775,15 @@ class LLMClient:
     async def _http_post(self, url: str, headers: dict, payload: dict) -> httpx.Response:
         """HTTP POST with retry for non-streaming calls."""
         last_exc = None
+        started_at = time.monotonic()
         for attempt in range(self.max_retries + 1):
             try:
                 timeout = httpx.Timeout(connect=30.0, read=self.timeout_sec, write=30.0, pool=30.0)
                 async with httpx.AsyncClient(timeout=timeout) as client:
                     resp = await client.post(url, headers=headers, json=payload)
-                    if resp.status_code in self.retryable_codes and attempt < self.max_retries:
+                    if resp.status_code in self.retryable_codes and self._retry_allowed(
+                        attempt, started_at
+                    ):
                         delay = self._retry_delay(resp, attempt)
                         print(
                             f"\n  [RETRY] HTTP {resp.status_code} in {delay:.1f}s ({attempt + 2}/{self.max_retries + 1})"
@@ -760,7 +799,7 @@ class LLMClient:
                 httpx.ConnectTimeout,
             ) as e:
                 last_exc = e
-                if attempt < self.max_retries:
+                if self._retry_allowed(attempt, started_at):
                     delay = self._retry_delay(None, attempt)
                     print(
                         f"\n  [RETRY] Connection: {e} in {delay:.1f}s ({attempt + 2}/{self.max_retries + 1})"

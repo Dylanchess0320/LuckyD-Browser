@@ -34,6 +34,7 @@ VALID_PROVIDERS = {
     "clinepass",
     "cline-usage",
     "cline",
+    "minimax",
 }
 
 PROVIDER_NAMES = {
@@ -50,6 +51,7 @@ PROVIDER_NAMES = {
     "clinepass": "ClinePass",
     "cline-usage": "Cline (usage)",
     "cline": "Cline (usage)",
+    "minimax": "MiniMax",
 }
 
 PROVIDER_DEFAULTS: dict[str, ProviderDefaults] = {
@@ -153,6 +155,15 @@ PROVIDER_DEFAULTS: dict[str, ProviderDefaults] = {
         "default_base": "https://api.cline.bot/api/v1",
         "default_model": "deepseek/deepseek-chat",
     },
+    # MiniMax (MiniMax-M3, Anthropic-compatible Messages API).
+    # mesh: python main.py --provider minimax --agent 1
+    "minimax": {
+        "env_key": "MINIMAX_API_KEY",
+        "env_base": "MINIMAX_BASE_URL",
+        "env_model": "MINIMAX_MODEL",
+        "default_base": "https://api.minimax.io/anthropic",
+        "default_model": "MiniMax-M3",
+    },
 }
 
 
@@ -192,6 +203,7 @@ def detect_provider() -> str | None:
         ("zai", "ZAI_API_KEY"),
         ("opencode", "OPENCODE_API_KEY"),
         ("openrouter", "OPENROUTER_API_KEY"),
+        ("minimax", "MINIMAX_API_KEY"),
         ("ollama", "OLLAMA_MODEL"),
     ]
     for provider, env_var in checks:
@@ -408,6 +420,7 @@ def detect_api_format(provider: str) -> str:
         "clinepass": "openai",  # ClinePass gateway is OpenAI-compatible
         "cline-usage": "openai",  # same gateway, usage-billed model ids
         "cline": "openai",  # alias of cline-usage
+        "minimax": "anthropic",  # Anthropic-compatible Messages API
     }
     return formats.get(provider, "openai")
 
@@ -436,6 +449,7 @@ PROVIDER_ORDER = (
     "gemini",
     "openai",
     "anthropic",
+    "minimax",
 )
 
 

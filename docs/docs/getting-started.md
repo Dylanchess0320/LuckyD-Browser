@@ -1,5 +1,10 @@
 # Getting Started
 
+> **New in 9.7.0:** the Code CLI is now the flagship terminal agent
+> (permission modes, `delegate_task` background subagents, Markdown slash
+> commands, auto-compaction, classified retry, session autosave) + MiniMax
+> provider (`--provider minimax`).
+>
 > **New in 9.6.0:** honest Deep Research (engine chip, fail-fast keys,
 > evidence, honest cancel) + opt-in `muse-spark` contributor tier
 > (`/contributor on`).
@@ -15,14 +20,14 @@
 
 ## Install the browser
 
-1. Download [**LuckyDBrowserSetup-9.6.0.exe**](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.6.0/LuckyDBrowserSetup-9.6.0.exe)
+1. Download [**LuckyDBrowserSetup-9.7.0.exe**](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.7.0/LuckyDBrowserSetup-9.7.0.exe)
 2. Run it — installs to `%LOCALAPPDATA%\Programs\LuckyDBrowser`
 3. Leave **"Set up free unlimited local AI"** checked to get Ollama + `llama3.2:3b` in one shot
 
 Silent install for scripts and fleets:
 
 ```powershell
-LuckyDBrowserSetup-9.6.0.exe /VERYSILENT /NORESTART
+LuckyDBrowserSetup-9.7.0.exe /VERYSILENT /NORESTART
 ```
 
 ## First launch in 60 seconds
@@ -54,11 +59,11 @@ browser\run_browser.bat
 
 # Shareable installer (needs Inno Setup 6)
 powershell -NoProfile -ExecutionPolicy Bypass -File browser\installer\build_installer.ps1
-# → browser\installer\output\LuckyDBrowserSetup-9.6.0.exe
+# → browser\installer\output\LuckyDBrowserSetup-9.7.0.exe
 ```
 
 ## Upgrading
 
-Install the new `LuckyDBrowserSetup-9.6.0.exe` right over your existing install — profile, settings, and workspaces carry over. The browser also checks for updates itself and can install them in-app with one click.
+Install the new `LuckyDBrowserSetup-9.7.0.exe` right over your existing install — profile, settings, and workspaces carry over. The browser also checks for updates itself and can install them in-app with one click.
 
 Next: [Features →](features.md)

@@ -75,13 +75,24 @@ See [`kit/SKILL_AUTHORING.md`](kit/SKILL_AUTHORING.md) to publish your own skill
 
 ## Latest release
 
-**v9.6.0** — Honest research + opt-in contributor tier, on top of everything from 9.5.0:
+**v9.7.0** — Flagship Code CLI + MiniMax provider, on top of everything from 9.6.0:
 
 | | |
 |---|---|
-| **⬇ Windows installer** | [`LuckyDBrowserSetup-9.6.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.6.0/LuckyDBrowserSetup-9.6.0.exe) — built on a real Windows runner with Inno Setup 6. Per-user, no admin, silent-install flags. |
+| **⬇ Windows installer** | [`LuckyDBrowserSetup-9.7.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.7.0/LuckyDBrowserSetup-9.7.0.exe) — built on a real Windows runner with Inno Setup 6. Per-user, no admin, silent-install flags. |
+| **🤖 LuckyD Code CLI is the flagship** | Permission modes (`--permission-mode`), background subagent delegation (`delegate_task`), slash commands from Markdown files (`/compact`, `/review`, `/init`), automatic context compaction, classified retry with backoff, session autosave. |
+| **🔌 MiniMax provider** | `--provider minimax` with `MiniMax-M3` (default), `MiniMax-M2.7-highspeed`, `MiniMax-M2.7`. |
+| **🖥 Agent mesh unified** | Agent 1 and Agent 2 both run LuckyD Code v9.7. |
+
+<details>
+<summary>New in 9.6.0 — Honest research + opt-in contributor tier</summary>
+
+| | |
+|---|---|
 | **🔬 Honest Deep Research** | Live engine chip (resolved provider + model + backend), keyed backends fail fast with `no API key configured`, evidence from `evidence.json`, honest cancel with no overlap. |
 | **💰 Opt-in contributor tier** | `muse-spark-1.3` standard vs `muse-spark-1.3-contributor` (cheaper because the provider may train on prompts). Hidden unless `/contributor on` — honest cached-token cost tracking. |
+
+</details>
 
 <details>
 <summary>New in 9.5.0 — Terminal crash fix</summary>
@@ -266,14 +277,14 @@ Also in this lineage: Deep Research swarm (`Ctrl+Shift+R`), Agent Mesh, self-hea
 
 ## Install in 10 seconds
 
-1. Get **[LuckyDBrowserSetup-9.6.0.exe](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.6.0/LuckyDBrowserSetup-9.6.0.exe)**
+1. Get **[LuckyDBrowserSetup-9.7.0.exe](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.7.0/LuckyDBrowserSetup-9.7.0.exe)**
 2. Run it — per-user, **no admin**, installs to `%LOCALAPPDATA%\Programs\LuckyDBrowser`
 3. Leave **“Set up free unlimited local AI”** checked → Ollama + `llama3.2:3b` (~2 GB, one time)
 4. `Ctrl+Shift+A` → chat offline. Or bring your own keys (Gemini, Groq, DeepSeek, OpenAI, Anthropic, Z.ai, OpenRouter, Cline, OpenCode)
 
 No local model yet? With no Ollama and no keys, chat falls back to the OpenCode Zen gateway (`OPENCODE_API_KEY`) — no local server needed.
 
-Silent: `LuckyDBrowserSetup-9.6.0.exe /VERYSILENT /NORESTART`
+Silent: `LuckyDBrowserSetup-9.7.0.exe /VERYSILENT /NORESTART`
 
 Windows 10/11 x64 only.
 
@@ -314,7 +325,7 @@ browser\run_browser.bat
 
 # Shareable installer (needs Inno Setup 6)
 powershell -NoProfile -ExecutionPolicy Bypass -File browser\installer\build_installer.ps1
-# → browser\installer\output\LuckyDBrowserSetup-9.6.0.exe
+# → browser\installer\output\LuckyDBrowserSetup-9.7.0.exe
 ```
 
 ---

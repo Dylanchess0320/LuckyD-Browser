@@ -5,6 +5,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [9.7.0] - 2026-09-21
+
+LuckyD Code CLI becomes the flagship terminal agent: best-of-minimax-code
+ports (permission modes, background subagent delegation, slash commands,
+context compaction, classified retry), MiniMax as a first-class model
+provider, and the agent mesh's Agent 1 / Agent 2 shells unified on v9.7.
+Shipped as `LuckyDBrowserSetup-9.7.0.exe`.
+
+### Added
+- **Permission modes** (idea ported from minimax-code, MIT) —
+  `--permission-mode`: `default` (trust-policy approvals, as before), `auto`
+  (pre-allow safe tools, approve the rest), `acceptEdits` (auto-allow file
+  edits), `bypassPermissions` (allow all but BLOCKED), `off` (read-only).
+  Enforced in `core/agent_loop.py` before the approval hook.
+- **Background subagent delegation** — new `tools/delegate.py`:
+  `delegate_task` spawns a subagent on a background thread, `task_output`
+  polls/reads (30s max wait), `task_stop` cancels cooperatively. True parallel
+  delegation inside the CLI.
+- **Slash commands as Markdown files** — `core/slash_commands.py`
+  auto-discovers `slash_commands/*.md` (`/compact`, `/review`, `/init`,
+  `/skills`); prompt-template commands run through the normal agent turn and
+  `/help` lists everything.
+- **Context compaction** — new `core/compaction.py`: past 30 turns / 60
+  messages, older turns are summarized via the model into one system message.
+  `/compact` triggers it manually; the loop also compacts automatically.
+- **Classified retry with backoff** — `core/llm_client.py`: 5 retries, 1s→30s
+  exponential backoff honoring Retry-After, 120s total retry budget, fail-fast
+  on 400/401/403, visible `[RETRY]` status.
+- **Session autosave** — the agent loop persists session state every 5 turns;
+  `-c`/`--continue` and `/resume` pick up where you left off.
+- **MiniMax provider** — new `llm/minimax_client.py` (Anthropic-compatible:
+  `https://api.minimax.io/anthropic`, `x-api-key` header; models `MiniMax-M3`
+  (default), `MiniMax-M2.7-highspeed`, `MiniMax-M2.7`); registered in
+  `core/providers.py` (`MINIMAX_API_KEY`/`MINIMAX_BASE_URL`/`MINIMAX_MODEL`);
+  `python main.py --provider minimax` just works, including from agent-mesh
+  sessions.
+- **Agent mesh: Agent 1 & 2 unified on LuckyD Code v9.7** — stale v3.6/v2.2
+  labels, PTY env, and exe candidates updated; both shells run the improved
+  CLI with Rich prompt, streaming output, and slash-command help.
+
 ## [9.6.0] - 2026-09-19
 
 Honest research + opt-in contributor tier, on top of everything from 9.5.0.

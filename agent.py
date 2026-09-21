@@ -24,6 +24,7 @@ import tools.config_tool
 import tools.data_tools
 import tools.datetime_tools
 import tools.deep_research_tool
+import tools.delegate
 import tools.desktop_tools
 
 # Auto-register built-in tools (populates the tool registry)

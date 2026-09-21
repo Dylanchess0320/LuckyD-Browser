@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [9.7.0] - 2026-09-21
+
+LuckyD Code CLI becomes the flagship terminal agent: best-of-minimax-code
+ports (permission modes, background subagent delegation, slash commands,
+context compaction, classified retry), MiniMax as a first-class model
+provider, and the agent mesh's Agent 1 / Agent 2 shells unified on v9.7.
+Shipped as `LuckyDBrowserSetup-9.7.0.exe`.
+
+- **Permission modes** — `--permission-mode`: `default`, `auto`, `acceptEdits`,
+  `bypassPermissions`, `off`.
+- **Background subagent delegation** — `delegate_task` / `task_output` /
+  `task_stop` tools.
+- **Slash commands as Markdown files** — `/compact`, `/review`, `/init`,
+  `/skills`, auto-discovered from `slash_commands/`.
+- **Context compaction** — automatic past 30 turns / 60 messages, or `/compact`.
+- **Classified retry** — 5 retries, 1s→30s backoff, 120s budget, fail-fast on
+  400/401/403.
+- **Session autosave** — every 5 turns; `-c`/`--continue` and `/resume`.
+- **MiniMax provider** — `--provider minimax` (`MiniMax-M3` default).
+- **Agent mesh** — Agent 1 & 2 both run LuckyD Code v9.7.
+
 ## [9.6.0] - 2026-09-19
 
 Honest research + opt-in contributor tier, on top of everything from 9.5.0.

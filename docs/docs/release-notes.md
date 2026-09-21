@@ -1,5 +1,18 @@
 # LuckyD Browser — Release Notes
 
+## [9.7.0] — Flagship Code CLI + MiniMax provider — 2026-09-21
+
+**[`LuckyDBrowserSetup-9.7.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.7.0/LuckyDBrowserSetup-9.7.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed
+
+- **LuckyD Code CLI is now the flagship terminal agent** — permission modes
+  (`--permission-mode`), background subagent delegation (`delegate_task`),
+  slash commands from Markdown files (`/compact`, `/review`, `/init`),
+  automatic context compaction, classified retry with backoff, and session
+  autosave.
+- **MiniMax is a first-class provider** — `--provider minimax` with
+  `MiniMax-M3` (default), `MiniMax-M2.7-highspeed`, `MiniMax-M2.7`.
+- **Agent mesh unified** — Agent 1 and Agent 2 both run LuckyD Code v9.7.
+
 ## [9.6.0] — Honest research + opt-in contributor tier — 2026-09-19
 
 **[`LuckyDBrowserSetup-9.6.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.6.0/LuckyDBrowserSetup-9.6.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed

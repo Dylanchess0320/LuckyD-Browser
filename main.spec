@@ -50,6 +50,10 @@ a = Analysis(
         ('llm', 'llm'),
         ('memory', 'memory'),
         ('tools', 'tools'),
+        # 9.7: Markdown slash-command templates (/compact /review /init
+        # /skills) live at repo root; bundle them so the frozen CLI discovers
+        # its built-in commands.
+        ('slash_commands', 'slash_commands'),
         ('features', 'features'),
         ('project', 'project'),
         ('skills', 'skills'),

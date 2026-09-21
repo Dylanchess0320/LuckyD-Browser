@@ -1,13 +1,26 @@
-# LuckyD Browser v9.6.0 — Release Notes
+# LuckyD Browser v9.7.0 — Release Notes
 
 > **The AI browser that doesn't need an API key.** Free, unlimited, offline AI built in —
 > plus a full coding agent and developer terminal living in your tabs.
 
-*9.6.0 is on `main` — the installer below publishes with Dylan's 9.6.0 release.*
+*9.7.0 is on `main` — the installer below publishes with Dylan's 9.7.0 release.*
 
-**[⬇ Download `LuckyDBrowserSetup-9.6.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.6.0/LuckyDBrowserSetup-9.6.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed
+**[⬇ Download `LuckyDBrowserSetup-9.7.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.7.0/LuckyDBrowserSetup-9.7.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed
 
 ---
+
+## What's new in 9.7.0
+
+- **LuckyD Code CLI is the flagship terminal agent** — permission modes
+  (`--permission-mode`), background subagent delegation (`delegate_task`),
+  slash commands from Markdown files (`/compact`, `/review`, `/init`),
+  automatic context compaction, classified retry with backoff, and session
+  autosave.
+- **MiniMax is a first-class provider** — `--provider minimax` with
+  `MiniMax-M3` (default), `MiniMax-M2.7-highspeed`, `MiniMax-M2.7`.
+- **Agent mesh unified** — Agent 1 and Agent 2 both run LuckyD Code v9.7.
+
+On top of everything from 9.6.0 below.
 
 ## What's new in 9.6.0
 

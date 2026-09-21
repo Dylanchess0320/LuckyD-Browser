@@ -51,12 +51,12 @@ def build_nuitka(onefile: bool = True) -> int:
 
     print(f"Running command: {' '.join(cmd)}")
     env = os.environ.copy()
-    env["LUCKYD_AGENT_VERSION"] = "v9.6.0"
+    env["LUCKYD_AGENT_VERSION"] = "v9.7.0"
     env["LUCKYD_AGENT_NAME"] = "Agent 1"
 
     result = subprocess.run(cmd, cwd=str(REPO_ROOT), env=env)
     if result.returncode == 0:
-        print("\n[SUCCESS] LuckyD Code v9.6 Nuitka build completed successfully in dist/")
+        print("\n[SUCCESS] LuckyD Code v9.7 Nuitka build completed successfully in dist/")
         dist_exe = REPO_ROOT / "dist" / "luckyd-cli.exe"
         if dist_exe.exists():
             import shutil

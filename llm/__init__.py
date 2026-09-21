@@ -110,6 +110,16 @@ class LLMConfig:
                 max_tokens=int(os.environ.get("CODING_AGENT_MAX_TOKENS", "8192")),
             )
 
+        if explicit == "minimax" or (not explicit and os.environ.get("MINIMAX_API_KEY")):
+            return cls(
+                api_key=os.environ.get("MINIMAX_API_KEY", ""),
+                base_url=os.environ.get("MINIMAX_BASE_URL", "https://api.minimax.io/anthropic"),
+                model=os.environ.get("MINIMAX_MODEL", "MiniMax-M3"),
+                provider="minimax",
+                temperature=float(os.environ.get("CODING_AGENT_TEMP", "0.0")),
+                max_tokens=int(os.environ.get("CODING_AGENT_MAX_TOKENS", "8192")),
+            )
+
         # Fallback: DeepSeek (original default)
         from config import get_config
 
@@ -337,6 +347,10 @@ class LLMClient(ABC):
             from .google_client import GoogleClient
 
             return GoogleClient(config)
+        elif config.provider == "minimax":
+            from .minimax_client import MiniMaxClient
+
+            return MiniMaxClient(config)
         elif config.provider == "ollama":
             from .ollama_client import OllamaClient
 

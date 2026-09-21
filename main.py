@@ -217,7 +217,7 @@ def model_catalog(free_only: bool = False) -> list[dict]:
 
     When ``free_only`` is True, returns only the free tier — filtered to
     providers where the free models would actually work (API key present or
-    local). This powers ``/model free`` for v3.6.
+    local). This powers ``/model free`` for v9.7.
     """
     cline_free = [m for m in _CLINE_USAGE_CATALOG if m in _CLINE_USAGE_FREE_TIER]
     cline_paid = [m for m in _CLINE_USAGE_CATALOG if m not in _CLINE_USAGE_FREE_TIER]
@@ -1215,7 +1215,7 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
             ui.warn("MCP not configured or no servers connected")
 
     elif cmd == "version":
-        agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v9.6.0")
+        agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v9.7.0")
         agent_name = os.environ.get("LUCKYD_AGENT_NAME", "Agent 1")
         ui.info(f"LuckyD Code {agent_version} ({agent_name})")
 
@@ -1223,7 +1223,46 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
         pass  # Empty command
 
     else:
-        ui.warn(f"Unknown command: /{cmd}. Try /help")
+        # Discovered slash commands: slash_commands/*.md + built-ins from
+        # core/slash_commands (9.7). Prompt-template commands (/init, /review,
+        # discovered files) are fed back through the agent turn; /compact is
+        # awaited directly since compaction is async.
+        _slash_name = cmd.split()[0] if cmd.split() else ""
+        try:
+            if _slash_name == "compact":
+                from core.compaction import maybe_compact
+
+                try:
+                    _compacted = await maybe_compact(agent)
+                except Exception as e:
+                    ui.error(f"Compaction failed: {e}")
+                else:
+                    ui.info("Context compacted." if _compacted else "No compaction needed yet.")
+            else:
+                from core import slash_commands as _slash
+
+                _discovered = _slash.discover_commands()
+                _handled, _response = _slash.handle_slash("/" + cmd, agent)
+                if _slash_name in ("init", "review") or _slash_name in _discovered:
+                    # Template command — run it as an agent turn.
+                    agent.stream_callback = ui.stream_token
+                    agent.think_callback = ui.stream_think_token
+                    ui.start_streaming()
+                    ui.start_spinner("working…")
+                    try:
+                        async with run_exclusive():
+                            await agent.run(_response or "")
+                    except Exception as e:
+                        ui.error(f"Agent error: {e}")
+                    finally:
+                        ui.stop_spinner()
+                        ui.end_streaming()
+                elif _response:
+                    ui.info(_response)
+                else:
+                    ui.warn(f"Unknown command: /{cmd}. Try /help")
+        except Exception as e:
+            ui.warn(f"Unknown command: /{cmd}. Try /help ({e})")
 
     return False
 
@@ -1670,6 +1709,7 @@ def main():
     temperature = cfg["temperature"]
     one_shot = ""
     resume_session_id = ""
+    permission_mode = "auto"
 
     json_mode = False
     i = 0
@@ -1711,6 +1751,18 @@ def main():
             os.environ["CODING_AGENT_MAX_TURNS"] = args[i + 1]
             cfg = get_config()
             i += 2
+        elif args[i] == "--permission-mode" and i + 1 < len(args):
+            mode = args[i + 1].strip()
+            if mode not in ("default", "acceptEdits", "bypassPermissions", "auto", "off"):
+                print(
+                    f"  [warn] Unknown --permission-mode '{mode}'; "
+                    "using 'auto'. Valid: default, acceptEdits, "
+                    "bypassPermissions, auto, off.",
+                    file=sys.stderr,
+                )
+                mode = "auto"
+            permission_mode = mode
+            i += 2
         elif args[i] in ("-c", "--continue"):
             resume_session_id = "latest"
             i += 1
@@ -1722,14 +1774,14 @@ def main():
             if slot == "2":
                 os.environ["LUCKYD_AGENT_SLOT"] = "2"
                 os.environ["LUCKYD_AGENT_NAME"] = "Agent 2"
-                os.environ["LUCKYD_AGENT_VERSION"] = "v2.2.0"
+                os.environ["LUCKYD_AGENT_VERSION"] = "v9.7.0"
             else:
                 os.environ["LUCKYD_AGENT_SLOT"] = "1"
                 os.environ["LUCKYD_AGENT_NAME"] = "Agent 1"
-                os.environ["LUCKYD_AGENT_VERSION"] = "v9.6.0"
+                os.environ["LUCKYD_AGENT_VERSION"] = "v9.7.0"
             i += 2
         elif args[i] in ("-v", "--version"):
-            agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v9.6.0")
+            agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v9.7.0")
             agent_name = os.environ.get("LUCKYD_AGENT_NAME", "")
             label = f"LuckyD Code {agent_version}" + (f" ({agent_name})" if agent_name else "")
             print(label)
@@ -1740,19 +1792,21 @@ def main():
 LuckyD Code — AI Coding Agent
 
 Usage:
-  lucky-code                       Interactive REPL (Agent 1 · v9.6.0)
-  lucky-code --agent 2             Interactive REPL (Agent 2 · v2.2.0)
+  lucky-code                       Interactive REPL (Agent 1 · v9.7.0)
+  lucky-code --agent 2             Interactive REPL (Agent 2 · v9.7.0)
   lucky-code providers           List AI providers — status, cost tier, current
   lucky-code "your query"          One-shot mode
   lucky-code -c                    Continue last session
   lucky-code --resume <id>         Resume specific session
 
 Options:
-  --agent 1|2        Select agent slot (1 = v9.6 Nuitka, 2 = v2.2)
+  --agent 1|2        Select agent slot (1 = v9.7 Nuitka, 2 = v9.7)
   --model NAME       Model: auto (default), flash, pro, or specific name
   --provider NAME    Set provider (see: lucky-code providers): ollama, opencode,
                      openrouter, clinepass, cline-usage, cline, groq, deepseek,
-                     zai, google, gemini, openai, anthropic
+                     zai, google, gemini, openai, anthropic, minimax
+  --permission-mode MODE  Tool permission mode: default, acceptEdits,
+                     bypassPermissions, auto (default), off
   --thinking         Use the thinking/reasoning model
   --temp FLOAT       Temperature (default: 0.0)
   -y, --yes, --yolo  Auto-approve all tool calls (non-interactive / yolo mode)
@@ -1810,6 +1864,7 @@ Environment:
         model=model,
         temperature=temperature,
         max_tokens=cfg["max_tokens"],
+        permission_mode=permission_mode,
     )
 
     # Wire approval hook — every tool decision flows through the trust policy
