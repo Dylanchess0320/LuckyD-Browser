@@ -4,7 +4,7 @@
 # (workflow_dispatch) or automatically on version tags (v*).
 #
 # One-command equivalent on your own PC:
-#   powershell -NoProfile -ExecutionPolicy Bypass -File browser\\installer\\build_installer.ps1
+#   powershell -NoProfile -ExecutionPolicy Bypass -File browser/installer/build_installer.ps1
 
 name: Windows Installer
 
@@ -52,7 +52,7 @@ jobs:
         env:
           LUCKYD_CERT_PFX_B64: ${{ secrets.LUCKYD_CERT_PFX_B64 }}
           LUCKYD_CERT_PASSWORD: ${{ secrets.LUCKYD_CERT_PASSWORD }}
-        run: powershell -NoProfile -ExecutionPolicy Bypass -File browser\\installer\\build_installer.ps1
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File browser/installer/build_installer.ps1
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
