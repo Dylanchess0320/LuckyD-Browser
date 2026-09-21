@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+from typing import Any
 
 import httpx
 
@@ -190,7 +191,7 @@ class MiniMaxClient(LLMClient):
                     }
                 )
             elif role == "assistant":
-                msg = {"role": "assistant", "content": []}
+                msg: dict[str, Any] = {"role": "assistant", "content": []}
                 if content:
                     msg["content"].append({"type": "text", "text": content})
                 for tc in m.get("tool_calls", []):

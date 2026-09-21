@@ -107,21 +107,21 @@ def _handle_compact(agent: Any) -> str:
     if maybe_compact is None:
         return "Compaction is unavailable: core.compaction has no maybe_compact()."
     try:
-        result = maybe_compact(agent)
-        if inspect.isawaitable(result):
+        pending = maybe_compact(agent)
+        if inspect.iscoroutine(pending):
             # maybe_compact is async. The interactive REPL (main.py) awaits it
             # directly; here we can only drive it when no loop is running.
             try:
                 asyncio.get_running_loop()
             except RuntimeError:
-                result = asyncio.run(result)
+                compacted = asyncio.run(pending)
             else:
                 return "COMPACT_DEFERRED"
+        else:
+            compacted = pending
     except Exception as e:
         return f"Compaction failed: {e}."
-    if result == "COMPACT_DEFERRED":
-        return result
-    return "Compaction complete." if result else "No compaction needed yet."
+    return "Compaction complete." if compacted else "No compaction needed yet."
 
 
 def _handle_resume(agent: Any, resume_id: str) -> str:

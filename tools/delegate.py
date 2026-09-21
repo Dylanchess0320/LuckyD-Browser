@@ -53,10 +53,9 @@ def _run_subagent(task_id: str, task: str) -> None:
 
     try:
         agent = core.agent_loop.CodingAgent()
-        result = agent.run(task)
+        raw_result = agent.run(task)
         # CodingAgent.run is async; fakes used in tests may return a plain value.
-        if asyncio.iscoroutine(result):
-            result = asyncio.run(result)
+        result = asyncio.run(raw_result) if asyncio.iscoroutine(raw_result) else raw_result
     except Exception as e:  # every failure must land in the entry
         with _tasks_lock:
             entry = _tasks.get(task_id)
@@ -163,7 +162,7 @@ class TaskOutputTool(ToolBase):
     permission_level = "ALWAYS_ALLOW"
 
     async def execute(self, **kwargs: Any) -> ToolOutput:
-        task_id = kwargs.get("task_id")
+        task_id = str(kwargs.get("task_id") or "")
         try:
             wait_sec = float(kwargs.get("wait_sec", 0) or 0)
         except (TypeError, ValueError):
@@ -220,7 +219,7 @@ class TaskStopTool(ToolBase):
     permission_level = "NORMAL"
 
     async def execute(self, **kwargs: Any) -> ToolOutput:
-        task_id = kwargs.get("task_id")
+        task_id = str(kwargs.get("task_id") or "")
         with _tasks_lock:
             entry = _tasks.get(task_id)
             if entry is None:
