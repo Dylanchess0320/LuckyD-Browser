@@ -662,7 +662,7 @@ def test_spawn_pty_agent_gets_workspace_cwd_and_env(monkeypatch, tmp_path) -> No
     parts = _env_parts(kw["env"])
     assert "LUCKYD_AGENT_SLOT=1" in parts
     assert "LUCKYD_AGENT_NAME=Agent 1" in parts
-    assert "LUCKYD_AGENT_VERSION=v9.9.0" in parts
+    assert "LUCKYD_AGENT_VERSION=v10.1.0" in parts
 
 
 def test_spawn_pty_agent2_gets_slot2_env(monkeypatch, tmp_path) -> None:
@@ -677,7 +677,7 @@ def test_spawn_pty_agent2_gets_slot2_env(monkeypatch, tmp_path) -> None:
     parts = _env_parts(kw["env"])
     assert "LUCKYD_AGENT_SLOT=2" in parts
     assert "LUCKYD_AGENT_NAME=Agent 2" in parts
-    assert "LUCKYD_AGENT_VERSION=v9.9.0" in parts
+    assert "LUCKYD_AGENT_VERSION=v10.1.0" in parts
 
 
 def test_spawn_pty_env_block_sanitizes_bad_entries(monkeypatch) -> None:

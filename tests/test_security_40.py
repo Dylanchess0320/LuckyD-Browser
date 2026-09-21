@@ -376,28 +376,28 @@ class TestVersionUnification:
 
         import browser
 
-        assert browser.__version__ == "9.9.0"
+        assert browser.__version__ == "10.1.0"
 
         with open(_REPO_ROOT / "pyproject.toml", "rb") as f:
-            assert tomllib.load(f)["project"]["version"] == "9.9.0"
+            assert tomllib.load(f)["project"]["version"] == "10.1.0"
 
         ai_bridge = (_BROWSER_DIR / "browser_core" / "ai_bridge.py").read_text(encoding="utf-8")
-        assert "LuckyDBrowser/9.9" in ai_bridge
+        assert "LuckyDBrowser/10.1" in ai_bridge
         assert "LuckyDBrowser/1.0" not in ai_bridge
 
         version_info = (_BROWSER_DIR / "version_info.txt").read_text(encoding="utf-8")
-        assert "9.9.0.0" in version_info
-        # "9.9.0.0" contains the substring "8.0.0", so the stale-version guard
-        # must match the full quad (regression: 6.0.0 shipped with stale
-        # 3.9.0.0 filevers/prodvers while the strings said 6.0.0.0).
+        assert "10.1.0.0" in version_info
+        # Match the full version quad for the stale-version guard (regression:
+        # 6.0.0 shipped with stale 3.9.0.0 filevers/prodvers while the strings
+        # said 6.0.0.0).
         assert "5.0.0.0" not in version_info
         # FFI numeric tuples must match the release (regression: 6.0.0 shipped
         # with stale 3.9.0.0 filevers/prodvers while the strings said 6.0.0.0).
-        assert "filevers=(9, 9, 0, 0)" in version_info
-        assert "prodvers=(9, 9, 0, 0)" in version_info
+        assert "filevers=(10, 1, 0, 0)" in version_info
+        assert "prodvers=(10, 1, 0, 0)" in version_info
 
         iss = (_BROWSER_DIR / "installer" / "LuckyDBrowser.iss").read_text(encoding="utf-8")
-        assert '#define AppVersion   "9.9.0"' in iss
+        assert '#define AppVersion   "10.1.0"' in iss
 
 
 # ── cline_bridge: inbound bearer auth ───────────────────────────────────────

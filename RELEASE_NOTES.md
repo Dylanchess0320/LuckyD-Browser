@@ -1,13 +1,32 @@
-# LuckyD Browser v9.9.0 — Release Notes
+# LuckyD Browser v10.1.0 — Release Notes
 
 > **The AI browser that doesn't need an API key.** Free, unlimited, offline AI built in —
 > plus a full coding agent and developer terminal living in your tabs.
 
-*9.9.0 is on `main` — the installer below publishes with Dylan's 9.9.0 release.*
+*10.1.0 is on `main` — the installer below publishes with Dylan's 10.1.0 release.*
 
-**[⬇ Download `LuckyDBrowserSetup-9.9.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.9.0/LuckyDBrowserSetup-9.9.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed
+**[⬇ Download `LuckyDBrowserSetup-10.1.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.1.0/LuckyDBrowserSetup-10.1.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed
 
-Prefer no installer? **[`LuckyDBrowser-Portable-9.9.0.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.9.0/LuckyDBrowser-Portable-9.9.0.zip)** — unzip and run, best option for locked-down work PCs.
+Prefer no installer? **[`LuckyDBrowser-Portable-10.1.0.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.1.0/LuckyDBrowser-Portable-10.1.0.zip)** — unzip and run, best option for locked-down work PCs.
+
+---
+
+## What's new in 10.1.0 — Google AI Pro edition
+
+- **OpenCode restored to the Agent Mesh** — `mesh-opencode` is back, keyed via
+  `OPENCODE_API_KEY`, sitting alongside MiniMax and Cline (not replacing them).
+  The old $0 keyless tier is gone, so OpenCode is a keyed provider, not a free one.
+- **Gemini models refreshed** — `gemini-2.5-flash` is the default everywhere;
+  `gemini-2.5-pro`, `gemini-3-flash-preview`, and `gemini-3-pro-preview` join the
+  model list.
+- **Nano Banana image generation** — `browser/models/gemini_media.py` generates
+  images through the Gemini API on the free tier.
+- **Veo 3.1 video generation** — same module; needs a billing-enabled API key
+  (it tells you before spending anything).
+- **2TB Google Drive backup** — `browser/browser_core/drive_backup.py`: one-time
+  Google sign-in, then one command backs up any files to the Drive.
+- **Honest note:** Google AI Pro covers the Gemini *app*; LuckyD uses the Gemini
+  *API*, which has its own free tier — Pro doesn't add API quota.
 
 ---
 

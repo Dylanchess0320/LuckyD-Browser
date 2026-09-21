@@ -27,10 +27,11 @@ from .luckyd import LuckyDProvider
 from .mock import MockProvider
 from .openai_compat import OpenAICompatProvider
 
-_FREE_BACKENDS = ("openrouter", "ollama")
+_FREE_BACKENDS = ("opencode", "openrouter", "ollama")
 
-# Assistant-side providers the bridge handoff can pin (9.8: Cline gateways
-# replaced the retired OpenCode Zen gateway).
+# Assistant-side providers the bridge handoff can pin (Cline gateways).
+# ("opencode" stays on the direct gateway path via _FREE_BACKENDS below —
+# same as pre-9.8 — rather than the bridge chat handoff.)
 _BRIDGE_PROVIDERS = ("bridge", "cline", "clinepass", "cline-usage")
 
 

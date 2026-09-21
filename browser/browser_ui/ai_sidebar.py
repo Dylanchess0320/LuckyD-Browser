@@ -722,6 +722,7 @@ class AiSidebar(QDockWidget):
         labels = {
             "clinepass": "Cline Pass",
             "cline-usage": "Cline Credits",
+            "opencode": "OpenCode Zen",
             "ollama": "Ollama",
             "lmstudio": "LM Studio",
             "google": "Google Gemini",

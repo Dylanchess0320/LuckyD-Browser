@@ -307,9 +307,8 @@ def _agent2_command(cli2_path: str = "") -> list[str]:
 # models in CLI/IDE.
 # NOTE: Gemini CLI (mesh-gemini/gemini) was dropped from the mesh in favor of
 # Antigravity (agy) for the plan/build stages (see ~/agent-mesh, v1.0.1).
-# 9.8: OpenCode (mesh-opencode/opencode) was retired with the Zen gateway —
-# MiniMax Code CLI (mesh-mcode/mcode) + media CLI (mesh-mmx/mmx) take its
-# dock slot (npm i -g @minimax-code/cli / @minimax/mmi).
+# OpenCode (mesh-opencode/opencode) rides alongside MiniMax Code CLI
+# (mesh-mcode/mcode) + media CLI (mesh-mmx/mmx).
 SHELLS = (
     "agent",
     "agent2",
@@ -321,6 +320,7 @@ SHELLS = (
     "mesh-codex",
     "mesh-copilot",
     "mesh-qwen",
+    "mesh-opencode",
     "mesh-mcode",
     "mesh-mmx",
     "mesh-cline",
@@ -348,6 +348,7 @@ MESH_SHELLS = {
     "mesh-codex": "codex",
     "mesh-copilot": "copilot",
     "mesh-qwen": "qwen",
+    "mesh-opencode": "opencode",
     "mesh-mcode": "mcode",
     "mcode": "mcode",
     "mesh-mmx": "mmx",
@@ -599,11 +600,11 @@ def _spawn_pty(
     if shell == "agent":
         env["LUCKYD_AGENT_SLOT"] = "1"
         env["LUCKYD_AGENT_NAME"] = "Agent 1"
-        env["LUCKYD_AGENT_VERSION"] = "v9.9.0"
+        env["LUCKYD_AGENT_VERSION"] = "v10.1.0"
     elif shell == "agent2":
         env["LUCKYD_AGENT_SLOT"] = "2"
         env["LUCKYD_AGENT_NAME"] = "Agent 2"
-        env["LUCKYD_AGENT_VERSION"] = "v9.9.0"
+        env["LUCKYD_AGENT_VERSION"] = "v10.1.0"
     # pywinpty's PTY.spawn() expects the environment as a NUL-joined block
     # string ("name=value\0name=value\0…"), NOT a dict — passing a dict
     # raises cffi's "argument env: 'dict' object is not an instance of str",

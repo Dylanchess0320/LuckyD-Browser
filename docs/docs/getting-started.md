@@ -1,5 +1,10 @@
 # Getting Started
 
+> **New in 10.1.0 (Google AI Pro edition):** OpenCode is back in the Agent Mesh
+> (keyed via `OPENCODE_API_KEY`), Gemini models refreshed, Nano Banana image
+> generation + Veo 3.1 video generation through the Gemini API, and one-command
+> backup to the 2TB Google Drive.
+>
 > **New in 9.9.0:** anti-block hardening — the installer no longer uses
 > `-ExecutionPolicy Bypass` (the #1 behavioral red flag for tools like
 > Halcyon), every release now ships a portable ZIP (`LuckyDBrowser-Portable-9.9.0.zip`)
@@ -29,14 +34,14 @@
 
 ## Install the browser
 
-1. Download [**LuckyDBrowserSetup-9.9.0.exe**](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.9.0/LuckyDBrowserSetup-9.9.0.exe)
+1. Download [**LuckyDBrowserSetup-10.1.0.exe**](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.1.0/LuckyDBrowserSetup-10.1.0.exe)
 2. Run it — installs to `%LOCALAPPDATA%\Programs\LuckyDBrowser`
 3. Optional: run `ollama_setup.ps1` from the install folder for free offline AI (Ollama + `llama3.2:3b`, ~2 GB one-time download)
 
 Silent install for scripts and fleets:
 
 ```powershell
-LuckyDBrowserSetup-9.9.0.exe /VERYSILENT /NORESTART
+LuckyDBrowserSetup-10.1.0.exe /VERYSILENT /NORESTART
 ```
 
 ## First launch in 60 seconds
@@ -68,11 +73,11 @@ browser\run_browser.bat
 
 # Shareable installer (needs Inno Setup 6)
 powershell -NoProfile -ExecutionPolicy Bypass -File browser\installer\build_installer.ps1
-# → browser\installer\output\LuckyDBrowserSetup-9.9.0.exe
+# → browser\installer\output\LuckyDBrowserSetup-10.1.0.exe
 ```
 
 ## Upgrading
 
-Install the new `LuckyDBrowserSetup-9.9.0.exe` right over your existing install — profile, settings, and workspaces carry over. The browser also checks for updates itself and can install them in-app with one click.
+Install the new `LuckyDBrowserSetup-10.1.0.exe` right over your existing install — profile, settings, and workspaces carry over. The browser also checks for updates itself and can install them in-app with one click.
 
 Next: [Features →](features.md)

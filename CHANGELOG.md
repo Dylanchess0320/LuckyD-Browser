@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [10.1.0] - 2026-09-21
+
+Google AI Pro edition. OpenCode is restored to the Agent Mesh (keyed,
+alongside MiniMax and Cline), Gemini models are refreshed, Nano Banana image
+generation and Veo 3.1 video generation are wired through the Gemini API, and
+there's a one-command backup to the 2TB Google Drive. Shipped as
+`LuckyDBrowserSetup-10.1.0.exe` + `LuckyDBrowser-Portable-10.1.0.zip`.
+
+### Added
+- **OpenCode restored to the Agent Mesh** — `mesh-opencode` is back in
+  `browser/browser_core/terminal_server.py` (allowlist + command map),
+  `terminal_page.py` (visible mesh agent), and `apps/luckyd-ui/src/state/agents.ts`.
+  Keyed via `OPENCODE_API_KEY` — the old $0 keyless tier is gone, so OpenCode
+  is NOT in the free tier and nothing migrates to Cline.
+- **Gemini media generation** — `browser/models/gemini_media.py`:
+  `generate_image()` (Nano Banana, `gemini-2.5-flash-image`, free API tier)
+  and `generate_video()` (Veo 3.1, billing-enabled key required — it says so
+  before spending). 6 tests in `tests/test_gemini_media.py`.
+- **2TB Google Drive backup** — `browser/browser_core/drive_backup.py`:
+  one-time OAuth, then `python -m browser.browser_core.drive_backup backup
+  <paths>`. 6 tests in `tests/test_drive_backup.py`.
+- **Refreshed Gemini models** — default `gemini-2.0-flash` → `gemini-2.5-flash`
+  (ai_bridge, core/providers, llm); providers_config.json free list now
+  includes `gemini-2.5-pro`, `gemini-3-flash-preview`, `gemini-3-pro-preview`.
+
+### Notes
+- Google AI Pro covers the Gemini *app*; LuckyD uses the Gemini *API*, which
+  has its own free tier — Pro does not add API quota. Documented in
+  `.env.example`.
+- NotebookLM has no public API, so it isn't code-integrated — notebooks get
+  built directly instead.
+
 ## [9.9.0] - 2026-09-21
 
 Anti-block hardening for Windows installs, a portable ZIP for locked-down

@@ -196,9 +196,9 @@ def model_catalog(free_only: bool = False) -> list[dict]:
 
     # Build free groups from providers_config.json (single source of truth for $0 models)
     free_providers = _load_free_providers()
-    # 9.8: the retired OpenCode Zen entries (and its "openai" mirror) are never
-    # listed — dropping them here keeps a stale config from resurrecting Zen.
-    free_providers = {k: v for k, v in free_providers.items() if k.lower() not in ("opencode",)}
+    # Providers with no $0 tier (e.g. keyed OpenCode Zen — restored to the
+    # mesh 2026-09-21 but its keyless tier is gone) are excluded by the
+    # free_tier flag check below, not by name.
     free_groups: list[dict] = []
     if free_providers:
         # Sort: available providers first, then alphabetically
@@ -383,12 +383,11 @@ def _free_entries() -> list[tuple[str, str]]:
     seen: set[str] = set()
     entries: list[tuple[str, str]] = []
     # 1) providers_config.json (clinepass, cline-usage, openrouter, groq, zai,
-    #    ollama… — OpenCode Zen is gone as of 9.8 and filtered out here too)
+    #    ollama… — OpenCode Zen is keyed-only since 2026-09 so the free_tier
+    #    flag below filters it out here too)
     try:
         free_providers = _load_free_providers()
         for pid, pinfo in free_providers.items():
-            if pid.lower() == "opencode":
-                continue
             if not pinfo.get("free_tier"):
                 continue
             models = pinfo.get("free_models", [])
@@ -1154,7 +1153,7 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
             ui.warn("MCP not configured or no servers connected")
 
     elif cmd == "version":
-        agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v9.9.0")
+        agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v10.1.0")
         agent_name = os.environ.get("LUCKYD_AGENT_NAME", "Agent 1")
         ui.info(f"LuckyD Code {agent_version} ({agent_name})")
 
@@ -1923,14 +1922,14 @@ def main():
             if slot == "2":
                 os.environ["LUCKYD_AGENT_SLOT"] = "2"
                 os.environ["LUCKYD_AGENT_NAME"] = "Agent 2"
-                os.environ["LUCKYD_AGENT_VERSION"] = "v9.9.0"
+                os.environ["LUCKYD_AGENT_VERSION"] = "v10.1.0"
             else:
                 os.environ["LUCKYD_AGENT_SLOT"] = "1"
                 os.environ["LUCKYD_AGENT_NAME"] = "Agent 1"
-                os.environ["LUCKYD_AGENT_VERSION"] = "v9.9.0"
+                os.environ["LUCKYD_AGENT_VERSION"] = "v10.1.0"
             i += 2
         elif args[i] in ("-v", "--version"):
-            agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v9.9.0")
+            agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v10.1.0")
             agent_name = os.environ.get("LUCKYD_AGENT_NAME", "")
             label = f"LuckyD Code {agent_version}" + (f" ({agent_name})" if agent_name else "")
             print(label)
@@ -1941,8 +1940,8 @@ def main():
 LuckyD Code — AI Coding Agent
 
 Usage:
-  lucky-code                       Interactive REPL (Agent 1 · v9.9.0)
-  lucky-code --agent 2             Interactive REPL (Agent 2 · v9.9.0)
+  lucky-code                       Interactive REPL (Agent 1 · v10.1.0)
+  lucky-code --agent 2             Interactive REPL (Agent 2 · v10.1.0)
   lucky-code providers           List AI providers — status, cost tier, current
   lucky-code model <name>        Switch model (fuzzy Cline-style picker)
   lucky-code plugin list --available   List/install plugins

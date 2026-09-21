@@ -42,14 +42,14 @@ _SHELL_LABELS = {
 # Dylan 2026-09-14: DeepSeek (mesh-dsh) and Muse Spark removed — Muse Code stays.
 # 9.4: Gemini CLI dropped in favor of Antigravity (agy) for plan/build stages;
 # Cline CLI kept (free rotating FREE models) — both work in Agent 1 + Agent 2.
-# 9.8: OpenCode retired with the Zen gateway — MiniMax Code (mcode) + media
-# (mmx) take its slot.
+# OpenCode (mesh-opencode) rides alongside MiniMax Code (mcode) + media (mmx).
 _MESH_AGENTS = {
     "mesh-agy": ("Antigravity", "🛸", "#38bdf8", "Google DeepMind · AGY"),
     "mesh-claude": ("Claude", "🟠", "#d97706", "Anthropic · architect"),
     "mesh-codex": ("Codex", "🟢", "#10b981", "OpenAI · builder"),
     "mesh-copilot": ("Copilot", "⚫", "#8b9bb4", "GitHub · reviewer"),
     "mesh-qwen": ("Qwen", "🟣", "#a855f7", "Qwen · test writer"),
+    "mesh-opencode": ("OpenCode", "🔵", "#3b82f6", "Anomaly · implementer"),
     "mesh-mcode": ("MiniMax Code", "🟥", "#ef4444", "MiniMax · implementer"),
     "mesh-mmx": ("MiniMax Media", "🎬", "#f59e0b", "MiniMax · media"),
     "mesh-cline": ("Cline", "🟡", "#eab308", "autonomous builder · free tier"),

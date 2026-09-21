@@ -100,7 +100,7 @@ def _cfg(provider, **kw):
         "anthropic": ("https://api.anthropic.com/v1", "claude-3-haiku-20240307"),
         "deepseek": ("https://api.deepseek.com/v1", "deepseek-chat"),
         "ollama": ("http://localhost:11434", "codellama"),
-        "google": ("https://generativelanguage.googleapis.com/v1beta", "gemini-2.0-flash"),
+        "google": ("https://generativelanguage.googleapis.com/v1beta", "gemini-2.5-flash"),
         "zai": ("https://api.z.ai/api/paas/v4", "glm-4.5"),
         "mystery": ("https://example.invalid", "mystery-model"),
     }[provider]

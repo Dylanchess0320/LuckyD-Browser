@@ -187,7 +187,7 @@ class SwarmManager:
             elif pname == "gemini":
                 rprovider = "gemini"
                 rmodel = drs_settings.model_worker
-            elif pname in ("openrouter", "ollama"):
+            elif pname in ("opencode", "openrouter", "ollama"):
                 try:
                     from features.deep_research.models.openai_compat import _BACKEND_DEFAULTS
 
@@ -1153,6 +1153,7 @@ def research_html() -> str:
         <option value="auto" selected>✨ Auto (recommended — assistant providers first)</option>
         <option value="bridge">🤖 AI Assistant (Cline &amp; connected providers)</option>
         <option value="cline">🆓 Cline (free tier, keyless)</option>
+        <option value="opencode">🔵 OpenCode Zen (API key)</option>
         <option value="ollama">💻 Local Ollama (offline, unlimited)</option>
         <option value="openrouter">🌐 OpenRouter (free models)</option>
         <option value="gemini">♊ Google Gemini (native grounding)</option>

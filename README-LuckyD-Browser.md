@@ -55,13 +55,13 @@ see [AI Providers](#ai-providers). Your own keys, your choice.
 
 ## 📦 Download & install
 
-**[⬇ Download Latest Release](https://github.com/Dylanchess0320/LuckyD-Browser/releases/latest)** (`LuckyDBrowserSetup-9.9.0.exe`)
+**[⬇ Download Latest Release](https://github.com/Dylanchess0320/LuckyD-Browser/releases/latest)** (`LuckyDBrowserSetup-10.1.0.exe`)
 
 - Windows 10/11 x64 · per-user install · **no admin rights needed**
 - Installs to `%LOCALAPPDATA%\Programs\LuckyDBrowser`
 - Start Menu shortcut, optional desktop icon, **Settings > Apps** uninstall entry
 - Everything is bundled (Chromium runtime + coding-agent backend) — nothing else required
-- Silent install for scripting: `LuckyDBrowserSetup-9.9.0.exe /VERYSILENT /NORESTART`
+- Silent install for scripting: `LuckyDBrowserSetup-10.1.0.exe /VERYSILENT /NORESTART`
 
 ---
 

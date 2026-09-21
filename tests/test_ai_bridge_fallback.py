@@ -1,9 +1,10 @@
 """Fallback-default regression tests for browser/browser_core/ai_bridge.py.
 
 HISTORY: these tests once asserted OpenCode Zen as a keyless $0 fallback.
-That tier died 2026-09 (verified: every keyless Zen chat call 401s) and the
-gateway was RETIRED in 9.8 — LuckyD no longer registers "opencode" at all.
-The free default is now Cline (api.cline.bot: usage-billed free models +
+That tier died 2026-09 (verified: every keyless Zen chat call 401s), so Zen
+is keyed-only now (OPENCODE_API_KEY) — and it was restored to the mesh
+2026-09-21 at Dylan's request after its 9.8 removal.
+The free default is Cline (api.cline.bot: usage-billed free models +
 flat subscription, authenticated by CLINEPASS_API_KEY or the logged-in Cline
 CLI session). With no local server, no keys, and no Cline auth there is
 simply no provider — the dashboard says so honestly.
@@ -50,14 +51,12 @@ def test_fallback_default_is_cline_usage_when_keyed(
     assert bridge.default_provider() == "cline-usage"
 
 
-def test_opencode_key_is_ignored_retired_in_98(
-    no_local_no_keys, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """OPENCODE_API_KEY no longer registers anything (Zen retired in 9.8)."""
+def test_opencode_registers_when_keyed(no_local_no_keys, monkeypatch: pytest.MonkeyPatch) -> None:
+    """OPENCODE_API_KEY registers the keyed Zen gateway (restored 2026-09-21)."""
     monkeypatch.setattr(ai_bridge, "_load_env", lambda: {"OPENCODE_API_KEY": "zk-test"})
     bridge = AIBridge()
-    assert "opencode" not in bridge.providers()
-    assert bridge.default_provider() is None
+    assert "opencode" in bridge.providers()
+    assert bridge.default_provider() == "opencode"
 
 
 def test_no_key_no_provider_registered(no_local_no_keys) -> None:

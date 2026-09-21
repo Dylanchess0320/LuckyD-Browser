@@ -54,7 +54,7 @@ class LLMConfig:
                 base_url=os.environ.get(
                     "GOOGLE_BASE_URL", "https://generativelanguage.googleapis.com/v1beta"
                 ),
-                model=os.environ.get("GOOGLE_MODEL", "gemini-2.0-flash"),
+                model=os.environ.get("GOOGLE_MODEL", "gemini-2.5-flash"),
                 provider="google",
                 temperature=float(os.environ.get("CODING_AGENT_TEMP", "0.0")),
                 max_tokens=int(os.environ.get("CODING_AGENT_MAX_TOKENS", "8192")),
@@ -200,8 +200,9 @@ MODEL_COSTS: dict[str, dict[str, float]] = {
     "glm-4.6": {"input": 0.60, "output": 2.20},
     "glm-4.5": {"input": 0.60, "output": 2.20},
     "glm-4.5-air": {"input": 0.20, "output": 1.10},
-    # Muse Spark 1.3 — Standard tier (was an OpenCode Zen model before the
-    # Zen gateway was retired in 9.8; kept for legacy cost accounting). The
+    # Muse Spark 1.3 — Standard tier (was an OpenCode Zen platform model; the
+    # Zen gateway's keyless tier died in 2026-09, so Zen is keyed-only now.
+    # Kept for legacy cost accounting). The
     # contributor tier is cheaper BECAUSE the provider may train on your
     # prompts, so it is listed here for honest cost accounting but is only
     # ever offered after an explicit opt-in (core/contributor.py).

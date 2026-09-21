@@ -338,7 +338,7 @@ function setPill(id, cls, text) {
 }
 // Provider ids are internals — the dashboard speaks product names.
 const PROVIDER_NAMES = {
-  ollama: 'Ollama', lmstudio: 'LM Studio',
+  ollama: 'Ollama', lmstudio: 'LM Studio', opencode: 'OpenCode Zen',
   openrouter: 'OpenRouter', clinepass: 'Cline Pass', 'cline-usage': 'Cline Credits',
   google: 'Gemini', groq: 'Groq', zai: 'Z.ai', deepseek: 'DeepSeek',
   openai: 'OpenAI', anthropic: 'Anthropic', cline: 'Cline',

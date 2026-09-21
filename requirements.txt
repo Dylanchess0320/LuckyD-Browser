@@ -10,10 +10,15 @@ fastapi==0.139.2
 uvicorn==0.51.0
 
 # ── Deep Research swarm (native tool: tools/deep_research_tool.py) ────
-# langgraph is required; google-genai only for Gemini grounding (DRS_PROVIDER=gemini).
-# ddgs powers keyless DDG search; trafilatura/bs4/lxml power full-page reads.
+# langgraph is required; google-genai powers Gemini chat grounding, Nano Banana
+# image gen and Veo video gen (browser/models/gemini_media.py).
+# google-api-python-client + google-auth-oauthlib power the 2TB Drive backup
+# (browser/browser_core/drive_backup.py).
 langgraph==1.2.11
 google-genai==2.17.0
+google-api-python-client==2.200.0
+google-auth-oauthlib==1.4.1
+# ddgs powers keyless DDG search; trafilatura/bs4/lxml power full-page reads.
 ddgs==9.14.4
 trafilatura==2.2.0
 beautifulsoup4==4.15.0

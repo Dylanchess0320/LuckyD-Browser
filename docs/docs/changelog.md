@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [10.1.0] - 2026-09-21
+
+Google AI Pro edition. OpenCode is restored to the Agent Mesh (keyed,
+alongside MiniMax and Cline), Gemini models are refreshed, Nano Banana image
+generation and Veo 3.1 video generation are wired through the Gemini API, and
+there's a one-command backup to the 2TB Google Drive. Shipped as
+`LuckyDBrowserSetup-10.1.0.exe` + `LuckyDBrowser-Portable-10.1.0.zip`.
+
+### Added
+- **OpenCode restored to the Agent Mesh** — `mesh-opencode` allowlist, command
+  map, and visible mesh agent (Python + web UI). Keyed via `OPENCODE_API_KEY`.
+- **Gemini media generation** — `browser/models/gemini_media.py` (Nano Banana
+  images on the free tier; Veo 3.1 video needs a billing-enabled key).
+- **2TB Google Drive backup** — `browser/browser_core/drive_backup.py`
+  (one-time OAuth, then one command).
+- **Refreshed Gemini models** — `gemini-2.5-flash` default; 2.5 Pro and 3
+  previews in the free list.
+
 ## [9.9.0] - 2026-09-21
 
 Anti-block hardening for Windows installs, a portable ZIP for locked-down

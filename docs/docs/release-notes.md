@@ -1,5 +1,16 @@
 # LuckyD Browser — Release Notes
 
+## [10.1.0] — Google AI Pro edition — 2026-09-21
+
+**[`LuckyDBrowserSetup-10.1.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.1.0/LuckyDBrowserSetup-10.1.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed.
+**[`LuckyDBrowser-Portable-10.1.0.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.1.0/LuckyDBrowser-Portable-10.1.0.zip)** — unzip and run, for locked-down PCs.
+
+- **OpenCode restored** — `mesh-opencode` is back in the Agent Mesh, keyed via `OPENCODE_API_KEY`, alongside MiniMax and Cline. (Old free tier is gone; keyed only.)
+- **Gemini refreshed** — 2.5 Pro/Flash defaults, 3 previews in the model list.
+- **Nano Banana + Veo 3.1** — image generation on the free API tier; video generation needs a billing-enabled key.
+- **2TB Drive backup** — one command after a one-time Google sign-in.
+- Note: Google AI Pro covers the Gemini app; the API LuckyD uses has its own free tier — Pro doesn't add API quota.
+
 ## [9.9.0] — Anti-block hardening + portable ZIP — 2026-09-21
 
 **[`LuckyDBrowserSetup-9.9.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.9.0/LuckyDBrowserSetup-9.9.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed.

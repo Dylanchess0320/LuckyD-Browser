@@ -30,6 +30,7 @@ VALID_PROVIDERS = {
     "zai",
     "groq",
     "openrouter",
+    "opencode",
     "clinepass",
     "cline-usage",
     "cline",
@@ -46,6 +47,7 @@ PROVIDER_NAMES = {
     "zai": "Z.ai (GLM)",
     "groq": "Groq",
     "openrouter": "OpenRouter",
+    "opencode": "OpenCode Zen",
     "clinepass": "ClinePass",
     "cline-usage": "Cline (usage)",
     "cline": "Cline (usage)",
@@ -72,7 +74,7 @@ PROVIDER_DEFAULTS: dict[str, ProviderDefaults] = {
         "env_base": "GOOGLE_BASE_URL",
         "env_model": "GOOGLE_MODEL",
         "default_base": "https://generativelanguage.googleapis.com/v1beta",
-        "default_model": "gemini-2.0-flash",
+        "default_model": "gemini-2.5-flash",
     },
     "gemini": {
         "env_key": "GOOGLE_API_KEY",
@@ -115,6 +117,15 @@ PROVIDER_DEFAULTS: dict[str, ProviderDefaults] = {
         "env_model": "OPENROUTER_MODEL",
         "default_base": "https://openrouter.ai/api/v1",
         "default_model": "deepseek/deepseek-chat-v3.1",
+    },
+    # OpenCode Zen (opencode.ai gateway) — OpenAI-compatible.
+    # Key comes from OPENCODE_API_KEY.
+    "opencode": {
+        "env_key": "OPENCODE_API_KEY",
+        "env_base": "OPENCODE_BASE_URL",
+        "env_model": "OPENCODE_MODEL",
+        "default_base": "https://opencode.ai/zen/v1",
+        "default_model": "nemotron-3-ultra-free",
     },
     # ClinePass (Cline flat-subscription gateway) — OpenAI-compatible.
     # Key comes from CLINEPASS_API_KEY, else the logged-in Cline CLI session.
@@ -186,7 +197,8 @@ def cline_session_token() -> str:
     may refresh a token over the network, so callers must not hammer it.
 
     9.8: this is the auth path that made Cline a drop-in replacement for the
-    retired OpenCode Zen gateway.
+    OpenCode Zen gateway's free tier (Zen is back in the mesh since 2026-09-21
+    but keyed-only).
     """
     global _CLINE_SESSION_TOKEN
     if _CLINE_SESSION_TOKEN is not None:
@@ -224,9 +236,9 @@ def detect_provider() -> str | None:
 
     9.8: a logged-in Cline CLI session is detected FIRST and returns
     ``cline-usage`` — Cline's usage-billed gateway carries free agent models and
-    its auth comes from the on-disk session, so it is the free default that
-    replaced the retired OpenCode Zen gateway (both for the CLI and for HQ,
-    which resolves its provider through this function).
+    its auth comes from the on-disk session, so it is the free default
+    (OpenCode Zen's keyless tier died in 2026-09; Zen is back in the mesh
+    since 2026-09-21 but keyed-only, so it can't be the free default).
     """
     explicit = os.environ.get("CODING_AGENT_PROVIDER", "").lower().strip()
     if explicit in VALID_PROVIDERS:
@@ -245,6 +257,7 @@ def detect_provider() -> str | None:
         ("google", "GOOGLE_API_KEY"),
         ("zai", "ZAI_API_KEY"),
         ("openrouter", "OPENROUTER_API_KEY"),
+        ("opencode", "OPENCODE_API_KEY"),
         ("minimax", "MINIMAX_API_KEY"),
         ("ollama", "OLLAMA_MODEL"),
     ]
@@ -304,16 +317,6 @@ def resolve_provider_config(provider: str | None = None) -> dict[str, object]:
     """
     mirror_model: str | None = None
     explicit = os.environ.get("CODING_AGENT_PROVIDER", "").lower().strip()
-    # 9.8 migration: OpenCode Zen was retired (gateway blocked / keyless tier
-    # gone). An old .env that still says "opencode" must not silently fall
-    # through to a paid cloud — route it to Cline with a plain explanation.
-    if explicit == "opencode":
-        print(
-            "\n  [PROVIDER] OpenCode Zen was retired in 9.8 (gateway blocked). "
-            "Switching this session to Cline — use `cline auth` for free models, "
-            "or set CODING_AGENT_PROVIDER in .env."
-        )
-        explicit = "cline-usage"
 
     if not provider:
         if explicit in VALID_PROVIDERS:
@@ -468,6 +471,7 @@ def detect_api_format(provider: str) -> str:
         "zai": "openai",  # Z.ai GLM uses OpenAI-compatible endpoint
         "groq": "openai",  # Groq uses OpenAI-compatible
         "openrouter": "openai",  # OpenRouter uses OpenAI-compatible
+        "opencode": "openai",  # OpenCode Zen is OpenAI-compatible
         "clinepass": "openai",  # ClinePass gateway is OpenAI-compatible
         "cline-usage": "openai",  # same gateway, usage-billed model ids
         "cline": "openai",  # alias of cline-usage
@@ -521,11 +525,11 @@ def provider_key_from_label(label: str) -> str:
 # Groq's free tier, and the Cline gateways (flat subscription or usage-billed
 # free models). Everything else bills per token.
 #
-# NOTE (9.8): OpenCode Zen was retired from LuckyD. Its keyless $0 tier died in
-# 2026-09 (every keyless call 401s) and the gateway now blocks the accounts this
-# project used, so it is no longer offered as a provider or an Agent Mesh peer.
-# Cline (usage-billed free models + the logged-in CLI session) takes its place
-# as the default free agent brain — see resolve_provider_config().
+# NOTE (2026-09-21): OpenCode Zen is restored to the mesh at Dylan's request,
+# but keyed only — its $0 keyless tier died in 2026-09 (every keyless call
+# 401s) — so it is NOT in the free tier anymore. Cline (usage-billed free
+# models + the logged-in CLI session) remains the default free agent brain —
+# see resolve_provider_config().
 FREE_TIER_PROVIDERS = frozenset(
     {"openrouter", "ollama", "groq", "clinepass", "cline-usage", "cline"}
 )
@@ -533,6 +537,7 @@ FREE_TIER_PROVIDERS = frozenset(
 # Stable display order for the provider list (local first, then free, then paid).
 PROVIDER_ORDER = (
     "ollama",
+    "opencode",
     "clinepass",
     "cline-usage",
     "cline",

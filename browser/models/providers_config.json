@@ -1,6 +1,18 @@
 {
-  "_source": "Cline gateways (api.cline.bot) + keyed clouds. 9.8: OpenCode Zen (opencode.ai) was retired — its keyless $0 tier died and the gateway now blocks these accounts — so its provider entry and the OPENAI_* Zen mirror were removed. 'free_models' = $0 cost per token.",
+  "_source": "Cline gateways (api.cline.bot) + keyed clouds + OpenCode Zen (opencode.ai, keyed since 2026-09 — the old $0 keyless tier is gone). 'free_models' = $0 cost per token.",
   "ai_providers": {
+    "opencode": {
+      "name": "OpenCode Zen",
+      "base_url": "https://opencode.ai/zen/v1",
+      "env_key": "OPENCODE_API_KEY",
+      "free_models": [],
+      "recommended": "gemini-3.5-flash-lite",
+      "requires_key": true,
+      "free_tier": false,
+      "note": "opencode.ai gateway — keyed since 2026-09 (the old $0 keyless tier is gone). Restored to the mesh at Dylan's request 2026-09-21.",
+      "paid_models": [],
+      "contributor_models": []
+    },
     "openai": {
       "name": "OpenAI",
       "base_url": "https://api.openai.com/v1",
@@ -9,7 +21,7 @@
       "recommended": "gpt-4o-mini",
       "requires_key": true,
       "free_tier": false,
-      "note": "api.openai.com — pay-per-token; the old Zen-gateway mirror was retired in 9.8.",
+      "note": "api.openai.com — pay-per-token.",
       "paid_models": [],
       "contributor_models": []
     },
@@ -49,14 +61,16 @@
         "gemma-4-31b-it",
         "gemini-2.5-flash",
         "gemini-2.5-flash-lite",
-        "gemini-2.0-flash",
+        "gemini-2.5-pro",
+        "gemini-3-flash-preview",
+        "gemini-3-pro-preview",
         "gemini-3.5-flash-lite",
         "gemini-3.5-flash"
       ],
       "recommended": "gemini-2.5-flash",
       "requires_key": true,
       "free_tier": true,
-      "note": "Gemini flash models are free-tier-quota (rate limited: 250 req/day API-key Flash-only, 1000 req/day Google login); gemma-4 entries are $0."
+      "note": "Gemini API free tier is rate-limited and separate from the Google AI Pro subscription (Pro covers the Gemini app, not API calls). Preview models may have lower free quotas. Image generation: gemini-2.5-flash-image (Nano Banana). Video: Veo via the Gemini API needs a billing-enabled key."
     },
     "groq": {
       "name": "Groq",
@@ -149,6 +163,7 @@
   "default_provider": "cline-usage",
   "fallback_chain": [
     "ollama",
+    "opencode",
     "cline-usage",
     "openrouter",
     "google",

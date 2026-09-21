@@ -59,7 +59,7 @@ _PROVIDER_SPECS = [
     (
         "google",
         "GOOGLE_API_KEY",
-        "gemini-2.0-flash",
+        "gemini-2.5-flash",
         "https://generativelanguage.googleapis.com/v1beta",
         "gemini",
     ),
@@ -179,13 +179,77 @@ _CLINEPASS_CATALOG = [
     "cline-pass/qwen3.7-plus",
 ]
 
-# OpenCode Zen (opencode.ai) was RETIRED in 9.8.
-# HISTORY: it served a keyless $0 tier of third-party "-free" models until
-# 2026-09, then demanded OPENCODE_API_KEY, and now the gateway blocks the
-# accounts this project used — so LuckyD no longer registers it, lists it,
-# or rotates through it. Cline (api.cline.bot: flat subscription +
-# usage-billed free models, authenticated by the logged-in Cline CLI
-# session) is the free default that replaced it.
+# OpenCode Zen (opencode.ai) platform catalog.
+# HISTORY: until 2026-09 Zen served a keyless $0 tier of third-party "-free"
+# models. That tier is gone — verified 2026-09-13: /models lists only
+# opencode-platform models and every chat call without OPENCODE_API_KEY
+# returns 401 "Missing API key". The provider is now keyed like any cloud.
+# The list below mirrors the live /models catalog (2026-09-13) and is only
+# the fetch_models() fallback when the live catalog request fails.
+_OPENCODE_ZEN_BASE = "https://opencode.ai/zen/v1"
+_OPENCODE_ZEN_DEFAULT = "gemini-3.5-flash-lite"
+_ZEN_CATALOG = [
+    "gemini-3.5-flash-lite",
+    "gpt-5-nano",
+    "gpt-5.4-nano",
+    "gpt-5.4-mini",
+    "claude-haiku-4-5",
+    "gemini-3.5-flash",
+    "gemini-3-flash",
+    "gemini-3.6-flash",
+    "gemini-3.7-flash",
+    "gemini-3.8-flash",
+    "gpt-5.1-codex-mini",
+    "gpt-5.5",
+    "gpt-5.4",
+    "gpt-5.2",
+    "gpt-5.1",
+    "gpt-5",
+    "claude-sonnet-4",
+    "claude-sonnet-4-5",
+    "claude-sonnet-4-6",
+    "claude-sonnet-5",
+    "gpt-5.1-codex",
+    "gpt-5.2-codex",
+    "gpt-5.3-codex",
+    "gpt-5.1-codex-max",
+    "gpt-5.3-codex-spark",
+    "gpt-6-astra",
+    "gpt-5.5-pro",
+    "gpt-5.4-pro",
+    "gpt-5.6-sol",
+    "gpt-5.6-terra",
+    "gpt-5.6-luna",
+    "gemini-3.1-pro",
+    "claude-opus-4-5",
+    "claude-opus-4-6",
+    "claude-opus-4-7",
+    "claude-opus-4-8",
+    "claude-opus-5",
+    "claude-fable-5",
+    "claude-fable-5-1",
+    # Muse Spark 1.3 — standard tier; the cheaper "-contributor" variant is
+    # only offered after an explicit opt-in (see _contributor_enabled below).
+    "muse-spark-1.3",
+    "muse-spark-1.2",
+]
+
+# Curated Zen top models — the chat path rotates through these
+# when the configured Zen model fails (404, unsupported, rate limit).
+# These are NOT free — Zen requires OPENCODE_API_KEY since 2026-09.
+_ZEN_TOP_MODELS = [
+    "gemini-3.5-flash-lite",  # fastest/cheapest in live catalog
+    "gpt-5-nano",
+    "gpt-5.4-nano",
+    "gpt-5.4-mini",
+    "claude-haiku-4-5",
+    "gemini-3.5-flash",
+    "gpt-5.1-codex-mini",
+    "claude-sonnet-4",
+    "gpt-5.1-codex",
+    "claude-opus-4-5",
+]
+_ZEN_TOP_MODELS_SET = set(_ZEN_TOP_MODELS)
 
 # OpenRouter free fallback — the :free chat models plus the auto free-router,
 # used only when the live /models request fails. Kept roughly largest-first.
@@ -255,7 +319,8 @@ _CLINE_USAGE_CATALOG = [
 
 # Cline gateway catalog (usage-billed free tier + flat subscription):
 # the picker fallback when the live /models request fails, and the rotation
-# pool for the chat path. Replaces the retired OpenCode Zen catalog.
+# pool for the chat path. Carries the free-tier role OpenCode Zen's keyless
+# catalog once had (Zen is back in the mesh but keyed-only since 2026-09).
 _CLINE_GATEWAY_CATALOG = list(_CLINE_USAGE_CATALOG) + list(_CLINEPASS_CATALOG)
 
 
@@ -300,9 +365,14 @@ class AIBridge:
             model = env.get(f"{prefix}_MODEL", "").strip() or model
             base_url = env.get(f"{prefix}_BASE_URL", "").strip() or base_url
             self._configs[name] = (model, base_url, key, kind)
-        # 9.8: OpenCode Zen is not registered any more — the gateway blocks
-        # these accounts. Cline (flat subscription + usage-billed free models,
-        # auth from the Cline CLI session) is registered by _detect_clinepass.
+        # Register OpenCode Zen only when keyed. The $0 keyless tier died
+        # 2026-09 (every keyless chat call 401s), so registering it without
+        # a key just burns rotation cycles on guaranteed failures.
+        opencode_key = env.get("OPENCODE_API_KEY", "").strip()
+        if opencode_key:
+            opencode_base = env.get("OPENCODE_BASE_URL", "").strip() or _OPENCODE_ZEN_BASE
+            opencode_model = env.get("OPENCODE_MODEL", "").strip() or _OPENCODE_ZEN_DEFAULT
+            self._configs["opencode"] = (opencode_model, opencode_base, opencode_key, "openai")
 
     def _detect_clinepass(self, env) -> None:
         """Register ClinePass subscription + Cline Usage (credit-billed/free tier).
@@ -381,18 +451,24 @@ class AIBridge:
         """Probe diagnosis per local server: ok | not_running | no_models."""
         return dict(AIBridge._local_status)
 
+    def is_opencode_zen(self, provider: str) -> bool:
+        """True when the provider's endpoint is the OpenCode Zen gateway."""
+        info = self._configs.get(provider)
+        return bool(info) and "opencode.ai" in info[1]
+
     def is_cline_gateway(self, provider: str) -> bool:
         """True when the provider talks to the Cline gateway (api.cline.bot).
 
         Covers both ClinePass (flat subscription) and Cline Usage (credit-billed
-        / free tier) — they share one endpoint and one auth. Replaces the old
-        ``is_opencode_zen()`` check after OpenCode Zen was retired in 9.8.
+        / free tier) — they share one endpoint and one auth.
         """
         info = self._configs.get(provider)
         return bool(info) and "api.cline.bot" in info[1]
 
     def provider_label(self, provider: str) -> str | None:
-        """Endpoint-aware display name: 'Cline (subscription)' vs plain 'OpenAI'."""
+        """Endpoint-aware display name: 'OpenCode Zen' / 'Cline' vs plain 'OpenAI'."""
+        if self.is_opencode_zen(provider):
+            return "OpenCode Zen"
         if self.is_cline_gateway(provider):
             return "Cline"
         return None
@@ -404,8 +480,8 @@ class AIBridge:
           1. Local keyless servers (Ollama, LM Studio) — free, unlimited,
              offline, no key or login needed
           2. cline-usage — Cline free tier, when auth actually exists
-             (API key or a logged-in Cline CLI session) — this is the free
-             default that replaced the retired OpenCode Zen gateway
+             (API key or a logged-in Cline CLI session) — the free default
+             (OpenCode Zen is back in the mesh but keyed, not free)
           3. Cloud keyed providers, in _PROVIDER_SPECS order
         """
         for name, *_ in _LOCAL_SPECS:
@@ -520,7 +596,7 @@ class AIBridge:
                     "research can't use it directly"
                 )
         key = (cfg["api_key"] or "").strip()
-        headers = {"User-Agent": "LuckyDBrowser/9.9", "Content-Type": "application/json"}
+        headers = {"User-Agent": "LuckyDBrowser/10.1", "Content-Type": "application/json"}
         if key:
             headers["Authorization"] = f"Bearer {key}"
         configured = cfg["model"]
@@ -580,8 +656,9 @@ class AIBridge:
     def _free_unlimited_providers(self) -> list[str]:
         """Providers with no rate limits — local servers only.
 
-        (OpenCode Zen used to be here when it had a $0 keyless tier; it was
-        retired in 9.8, so the unlimited pool is keyless locals only.)
+        (OpenCode Zen used to be here when it had a $0 keyless tier; that tier
+        died in 2026-09 and Zen is keyed-only now, so the unlimited pool is
+        keyless locals only.)
         """
         # _LOCAL_SPECS order (Ollama first) — not the _local_names set, whose
         # iteration order is hash-randomized across processes and would flip
@@ -630,6 +707,16 @@ class AIBridge:
                 models = top + rest
             else:
                 models = list(_CLINE_GATEWAY_CATALOG)
+        if self.is_opencode_zen(provider):
+            # LuckyD: curated top models first, then the rest of the live
+            # platform catalog — clean picker, rotation members visible.
+            if models:
+                live_set = set(models)
+                top = [m for m in _ZEN_TOP_MODELS if m in live_set]
+                rest = [m for m in models if m not in top]
+                models = top + rest
+            else:
+                models = list(_ZEN_CATALOG)
         if not models:
             if provider == "clinepass":
                 models = list(_CLINEPASS_CATALOG)
@@ -637,13 +724,15 @@ class AIBridge:
                 models = list(_CLINE_USAGE_CATALOG)
             elif self.is_cline_gateway(provider):
                 models = list(_CLINE_GATEWAY_CATALOG)
+            elif self.is_opencode_zen(provider):
+                models = list(_ZEN_CATALOG)
             elif provider == "openrouter":
                 # Only free tier; sorted :free first for the picker
                 models = list(_OPENROUTER_FREE_FALLBACK)
             else:
                 models = [model]
         # Ensure the current model is present (user override may be outside top)
-        if model not in models and model in _CLINE_GATEWAY_CATALOG:
+        if model not in models and (model in _ZEN_CATALOG or model in _CLINE_GATEWAY_CATALOG):
             # If it's a valid free model but not top, keep it visible at top
             models.insert(0, model)
         elif model in models:
@@ -653,7 +742,7 @@ class AIBridge:
             model not in models
             and self.is_cline_gateway(provider)
             and model in _CLINE_GATEWAY_CATALOG
-        ):
+        ) or (model not in models and self.is_opencode_zen(provider) and model in _ZEN_CATALOG):
             models.insert(0, model)
         if provider == "openrouter" and len(models) > 1:
             # The "openrouter/free" meta-router heads the curated list; keep
@@ -905,7 +994,7 @@ class AIBridge:
             )
         )
         body["model"] = model
-        headers = {"User-Agent": "LuckyDBrowser/9.9"}
+        headers = {"User-Agent": "LuckyDBrowser/10.1"}
 
         if kind == "gemini":
             url = f"{base_url}/models/{model}:streamGenerateContent?key={api_key}&alt=sse"

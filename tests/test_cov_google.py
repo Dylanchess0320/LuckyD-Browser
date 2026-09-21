@@ -17,7 +17,7 @@ def _cfg(**kw):
     base = {
         "api_key": "test-key",
         "base_url": "https://example.com",
-        "model": "gemini-2.0-flash",
+        "model": "gemini-2.5-flash",
         "provider": "google",
     }
     base.update(kw)
@@ -104,7 +104,7 @@ class TestChat:
         result = await client.chat([{"role": "user", "content": "hi"}])
 
         assert result.content == "Hello"
-        assert result.model == "gemini-2.0-flash"
+        assert result.model == "gemini-2.5-flash"
         assert result.tool_calls is not None
         call = result.tool_calls[0]
         assert call["id"] == "get_weather"

@@ -100,12 +100,18 @@ def test_provider_env_overrides(hermetic) -> None:
     assert info[1] == "https://x/v1"
 
 
-def test_opencode_never_registers_retired_in_98(hermetic) -> None:
-    """OpenCode Zen was retired in 9.8 — OPENCODE_API_KEY registers nothing."""
+def test_opencode_registers_when_keyed_restored_2026_09_21(hermetic) -> None:
+    """OpenCode Zen restored to the mesh 2026-09-21 — keyed registration only.
+
+    The $0 keyless tier died 2026-09, so no key means no registration;
+    OPENCODE_API_KEY registers the Zen gateway (endpoint-labelled).
+    """
     assert "opencode" not in _bridge_with({}).providers()
     b = _bridge_with({"OPENCODE_API_KEY": "zk"})
-    assert "opencode" not in b.providers()
-    # Cline gateways replaced Zen: always registered, labelled "Cline".
+    assert "opencode" in b.providers()
+    assert b.is_opencode_zen("opencode")
+    assert b.provider_label("opencode") == "OpenCode Zen"
+    # Cline gateways still register alongside, labelled "Cline".
     assert b.is_cline_gateway("clinepass")
     assert b.is_cline_gateway("cline-usage")
     assert b.provider_label("clinepass") == "Cline"

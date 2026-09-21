@@ -3,12 +3,14 @@
 Speaks plain ``POST {base_url}/chat/completions`` via sync httpx, so it runs
 against any OpenAI-compatible gateway without extra SDKs (frozen-safe):
 
+- ``opencode``   — OpenCode Zen gateway (https://opencode.ai/zen/v1).
+                  Keyed since 2026-09 (OPENCODE_API_KEY; the old $0 keyless
+                  tier is gone) — fast/cheap platform models.
 - ``openrouter`` — OpenRouter (https://openrouter.ai/api/v1) ``:free`` models.
 - ``ollama``     — local Ollama (http://127.0.0.1:11434/v1), free/unlimited.
 
-(The retired ``opencode`` backend — OpenCode Zen's $0 gateway — was removed
-in 9.8; the AI assistant's connected providers, including the Cline
-gateways, are served by ``models/luckyd_bridge.py`` instead.)
+(The AI assistant's connected providers, including the Cline gateways, are
+served by ``models/luckyd_bridge.py`` instead.)
 
 Role routing (override with DRS_MODEL_<ROLE>, e.g. DRS_MODEL_PLANNER):
 - planner / critic  -> flagship model (strongest reasoning/verification)
@@ -38,7 +40,12 @@ _FENCE = re.compile(r"^```(?:json)?\s*|\s*```$", re.MULTILINE | re.IGNORECASE)
 
 # Verified-live free pools (probed against the real gateways, 2026-09-06).
 # First entry = flagship (planner/critic), second = fast (worker/synthesizer).
-# (OPENCODE_FREE_POOL is gone: the Zen gateway was retired in 9.8.)
+# OpenCode Zen pool: keyed platform models (the $0 keyless tier died 2026-09).
+OPENCODE_ZEN_POOL = [
+    "gemini-3.5-flash-lite",
+    "gpt-5-nano",
+    "gpt-5.4-nano",
+]
 OPENROUTER_FREE_POOL = [
     "nvidia/nemotron-3-ultra-550b-a55b:free",
     "nvidia/nemotron-3.5-lightning:free",
@@ -47,6 +54,12 @@ OPENROUTER_FREE_POOL = [
 OLLAMA_FREE_POOL = ["llama3.2:3b"]
 
 _BACKEND_DEFAULTS = {
+    "opencode": {
+        "base_url": "https://opencode.ai/zen/v1",
+        "key_env": "OPENCODE_API_KEY",
+        "model_env": "DRS_OPENCODE_MODEL",
+        "pool": OPENCODE_ZEN_POOL,
+    },
     "openrouter": {
         "base_url": "https://openrouter.ai/api/v1",
         "key_env": "OPENROUTER_API_KEY",
