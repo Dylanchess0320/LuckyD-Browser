@@ -4,7 +4,7 @@
 # (workflow_dispatch) or automatically on version tags (v*).
 #
 # One-command equivalent on your own PC:
-#   powershell -NoProfile -ExecutionPolicy Bypass -File browser\installer\build_installer.ps1
+#   powershell -NoProfile -ExecutionPolicy Bypass -File browser\\installer\\build_installer.ps1
 
 name: Windows Installer
 
@@ -45,18 +45,29 @@ jobs:
         run: choco install innosetup --no-progress -y
 
       - name: Build installer
-        run: powershell -NoProfile -ExecutionPolicy Bypass -File browser\installer\build_installer.ps1
+        # 9.9: code-signing activates automatically once the LUCKYD_CERT_PFX_B64
+        # / LUCKYD_CERT_PASSWORD repo secrets exist (see
+        # browser/installer/sign_binaries.ps1). Until then the build stays
+        # unsigned and every step below works exactly as before.
+        env:
+          LUCKYD_CERT_PFX_B64: ${{ secrets.LUCKYD_CERT_PFX_B64 }}
+          LUCKYD_CERT_PASSWORD: ${{ secrets.LUCKYD_CERT_PASSWORD }}
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File browser\\installer\\build_installer.ps1
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
           name: LuckyDBrowserSetup
-          path: browser/installer/output/LuckyDBrowserSetup-*.exe
+          path: |
+            browser/installer/output/LuckyDBrowserSetup-*.exe
+            browser/installer/output/LuckyDBrowser-Portable-*.zip
           retention-days: 30
 
       - name: Attach to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
-          files: browser/installer/output/LuckyDBrowserSetup-*.exe
+          files: |
+            browser/installer/output/LuckyDBrowserSetup-*.exe
+            browser/installer/output/LuckyDBrowser-Portable-*.zip
           fail_on_unmatched_files: true
