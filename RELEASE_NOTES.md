@@ -1,15 +1,37 @@
-# LuckyD Browser v9.7.0 — Release Notes
+# LuckyD Browser v9.8.0 — Release Notes
 
 > **The AI browser that doesn't need an API key.** Free, unlimited, offline AI built in —
 > plus a full coding agent and developer terminal living in your tabs.
 
-*9.7.0 is on `main` — the installer below publishes with Dylan's 9.7.0 release.*
+*9.8.0 is on `main` — the installer below publishes with Dylan's 9.8.0 release.*
 
-**[⬇ Download `LuckyDBrowserSetup-9.7.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.7.0/LuckyDBrowserSetup-9.7.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed
+**[⬇ Download `LuckyDBrowserSetup-9.8.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.8.0/LuckyDBrowserSetup-9.8.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed
 
 ---
 
-## What's new in 9.7.0
+## What's new in 9.8.0
+
+- **OpenCode Zen retired, Cline is the free default** — the Zen keyless `$0`
+  tier died and the gateway blocks these accounts, so LuckyD no longer offers
+  it. A logged-in Cline CLI session (`cline auth`) gives free agent models
+  with no API key; `CODING_AGENT_PROVIDER=opencode` auto-migrates to Cline.
+- **Goals, steering, follow-ups** — `/goal <text>` (+ `budget=50K`, `pause`,
+  `resume`, `clear`), `/steer <guidance>` mid-run, `/btw <text>` queued next.
+- **Plugins + custom providers** — `lucky-code plugin add/enable/disable`,
+  `lucky-code custom-provider add/test/use` for any OpenAI-compatible gateway.
+- **ACP stdio server** — `lucky-code --acp` for editor extensions.
+- **MiniMax Code + media in the mesh** — `mesh-mcode`/`mesh-mmx` replace the
+  retired `mesh-opencode`; `mcode`/`mmx` also work as agent tools.
+- **Deep research on your providers** — the swarm rides the sidebar's
+  connected providers via the bridge (locals → Cline → keyed clouds).
+- **Google-CAPTCHA-proof** — DDG default search, adblock allowlist for
+  Sorry/consent pages, desktop UA hardening.
+
+On top of everything from 9.7.0 below.
+
+---
+
+## What's new in 9.7.0 (archive)
 
 - **LuckyD Code CLI is the flagship terminal agent** — permission modes
   (`--permission-mode`), background subagent delegation (`delegate_task`),

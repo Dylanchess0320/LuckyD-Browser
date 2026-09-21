@@ -37,12 +37,12 @@ python main.py model <model-name>
 
 Example:
 python main.py model gemini-3-flash-preview  # Google Gemini (current)
-python main.py model nemotron-3-ultra-free    # OpenCode Zen alternative
+python main.py model deepseek/deepseek-chat  # Cline gateway (free tier)
 python main.py model llama3.2:3b              # Local Ollama (free)
 
 ## Provider Priority:
 1. Google Gemini (currently active - free tier)
-2. OpenCode Zen (free tier alternative)
+2. Cline gateways (free tier via the logged-in Cline CLI session)
 3. Local Ollama (always free, no API needed)
 4. OpenRouter (variety of free large models)
 """

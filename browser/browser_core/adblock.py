@@ -10,6 +10,71 @@ from PySide6.QtWebEngineCore import QWebEngineUrlRequestInterceptor
 ASSETS_DIR = Path(__file__).resolve().parent.parent / "assets"
 LIST_PATH = ASSETS_DIR / "adblock.txt"
 
+# ── Google CAPTCHA-safe allowlist ─────────────────────────────────────
+# Every google.com search was landing in an unsolvable "I'm not a robot"
+# sorry-image CAPTCHA. The adblocker must never break the challenge flow:
+# google /search, /sorry/*, and consent.google.com must always load even if
+# an aggressive list blocks "google.com" outright.
+_CAPTCHA_SAFE_HOSTS = frozenset(
+    {"www.google.com", "google.com", "consent.google.com", "sorry.google.com"}
+)
+
+# CAPTCHA-safe URL regexes — any match means NEVER block (checked before
+# both Layer 1 domain blocking and Layer 2 pattern blocking).
+_CAPTCHA_SAFE_RES: list[re.Pattern] = [
+    re.compile(r"google\.com/sorry/"),  # CAPTCHA-safe: challenge flow
+    re.compile(r"consent\.google\.com"),  # CAPTCHA-safe: consent redirect
+    re.compile(r"[?&]id="),  # CAPTCHA-safe: challenge token (scoped in _is_captcha_safe_url)
+    re.compile(r"/sorry/image"),  # CAPTCHA-safe: challenge image
+    re.compile(r"sorry/image"),  # CAPTCHA-safe: challenge image (any prefix)
+    re.compile(r"sorry/index"),  # CAPTCHA-safe: challenge page
+]
+
+
+def _is_captcha_safe_url(url_str: str, host: str) -> bool:
+    """True when the URL is part of Google search/consent/challenge flow.
+
+    Checked before every blocking layer so an aggressive blocklist entry
+    (e.g. "google.com") can never break CAPTCHA rendering.
+    """
+    lowered = url_str.lower()
+    # CAPTCHA-safe: "[?&]id=" is the sorry-image challenge token — but only
+    # for Google consent/sorry challenge URLs, NOT every "?id=" URL on the
+    # web (otherwise ordinary ad URLs with an id param would slip through).
+    id_token = re.search(r"[?&]id=", url_str)
+    if id_token and (
+        "google.com/sorry" in lowered
+        or "consent.google" in lowered
+        or "sorry/image" in lowered
+        or "sorry/index" in lowered
+    ):
+        return True
+    # CAPTCHA-safe: never break the sorry/consent challenge rendering.
+    for pattern in _CAPTCHA_SAFE_RES:
+        if pattern.pattern == r"[?&]id=":
+            continue  # handled above with google/sorry scoping
+        if pattern.search(url_str) or pattern.search(lowered):
+            return True
+    # CAPTCHA-safe: Google search/consent hosts always allow their
+    # search and challenge paths.
+    host_lower = (host or "").lower()
+    path = _url_path(url_str)
+    # CAPTCHA-safe: return the host/path condition directly (ruff SIM103).
+    return host_lower in _CAPTCHA_SAFE_HOSTS and (
+        path.startswith("/search") or path.startswith("/sorry") or "consent.google" in lowered
+    )
+
+
+def _url_path(url_str: str) -> str:
+    """Extract the URL path without requiring a real QUrl (test fakes too)."""
+    try:
+        from urllib.parse import urlsplit
+
+        return urlsplit(url_str).path or ""
+    except Exception:
+        return ""
+
+
 # ── YouTube ad-serving URL regexes ────────────────────────────────────
 # These match against the full request URL.  googlevideo.com / ytimg.com
 # are deliberately NOT blocked by domain (they serve content); ad patterns
@@ -133,6 +198,14 @@ class AdBlockInterceptor(QWebEngineUrlRequestInterceptor):
         return False
 
     def _url_matches_ad_pattern(self, url_str: str) -> bool:
+        # CAPTCHA-safe: never treat Google sorry/consent challenge URLs as
+        # ads, even if an aggressive ad pattern happens to match (e.g. a
+        # googlevideo "?id=" + "ad" pattern against /sorry/image?id=...).
+        lowered = url_str.lower()
+        if "google.com/sorry" in lowered or "consent.google" in lowered:
+            return False
+        if "sorry/image" in lowered or "sorry/index" in lowered:
+            return False
         return any(pattern.search(url_str) for pattern in _YT_AD_PATTERNS)
 
     # ── Qt interceptor ────────────────────────────────────────────────
@@ -145,6 +218,12 @@ class AdBlockInterceptor(QWebEngineUrlRequestInterceptor):
         host = url.host()
         url_str = url.toString()
         if not host or not url_str:
+            return
+
+        # CAPTCHA-safe allowlist: checked BEFORE Layer 1 so Google
+        # search/consent/challenge URLs always load even when the domain
+        # list aggressively blocks "google.com".
+        if _is_captcha_safe_url(url_str, host):
             return
 
         # Layer 1: Domain-suffix blocklist

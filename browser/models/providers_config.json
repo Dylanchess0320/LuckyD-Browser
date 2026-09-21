@@ -1,95 +1,17 @@
 {
-  "_source": "Synced from opencode's open model registry (https://models.dev/api.json), 2026-08-24. 'free_models' = $0 cost per token.",
+  "_source": "Cline gateways (api.cline.bot) + keyed clouds. 9.8: OpenCode Zen (opencode.ai) was retired — its keyless $0 tier died and the gateway now blocks these accounts — so its provider entry and the OPENAI_* Zen mirror were removed. 'free_models' = $0 cost per token.",
   "ai_providers": {
-    "opencode": {
-      "name": "OpenCode Zen",
-      "base_url": "https://opencode.ai/zen/v1",
-      "env_key": "OPENCODE_API_KEY",
-      "free_models": [
-        "nemotron-3-ultra-free",
-        "hy3-free",
-        "laguna-s-2.1-free",
-        "nemotron-3.5-lightning-free",
-        "deepseek-v4-flash-free",
-        "mimo-v2.5-free",
-        "muse-spark-1.2-contributor-free",
-        "big-pickle",
-        "glm-4.7-free",
-        "glm-5-free",
-        "grok-code",
-        "hy3-preview-free",
-        "kimi-k2.5-free",
-        "ling-2.6-flash-free",
-        "ling-3.0-flash-free",
-        "ling-3.0-tiny-free",
-        "longcat-2.0-free",
-        "mimo-v2-flash-free",
-        "mimo-v2-omni-free",
-        "mimo-v2-pro-free",
-        "minimax-m2.1-free",
-        "minimax-m2.5-free",
-        "minimax-m3-free",
-        "north-mini-code-free",
-        "qwen3.6-plus-free",
-        "ring-2.6-1t-free",
-        "trinity-large-preview-free",
-        "x-preview-f-free"
-      ],
-      "recommended": "nemotron-3-ultra-free",
-      "requires_key": false,
-      "free_tier": true,
-      "paid_models": [
-        "muse-spark-1.3"
-      ],
-      "contributor_models": [
-        "muse-spark-1.3-contributor"
-      ],
-      "contributor_note": "Contributor tier is cheaper because the provider may train on your prompts. Off unless explicitly opted in (/contributor on or LUCKYD_CONTRIBUTOR_TIER=1)."
-    },
     "openai": {
-      "name": "OpenAI-compatible / OpenCode Zen",
-      "base_url": "https://opencode.ai/zen/v1",
+      "name": "OpenAI",
+      "base_url": "https://api.openai.com/v1",
       "env_key": "OPENAI_API_KEY",
-      "free_models": [
-        "big-pickle",
-        "deepseek-v4-flash-free",
-        "glm-4.7-free",
-        "glm-5-free",
-        "grok-code",
-        "hy3-free",
-        "hy3-preview-free",
-        "kimi-k2.5-free",
-        "laguna-s-2.1-free",
-        "ling-2.6-flash-free",
-        "ling-3.0-flash-free",
-        "ling-3.0-tiny-free",
-        "longcat-2.0-free",
-        "mimo-v2-flash-free",
-        "mimo-v2-omni-free",
-        "mimo-v2-pro-free",
-        "mimo-v2.5-free",
-        "minimax-m2.1-free",
-        "minimax-m2.5-free",
-        "minimax-m3-free",
-        "muse-spark-1.2-contributor-free",
-        "nemotron-3-ultra-free",
-        "nemotron-3.5-lightning-free",
-        "north-mini-code-free",
-        "qwen3.6-plus-free",
-        "ring-2.6-1t-free",
-        "trinity-large-preview-free",
-        "x-preview-f-free"
-      ],
-      "recommended": "nemotron-3-ultra-free",
+      "free_models": [],
+      "recommended": "gpt-4o-mini",
       "requires_key": true,
-      "free_tier": true,
-      "note": "OPENAI_BASE_URL in .env points at the Zen gateway, so this provider serves Zen free models.",
-      "paid_models": [
-        "muse-spark-1.3"
-      ],
-      "contributor_models": [
-        "muse-spark-1.3-contributor"
-      ]
+      "free_tier": false,
+      "note": "api.openai.com — pay-per-token; the old Zen-gateway mirror was retired in 9.8.",
+      "paid_models": [],
+      "contributor_models": []
     },
     "openrouter": {
       "name": "OpenRouter",
@@ -224,12 +146,11 @@
       "note": "Rotating FREE promotions in Cline CLI/IDE (Cline account, quota-limited, rate-limited). Same auth as ClinePass."
     }
   },
-  "default_provider": "opencode",
+  "default_provider": "cline-usage",
   "fallback_chain": [
     "ollama",
-    "opencode",
-    "openrouter",
     "cline-usage",
+    "openrouter",
     "google",
     "zai",
     "groq"

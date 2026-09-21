@@ -26,6 +26,9 @@ BUILTIN_COMMANDS: dict[str, str] = {
     "resume": "Restore a saved session by id: /resume <id>",
     "init": "Generate project guidance for this repo",
     "review": "Review recent changes and give a verdict",
+    "goal": "Set/show the active objective: /goal <text> | /goal budget=50K | /goal pause|resume|edit|clear|status",
+    "steer": "Guide the current response mid-run: /steer <guidance>",
+    "btw": "Queue a follow-up after the current response: /btw <text>",
 }
 
 
@@ -137,6 +140,43 @@ def _handle_resume(agent: Any, resume_id: str) -> str:
     return f"Restored session '{resume_id}'."
 
 
+def _handle_goal(agent: Any, args: str) -> str:
+    """Route /goal to the agent's GoalStore (honest when agent lacks one)."""
+    store = getattr(agent, "goals", None)
+    if store is None or not hasattr(store, "handle_command"):
+        return "/goal is not supported by this agent (no goal store)."
+    try:
+        return str(store.handle_command(args or ""))
+    except Exception as e:
+        return f"Could not update goal: {e}."
+
+
+def _handle_steer(agent: Any, args: str) -> str:
+    """Route /steer to agent.steer() — mid-run guidance for this response."""
+    fn = getattr(agent, "steer", None)
+    if fn is None:
+        return "/steer is not supported by this agent."
+    if not (args or "").strip():
+        return "Usage: /steer <guidance>"
+    try:
+        return str(fn(args))
+    except Exception as e:
+        return f"Could not steer: {e}."
+
+
+def _handle_btw(agent: Any, args: str) -> str:
+    """Route /btw to agent.queue() — deferred follow-up after this response."""
+    fn = getattr(agent, "queue", None)
+    if fn is None:
+        return "/btw is not supported by this agent."
+    if not (args or "").strip():
+        return "Usage: /btw <follow-up text>"
+    try:
+        return str(fn(args))
+    except Exception as e:
+        return f"Could not queue follow-up: {e}."
+
+
 def handle_slash(text: str, agent: Any = None) -> tuple[bool, str | None]:
     """Handle a ``/command args`` line.
 
@@ -157,6 +197,12 @@ def handle_slash(text: str, agent: Any = None) -> tuple[bool, str | None]:
         return True, _handle_compact(agent)
     if command == "resume":
         return True, _handle_resume(agent, args.strip())
+    if command == "goal":
+        return True, _handle_goal(agent, args)
+    if command == "steer":
+        return True, _handle_steer(agent, args)
+    if command == "btw":
+        return True, _handle_btw(agent, args)
     if command in ("init", "review"):
         fallback = (
             f"(No {command}.md template found.)\n\n/{command} args: {args}"

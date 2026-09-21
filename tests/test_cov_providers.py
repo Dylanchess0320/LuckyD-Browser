@@ -59,10 +59,25 @@ _PROVIDER_ENV_VARS = [
 
 
 @pytest.fixture
-def clean_env(monkeypatch):
-    """Remove every provider-related env var so detection is deterministic."""
+def clean_env(monkeypatch, tmp_path):
+    """Remove every provider-related env var so detection is deterministic.
+
+    ``CLINE_DATA_DIR`` is redirected to an empty per-test dir rather than
+    deleted: without it ``core.providers`` (via ``browser_core.cline_session``)
+    would read the developer's real ``~/.cline`` session and detection would
+    always return ``cline-usage`` on a logged-in machine.
+
+    9.8: also reset the cached Cline session token and default it to empty —
+    detection is session-first, so every test starts with no session unless it
+    explicitly mocks one.
+    """
     for var in _PROVIDER_ENV_VARS:
-        monkeypatch.delenv(var, raising=False)
+        if var == "CLINE_DATA_DIR":
+            monkeypatch.setenv(var, str(tmp_path / "cline-data"))
+        else:
+            monkeypatch.delenv(var, raising=False)
+    providers.reset_cline_session_cache()
+    monkeypatch.setattr(providers, "cline_session_token", lambda: "")
     return monkeypatch
 
 

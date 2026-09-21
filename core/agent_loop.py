@@ -30,6 +30,7 @@ from memory.store import get_memory
 from tools.registry import registry
 
 from .compaction import maybe_compact
+from .goals import GoalStore, goal_from_session
 from .hooks import get_hooks
 from .llm_client import LLMClient
 from .message_builder import MessageBuilder
@@ -213,6 +214,10 @@ class CodingAgent:
         self._max_consecutive_failed_tool_turns: int = int(
             os.environ.get("CODING_AGENT_MAX_FAILED_TOOL_TURNS", "4")
         )
+        # Active objective (9.8) + mid-run steer/queue buffers.
+        self.goals = GoalStore()
+        self._pending_steer: list[str] = []
+        self._pending_queue: list[str] = []
 
         # Cost tracking (for /cost, goodbye)
         self._cost_tracker = CostTracker()
@@ -295,6 +300,16 @@ class CodingAgent:
     def think_callback(self, cb):
         self.callbacks.stream_think_token = cb
 
+    def _is_cline_provider(self) -> bool:
+        """True when the resolved provider is one of the Cline gateways."""
+        try:
+            return str(getattr(self._provider_config, "provider", "")).lower() in (
+                "clinepass",
+                "cline-usage",
+            )
+        except Exception:
+            return False
+
     @property
     def provider_name(self) -> str:
         names = {
@@ -306,7 +321,6 @@ class CodingAgent:
             "zai": "Z.ai",
             "groq": "Groq",
             "openrouter": "OpenRouter",
-            "opencode": "OpenCode Zen",
             "clinepass": "ClinePass",
             "cline-usage": "Cline (usage)",
         }
@@ -370,6 +384,48 @@ class CodingAgent:
         if self.callbacks and self.callbacks.on_event:
             event = AgentEvent(type=event_type, payload=payload or {}, turn=self.turn_count)
             self.callbacks.on_event(event)
+
+    def set_goal(self, text: str) -> str:
+        """Set the active objective; returns the REPL confirmation text."""
+        goal = self.goals.set(text)
+        return f"Goal set: {goal.text}"
+
+    def goal_status(self) -> str:
+        """One-line status of the active goal (or the empty-goal message)."""
+        return self.goals.describe()
+
+    def steer(self, text: str) -> str:
+        """Inject mid-run guidance for the CURRENT response."""
+        cleaned = (text or "").strip()
+        if not cleaned:
+            return "Nothing to steer with - provide guidance text."
+        self._pending_steer.append(cleaned)
+        return "Steer noted - it will guide the current response."
+
+    def queue(self, text: str) -> str:
+        """Defer a follow-up for AFTER the current response finishes."""
+        cleaned = (text or "").strip()
+        if not cleaned:
+            return "Nothing queued - provide follow-up text."
+        self._pending_queue.append(cleaned)
+        return "Queued - it will run after the current response."
+
+    def _take_steer(self) -> list[str]:
+        pending, self._pending_steer = self._pending_steer, []
+        return pending
+
+    def _take_queue(self) -> list[str]:
+        pending, self._pending_queue = self._pending_queue, []
+        return pending
+
+    def _drain_steer_into_messages(self) -> bool:
+        """Splice pending steer guidance into messages. True when added."""
+        pending = self._take_steer()
+        if not pending:
+            return False
+        guidance = "\n".join(f"[steer] {line}" for line in pending)
+        self.messages.append({"role": "user", "content": guidance})
+        return True
 
     def _build_system(self) -> str:
         """Build the system prompt with tools, project info, memories, and rules."""
@@ -794,6 +850,11 @@ class CodingAgent:
         for turn in range(max_turns):
             self.turn_count = turn + 1
             self._emit_event(AgentEventType.TURN_START, {"turn": self.turn_count})
+            # 9.8: consume pending steer guidance at the turn boundary so it
+            # shapes the CURRENT response (a user message is already in the
+            # history; appending another one here is exactly "inject a user
+            # message mid-run guiding the current response").
+            self._drain_steer_into_messages()
 
             # Safety: cap messages to prevent context overflow
             if len(self.messages) > 40:
@@ -878,17 +939,18 @@ class CodingAgent:
                 and assistant_msg.get("content", "").startswith("[API Error:")
                 and (
                     self.model.endswith("-free")
-                    or getattr(self._provider_config, "provider", "") == "opencode"
+                    or ":free" in self.model
+                    or self._is_cline_provider()
                 )
             ):
+                # 9.8: Cline gateway free-tier models replaced the retired
+                # OpenCode Zen "-free" pool (big-pickle, hy3, nemotron…).
                 _free_fallbacks = [
-                    "nemotron-3-ultra-free",
-                    "hy3-free",
-                    "laguna-s-2.1-free",
-                    "nemotron-3.5-lightning-free",
-                    "deepseek-v4-flash-free",
-                    "mimo-v2.5-free",
-                    "big-pickle",
+                    "deepseek/deepseek-chat",
+                    "minimax/minimax-m2.5",
+                    "qwen/qwen3-8b",
+                    "deepseek/deepseek-v4-flash",
+                    "z-ai/glm-5.3-flash",
                 ]
                 # Contributor-tier fallbacks only appear after explicit opt-in.
                 try:
@@ -1060,6 +1122,15 @@ class CodingAgent:
                 if summary:
                     final_text = summary.get("content", "(timeout)")
 
+        # 9.8: queued follow-ups become the next user turn. Any queued text
+        # is appended as a user message and recorded on final_text so the
+        # caller can see the follow-up was accepted (the next run() call
+        # continues from the queued message already in history).
+        queued = self._take_queue()
+        if queued:
+            self.messages.append({"role": "user", "content": "\n".join(queued)})
+            note = "[queued] " + " | ".join(queued)
+            final_text = f"{final_text}\n{note}" if final_text else note
         # Extract long-term memories in the background (extra LLM call)
         # so the user gets the prompt back immediately.
         self._last_extraction_msg_count = len(self.messages)
@@ -1095,20 +1166,41 @@ class CodingAgent:
 
     def save_session(self) -> str | None:
         """Persist the current conversation to the session store.
-        Returns the file path, or None if no messages to save."""
+
+        The 9.8 goal payload rides along (top-level ``goal`` key plus a
+        ``meta.goal`` mirror) without changing the existing keys, so older
+        restores keep working. Returns the file path, or None if empty.
+        """
         if not self.messages:
             return None
         try:
             store = get_session_store()
-            return str(
-                store.save(
-                    conversation_id=self.conversation_id,
-                    messages=self.messages,
-                    model=self.model,
-                    provider=self.provider_name,
-                    meta={"turn_count": self.turn_count},
-                )
+            meta: dict = {"turn_count": self.turn_count}
+            goal_data = self.goals.to_dict()
+            if goal_data is not None:
+                meta["goal"] = goal_data
+            path = store.save(
+                conversation_id=self.conversation_id,
+                messages=self.messages,
+                model=self.model,
+                provider=self.provider_name,
+                meta=meta,
             )
+            # Extend the on-disk record with the top-level goal key as well
+            # (SessionStore.save has no goal parameter by design).
+            if goal_data is not None:
+                try:
+                    import json as _json
+
+                    record = store.load(self.conversation_id) or {}
+                    record["goal"] = goal_data
+                    fpath = store._path(self.conversation_id)
+                    tmp = fpath.with_suffix(".tmp")
+                    tmp.write_text(_json.dumps(record, indent=2, default=str), encoding="utf-8")
+                    tmp.replace(fpath)
+                except Exception:
+                    pass
+            return str(path)
         except Exception:
             return None
 
@@ -1118,9 +1210,17 @@ class CodingAgent:
             return
         self.messages = session.get("messages", [])
         self.conversation_id = session.get("conversation_id", self.conversation_id)
-        self.turn_count = session.get("meta", {}).get("turn_count", 0)
+        meta = session.get("meta", {}) or {}
+        self.turn_count = meta.get("turn_count", 0)
         if session.get("model"):
             self.model = session["model"]
+        # 9.8: goals restore from top-level ``goal`` or the meta mirror;
+        # absent on old records -> no goal (backward compatible).
+        try:
+            restored = goal_from_session(session)
+            self.goals.restore(restored.to_dict() if restored else None)
+        except Exception:
+            pass
 
     def reset(self):
         """Reset conversation state."""

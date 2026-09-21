@@ -162,10 +162,32 @@ class SwarmManager:
                     rmodel = str(cfg.get("model", "") or "")
                 except Exception:
                     rprovider = pname
+            elif pname in ("bridge", "cline", "clinepass", "cline-usage"):
+                # The assistant's connected providers — mirror the bridge's
+                # resolved default (Cline gateways included) + its model.
+                try:
+                    from browser.browser_core.ai_bridge import AIBridge
+
+                    bridge = AIBridge()
+                    target = pname if pname not in ("bridge", "cline") else ""
+                    rprovider = target or bridge.default_provider() or pname
+                    cfg = bridge.provider_config(rprovider) or {}
+                    rmodel = str(cfg.get("model", "") or "")
+                except Exception:
+                    try:
+                        from browser_core.ai_bridge import AIBridge
+
+                        bridge = AIBridge()
+                        target = pname if pname not in ("bridge", "cline") else ""
+                        rprovider = target or bridge.default_provider() or pname
+                        cfg = bridge.provider_config(rprovider) or {}
+                        rmodel = str(cfg.get("model", "") or "")
+                    except Exception:
+                        rprovider = pname
             elif pname == "gemini":
                 rprovider = "gemini"
                 rmodel = drs_settings.model_worker
-            elif pname in ("opencode", "openrouter", "ollama"):
+            elif pname in ("openrouter", "ollama"):
                 try:
                     from features.deep_research.models.openai_compat import _BACKEND_DEFAULTS
 
@@ -1128,12 +1150,13 @@ def research_html() -> str:
     <div class="form-group">
       <label for="provider-select">LLM Provider</label>
       <select id="provider-select">
-        <option value="auto" selected>✨ Auto (recommended — free pools first)</option>
-        <option value="opencode">🆓 OpenCode Zen (free pool)</option>
+        <option value="auto" selected>✨ Auto (recommended — assistant providers first)</option>
+        <option value="bridge">🤖 AI Assistant (Cline &amp; connected providers)</option>
+        <option value="cline">🆓 Cline (free tier, keyless)</option>
         <option value="ollama">💻 Local Ollama (offline, unlimited)</option>
         <option value="openrouter">🌐 OpenRouter (free models)</option>
         <option value="gemini">♊ Google Gemini (native grounding)</option>
-        <option value="luckyd">🤖 Browser's active AI provider</option>
+        <option value="luckyd">🧩 Browser's active AI provider</option>
         <option value="mock">🧪 Test run (offline, no network)</option>
       </select>
     </div>

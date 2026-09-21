@@ -50,7 +50,7 @@ from browser_core.storage import Storage
 
 def test_settings_defaults_loaded_when_missing(tmp_path: Path) -> None:
     s = SettingsStore(tmp_path / "settings.json")
-    assert s.get("search_engine") == "Google"
+    assert s.get("search_engine") == "DuckDuckGo"
     assert s.get("adblock_enabled") is True
     # every DEFAULTS key resolves without KeyError
     for key in DEFAULTS:
@@ -71,7 +71,7 @@ def test_settings_corrupt_file_preserved_and_defaults_used(tmp_path: Path) -> No
     p = tmp_path / "settings.json"
     p.write_text("{not valid json", encoding="utf-8")
     s = SettingsStore(p)
-    assert s.get("search_engine") == "Google"  # fell back to defaults
+    assert s.get("search_engine") == "DuckDuckGo"  # fell back to defaults
     preserved = list(tmp_path.glob("settings.corrupt.*.json"))
     assert len(preserved) == 1
     assert preserved[0].read_text(encoding="utf-8") == "{not valid json"
@@ -95,9 +95,9 @@ def test_settings_search_url_encoding(tmp_path: Path) -> None:
     url = s.search_url_for("hello world & more")
     assert url.startswith("https://duckduckgo.com/?q=")
     assert "hello+world+%26+more" in url
-    # unknown engine falls back to Google
+    # unknown engine falls back to DuckDuckGo
     s.set("search_engine", "Nope")
-    assert s.search_url_for("x").startswith("https://www.google.com/search?q=")
+    assert s.search_url_for("x").startswith("https://duckduckgo.com/?q=")
 
 
 def test_settings_legacy_terminal_cli_migrated(tmp_path: Path) -> None:

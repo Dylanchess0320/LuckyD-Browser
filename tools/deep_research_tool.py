@@ -64,7 +64,18 @@ DEPTH_PRESETS: dict[str, dict[str, int]] = {
 }
 
 _VALID_BACKENDS = ("auto", "gemini", "ddg", "tavily", "brave", "none")
-_VALID_PROVIDERS = ("auto", "gemini", "luckyd", "opencode", "openrouter", "ollama", "mock")
+_VALID_PROVIDERS = (
+    "auto",
+    "gemini",
+    "luckyd",
+    "bridge",
+    "cline",
+    "clinepass",
+    "cline-usage",
+    "openrouter",
+    "ollama",
+    "mock",
+)
 
 
 class DeepResearchTool(ToolBase):
@@ -115,7 +126,11 @@ class DeepResearchTool(ToolBase):
         },
         "provider": {
             "type": "string",
-            "description": "auto (default: free OpenCode Zen pool), gemini, luckyd, opencode, openrouter, ollama, or mock.",
+            "description": (
+                "auto (default: the AI assistant's connected providers — Cline "
+                "gateways first), bridge, cline, clinepass, cline-usage, gemini, "
+                "luckyd, openrouter, ollama, or mock."
+            ),
         },
         "dry_run": {
             "type": "boolean",

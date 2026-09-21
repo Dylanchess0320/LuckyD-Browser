@@ -1,10 +1,12 @@
 """Fallback-default regression tests for browser/browser_core/ai_bridge.py.
 
 HISTORY: these tests once asserted OpenCode Zen as a keyless $0 fallback.
-That tier died 2026-09 (verified: every keyless Zen chat call 401s), so
-Zen now registers ONLY with OPENCODE_API_KEY. With no local server, no
-keys, and no Cline auth there is simply no provider — the dashboard says
-so honestly instead of routing into a guaranteed 401.
+That tier died 2026-09 (verified: every keyless Zen chat call 401s) and the
+gateway was RETIRED in 9.8 — LuckyD no longer registers "opencode" at all.
+The free default is now Cline (api.cline.bot: usage-billed free models +
+flat subscription, authenticated by CLINEPASS_API_KEY or the logged-in Cline
+CLI session). With no local server, no keys, and no Cline auth there is
+simply no provider — the dashboard says so honestly.
 """
 
 from __future__ import annotations
@@ -39,17 +41,27 @@ def no_local_no_keys(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(cline_session, "has_session", lambda: False)
 
 
-def test_fallback_default_is_opencode_zen(
+def test_fallback_default_is_cline_usage_when_keyed(
     no_local_no_keys, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """With OPENCODE_API_KEY set → Zen gateway is the default."""
+    """With CLINEPASS_API_KEY set → Cline usage gateway is the default."""
+    monkeypatch.setattr(ai_bridge, "_load_env", lambda: {"CLINEPASS_API_KEY": "zk-test"})
+    bridge = AIBridge()
+    assert bridge.default_provider() == "cline-usage"
+
+
+def test_opencode_key_is_ignored_retired_in_98(
+    no_local_no_keys, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """OPENCODE_API_KEY no longer registers anything (Zen retired in 9.8)."""
     monkeypatch.setattr(ai_bridge, "_load_env", lambda: {"OPENCODE_API_KEY": "zk-test"})
     bridge = AIBridge()
-    assert bridge.default_provider() == "opencode"
+    assert "opencode" not in bridge.providers()
+    assert bridge.default_provider() is None
 
 
-def test_no_key_no_zen_registered(no_local_no_keys) -> None:
-    """Without OPENCODE_API_KEY, Zen must NOT register (keyless 401s)."""
+def test_no_key_no_provider_registered(no_local_no_keys) -> None:
+    """Without keys or Cline auth, no cloud provider is usable."""
     bridge = AIBridge()
     assert "opencode" not in bridge.providers()
     assert bridge.default_provider() is None
@@ -65,23 +77,21 @@ def test_fallback_default_never_empty_token_clinepass(no_local_no_keys) -> None:
     assert default is None
 
 
-def test_opencode_zen_registered_when_keyed(
-    no_local_no_keys, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """The Zen gateway registers when OPENCODE_API_KEY is set."""
-    monkeypatch.setattr(ai_bridge, "_load_env", lambda: {"OPENCODE_API_KEY": "zk-test"})
+def test_cline_registers_when_keyed(no_local_no_keys, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The Cline gateway registers when CLINEPASS_API_KEY is set."""
+    monkeypatch.setattr(ai_bridge, "_load_env", lambda: {"CLINEPASS_API_KEY": "zk-test"})
     bridge = AIBridge()
-    model, base, key, kind = bridge._configs["opencode"]
-    assert "opencode.ai" in base
+    model, base, key, kind = bridge._configs["cline-usage"]
+    assert "api.cline.bot" in base
     assert key == "zk-test"
     assert kind == "openai"  # OpenAI-compatible endpoint
-    assert model  # a default platform model is pinned
-    assert model in ai_bridge._ZEN_CATALOG
+    assert model  # a default model is pinned
+    assert model in ai_bridge._CLINE_GATEWAY_CATALOG
 
 
-def test_local_server_still_beats_zen(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A reachable Ollama keeps priority #1 over the Zen gateway."""
-    monkeypatch.setattr(ai_bridge, "_load_env", lambda: {})
+def test_local_server_still_beats_cline(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A reachable Ollama keeps priority #1 over the Cline gateway."""
+    monkeypatch.setattr(ai_bridge, "_load_env", lambda: {"CLINEPASS_API_KEY": "k"})
     monkeypatch.setattr(
         AIBridge,
         "_detect_local",

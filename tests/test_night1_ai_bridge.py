@@ -100,11 +100,15 @@ def test_provider_env_overrides(hermetic) -> None:
     assert info[1] == "https://x/v1"
 
 
-def test_opencode_registers_only_with_key(hermetic) -> None:
+def test_opencode_never_registers_retired_in_98(hermetic) -> None:
+    """OpenCode Zen was retired in 9.8 — OPENCODE_API_KEY registers nothing."""
     assert "opencode" not in _bridge_with({}).providers()
     b = _bridge_with({"OPENCODE_API_KEY": "zk"})
-    assert b.is_opencode_zen("opencode")
-    assert b.provider_label("opencode") == "OpenCode Zen"
+    assert "opencode" not in b.providers()
+    # Cline gateways replaced Zen: always registered, labelled "Cline".
+    assert b.is_cline_gateway("clinepass")
+    assert b.is_cline_gateway("cline-usage")
+    assert b.provider_label("clinepass") == "Cline"
     assert b.provider_label("openai") is None
 
 
@@ -238,7 +242,9 @@ def test_fetch_models_clinepass_curated_fallback(monkeypatch, hermetic) -> None:
     b = _bridge_with({})
     models = b.fetch_models("clinepass")
     assert "cline-pass/kimi-k3" in models
-    assert models[0] == b.model_for("clinepass")  # current model pinned first
+    # Fallback is the full gateway catalog, top-sorted: Cline top models lead.
+    assert set(models) == set(ai_bridge._CLINE_GATEWAY_CATALOG)
+    assert models[:6] == list(ai_bridge._CLINE_GATEWAY_TOP_MODELS[:6])
 
 
 def test_fetch_models_cline_usage_catalog(monkeypatch, hermetic) -> None:
@@ -422,20 +428,20 @@ def test_chat_auto_string_sentinel(hermetic, monkeypatch) -> None:
     assert calls == ["ollama"]
 
 
-def test_chat_zen_explicit_rotates_models(hermetic, monkeypatch) -> None:
-    """Explicit Zen provider: per-model rotation on failure, config updated."""
-    b = _bridge_with({"OPENCODE_API_KEY": "zk"})
+def test_chat_cline_explicit_rotates_models(hermetic, monkeypatch) -> None:
+    """Explicit Cline provider: per-model rotation on failure, config updated."""
+    b = _bridge_with({"CLINEPASS_API_KEY": "zk"})
     tried = []
 
     async def _call(name, info, messages, on_token):
         tried.append(info[0])
-        if info[0] == "gemini-3.5-flash-lite":
+        if info[0] == "deepseek/deepseek-chat":
             raise RuntimeError("404 model not found")
-        return "zen-ok"
+        return "cline-ok"
 
     monkeypatch.setattr(b, "_call", _call)
-    text, name = asyncio.run(b.chat([{"role": "user", "content": "hi"}], provider="opencode"))
-    assert text == "zen-ok" and name == "opencode"
-    assert tried[0] == "gemini-3.5-flash-lite"
+    text, name = asyncio.run(b.chat([{"role": "user", "content": "hi"}], provider="cline-usage"))
+    assert text == "cline-ok" and name == "cline-usage"
+    assert tried[0] == "deepseek/deepseek-chat"
     assert len(tried) >= 2
-    assert b.model_for("opencode") == tried[-1]
+    assert b.model_for("cline-usage") == tried[-1]

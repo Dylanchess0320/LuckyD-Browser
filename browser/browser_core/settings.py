@@ -38,7 +38,7 @@ SEARCH_ENGINES = {
 
 DEFAULTS = {
     "homepage": "newtab",  # "newtab" or a full URL
-    "search_engine": "Google",
+    "search_engine": "DuckDuckGo",
     "adblock_enabled": True,
     "download_dir": "",  # empty = system Downloads folder
     "zoom_factor": 1.0,
@@ -202,9 +202,8 @@ class SettingsStore:
         self.save()
 
     def search_url_for(self, query: str) -> str:
-        template = SEARCH_ENGINES.get(
-            self._data.get("search_engine", "Google"), SEARCH_ENGINES["Google"]
-        )
+        engine = str(self._data.get("search_engine", "DuckDuckGo"))
+        template = SEARCH_ENGINES.get(engine, SEARCH_ENGINES["DuckDuckGo"])
         return template.format(query=quote_plus(query))
 
 

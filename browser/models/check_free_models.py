@@ -2,8 +2,9 @@
 """
 LuckyD Browser - Free Models Status Checker
 
-Reads browser/models/providers_config.json (synced from opencode's open
-model registry, models.dev) and prints every free model per provider.
+Reads browser/models/providers_config.json (Cline gateways + keyed clouds
+since 9.8 — the old OpenCode Zen registry sync was retired) and prints every
+free model per provider.
 """
 
 import json

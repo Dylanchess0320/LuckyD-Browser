@@ -4,13 +4,17 @@ Resolution order:
 - dry_run=True -> MockProvider (offline, deterministic).
 - DRS_PROVIDER=gemini -> GeminiProvider (native grounding, needs key).
 - DRS_PROVIDER=luckyd -> LuckyDProvider (LuckyD's resolved provider config).
-- DRS_PROVIDER=opencode | openrouter | ollama -> OpenAICompatProvider on the
+- DRS_PROVIDER=bridge -> LuckyDBridgeProvider on the AI assistant's connected
+  provider — the bridge-resolved chain: keyless locals → Cline gateways →
+  keyed clouds (9.8 default after the OpenCode Zen retirement).
+  DRS_PROVIDER=cline | clinepass | cline-usage pins the Cline gateways.
+- DRS_PROVIDER=openrouter | ollama -> OpenAICompatProvider on the
   verified-free pool for that backend (best free models, live-probed).
 - DRS_PROVIDER=mock -> MockProvider.
 - auto (default): Gemini native grounding only when the LuckyD stack resolves
-  to provider=google with a key; otherwise the verified-free OpenCode Zen
-  pool (nemotron-3-ultra-free, no per-token cost), then OpenRouter :free,
-  then local Ollama, then LuckyD multi-provider, then mock.
+  to provider=google with a key; otherwise the AI assistant's providers via
+  the bridge, then OpenRouter :free, then local Ollama, then LuckyD
+  multi-provider, then mock.
 """
 
 from __future__ import annotations
@@ -23,40 +27,34 @@ from .luckyd import LuckyDProvider
 from .mock import MockProvider
 from .openai_compat import OpenAICompatProvider
 
-_FREE_BACKENDS = ("opencode", "openrouter", "ollama")
+_FREE_BACKENDS = ("openrouter", "ollama")
 
-
-def _has_opencode_key() -> bool:
-    if (os.getenv("OPENCODE_API_KEY", "") or "").strip():
-        return True
-    # OPENAI_* pointing at the Zen gateway counts, but ONLY with a real key.
-    # (Previous code returned True on default_base alone, so frozen builds with
-    # no keys picked a broken opencode backend with an empty key -> 401.)
-    if (os.getenv("OPENAI_API_KEY", "") or "").strip():
-        base = (os.getenv("OPENAI_BASE_URL", "") or "").strip()
-        if "opencode.ai" in base:
-            return True
-        try:
-            from core.providers import resolve_provider_config
-
-            cfg = resolve_provider_config("openai")
-            if cfg.get("api_key") and "opencode.ai" in str(cfg.get("base_url", "")):
-                return True
-        except Exception:
-            pass
-    try:
-        from core.providers import resolve_provider_config
-
-        cfg = resolve_provider_config("opencode")
-        if cfg.get("api_key") and "opencode.ai" in str(cfg.get("base_url", "")):
-            return True
-    except Exception:
-        pass
-    return False
+# Assistant-side providers the bridge handoff can pin (9.8: Cline gateways
+# replaced the retired OpenCode Zen gateway).
+_BRIDGE_PROVIDERS = ("bridge", "cline", "clinepass", "cline-usage")
 
 
 def _has_openrouter_key() -> bool:
     return bool((os.getenv("OPENROUTER_API_KEY", "") or "").strip())
+
+
+def _has_bridge_provider() -> bool:
+    """True when the AI assistant has any usable provider registered.
+
+    The bridge owns the 9.8 chain (keyless locals → Cline gateways → keyed
+    clouds); deep research rides on it instead of probing gateways itself.
+    """
+    try:
+        from browser.browser_core.ai_bridge import AIBridge as _Bridge1
+
+        return bool(_Bridge1().providers())
+    except Exception:
+        try:
+            from browser_core.ai_bridge import AIBridge as _Bridge2
+
+            return bool(_Bridge2().providers())
+        except Exception:
+            return False
 
 
 def _has_ollama() -> bool:
@@ -89,10 +87,13 @@ def _auto_llm() -> LLMProvider:
                 return GeminiProvider()
         except Exception:
             return GeminiProvider()
-    # Verified-free pools first (no per-token cost).
-    if _has_opencode_key():
+    # The AI assistant's connected providers (bridge-resolved chain:
+    # keyless locals → Cline gateways → keyed clouds) — free $0 tiers first.
+    if _has_bridge_provider():
         try:
-            return OpenAICompatProvider(backend="opencode")
+            from .luckyd_bridge import LuckyDBridgeProvider
+
+            return LuckyDBridgeProvider()
         except Exception:
             pass
     if _has_openrouter_key():
@@ -129,6 +130,11 @@ def get_llm(dry_run: bool = False, provider: str | None = None) -> LLMProvider:
         return GeminiProvider()
     if name == "luckyd":
         return LuckyDProvider()
+    if name in _BRIDGE_PROVIDERS:
+        from .luckyd_bridge import LuckyDBridgeProvider
+
+        # "bridge" -> assistant default; the Cline aliases pin that gateway.
+        return LuckyDBridgeProvider(None if name == "bridge" else name)
     if name in _FREE_BACKENDS or name in ("local", "ollama-local"):
         backend = "ollama" if name in ("local", "ollama-local") else name
         return OpenAICompatProvider(backend=backend)

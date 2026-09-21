@@ -30,7 +30,6 @@ VALID_PROVIDERS = {
     "zai",
     "groq",
     "openrouter",
-    "opencode",
     "clinepass",
     "cline-usage",
     "cline",
@@ -47,7 +46,6 @@ PROVIDER_NAMES = {
     "zai": "Z.ai (GLM)",
     "groq": "Groq",
     "openrouter": "OpenRouter",
-    "opencode": "OpenCode Zen",
     "clinepass": "ClinePass",
     "cline-usage": "Cline (usage)",
     "cline": "Cline (usage)",
@@ -118,16 +116,6 @@ PROVIDER_DEFAULTS: dict[str, ProviderDefaults] = {
         "default_base": "https://openrouter.ai/api/v1",
         "default_model": "deepseek/deepseek-chat-v3.1",
     },
-    # OpenCode Zen (opencode.ai gateway) — every model on it is $0/free.
-    # Catalog: opencode's open registry (models.dev), 2026-08; live-probed
-    # 2026-09-06: nemotron-3-ultra-free is the verified flagship (JSON + free).
-    "opencode": {
-        "env_key": "OPENCODE_API_KEY",
-        "env_base": "OPENCODE_BASE_URL",
-        "env_model": "OPENCODE_MODEL",
-        "default_base": "https://opencode.ai/zen/v1",
-        "default_model": "nemotron-3-ultra-free",
-    },
     # ClinePass (Cline flat-subscription gateway) — OpenAI-compatible.
     # Key comes from CLINEPASS_API_KEY, else the logged-in Cline CLI session.
     "clinepass": {
@@ -185,13 +173,68 @@ class LLMConfig:
 
 # ── Detection logic ───────────────────────────────────────────────────
 
+#: Cached Cline CLI session token ("" = probed and absent, None = not probed).
+_CLINE_SESSION_TOKEN: str | None = None
+
+
+def cline_session_token() -> str:
+    """Return a live Cline CLI session token, or "" when there is none.
+
+    The Cline CLI stores its WorkOS session under ``~/.cline``; the browser and
+    the CLI both reuse it so Cline (flat subscription *or* usage-billed free
+    models) works with no API key. Probed once per process — it touches disk and
+    may refresh a token over the network, so callers must not hammer it.
+
+    9.8: this is the auth path that made Cline a drop-in replacement for the
+    retired OpenCode Zen gateway.
+    """
+    global _CLINE_SESSION_TOKEN
+    if _CLINE_SESSION_TOKEN is not None:
+        return _CLINE_SESSION_TOKEN
+    try:
+        import sys
+        from pathlib import Path
+
+        # cline_session is bundled into the exe (hidden import) or, in the
+        # source tree, lives under browser/browser_core/.
+        try:
+            import cline_session
+        except ImportError:
+            bc = str(Path(__file__).resolve().parent.parent / "browser" / "browser_core")
+            if bc not in sys.path:
+                sys.path.insert(0, bc)
+            import cline_session
+
+        token = (cline_session.fresh_token() or "").strip()
+    except Exception:
+        token = ""
+    _CLINE_SESSION_TOKEN = token
+    return token
+
+
+def reset_cline_session_cache() -> None:
+    """Clear the cached Cline session token (tests call this in fixtures)."""
+    global _CLINE_SESSION_TOKEN
+    _CLINE_SESSION_TOKEN = None
+
 
 def detect_provider() -> str | None:
     """Auto-detect which provider to use based on environment variables.
-    Returns provider name or None if DeepSeek (fallback) should be used."""
+    Returns provider name or None if DeepSeek (fallback) should be used.
+
+    9.8: a logged-in Cline CLI session is detected FIRST and returns
+    ``cline-usage`` — Cline's usage-billed gateway carries free agent models and
+    its auth comes from the on-disk session, so it is the free default that
+    replaced the retired OpenCode Zen gateway (both for the CLI and for HQ,
+    which resolves its provider through this function).
+    """
     explicit = os.environ.get("CODING_AGENT_PROVIDER", "").lower().strip()
     if explicit in VALID_PROVIDERS:
         return explicit
+
+    # Free-first: reuse the logged-in Cline CLI session when there is one.
+    if cline_session_token():
+        return "cline-usage"
 
     # Check env vars in priority order
     checks = [
@@ -201,7 +244,6 @@ def detect_provider() -> str | None:
         ("anthropic", "ANTHROPIC_API_KEY"),
         ("google", "GOOGLE_API_KEY"),
         ("zai", "ZAI_API_KEY"),
-        ("opencode", "OPENCODE_API_KEY"),
         ("openrouter", "OPENROUTER_API_KEY"),
         ("minimax", "MINIMAX_API_KEY"),
         ("ollama", "OLLAMA_MODEL"),
@@ -262,6 +304,16 @@ def resolve_provider_config(provider: str | None = None) -> dict[str, object]:
     """
     mirror_model: str | None = None
     explicit = os.environ.get("CODING_AGENT_PROVIDER", "").lower().strip()
+    # 9.8 migration: OpenCode Zen was retired (gateway blocked / keyless tier
+    # gone). An old .env that still says "opencode" must not silently fall
+    # through to a paid cloud — route it to Cline with a plain explanation.
+    if explicit == "opencode":
+        print(
+            "\n  [PROVIDER] OpenCode Zen was retired in 9.8 (gateway blocked). "
+            "Switching this session to Cline — use `cline auth` for free models, "
+            "or set CODING_AGENT_PROVIDER in .env."
+        )
+        explicit = "cline-usage"
 
     if not provider:
         if explicit in VALID_PROVIDERS:
@@ -416,7 +468,6 @@ def detect_api_format(provider: str) -> str:
         "zai": "openai",  # Z.ai GLM uses OpenAI-compatible endpoint
         "groq": "openai",  # Groq uses OpenAI-compatible
         "openrouter": "openai",  # OpenRouter uses OpenAI-compatible
-        "opencode": "openai",  # OpenCode Zen is OpenAI-compatible
         "clinepass": "openai",  # ClinePass gateway is OpenAI-compatible
         "cline-usage": "openai",  # same gateway, usage-billed model ids
         "cline": "openai",  # alias of cline-usage
@@ -427,21 +478,65 @@ def detect_api_format(provider: str) -> str:
 
 # ── Provider listing ────────────────────────────────────────────────
 
-# Providers with a usable $0 tier: local servers, the OpenCode Zen / OpenRouter
-# free catalogs, Groq's free tier, and the Cline gateways (flat subscription
-# or usage-billed free models). Everything else bills per token.
+
+def provider_key_from_label(label: str) -> str:
+    """Map a human catalog group label to its provider id.
+
+    Shared by ``ui.show_models()``, the ``/model`` picker and the
+    ``luckyd-code model`` subcommand so a label like
+    ``"Cline Usage (free tier) ✓"`` always resolves to the same provider key.
+
+    Unknown labels fall back to the first word, then to ``cline-usage`` (the
+    free default) — never to a retired provider.
+    """
+    low = (label or "").lower()
+    if not low.split():
+        return "cline-usage"
+    if "clinepass" in low.replace("-", "").replace(" ", ""):
+        return "clinepass"
+    if "cline" in low:
+        return "cline-usage" if "usage" in low else "clinepass"
+    if "openrouter" in low:
+        return "openrouter"
+    if "ollama" in low:
+        return "ollama"
+    if "openai" in low:
+        return "openai"
+    if "anthropic" in low or "claude" in low:
+        return "anthropic"
+    if "z.ai" in low or low.strip().startswith("zai"):
+        return "zai"
+    if "groq" in low:
+        return "groq"
+    if "google" in low or "gemini" in low or "gemma" in low:
+        return "google"
+    if "deepseek" in low:
+        return "deepseek"
+    if "minimax" in low:
+        return "minimax"
+    return label.split()[0].lower()
+
+
+# Providers with a usable $0 tier: local servers, the OpenRouter free catalog,
+# Groq's free tier, and the Cline gateways (flat subscription or usage-billed
+# free models). Everything else bills per token.
+#
+# NOTE (9.8): OpenCode Zen was retired from LuckyD. Its keyless $0 tier died in
+# 2026-09 (every keyless call 401s) and the gateway now blocks the accounts this
+# project used, so it is no longer offered as a provider or an Agent Mesh peer.
+# Cline (usage-billed free models + the logged-in CLI session) takes its place
+# as the default free agent brain — see resolve_provider_config().
 FREE_TIER_PROVIDERS = frozenset(
-    {"opencode", "openrouter", "ollama", "groq", "clinepass", "cline-usage", "cline"}
+    {"openrouter", "ollama", "groq", "clinepass", "cline-usage", "cline"}
 )
 
 # Stable display order for the provider list (local first, then free, then paid).
 PROVIDER_ORDER = (
     "ollama",
-    "opencode",
-    "openrouter",
     "clinepass",
     "cline-usage",
     "cline",
+    "openrouter",
     "groq",
     "deepseek",
     "zai",
@@ -465,9 +560,9 @@ def list_providers() -> list[dict[str, object]]:
     """
     explicit = os.environ.get("CODING_AGENT_PROVIDER", "").lower().strip()
     current = explicit if explicit in VALID_PROVIDERS else detect_provider() or "deepseek"
+    cline_ok = bool(cline_session_token())
 
     providers: list[dict[str, object]] = []
-    _cline_session_ok: bool | None = None
     for pid in PROVIDER_ORDER:
         defaults = PROVIDER_DEFAULTS.get(pid)
         if defaults is None:
@@ -480,25 +575,7 @@ def list_providers() -> list[dict[str, object]]:
             # Auth may come from the logged-in Cline CLI session instead of a key.
             key_present = bool((os.environ.get(env_key or "", "") or "").strip())
             if not key_present:
-                if _cline_session_ok is None:
-                    try:
-                        import sys
-                        from pathlib import Path
-
-                        try:
-                            import cline_session
-                        except ImportError:
-                            bc = str(
-                                Path(__file__).resolve().parent.parent / "browser" / "browser_core"
-                            )
-                            if bc not in sys.path:
-                                sys.path.insert(0, bc)
-                            import cline_session
-
-                        _cline_session_ok = bool((cline_session.fresh_token() or "").strip())
-                    except Exception:
-                        _cline_session_ok = False
-                key_present = _cline_session_ok
+                key_present = cline_ok
             configured = key_present
         elif local:
             configured = True

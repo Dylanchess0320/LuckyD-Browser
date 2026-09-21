@@ -5,6 +5,57 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [9.8.0] - 2026-09-21
+
+OpenCode Zen retired, Cline is the free default — plus goals, plugins,
+custom providers, ACP, MiniMax CLIs, bridge deep research, and a
+Google-CAPTCHA-proof browser. Shipped as `LuckyDBrowserSetup-9.8.0.exe`.
+
+### Added
+- **Goals with token budgets** — `/goal <text>`, `/goal budget=50K|2M|clear`,
+  `/goal pause|resume|edit|clear|status` (`core/goals.py`); the active
+  objective persists across `--continue`/`/resume` and is servable over ACP.
+- **Mid-run steering + follow-up queue** — `/steer <guidance>` injects guidance
+  into the current response, `/btw <text>` queues the next turn
+  (`core/agent_loop.py`, `core/slash_commands.py`).
+- **Plugin management** — `lucky-code plugin list --available`, `add`,
+  `enable|disable`, `remove` for local (`~/.luckyd-code/plugins`) + official
+  (`kit/skills`) catalogs (`core/plugins.py`).
+- **User-defined providers** — `lucky-code custom-provider add|list|remove|test|use`
+  for any OpenAI-compatible gateway (`core/custom_providers.py`).
+- **ACP stdio server** — `lucky-code --acp` speaks JSON-RPC (`initialize`,
+  `prompt`, `goal`, `steer`, `ping`, `shutdown`) for editor extensions
+  (`acp_server.py`, bundled in all three frozen builds).
+- **MiniMax Code + media CLIs** — `mcode`/`mmx` agent tools
+  (`tools/minimax_cli.py`, auto-registered), `mesh-mcode`/`mesh-mmx` dock
+  shells replacing the retired `mesh-opencode`.
+- **Deep research on the assistant's providers** — `DRS_PROVIDER=bridge|cline|…`
+  rides `AIBridge` (locals → Cline gateways → keyed clouds) via
+  `features/deep_research/models/luckyd_bridge.py`; OpenRouter `:free` is the
+  compat-pool default after the Zen backend removal.
+- **Google-CAPTCHA-proof browsing** — DDG default search, adblock allowlist for
+  `google.com/sorry/*` + `consent.google.com`, desktop UA + language hardening
+  (`tests/test_98_google_captcha.py`).
+
+### Changed
+- **OpenCode Zen retired** — the keyless `$0` tier died and the gateway blocks
+  these accounts, so `opencode` is gone from providers, catalogs, the mesh,
+  and docs; `CODING_AGENT_PROVIDER=opencode` migrates to `cline-usage` with a
+  notice, and `default_provider` is `cline-usage` when authed.
+- **Cline session-first detection** — a logged-in Cline CLI session makes
+  `cline-usage` the free default for the CLI, HQ, and research.
+- **Version unification to 9.8.0** — pyproject, browser `__version__`, Inno
+  Setup script, version_info, AI bridge User-Agent, docs, and version-pinned
+  tests.
+
+### Fixed
+- **Stale Zen tests migrated** — `test_ai_bridge_fallback`, `test_cov_ai_bridge`,
+  `test_night1_ai_bridge`, `test_cov_providers` now assert the Cline-first
+  9.8 behavior; new `tests/test_98_cli.py` covers goals/plugins/providers/ACP/mmx.
+- **Frozen-build wiring** — `acp_server`, `core.goals`, `core.plugins`,
+  `core.custom_providers`, `tools.minimax_cli`, `luckyd_bridge` added to all
+  three PyInstaller specs; `mcode` fallback probing in the mesh.
+
 ## [9.7.0] - 2026-09-21
 
 LuckyD Code CLI becomes the flagship terminal agent: best-of-minimax-code

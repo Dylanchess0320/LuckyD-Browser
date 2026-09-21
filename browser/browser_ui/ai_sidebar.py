@@ -531,10 +531,10 @@ class AiSidebar(QDockWidget):
             # NOTE: keep this in a separate name — `providers` above is the
             # joined display string used in the greeting HTML below.
             available = getattr(self.bridge, "providers", lambda: [])()
-            if "opencode" in available:
+            if "cline-usage" in available or "clinepass" in available:
                 free_pool: list[str] = getattr(self.bridge, "free_top_models", lambda: [])()
                 if free_pool:
-                    free_hint = f"Zen top models (auto-rotating): {', '.join(free_pool[:3])}…"
+                    free_hint = f"Cline top models (auto-rotating): {', '.join(free_pool[:3])}…"
         except Exception:
             pass
         self._blocks = [
@@ -722,7 +722,6 @@ class AiSidebar(QDockWidget):
         labels = {
             "clinepass": "Cline Pass",
             "cline-usage": "Cline Credits",
-            "opencode": "OpenCode Zen",
             "ollama": "Ollama",
             "lmstudio": "LM Studio",
             "google": "Google Gemini",

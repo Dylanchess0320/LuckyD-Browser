@@ -281,7 +281,7 @@ let shortcuts = JSON.parse(localStorage.getItem('ld_shortcuts') || 'null') || DE
 // One-time cleanup: drop the retired FMHY tile from saved shortcuts.
 shortcuts = shortcuts.filter(([n, u]) => !/fmhy/i.test(n + u));
 localStorage.setItem('ld_shortcuts', JSON.stringify(shortcuts));
-document.getElementById('engine').value = localStorage.getItem('ld_engine') || 'google';
+document.getElementById('engine').value = localStorage.getItem('ld_engine') || 'ddg';
 
 function tick() {
   const now = new Date();
@@ -338,7 +338,7 @@ function setPill(id, cls, text) {
 }
 // Provider ids are internals — the dashboard speaks product names.
 const PROVIDER_NAMES = {
-  ollama: 'Ollama', lmstudio: 'LM Studio', opencode: 'OpenCode Zen',
+  ollama: 'Ollama', lmstudio: 'LM Studio',
   openrouter: 'OpenRouter', clinepass: 'Cline Pass', 'cline-usage': 'Cline Credits',
   google: 'Gemini', groq: 'Groq', zai: 'Z.ai', deepseek: 'DeepSeek',
   openai: 'OpenAI', anthropic: 'Anthropic', cline: 'Cline',

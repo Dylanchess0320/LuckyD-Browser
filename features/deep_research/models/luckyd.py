@@ -1,7 +1,7 @@
 """LuckyD multi-provider LLM backend for Deep Research.
 
 Wraps any LuckyD-configured provider (Ollama local free, DeepSeek, OpenAI,
-OpenRouter, OpenCode Zen, Gemini via OpenAI-compat, ...) using synchronous
+OpenRouter, Gemini via OpenAI-compat, ...) using synchronous
 OpenAI-compatible ``/chat/completions`` calls.
 
 - :meth:`text` — plain chat completion.

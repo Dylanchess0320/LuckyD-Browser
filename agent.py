@@ -35,6 +35,7 @@ import tools.harness_tool
 import tools.lsp_tools
 import tools.mcp_tools
 import tools.memory_tools
+import tools.minimax_cli
 import tools.plan_tools
 import tools.schedule_tools
 import tools.session_tools

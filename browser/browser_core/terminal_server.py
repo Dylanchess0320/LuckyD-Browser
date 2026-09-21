@@ -307,6 +307,9 @@ def _agent2_command(cli2_path: str = "") -> list[str]:
 # models in CLI/IDE.
 # NOTE: Gemini CLI (mesh-gemini/gemini) was dropped from the mesh in favor of
 # Antigravity (agy) for the plan/build stages (see ~/agent-mesh, v1.0.1).
+# 9.8: OpenCode (mesh-opencode/opencode) was retired with the Zen gateway —
+# MiniMax Code CLI (mesh-mcode/mcode) + media CLI (mesh-mmx/mmx) take its
+# dock slot (npm i -g @minimax-code/cli / @minimax/mmi).
 SHELLS = (
     "agent",
     "agent2",
@@ -318,7 +321,8 @@ SHELLS = (
     "mesh-codex",
     "mesh-copilot",
     "mesh-qwen",
-    "mesh-opencode",
+    "mesh-mcode",
+    "mesh-mmx",
     "mesh-cline",
     "cline",
     "mesh-openclaw",
@@ -330,6 +334,8 @@ SHELLS = (
     "antigravity",
     "grok",
     "muse",
+    "mcode",
+    "mmx",
 )
 
 # Agent Mesh shells: shell name -> executable resolved on PATH.
@@ -342,7 +348,10 @@ MESH_SHELLS = {
     "mesh-codex": "codex",
     "mesh-copilot": "copilot",
     "mesh-qwen": "qwen",
-    "mesh-opencode": "opencode",
+    "mesh-mcode": "mcode",
+    "mcode": "mcode",
+    "mesh-mmx": "mmx",
+    "mmx": "mmx",
     "mesh-cline": "cline",
     "cline": "cline",
     "mesh-openclaw": "openclaw",
@@ -421,6 +430,20 @@ def _find_mesh_exe(exe_name: str) -> str | None:
         ):
             if cand.is_file():
                 return str(cand)
+    if exe_name == "mcode":
+        # MiniMax Code CLI: npm i -g @minimax-code/cli. Probe the
+        # %USERPROFILE%/.minimax-code fallback like tools/minimax_cli.
+        for cand in (
+            Path.home() / ".minimax-code" / ("mcode.cmd" if os.name == "nt" else "mcode"),
+            Path(os.environ.get("USERPROFILE", "").strip() or str(Path.home()))
+            / ".minimax-code"
+            / ("mcode.cmd" if os.name == "nt" else "mcode"),
+        ):
+            try:
+                if cand.is_file():
+                    return str(cand)
+            except OSError:
+                pass
     return None
 
 
@@ -576,11 +599,11 @@ def _spawn_pty(
     if shell == "agent":
         env["LUCKYD_AGENT_SLOT"] = "1"
         env["LUCKYD_AGENT_NAME"] = "Agent 1"
-        env["LUCKYD_AGENT_VERSION"] = "v9.7.0"
+        env["LUCKYD_AGENT_VERSION"] = "v9.8.0"
     elif shell == "agent2":
         env["LUCKYD_AGENT_SLOT"] = "2"
         env["LUCKYD_AGENT_NAME"] = "Agent 2"
-        env["LUCKYD_AGENT_VERSION"] = "v9.7.0"
+        env["LUCKYD_AGENT_VERSION"] = "v9.8.0"
     # pywinpty's PTY.spawn() expects the environment as a NUL-joined block
     # string ("name=value\0name=value\0…"), NOT a dict — passing a dict
     # raises cffi's "argument env: 'dict' object is not an instance of str",

@@ -53,7 +53,6 @@ _PROVIDER_DISPLAY_NAMES = {
     "zai": "Z.ai",
     "groq": "Groq",
     "openrouter": "OpenRouter",
-    "opencode": "OpenCode Zen",
     "clinepass": "ClinePass",
     "cline-usage": "Cline (usage)",
     "cline": "Cline (usage)",
@@ -118,47 +117,19 @@ _CLINE_USAGE_FREE_TIER = frozenset(_CLINE_USAGE_CATALOG[:12])
 # flat-subscription quota.
 _CLINEPASS_FREE_TIER = frozenset()
 
-# OpenCode Zen (opencode.ai) free catalog — every model on this gateway is
-# $0. Mirror of browser/browser_core/ai_bridge.py's _OPENCODE_FREE_CATALOG —
-# keep the two in sync.
-_OPENCODE_FREE_CATALOG = [
-    "big-pickle",
-    "deepseek-v4-flash-free",
-    "glm-4.7-free",
-    "glm-5-free",
-    "grok-code",
-    "hy3-free",
-    "hy3-preview-free",
-    "kimi-k2.5-free",
-    "laguna-s-2.1-free",
-    "ling-2.6-flash-free",
-    "ling-3.0-flash-free",
-    "ling-3.0-tiny-free",
-    "longcat-2.0-free",
-    "mimo-v2-flash-free",
-    "mimo-v2-omni-free",
-    "mimo-v2-pro-free",
-    "mimo-v2.5-free",
-    "minimax-m2.1-free",
-    "minimax-m2.5-free",
-    "minimax-m3-free",
-    # NOTE: the gateway's "muse-spark-*-contributor-*" ids are contributor-tier
-    # (prompts may be used for training) and are filtered out below unless the
-    # user explicitly opted in — never a silent default.
-    "nemotron-3-ultra-free",
-    "nemotron-3.5-lightning-free",
-    "north-mini-code-free",
-    "qwen3.6-plus-free",
-    "ring-2.6-1t-free",
-    "trinity-large-preview-free",
-    "x-preview-f-free",
-]
+# OpenCode Zen was RETIRED in 9.8 — its keyless $0 tier died in 2026-09 and the
+# gateway now blocks these accounts, so nothing in LuckyD offers it any more
+# (provider, catalog entry, or Agent Mesh peer). Cline's usage-billed free tier
+# + the logged-in Cline CLI session is the free default that replaced it.
+# Keep the Cline catalogs below in sync with browser/browser_core/ai_bridge.py.
 
 # Aliases accepted in "/model <provider> <name>" on top of canonical names.
 _PROVIDER_ALIASES = {
     "cline-pass": "clinepass",
     "cline": "cline-usage",
     "gemini": "google",
+    # 9.8 migration: a stale alias still routes to Cline instead of erroring.
+    "opencode": "cline-usage",
 }
 
 
@@ -203,7 +174,7 @@ def _is_free_provider_available(pid: str, pinfo: dict) -> bool:
     env_key = pinfo.get("env_key")
     if not env_key:
         return False
-    # For OpenCode/OpenRouter/etc, check if API key is set in current env
+    # For OpenRouter/Cline/etc, check if API key is set in current env
     # or if .env has it (via config.load_env which already ran)
     return bool(os.environ.get(env_key, "").strip())
 
@@ -225,11 +196,9 @@ def model_catalog(free_only: bool = False) -> list[dict]:
 
     # Build free groups from providers_config.json (single source of truth for $0 models)
     free_providers = _load_free_providers()
-    # "openai" entry duplicates the opencode gateway list verbatim — prefer
-    # the canonical "opencode" name so the catalog says "OpenCode Zen", not
-    # "OpenAI-compatible / OpenCode Zen".
-    if "openai" in free_providers and "opencode" in free_providers:
-        free_providers = {k: v for k, v in free_providers.items() if k != "openai"}
+    # 9.8: the retired OpenCode Zen entries (and its "openai" mirror) are never
+    # listed — dropping them here keeps a stale config from resurrecting Zen.
+    free_providers = {k: v for k, v in free_providers.items() if k.lower() not in ("opencode",)}
     free_groups: list[dict] = []
     if free_providers:
         # Sort: available providers first, then alphabetically
@@ -246,9 +215,9 @@ def model_catalog(free_only: bool = False) -> list[dict]:
             # Only include free tier that is marked free_tier=true
             if not pinfo.get("free_tier"):
                 continue
-            # Deduplicate: "openai" entry in providers_config.json duplicates
-            # the opencode gateway list verbatim — skip the alias to avoid
-            # showing the same 28 models twice in the catalog.
+            # Deduplicate across providers — the Cline aliases (clinepass /
+            # cline-usage) share one gateway, so the same model id must not be
+            # listed twice.
             deduped = [m for m in models if m.lower() not in seen_models]
             # If >80% would be duplicates, this provider is an alias — skip it
             if pid == "openai" and len(deduped) < len(models) * 0.2:
@@ -276,20 +245,18 @@ def model_catalog(free_only: bool = False) -> list[dict]:
                 {
                     "provider": label,
                     "models": deduped,
-                    "provider_key": pid if pid != "openai" else "opencode",
+                    "provider_key": pid,
                 }
             )
         # Fallback to hardcoded if config gave no groups (should not happen)
         if not free_groups:
             free_groups = [
                 {"provider": "Ollama ✓", "models": ["codellama", "llama3.1", "mistral", "phi3"]},
-                {"provider": "OpenCode Zen (free) ✓", "models": list(_OPENCODE_FREE_CATALOG)},
-                {"provider": "Cline Usage (free tier)", "models": cline_free},
+                {"provider": "Cline Usage (free tier) ✓", "models": cline_free},
             ]
     else:
         free_groups = [
             {"provider": "Ollama", "models": ["codellama", "llama3.1", "mistral", "phi3"]},
-            {"provider": "OpenCode Zen (free)", "models": list(_OPENCODE_FREE_CATALOG)},
             {"provider": "Cline Usage (free tier)", "models": cline_free},
         ]
 
@@ -345,11 +312,11 @@ def model_catalog(free_only: bool = False) -> list[dict]:
                     ],
                 },
                 {
-                    "provider": "OpenCode Zen (Muse Spark)",
+                    "provider": "Cline Usage (Muse Spark)",
                     "models": (
                         ["muse-spark-1.3"] + (_CONTRIBUTOR_MODELS if _contributor_on() else [])
                     ),
-                    "provider_key": "opencode",
+                    "provider_key": "cline-usage",
                 },
                 {"provider": "ClinePass (subscription)", "models": clinepass_paid},
                 {"provider": "Cline Usage (credit-billed)", "models": cline_paid},
@@ -399,11 +366,11 @@ def _match_cline_model(desired: str) -> tuple[str, str] | None:
     print("  Pick from /model (no args), or force any model with:")
     print("    /model <provider> <name>   e.g. /model cline-usage openai/gpt-4o")
     print("  Providers: openai, anthropic, google, ollama, deepseek, zai,")
-    print("             openrouter, opencode, clinepass (subscription), cline-usage (free/credits)")
+    print("             openrouter, clinepass (subscription), cline-usage (free/credits)")
     return None
 
 
-# ── Free-model fuzzy matching (opencode-style) ─────────────────────────
+# ── Free-model fuzzy matching (Cline-style picker) ─────────────────────
 
 
 def _free_entries() -> list[tuple[str, str]]:
@@ -415,31 +382,26 @@ def _free_entries() -> list[tuple[str, str]]:
     """
     seen: set[str] = set()
     entries: list[tuple[str, str]] = []
-    # 1) providers_config.json (opencode, openrouter, groq, zai, ollama…)
+    # 1) providers_config.json (clinepass, cline-usage, openrouter, groq, zai,
+    #    ollama… — OpenCode Zen is gone as of 9.8 and filtered out here too)
     try:
         free_providers = _load_free_providers()
         for pid, pinfo in free_providers.items():
+            if pid.lower() == "opencode":
+                continue
             if not pinfo.get("free_tier"):
                 continue
             models = pinfo.get("free_models", [])
-            # "openai" entry duplicates opencode gateway models — fold into opencode
-            provider = "opencode" if pid == "openai" else pid
-            # Only map known valid providers; groq is now valid, others skip unknown
             for mid in models:
                 key = mid.lower()
                 if key in seen:
                     continue
                 seen.add(key)
-                entries.append((provider, str(mid)))
+                entries.append((pid, str(mid)))
     except Exception:
         pass
-    # 2) Fallback if config missing — hardcoded opencode catalog
-    if not entries:
-        for mid in _OPENCODE_FREE_CATALOG:
-            if mid.lower() not in seen:
-                seen.add(mid.lower())
-                entries.append(("opencode", mid))
-    # 3) Cline Usage free tier (same gateway as ClinePass but $0)
+    # 2) Cline Usage free tier (same gateway as ClinePass but $0) — also the
+    #    fallback catalog when providers_config.json is missing/corrupt.
     for mid in _CLINE_USAGE_CATALOG:
         if mid in _CLINE_USAGE_FREE_TIER and mid.lower() not in seen:
             seen.add(mid.lower())
@@ -473,7 +435,7 @@ def _fuzzy_score(query: str, model_id: str, provider: str) -> float:
         return 96.0
     if q == _norm_model(provider + " " + model_id):
         return 100.0
-    # Provider-qualified exact like "opencode nemotron" -> boost
+    # Provider-qualified exact like "cline kimi" -> boost
     if q.startswith(prov + " "):
         rest = q[len(prov) :].strip()
         if rest and rest in norm:
@@ -642,7 +604,6 @@ def _resolve_provider(provider_hint: str | None, model_name: str) -> dict:
         "zai": ("ZAI_API_KEY", "ZAI_BASE_URL", "ZAI_MODEL"),
         "groq": ("GROQ_API_KEY", "GROQ_BASE_URL", "GROQ_MODEL"),
         "openrouter": ("OPENROUTER_API_KEY", "OPENROUTER_BASE_URL", "OPENROUTER_MODEL"),
-        "opencode": ("OPENCODE_API_KEY", "OPENCODE_BASE_URL", "OPENCODE_MODEL"),
         "clinepass": ("CLINEPASS_API_KEY", "CLINEPASS_BASE_URL", "CLINEPASS_MODEL"),
         # Same gateway + auth as ClinePass; only the model env var differs.
         "cline-usage": ("CLINEPASS_API_KEY", "CLINEPASS_BASE_URL", "CLINE_USAGE_MODEL"),
@@ -677,13 +638,11 @@ def _resolve_provider(provider_hint: str | None, model_name: str) -> dict:
         _base_defaults = {
             "clinepass": "https://api.cline.bot/api/v1",
             "cline-usage": "https://api.cline.bot/api/v1",
-            "opencode": "https://opencode.ai/zen/v1",
         }
         base_url = os.environ.get(env_base, "") or _base_defaults.get(provider_hint, "")
         _model_defaults = {
             "clinepass": "cline-pass/kimi-k3",
             "cline-usage": "deepseek/deepseek-chat",
-            "opencode": "nemotron-3-ultra-free",
         }
         resolved_model = (
             model_name or os.environ.get(env_model, "") or _model_defaults.get(provider_hint, "")
@@ -776,9 +735,9 @@ def _persist_model_selection(provider: str, model: str) -> None:
         "zai": "ZAI_MODEL",
         "groq": "GROQ_MODEL",
         "openrouter": "OPENROUTER_MODEL",
-        "opencode": "OPENCODE_MODEL",
         "clinepass": "CLINEPASS_MODEL",
         "cline-usage": "CLINE_USAGE_MODEL",
+        "minimax": "MINIMAX_MODEL",
     }.get(provider)
     if not env_key or not model:
         return
@@ -898,7 +857,7 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
             ui.error(f"Memory error: {e}")
 
     elif cmd.startswith("model"):
-        # ── Professional free-model browser + fuzzy picker (opencode-style) ──
+        # ── Professional free-model browser + fuzzy picker (Cline-style) ──
         # "/model"              → browse free catalog with numbers + interactive prompt
         # "/model free" / list  → same (explicit)
         # "/model all"          → full catalog (free + paid)
@@ -916,34 +875,15 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
 
         def _flat_for_catalog(free_only: bool) -> dict[int, tuple[str, str]]:
             """Build the same number→(provider,model) map that ui.show_models() uses."""
+            from core.providers import provider_key_from_label
+
             sections = model_catalog(free_only=free_only)
             flat: dict[int, tuple[str, str]] = {}
             idx = 0
             for section in sections or []:
                 for group in section.get("groups", []) or []:
                     label = str(group.get("provider", ""))
-                    # mirror _provider_key logic in ui.show_models
-                    low_label = label.lower()
-                    if "opencode" in low_label:
-                        pkey = "opencode"
-                    elif "openrouter" in low_label:
-                        pkey = "openrouter"
-                    elif "ollama" in low_label:
-                        pkey = "ollama"
-                    elif "openai" in low_label:
-                        pkey = "opencode"
-                    elif "z.ai" in low_label or low_label.strip().startswith("zai"):
-                        pkey = "zai"
-                    elif "groq" in low_label:
-                        pkey = "groq"
-                    elif "google" in low_label or "gemini" in low_label or "gemma" in low_label:
-                        pkey = "google"
-                    elif "cline" in low_label:
-                        pkey = "cline-usage" if "usage" in low_label else "clinepass"
-                    elif "deepseek" in low_label:
-                        pkey = "deepseek"
-                    else:
-                        pkey = label.split()[0].lower() if label else "opencode"
+                    pkey = provider_key_from_label(label)
                     if group.get("provider_key"):
                         pkey = str(group["provider_key"])
                     for m in group.get("models", []) or []:
@@ -987,7 +927,6 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
                     "clinepass",
                     "cline",
                     "openrouter",
-                    "opencode",
                     "groq",
                     "zai",
                     "google",
@@ -1077,7 +1016,7 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
                 )
             return False
 
-        # Provider-prefixed direct switch: "/model opencode nemotron-3-ultra-free"
+        # Provider-prefixed direct switch: "/model cline kimi"
         provider = None
         desired = raw
         for p in (
@@ -1086,7 +1025,6 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
             "clinepass",
             "cline",
             "openrouter",
-            "opencode",
             "groq",
             "anthropic",
             "deepseek",
@@ -1094,6 +1032,7 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
             "google",
             "ollama",
             "zai",
+            "minimax",
         ):
             if low.startswith(p + " "):
                 provider = _PROVIDER_ALIASES.get(p, p)
@@ -1103,8 +1042,8 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
             _switch_model(agent, provider=provider, model_name=desired)
             return False
 
-        # ── Fuzzy free-model resolve (the main opencode-style path) ──
-        # "/model nemotron" / "/model kimi" / "/model qwen" / "/model spark" etc.
+        # ── Fuzzy free-model resolve (the main Cline-style path) ──
+        # "/model kimi" / "/model qwen" / "/model spark" etc.
         hit = _resolve_free_query(raw)
         if hit:
             _switch_model(agent, provider=hit[0], model_name=hit[1])
@@ -1215,7 +1154,7 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
             ui.warn("MCP not configured or no servers connected")
 
     elif cmd == "version":
-        agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v9.7.0")
+        agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v9.8.0")
         agent_name = os.environ.get("LUCKYD_AGENT_NAME", "Agent 1")
         ui.info(f"LuckyD Code {agent_version} ({agent_name})")
 
@@ -1398,17 +1337,17 @@ async def run_repl(agent: CodingAgent):
 def _cli_model(args):
     """luckyd-code model [list | <fuzzy-name> | <number>]
 
-    Professional, opencode-style free-model switcher for the CLI.
+    Professional, Cline-style free-model switcher for the CLI.
 
     - No args:            show current model + hint
     - "list" / "free":    browse free catalog (Panel + Table)
     - "all":              free + paid catalog
     - "<number>":         pick by number from free catalog
     - "<fuzzy>"           fuzzy — e.g. ``nemotron``, ``kimi``, ``qwen``, ``spark``
-    - "<provider> <name>" direct — e.g. ``opencode nemotron-3-ultra-free``
+    - "<provider> <name>" direct — e.g. ``cline-usage kimi``
     """
     from config import ENV_FILE
-    from core.providers import PROVIDER_DEFAULTS
+    from core.providers import PROVIDER_DEFAULTS, provider_key_from_label
 
     def _read_env_pairs() -> dict:
         pairs = {}
@@ -1467,7 +1406,7 @@ def _cli_model(args):
         print(
             "  lucky-code model <name>            — fuzzy (e.g. model nemotron, model kimi, model qwen)"
         )
-        print("  lucky-code model <provider> <name> — direct (e.g. model opencode grok-code)")
+        print("  lucky-code model <provider> <name> — direct (e.g. model cline-usage kimi)")
         print("\nTip: inside the terminal use /model — same fuzzy picker, no restart needed.")
         return
 
@@ -1495,28 +1434,7 @@ def _cli_model(args):
         idx = 0
         for section in sections:
             for group in section.get("groups", []):
-                label = str(group.get("provider", ""))
-                low_label = label.lower()
-                if "opencode" in low_label:
-                    pkey = "opencode"
-                elif "openrouter" in low_label:
-                    pkey = "openrouter"
-                elif "ollama" in low_label:
-                    pkey = "ollama"
-                elif "openai" in low_label:
-                    pkey = "opencode"
-                elif "z.ai" in low_label or low_label.strip().startswith("zai"):
-                    pkey = "zai"
-                elif "groq" in low_label:
-                    pkey = "groq"
-                elif "google" in low_label or "gemini" in low_label or "gemma" in low_label:
-                    pkey = "google"
-                elif "cline" in low_label:
-                    pkey = "cline-usage" if "usage" in low_label else "clinepass"
-                elif "deepseek" in low_label:
-                    pkey = "deepseek"
-                else:
-                    pkey = label.split()[0].lower() if label else "opencode"
+                pkey = provider_key_from_label(str(group.get("provider", "")))
                 if group.get("provider_key"):
                     pkey = str(group["provider_key"])
                 for m in group.get("models", []) or []:
@@ -1538,7 +1456,6 @@ def _cli_model(args):
             "clinepass",
             "cline",
             "openrouter",
-            "opencode",
             "groq",
             "zai",
             "google",
@@ -1546,6 +1463,7 @@ def _cli_model(args):
             "deepseek",
             "openai",
             "anthropic",
+            "minimax",
         ):
             if raw_query.lower().startswith(p + " "):
                 provider = _PROVIDER_ALIASES.get(p, p)
@@ -1555,7 +1473,7 @@ def _cli_model(args):
             # direct — no fuzzy, use exactly what user typed
             pass
         else:
-            # Fuzzy over the free catalog (opencode-style: knows what you want)
+            # Fuzzy over the free catalog (Cline-style: knows what you want)
             hit = _resolve_free_query(raw_query)
             # Fallback to legacy exact Cline match for subscription models
             if hit is None:
@@ -1566,7 +1484,7 @@ def _cli_model(args):
             provider, picked = hit
 
     # ── Persist to .env (generic — works for any provider) ──────────
-    defaults = PROVIDER_DEFAULTS.get(provider, PROVIDER_DEFAULTS.get("opencode"))
+    defaults = PROVIDER_DEFAULTS.get(provider, PROVIDER_DEFAULTS.get("cline-usage"))
     env_model = defaults.get("env_model") if defaults else None
 
     lines = []
@@ -1582,8 +1500,6 @@ def _cli_model(args):
     # Friendly tier label
     if provider == "clinepass":
         tier = "ClinePass subscription"
-    elif provider == "opencode":
-        tier = "OpenCode Zen — free $0"
     elif provider == "openrouter":
         tier = "OpenRouter — free"
     elif provider in ("groq", "zai", "google", "ollama"):
@@ -1685,6 +1601,223 @@ def _cli_schedule(args):
         sys.exit(2)
 
 
+def _cli_plugin(args: list[str]) -> None:
+    """lucky-code plugin <list|add|enable|disable|remove|marketplaces> [...] (9.8)."""
+    from pathlib import Path
+
+    from core.plugins import (
+        add_plugin,
+        disable_plugin,
+        enable_plugin,
+        list_plugins,
+        marketplace_names,
+        remove_plugin,
+    )
+
+    if not args or args[0] in ("-h", "--help", "help"):
+        print(
+            """
+lucky-code plugin — local + official plugin management (9.8)
+
+  plugin list [--available] [--marketplace official|local]
+  plugin marketplace list
+  plugin add <name[@official]>     — install from the official kit/skills catalog
+  plugin enable <name> | disable <name>
+  plugin remove <name>
+"""
+        )
+        return
+    cmd = args[0].lower()
+    rest = args[1:]
+    if cmd == "list":
+        include_available = "--available" in rest
+        market = ""
+        for i, tok in enumerate(rest):
+            if tok == "--marketplace" and i + 1 < len(rest):
+                market = rest[i + 1]
+        try:
+            rows = list_plugins(
+                marketplace=market,
+                include_available=include_available,
+                repo_root=Path(__file__).resolve().parent,
+            )
+        except ValueError as exc:
+            print(f"Error: {exc}")
+            sys.exit(2)
+        if not rows:
+            print("No plugins installed. Try: lucky-code plugin list --available")
+            return
+        for p in rows:
+            state = "enabled" if p.enabled else "disabled"
+            desc = f" — {p.description}" if p.description else ""
+            print(f"  {p.name} [{p.marketplace}/{state}]{desc}")
+        return
+    if cmd == "marketplace" and rest[:1] == ["list"]:
+        for name in marketplace_names():
+            print(f"  {name}")
+        return
+    if cmd == "add" and rest:
+        try:
+            info = add_plugin(rest[0], repo_root=Path(__file__).resolve().parent)
+        except ValueError as exc:
+            print(f"Error: {exc}")
+            sys.exit(2)
+        print(f"Installed plugin '{info.name}' from {info.marketplace}.")
+        return
+    if cmd in ("enable", "disable") and rest:
+        ok = enable_plugin(rest[0]) if cmd == "enable" else disable_plugin(rest[0])
+        if not ok:
+            print(f"Plugin '{rest[0]}' is not installed.")
+            sys.exit(2)
+        print(f"Plugin '{rest[0]}' {cmd}d.")
+        return
+    if cmd == "remove" and rest:
+        if remove_plugin(rest[0]):
+            print(f"Removed plugin '{rest[0]}'.")
+        else:
+            print(f"Plugin '{rest[0]}' is not installed.")
+            sys.exit(2)
+        return
+    print(f"Unknown plugin command: {' '.join(args)} (try: lucky-code plugin --help)")
+    sys.exit(2)
+
+
+def _cli_custom_provider(args: list[str]) -> None:
+    """lucky-code custom-provider <list|add|remove|test|use> [...] (9.8)."""
+    from core.custom_providers import (
+        add_provider,
+        get_provider,
+        remove_provider,
+        test_provider,
+        use_provider_env,
+    )
+    from core.custom_providers import (
+        list_providers as list_custom,
+    )
+
+    if not args or args[0] in ("-h", "--help", "help"):
+        print(
+            """
+lucky-code custom-provider — user-defined OpenAI-compatible providers (9.8)
+
+  custom-provider list
+  custom-provider add --id <id> --base-url <https://...> --api-format <openai-completions|anthropic-messages|openai-responses> --model <id> [--model <id>...] [--api-key-env <VAR>] [--name <label>] [--overwrite]
+  custom-provider remove <id>
+  custom-provider test <id> [--model <id>]
+  custom-provider use <id> [--model <id>]   — persist to .env (CODING_AGENT_PROVIDER/MODEL)
+"""
+        )
+        return
+    cmd = args[0].lower()
+    rest = args[1:]
+    if cmd == "list":
+        rows = list_custom()
+        if not rows:
+            print("No custom providers. Add one with: lucky-code custom-provider add --help")
+            return
+        for p in rows:
+            models = ", ".join(p.models)
+            print(f"  {p.id} — {p.name} [{p.api_format}] {p.base_url} (models: {models})")
+        return
+    if cmd == "add":
+
+        def _flag(name: str) -> list[str]:
+            out: list[str] = []
+            i = 0
+            while i < len(rest):
+                if rest[i] == name and i + 1 < len(rest):
+                    out.append(rest[i + 1])
+                    i += 2
+                else:
+                    i += 1
+            return out
+
+        def _single(name: str) -> str:
+            vals = _flag(name)
+            return vals[-1] if vals else ""
+
+        pid = _single("--id")
+        base = _single("--base-url")
+        fmt = _single("--api-format")
+        models = _flag("--model")
+        key_env = _single("--api-key-env")
+        label = _single("--name")
+        overwrite = "--overwrite" in rest
+        try:
+            info = add_provider(pid, base, fmt, models, key_env, label, overwrite=overwrite)
+        except ValueError as exc:
+            print(f"Error: {exc}")
+            sys.exit(2)
+        print(f"Saved custom provider '{info.id}' ({len(info.models)} model(s)).")
+        return
+    if cmd == "remove" and rest:
+        if remove_provider(rest[0]):
+            print(f"Removed custom provider '{rest[0]}'.")
+        else:
+            print(f"Custom provider '{rest[0]}' not found.")
+            sys.exit(2)
+        return
+    if cmd == "test" and rest:
+        provider = get_provider(rest[0])
+        if provider is None:
+            print(f"Custom provider '{rest[0]}' not found.")
+            sys.exit(2)
+        model = ""
+        if "--model" in rest:
+            idx = rest.index("--model")
+            if idx + 1 < len(rest):
+                model = rest[idx + 1]
+        result = test_provider(provider, model=model)
+        if result["ok"]:
+            found = ", ".join(result["models"][:5])
+            print(f"OK (HTTP {result['status']}){': ' + found if found else ''}")
+        else:
+            print(f"FAILED: {result['error']}")
+            sys.exit(1)
+        return
+    if cmd == "use" and rest:
+        from config import ENV_FILE
+
+        provider = get_provider(rest[0])
+        if provider is None:
+            print(f"Custom provider '{rest[0]}' not found.")
+            sys.exit(2)
+        model = ""
+        if "--model" in rest:
+            idx = rest.index("--model")
+            if idx + 1 < len(rest):
+                model = rest[idx + 1]
+        env = use_provider_env(provider, model)
+        try:
+            lines = (
+                ENV_FILE.read_text(encoding="utf-8-sig").splitlines() if ENV_FILE.exists() else []
+            )
+            pending = dict(env)
+            rewritten: list[str] = []
+            for line in lines:
+                key = (
+                    line.split("=", 1)[0].strip()
+                    if "=" in line and not line.lstrip().startswith("#")
+                    else ""
+                )
+                if key in pending:
+                    rewritten.append(f"{key}={pending.pop(key)}")
+                else:
+                    rewritten.append(line)
+            if pending:
+                if rewritten and rewritten[-1].strip():
+                    rewritten.append("")
+                rewritten.extend(f"{k}={v}" for k, v in sorted(pending.items()))
+            ENV_FILE.write_text("\n".join(rewritten) + "\n", encoding="utf-8")
+        except OSError as exc:
+            print(f"Error saving .env: {exc}")
+            sys.exit(1)
+        print(f"Now using custom provider '{provider.id}' (saved to .env).")
+        return
+    print(f"Unknown custom-provider command: {' '.join(args)} (try --help)")
+    sys.exit(2)
+
+
 def main():
     # Parse CLI args
     args = sys.argv[1:]
@@ -1698,6 +1831,22 @@ def main():
     if args and args[0] in ("providers", "provider"):
         _cli_providers(args[1:])
         return
+
+    # Dispatch "plugin" subcommand early (9.8 — no API key needed)
+    if args and args[0] == "plugin":
+        _cli_plugin(args[1:])
+        return
+
+    # Dispatch "custom-provider" subcommand early (9.8 — no API key needed)
+    if args and args[0] in ("custom-provider", "custom-providers"):
+        _cli_custom_provider(args[1:])
+        return
+
+    # ACP stdio server (9.8 — editor extensions speak JSON-RPC on stdio).
+    if args and args[0] == "--acp":
+        from acp_server import main as _acp_main
+
+        raise SystemExit(_acp_main())
 
     # Dispatch "schedule" subcommand early (6.0 — background agents)
     if args and args[0] == "schedule":
@@ -1774,14 +1923,14 @@ def main():
             if slot == "2":
                 os.environ["LUCKYD_AGENT_SLOT"] = "2"
                 os.environ["LUCKYD_AGENT_NAME"] = "Agent 2"
-                os.environ["LUCKYD_AGENT_VERSION"] = "v9.7.0"
+                os.environ["LUCKYD_AGENT_VERSION"] = "v9.8.0"
             else:
                 os.environ["LUCKYD_AGENT_SLOT"] = "1"
                 os.environ["LUCKYD_AGENT_NAME"] = "Agent 1"
-                os.environ["LUCKYD_AGENT_VERSION"] = "v9.7.0"
+                os.environ["LUCKYD_AGENT_VERSION"] = "v9.8.0"
             i += 2
         elif args[i] in ("-v", "--version"):
-            agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v9.7.0")
+            agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v9.8.0")
             agent_name = os.environ.get("LUCKYD_AGENT_NAME", "")
             label = f"LuckyD Code {agent_version}" + (f" ({agent_name})" if agent_name else "")
             print(label)
@@ -1792,18 +1941,22 @@ def main():
 LuckyD Code — AI Coding Agent
 
 Usage:
-  lucky-code                       Interactive REPL (Agent 1 · v9.7.0)
-  lucky-code --agent 2             Interactive REPL (Agent 2 · v9.7.0)
+  lucky-code                       Interactive REPL (Agent 1 · v9.8.0)
+  lucky-code --agent 2             Interactive REPL (Agent 2 · v9.8.0)
   lucky-code providers           List AI providers — status, cost tier, current
+  lucky-code model <name>        Switch model (fuzzy Cline-style picker)
+  lucky-code plugin list --available   List/install plugins
+  lucky-code custom-provider list      List user-defined providers
+  lucky-code --acp               ACP stdio server (for editor extensions)
   lucky-code "your query"          One-shot mode
   lucky-code -c                    Continue last session
   lucky-code --resume <id>         Resume specific session
 
 Options:
-  --agent 1|2        Select agent slot (1 = v9.7 Nuitka, 2 = v9.7)
+  --agent 1|2        Select agent slot (1 = v9.8 Nuitka, 2 = v9.8)
   --model NAME       Model: auto (default), flash, pro, or specific name
-  --provider NAME    Set provider (see: lucky-code providers): ollama, opencode,
-                     openrouter, clinepass, cline-usage, cline, groq, deepseek,
+  --provider NAME    Set provider (see: lucky-code providers): ollama, clinepass,
+                     cline-usage, openrouter, groq, deepseek,
                      zai, google, gemini, openai, anthropic, minimax
   --permission-mode MODE  Tool permission mode: default, acceptEdits,
                      bypassPermissions, auto (default), off
@@ -1813,9 +1966,14 @@ Options:
   --max-turns N      Override max agent turns (default: 30)
   -c, --continue     Resume most recent session
   --resume <id>      Resume a specific session by ID or prefix
+  --acp              ACP stdio server (JSON-RPC for editors)
   --json             Structured JSON-line output (for extensions)
   -v, --version      Show version
   --help             Show this help
+
+REPL slash commands (9.8): /goal <text> | /goal budget=50K | /goal pause|resume|clear,
+  /steer <guidance> (guide the current response), /btw <text> (queue follow-up),
+  /model, /providers, /contributor, /compact, /review, /init.
 
 Environment:
   <PROVIDER>_API_KEY   Set in .env for your provider

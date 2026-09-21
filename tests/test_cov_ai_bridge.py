@@ -139,9 +139,9 @@ def test_default_provider_cline_usage_when_keyed(hermetic) -> None:
 def test_free_top_models_returns_a_copy(hermetic) -> None:
     bridge = _bridge(hermetic)
     models = bridge.free_top_models()
-    assert models == list(ai_bridge._ZEN_TOP_MODELS)
+    assert models == list(ai_bridge._CLINE_GATEWAY_TOP_MODELS)
     models.append("junk")
-    assert bridge.free_top_models() == list(ai_bridge._ZEN_TOP_MODELS)
+    assert bridge.free_top_models() == list(ai_bridge._CLINE_GATEWAY_TOP_MODELS)
 
 
 # ── fetch_models ─────────────────────────────────────────────────────
@@ -158,12 +158,12 @@ class _FakeGetResp:
         return self._payload
 
 
-def test_fetch_models_zen_live_reorders_top_first(
+def test_fetch_models_cline_usage_live_reorders_top_first(
     hermetic, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Live Zen catalog: top models first (in _ZEN_TOP_MODELS order), extras
-    after, embed models filtered, current model pinned at the head."""
-    hermetic["env"] = {"OPENCODE_API_KEY": "zk-test"}
+    """Live Cline Usage catalog: top models first (in _CLINE_GATEWAY_TOP_MODELS
+    order), extras after, embed models filtered, current model pinned at the head."""
+    hermetic["env"] = {"CLINEPASS_API_KEY": "zk-test"}
     seen: dict = {}
 
     def _get(url, headers=None, timeout=None):
@@ -171,40 +171,42 @@ def test_fetch_models_zen_live_reorders_top_first(
         return _FakeGetResp(
             {
                 "data": [
-                    {"id": "custom-z"},
-                    {"id": "gemini-3.5-flash"},
+                    {"id": "custom-x"},
+                    {"id": "minimax/minimax-m2.5"},
+                    {"id": "deepseek/deepseek-chat"},
                     {"id": "nomic-embed-text"},
-                    {"id": "gpt-5-nano"},
+                    {"id": "kwaipilot/kat-coder-pro"},
                 ]
             }
         )
 
     monkeypatch.setattr(ai_bridge.httpx, "get", _get)
     bridge = _bridge(hermetic)
-    models = bridge.fetch_models("opencode")
+    models = bridge.fetch_models("cline-usage")
     assert seen["headers"] == {"Authorization": "Bearer zk-test"}
     assert models == [
-        "gemini-3.5-flash-lite",  # current model pinned first
-        "gpt-5-nano",  # _ZEN_TOP_MODELS order…
-        "gemini-3.5-flash",
-        "custom-z",  # …then the rest of the live catalog
+        "deepseek/deepseek-chat",  # current model pinned first (also TOP[0])
+        "minimax/minimax-m2.5",  # _CLINE_GATEWAY_TOP_MODELS order…
+        "kwaipilot/kat-coder-pro",
+        "custom-x",  # …then the rest of the live catalog
     ]
 
 
-def test_fetch_models_zen_live_failure_uses_platform_catalog(
+def test_fetch_models_cline_usage_live_failure_uses_gateway_catalog(
     hermetic, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    hermetic["env"] = {"OPENCODE_API_KEY": "zk-test"}
+    hermetic["env"] = {"CLINEPASS_API_KEY": "zk-test"}
 
     def _get(url, headers=None, timeout=None):
         raise RuntimeError("offline")
 
     monkeypatch.setattr(ai_bridge.httpx, "get", _get)
     bridge = _bridge(hermetic)
-    models = bridge.fetch_models("opencode")
-    assert models[0] == "gemini-3.5-flash-lite"
-    assert models[: len(ai_bridge._ZEN_TOP_MODELS)] == list(ai_bridge._ZEN_TOP_MODELS)
-    assert set(models) == set(ai_bridge._ZEN_CATALOG)
+    models = bridge.fetch_models("cline-usage")
+    top_order = {m: i for i, m in enumerate(ai_bridge._CLINE_GATEWAY_TOP_MODELS)}
+    expected = sorted(ai_bridge._CLINE_GATEWAY_CATALOG, key=lambda m: top_order.get(m, 999))
+    assert models == expected
+    assert set(models) == set(ai_bridge._CLINE_GATEWAY_CATALOG)
 
 
 def test_fetch_models_generic_fallback_is_current_model(
@@ -223,9 +225,10 @@ def test_fetch_models_generic_fallback_is_current_model(
 def test_fetch_models_clinepass_model_override_pinned_first(
     hermetic, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A CLINEPASS_MODEL override that lives in the Zen catalog but not in
-    the curated ClinePass catalog is inserted at the head of the list."""
-    hermetic["env"] = {"CLINEPASS_MODEL": "gpt-5-nano"}
+    """A CLINEPASS_MODEL override in the gateway catalog but not in TOP is
+    kept visible after the top-sorted gateway catalog (top-sort runs after
+    pinning)."""
+    hermetic["env"] = {"CLINEPASS_MODEL": "cline-pass/kimi-k2.6"}
 
     def _get(url, headers=None, timeout=None):
         raise RuntimeError("offline")
@@ -233,7 +236,8 @@ def test_fetch_models_clinepass_model_override_pinned_first(
     monkeypatch.setattr(ai_bridge.httpx, "get", _get)
     bridge = _bridge(hermetic)
     models = bridge.fetch_models("clinepass")
-    assert models[0] == "gpt-5-nano"
+    assert "cline-pass/kimi-k2.6" in models
+    assert models[:6] == list(ai_bridge._CLINE_GATEWAY_TOP_MODELS[:6])
     assert "cline-pass/kimi-k3" in models  # curated catalog still present
 
 
@@ -251,7 +255,10 @@ def test_fetch_models_cline_session_uses_fresh_token(
 
     monkeypatch.setattr(ai_bridge.httpx, "get", _get)
     bridge = _bridge(hermetic)
-    assert bridge.fetch_models("clinepass") == ["cline-pass/kimi-k3"]
+    models = bridge.fetch_models("clinepass")
+    assert models[0] == "cline-pass/kimi-k3"
+    assert "cline-pass/deepseek-v4-pro" in models
+    assert len(models) >= 2
     assert seen["headers"] == {"Authorization": "Bearer fresh-123"}
 
 
@@ -273,7 +280,10 @@ def test_fetch_models_cline_session_refresh_failure_sends_no_auth(
 
     monkeypatch.setattr(ai_bridge.httpx, "get", _get)
     bridge = _bridge(hermetic)
-    assert bridge.fetch_models("clinepass") == ["cline-pass/kimi-k3"]
+    models = bridge.fetch_models("clinepass")
+    assert models[0] == "cline-pass/kimi-k3"
+    assert "cline-pass/deepseek-v4-pro" in models
+    assert len(models) >= 2
     assert seen["headers"] == {}
 
 
@@ -335,55 +345,57 @@ def test_chat_auto_sentinel_means_auto(hermetic, monkeypatch: pytest.MonkeyPatch
     assert calls == ["ollama"]
 
 
-def test_chat_fast_path_zen_gateway_rotates_models(
+def test_chat_fast_path_cline_gateway_rotates_models(
     hermetic, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A local-spec entry whose endpoint is the Zen gateway exercises the
+    """A local-spec entry whose endpoint is the Cline gateway exercises the
     fast-path per-model rotation: 404s rotate to the next top model, the
     cursor advances, and the winning model is stored in the config."""
     monkeypatch.setattr(
         ai_bridge,
         "_LOCAL_SPECS",
-        [("zenlocal", "ZENLOCAL_HOST", "https://opencode.ai/zen/v1", "")],
+        [("clinelocal", "CLINELOCAL_HOST", "https://api.cline.bot/api/v1", "")],
     )
     hermetic["local"] = {
-        "zenlocal": ("gemini-3.5-flash-lite", "https://opencode.ai/zen/v1", "", "openai")
+        "clinelocal": ("deepseek/deepseek-chat", "https://api.cline.bot/api/v1", "", "openai")
     }
     tried: list[str] = []
 
     async def _call(name, info, messages, on_token):
         tried.append(info[0])
-        if info[0] in ("gemini-3.5-flash-lite", "gpt-5-nano"):
+        if info[0] in ("deepseek/deepseek-chat", "minimax/minimax-m2.5"):
             raise RuntimeError("404 model not found")
-        return "zen-fast-ok"
+        return "cline-fast-ok"
 
     bridge = _bridge(hermetic)
-    assert bridge.is_opencode_zen("zenlocal")
+    assert bridge.is_cline_gateway("clinelocal")
     monkeypatch.setattr(bridge, "_call", _call)
     text, name = asyncio.run(bridge.chat([{"role": "user", "content": "hi"}]))
-    assert (text, name) == ("zen-fast-ok", "zenlocal")
-    assert tried == ["gemini-3.5-flash-lite", "gpt-5-nano", "gpt-5.4-nano"]
-    assert bridge._configs["zenlocal"][0] == "gpt-5.4-nano"
+    assert (text, name) == ("cline-fast-ok", "clinelocal")
+    assert tried == list(ai_bridge._CLINE_GATEWAY_TOP_MODELS[:3])
+    assert bridge._configs["clinelocal"][0] == "qwen/qwen3-8b"
     assert bridge._free_cursor == 3
 
 
-def test_chat_fast_path_zen_all_fail_then_cloud(hermetic, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Fast path burns all Zen top models; the generic fallback then skips
-    the already-tried Zen gateway and reaches the keyed cloud."""
+def test_chat_fast_path_cline_all_fail_then_cloud(
+    hermetic, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Fast path burns all Cline top models; the generic fallback then skips
+    the already-tried Cline gateway and reaches the keyed cloud."""
     monkeypatch.setattr(
         ai_bridge,
         "_LOCAL_SPECS",
-        [("zenlocal", "ZENLOCAL_HOST", "https://opencode.ai/zen/v1", "")],
+        [("clinelocal", "CLINELOCAL_HOST", "https://api.cline.bot/api/v1", "")],
     )
     hermetic["env"] = {"OPENAI_API_KEY": "k"}
     hermetic["local"] = {
-        "zenlocal": ("gemini-3.5-flash-lite", "https://opencode.ai/zen/v1", "", "openai")
+        "clinelocal": ("deepseek/deepseek-chat", "https://api.cline.bot/api/v1", "", "openai")
     }
     calls: list[str] = []
 
     async def _call(name, info, messages, on_token):
         calls.append(name)
-        if name == "zenlocal":
+        if name == "clinelocal":
             raise RuntimeError("429 rate limited")
         return "cloud-ok"
 
@@ -391,9 +403,9 @@ def test_chat_fast_path_zen_all_fail_then_cloud(hermetic, monkeypatch: pytest.Mo
     monkeypatch.setattr(bridge, "_call", _call)
     text, name = asyncio.run(bridge.chat([{"role": "user", "content": "hi"}]))
     assert (text, name) == ("cloud-ok", "openai")
-    # All 10 top models tried in the fast path, then the Zen gateway skipped
+    # All 10 top models tried in the fast path, then the Cline gateway skipped
     # once in the generic loop — openai tried exactly once.
-    assert calls.count("zenlocal") == len(ai_bridge._ZEN_TOP_MODELS)
+    assert calls.count("clinelocal") == len(ai_bridge._CLINE_GATEWAY_TOP_MODELS)
     assert calls.count("openai") == 1
     assert calls[-1] == "openai"
 
@@ -459,26 +471,29 @@ def test_chat_generic_cline_refresh_failure_surfaces(
         asyncio.run(bridge.chat([{"role": "user", "content": "hi"}], provider="clinepass"))
 
 
-def test_chat_auto_zen_rotation_on_generic_failure(
+def test_chat_auto_cline_rotation_on_generic_failure(
     hermetic, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Auto mode, no locals: the Zen gateway's configured model fails in the
+    """Auto mode, no locals: the Cline gateway's configured model fails in the
     generic fallback → rotates through alternates and pins the winner."""
-    hermetic["env"] = {"OPENCODE_API_KEY": "zk-test"}
+    hermetic["env"] = {"CLINEPASS_API_KEY": "zk-test"}
     tried: list[str] = []
 
     async def _call(name, info, messages, on_token):
         tried.append(info[0])
-        if info[0] == "gemini-3.5-flash-lite":
+        if info[0] == "deepseek/deepseek-chat":
             raise RuntimeError("404 model not found")
-        return "zen-ok"
+        return "cline-ok"
 
     bridge = _bridge(hermetic)
+    # _detect_clinepass registers both clinepass + cline-usage; isolate
+    # cline-usage so the rotation covers exactly the TOP pool.
+    del bridge._configs["clinepass"]
     monkeypatch.setattr(bridge, "_call", _call)
     text, name = asyncio.run(bridge.chat([{"role": "user", "content": "hi"}]))
-    assert (text, name) == ("zen-ok", "opencode")
-    assert tried == ["gemini-3.5-flash-lite", "gpt-5-nano"]
-    assert bridge._configs["opencode"][0] == "gpt-5-nano"
+    assert (text, name) == ("cline-ok", "cline-usage")
+    assert tried == ["deepseek/deepseek-chat", "minimax/minimax-m2.5"]
+    assert bridge._configs["cline-usage"][0] == "minimax/minimax-m2.5"
 
 
 # ── _call: streaming, per-kind URLs/headers, errors ───────────────────
@@ -576,7 +591,7 @@ def test_call_openai_streaming_success(
     assert method == "POST"
     assert url == "https://api.openai.com/v1/chat/completions"
     assert headers["Authorization"] == "Bearer k"
-    assert headers["User-Agent"] == "LuckyDBrowser/9.7"
+    assert headers["User-Agent"] == "LuckyDBrowser/9.8"
     assert body["model"] == "gpt-4o"
     assert body["stream"] is True
 
@@ -818,10 +833,10 @@ def test_chat_generic_loop_covers_post_startup_local(
     assert calls == ["ollama", "latelocal", "latelocal"]
 
 
-def test_chat_explicit_zen_all_models_fail(hermetic, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Explicit Zen provider: every rotation candidate fails → the honest
+def test_chat_explicit_cline_all_models_fail(hermetic, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Explicit Cline provider: every rotation candidate fails → the honest
     'all providers failed' error, not a hang or a silent empty reply."""
-    hermetic["env"] = {"OPENCODE_API_KEY": "zk-test"}
+    hermetic["env"] = {"CLINEPASS_API_KEY": "zk-test"}
     tried: list[str] = []
 
     async def _call(name, info, messages, on_token):
@@ -831,31 +846,35 @@ def test_chat_explicit_zen_all_models_fail(hermetic, monkeypatch: pytest.MonkeyP
     bridge = _bridge(hermetic)
     monkeypatch.setattr(bridge, "_call", _call)
     with pytest.raises(RuntimeError, match="all providers failed — last error: 500 everywhere"):
-        asyncio.run(bridge.chat([{"role": "user", "content": "hi"}], provider="opencode"))
+        asyncio.run(bridge.chat([{"role": "user", "content": "hi"}], provider="cline-usage"))
     # Configured model + every alternate top model tried exactly once.
-    assert tried == ["gemini-3.5-flash-lite"] + [
-        m for m in ai_bridge._ZEN_TOP_MODELS if m != "gemini-3.5-flash-lite"
+    assert tried == ["deepseek/deepseek-chat"] + [
+        m for m in ai_bridge._CLINE_GATEWAY_TOP_MODELS if m != "deepseek/deepseek-chat"
     ]
 
 
-def test_chat_auto_zen_rotation_exhausted_raises(hermetic, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Auto mode: the Zen gateway fails on its configured model AND every
+def test_chat_auto_cline_rotation_exhausted_raises(
+    hermetic, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Auto mode: the Cline gateway fails on its configured model AND every
     rotation alternate → the rotation is exhausted and the honest
     'all providers failed' error surfaces."""
-    hermetic["env"] = {"OPENCODE_API_KEY": "zk-test"}
+    hermetic["env"] = {"CLINEPASS_API_KEY": "zk-test"}
     calls: list[str] = []
 
     async def _call(name, info, messages, on_token):
         calls.append(info[0])
-        raise RuntimeError("zen down")
+        raise RuntimeError("cline down")
 
     bridge = _bridge(hermetic)
+    # Isolate cline-usage (clinepass also registers from the same key).
+    del bridge._configs["clinepass"]
     monkeypatch.setattr(bridge, "_call", _call)
-    with pytest.raises(RuntimeError, match="all providers failed — last error: zen down"):
+    with pytest.raises(RuntimeError, match="all providers failed — last error: cline down"):
         asyncio.run(bridge.chat([{"role": "user", "content": "hi"}]))
     # Configured model + every alternate tried exactly once.
-    assert calls == ["gemini-3.5-flash-lite"] + [
-        m for m in ai_bridge._ZEN_TOP_MODELS if m != "gemini-3.5-flash-lite"
+    assert calls == ["deepseek/deepseek-chat"] + [
+        m for m in ai_bridge._CLINE_GATEWAY_TOP_MODELS if m != "deepseek/deepseek-chat"
     ]
 
 

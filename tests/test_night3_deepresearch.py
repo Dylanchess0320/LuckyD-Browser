@@ -60,7 +60,7 @@ def test_effective_search_backend_gemini_with_key():
 
 def test_effective_search_backend_default_ddg():
     s = Settings(search_backend="auto", api_key="k")
-    assert s.effective_search_backend("opencode") == "ddg"
+    assert s.effective_search_backend("cline-usage") == "ddg"
     assert s.effective_search_backend("") == "ddg"
 
 

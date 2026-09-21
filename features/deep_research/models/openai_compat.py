@@ -3,14 +3,12 @@
 Speaks plain ``POST {base_url}/chat/completions`` via sync httpx, so it runs
 against any OpenAI-compatible gateway without extra SDKs (frozen-safe):
 
-- ``opencode``   — OpenCode Zen $0 gateway (https://opencode.ai/zen/v1).
-                  Verified working 2026-09-06: ``nemotron-3-ultra-free``
-                  (flagship, strong reasoning) + ``nemotron-3.5-lightning-free``
-                  (fast). ``ling-3.0-flash-fin-free`` answers plain prompts but
-                  rejects ``response_format=json_object``, so structured calls
-                  auto-retry without it.
 - ``openrouter`` — OpenRouter (https://openrouter.ai/api/v1) ``:free`` models.
 - ``ollama``     — local Ollama (http://127.0.0.1:11434/v1), free/unlimited.
+
+(The retired ``opencode`` backend — OpenCode Zen's $0 gateway — was removed
+in 9.8; the AI assistant's connected providers, including the Cline
+gateways, are served by ``models/luckyd_bridge.py`` instead.)
 
 Role routing (override with DRS_MODEL_<ROLE>, e.g. DRS_MODEL_PLANNER):
 - planner / critic  -> flagship model (strongest reasoning/verification)
@@ -40,11 +38,7 @@ _FENCE = re.compile(r"^```(?:json)?\s*|\s*```$", re.MULTILINE | re.IGNORECASE)
 
 # Verified-live free pools (probed against the real gateways, 2026-09-06).
 # First entry = flagship (planner/critic), second = fast (worker/synthesizer).
-OPENCODE_FREE_POOL = [
-    "nemotron-3-ultra-free",
-    "nemotron-3.5-lightning-free",
-    "ling-3.0-flash-fin-free",
-]
+# (OPENCODE_FREE_POOL is gone: the Zen gateway was retired in 9.8.)
 OPENROUTER_FREE_POOL = [
     "nvidia/nemotron-3-ultra-550b-a55b:free",
     "nvidia/nemotron-3.5-lightning:free",
@@ -53,12 +47,6 @@ OPENROUTER_FREE_POOL = [
 OLLAMA_FREE_POOL = ["llama3.2:3b"]
 
 _BACKEND_DEFAULTS = {
-    "opencode": {
-        "base_url": "https://opencode.ai/zen/v1",
-        "key_env": "OPENCODE_API_KEY",
-        "model_env": "DRS_OPENCODE_MODEL",
-        "pool": OPENCODE_FREE_POOL,
-    },
     "openrouter": {
         "base_url": "https://openrouter.ai/api/v1",
         "key_env": "OPENROUTER_API_KEY",
@@ -109,7 +97,7 @@ class OpenAICompatProvider(LLMProvider):
 
     def __init__(
         self,
-        backend: str = "opencode",
+        backend: str = "openrouter",
         model: str | None = None,
         api_key: str | None = None,
         base_url: str | None = None,
@@ -118,11 +106,11 @@ class OpenAICompatProvider(LLMProvider):
         from ..config import settings as drs_settings
 
         self._settings = drs_settings
-        backend = (backend or "opencode").lower().strip()
+        backend = (backend or "openrouter").lower().strip()
         if backend in ("local", "ollama-local"):
             backend = "ollama"
         if backend not in _BACKEND_DEFAULTS:
-            backend = "opencode"
+            backend = "openrouter"
         self._backend = backend
         self._spec = _BACKEND_DEFAULTS[backend]
         self._model_override = model
@@ -158,7 +146,7 @@ class OpenAICompatProvider(LLMProvider):
             override = ""
         if (
             override
-            and self._backend in ("opencode", "openrouter", "ollama")
+            and self._backend in ("openrouter", "ollama")
             and (override.startswith("gemini-") or override.startswith("gemini/"))
         ):
             override = ""
@@ -179,36 +167,11 @@ class OpenAICompatProvider(LLMProvider):
             key = self._key_override
         elif self._spec["key_env"]:
             key = os.getenv(self._spec["key_env"], "") or ""
-            if not key and self._backend == "opencode":
-                # Fall back to whatever LuckyD core resolved (OPENAI_BASE_URL
-                # often points at the Zen gateway with its own key).
-                try:
-                    from core.providers import resolve_provider_config
-
-                    for candidate in ("opencode", "openai"):
-                        try:
-                            cfg = resolve_provider_config(candidate)
-                        except Exception:
-                            continue
-                        if "opencode.ai" in str(cfg.get("base_url", "")):
-                            key = str(cfg.get("api_key", "") or "")
-                            break
-                except Exception:
-                    pass
         base = (
             self._base_override
             or os.getenv(f"DRS_{self._backend.upper()}_BASE_URL", "").strip()
             or self._spec["base_url"]
         )
-        if self._backend == "opencode" and not self._base_override:
-            try:
-                from core.providers import resolve_provider_config
-
-                cfg = resolve_provider_config("opencode")
-                if cfg.get("base_url"):
-                    base = str(cfg["base_url"])
-            except Exception:
-                pass
         if self._backend == "ollama" and not self._base_override:
             host = (
                 os.getenv("OLLAMA_HOST", "").strip() or os.getenv("DRS_OLLAMA_BASE_URL", "").strip()

@@ -1,7 +1,7 @@
 // ai.js
 // ---------------------------------------------------------------
 // Free LLM access + deck generator for LuckyD videos.
-// Gemini primary, Zen fallback, OpenRouter :free last resort.
+// Gemini primary, Cline free-tier fallback, OpenRouter :free last resort.
 // Reads .env next to this file. No dependencies.
 //
 // CLI:
@@ -80,16 +80,40 @@ async function askOpenRouter(prompt, { model } = {}) {
     return text;
 }
 
-async function askZen(prompt, { model } = {}) {
-    const env = loadEnv();
-    const key = env.ZEN_API_KEY;
-    if (!key) throw new Error("ZEN_API_KEY not set in .env");
-    const base = (env.ZEN_BASE_URL || "https://opencode.ai/zen/v1").replace(/\/$/, "");
-    const chosen = model || env.ZEN_MODEL || "nemotron-3-ultra-free";
-    const res = await fetch(`${base}/chat/completions`, {
+async function askCline(prompt, { model } = {}) {
+    // 9.8: OpenCode Zen was retired — the Cline gateway (api.cline.bot)
+    // replaces it, authenticated by the logged-in Cline CLI session
+    // (~/.cline/data/settings/providers.json, same file the Python
+    // browser_core.cline_session reads).
+    const fsMod = require("fs");
+    const pathMod = require("path");
+    const os = require("os");
+    const dataDir = process.env.CLINE_DATA_DIR || pathMod.join(os.homedir(), ".cline", "data");
+    const providersPath = pathMod.join(dataDir, "settings", "providers.json");
+    let token = process.env.CLINER_PASS_ACCESS_TOKEN || "";
+    if (!token && fsMod.existsSync(providersPath)) {
+        try {
+            const raw = JSON.parse(fsMod.readFileSync(providersPath, "utf8"));
+            const providers = raw.providers || {};
+            for (const name of ["cline-usage", "clinepass"]) {
+                const auth = ((providers[name] || {}).settings || {}).auth || {};
+                const tok = String(auth.accessToken || "").trim();
+                if (tok) {
+                    token = tok;
+                    break;
+                }
+            }
+        } catch {
+            // fall through to the env/missing-token error below
+        }
+    }
+    if (!token) throw new Error("no Cline session token — run `cline auth` once (or set CLINER_PASS_ACCESS_TOKEN)");
+    const base = (process.env.CLINER_PASS_BASE_URL || "https://api.cline.bot").replace(/\/$/, "");
+    const chosen = model || process.env.CLINER_PASS_MODEL || "deepseek/deepseek-chat";
+    const res = await fetch(`${base}/api/v1/chat/completions`, {
         method: "POST",
         headers: {
-            Authorization: `Bearer ${key}`,
+            Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
         },
         body: JSON.stringify({
@@ -101,10 +125,10 @@ async function askZen(prompt, { model } = {}) {
             max_tokens: 16384,
         }),
     });
-    if (!res.ok) throw new Error(`Zen HTTP ${res.status}`);
+    if (!res.ok) throw new Error(`Cline HTTP ${res.status}`);
     const data = await res.json();
     const text = data.choices?.[0]?.message?.content;
-    if (!text) throw new Error("Zen returned no content");
+    if (!text) throw new Error("Cline returned no content");
     return text;
 }
 
@@ -113,15 +137,15 @@ async function ask(prompt, opts = {}) {
     try {
         return await askGemini(prompt, opts);
     } catch (err) {
-        console.error(`[ai] Gemini failed (${err.message}) — falling back to Zen...`);
-        return await askZen(prompt, opts);
+        console.error(`[ai] Gemini failed (${err.message}) — falling back to Cline...`);
+        return await askCline(prompt, opts);
     }
 }
 
 async function askWithFullFallback(prompt, opts = {}) {
     for (const [name, fn] of [
         ["gemini", askGemini],
-        ["zen", askZen],
+        ["cline", askCline],
         ["openrouter", askOpenRouter],
     ]) {
         try {
@@ -290,7 +314,7 @@ async function makeDeck(opts = {}) {
     return outPath;
 }
 
-module.exports = { ask, askGemini, askZen, askOpenRouter, askWithFullFallback, makeDeck };
+module.exports = { ask, askGemini, askCline, askOpenRouter, askWithFullFallback, makeDeck };
 
 if (require.main === module) {
     const argv = process.argv.slice(2);
@@ -306,13 +330,13 @@ if (require.main === module) {
         }
         const prompt = parts.join(" ").trim();
         if (!prompt) {
-            console.error('Usage: node ai.js "your prompt" [--provider gemini|zen|openrouter]');
+            console.error('Usage: node ai.js "your prompt" [--provider gemini|cline|openrouter]');
             console.error("       node ai.js deck --topic \"...\" | --file notes.md [--slides N] [--style fun|hype|pro|story]");
             process.exit(1);
         }
         const fn =
             provider === "openrouter" ? askOpenRouter :
-            provider === "zen" ? askZen :
+            provider === "cline" ? askCline :
             provider === "gemini" ? askGemini : ask;
         fn(prompt)
             .then((text) => console.log(text))

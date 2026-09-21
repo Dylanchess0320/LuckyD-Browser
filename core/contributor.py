@@ -16,7 +16,8 @@ from pathlib import Path
 # Env flag that gates every contributor-tier model.
 CONTRIBUTOR_ENV = "LUCKYD_CONTRIBUTOR_TIER"
 
-# Canonical contributor model id (OpenCode Zen gateway).
+# Canonical contributor model id (muse-spark on the Cline gateway; the model
+# itself predates the 9.8 OpenCode Zen retirement, pricing unchanged).
 CONTRIBUTOR_MODEL = "muse-spark-1.3-contributor"
 
 # The one-line warning shown on opt-in and while the tier is active.

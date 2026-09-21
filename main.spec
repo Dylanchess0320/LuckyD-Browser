@@ -73,6 +73,13 @@ a = Analysis(
         # Deep Research swarm (tools/deep_research_tool.py + features/deep_research):
         # langgraph orchestration, Gemini grounding, keyless DDG search.
         'langgraph', 'langgraph.graph', 'google.genai', 'ddgs',
+        'features.deep_research.models.luckyd_bridge',
+        # 9.8 additions: goals/plugins/custom-providers/ACP/minimax CLI.
+        'acp_server',
+        'core.goals',
+        'core.plugins',
+        'core.custom_providers',
+        'tools.minimax_cli',
         # Rich powers the real terminal experience here (unlike
         # luckyd-code.spec, which excludes it -- that exe never renders a
         # prompt so it doesn't need it. This one does.)

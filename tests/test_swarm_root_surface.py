@@ -715,5 +715,7 @@ class TestModelCatalog:
                 }
             ]
         )
-        assert flat[1] == ("opencode", "m1")
+        # Empty provider label falls back to the 9.8 free default
+        # (cline-usage) in both provider_key_from_label and the UI guard.
+        assert flat[1] == ("cline-usage", "m1")
         capsys.readouterr()  # discard rendered table

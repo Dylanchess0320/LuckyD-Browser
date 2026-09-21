@@ -623,8 +623,8 @@ class TerminalUI:
 
         Returns a flat ``{number: (provider_id, model_id)}`` map so callers can
         resolve ``/model 12`` without re-walking the catalog. Provider id is the
-        raw key (e.g. ``opencode``) derived from the group header when possible;
-        otherwise the display label lower-cased.
+        raw key (e.g. ``cline-usage``) derived from the group header when
+        possible; otherwise the display label lower-cased.
 
         ``sections`` is a JSON-shaped list::
             [{"tier": "free"|"paid", "label": str,
@@ -636,29 +636,16 @@ class TerminalUI:
         idx = 0
 
         def _provider_key(label: str) -> str:
-            # An empty/whitespace label would IndexError on split()[0].
-            if not label or not label.split():
-                return "opencode"
-            low = label.lower()
-            if "opencode" in low:
-                return "opencode"
-            if "openrouter" in low:
-                return "openrouter"
-            if "ollama" in low:
-                return "ollama"
-            if "openai" in low:
-                return "opencode"
-            if "z.ai" in low or low.strip().startswith("zai"):
-                return "zai"
-            if "groq" in low:
-                return "groq"
-            if "google" in low or "gemini" in low or "gemma" in low:
-                return "google"
-            if "cline" in low:
-                return "cline-usage" if "usage" in low else "clinepass"
-            if "deepseek" in low:
-                return "deepseek"
-            return label.split()[0].lower()
+            # Single source of truth lives in core/providers.py so the REPL,
+            # this renderer and the `luckyd-code model` subcommand can never
+            # disagree about which provider a catalog group belongs to.
+            try:
+                from core.providers import provider_key_from_label
+
+                return provider_key_from_label(label)
+            except Exception:
+                # Never let a catalog label break the model picker.
+                return label.split()[0].lower() if label and label.split() else "cline-usage"
 
         # Pre-walk to populate flat (used by both render paths + caller)
         for section in sections or []:
@@ -926,7 +913,7 @@ class TerminalUI:
                 )
                 self._console.print(panel)
                 self._console.print(
-                    f"  {self._dim('Switch:')} {self._primary('/model <provider> <name>')} {self._dim('e.g.')} {self._primary('/model opencode nemotron-3-ultra-free')}"
+                    f"  {self._dim('Switch:')} {self._primary('/model <provider> <name>')} {self._dim('e.g.')} {self._primary('/model cline-usage kimi')}"
                 )
                 self._console.print()
                 return

@@ -238,7 +238,7 @@ class SettingsDialog(QDialog):
 
         self.engine = QComboBox(self)
         self.engine.addItems(list(SEARCH_ENGINES.keys()))
-        self.engine.setCurrentText(settings.get("search_engine", "Google"))
+        self.engine.setCurrentText(settings.get("search_engine", "DuckDuckGo"))
         gform.addRow("Search engine", self.engine)
 
         dir_row = QHBoxLayout()

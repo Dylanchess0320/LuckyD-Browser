@@ -169,9 +169,8 @@ MODEL_COSTS: dict[str, dict[str, float]] = {
     # Current DeepSeek v4 IDs (billed like chat/reasoner; adjust when priced)
     "deepseek-v4-flash": {"input": 0.27, "output": 1.10},
     "deepseek-v4-pro": {"input": 0.55, "output": 2.19},
-    # OpenCode Zen / OpenRouter free-tier models ($0 marginal cost)
-    "nemotron-3-ultra-free": {"input": 0.0, "output": 0.0},
-    "nemotron-3.5-lightning-free": {"input": 0.0, "output": 0.0},
+    # OpenRouter free-tier models ($0 marginal cost). (The OpenCode Zen
+    # "-free" ids died with the Zen gateway in 9.8.)
     "nvidia/nemotron-3-ultra-550b-a55b:free": {"input": 0.0, "output": 0.0},
     "nvidia/nemotron-3.5-lightning:free": {"input": 0.0, "output": 0.0},
     "x-ai/grok-4.3": {"input": 0.0, "output": 0.0},  # via free-tier key; verify on-platform
@@ -201,10 +200,11 @@ MODEL_COSTS: dict[str, dict[str, float]] = {
     "glm-4.6": {"input": 0.60, "output": 2.20},
     "glm-4.5": {"input": 0.60, "output": 2.20},
     "glm-4.5-air": {"input": 0.20, "output": 1.10},
-    # Muse Spark 1.3 (OpenCode Zen) — Standard tier. The contributor tier is
-    # cheaper BECAUSE the provider may train on your prompts, so it is listed
-    # here for honest cost accounting but is only ever offered after an
-    # explicit opt-in (core/contributor.py).
+    # Muse Spark 1.3 — Standard tier (was an OpenCode Zen model before the
+    # Zen gateway was retired in 9.8; kept for legacy cost accounting). The
+    # contributor tier is cheaper BECAUSE the provider may train on your
+    # prompts, so it is listed here for honest cost accounting but is only
+    # ever offered after an explicit opt-in (core/contributor.py).
     "muse-spark-1.3": {"input": 1.25, "output": 4.25, "cached_input": 0.15},
     "muse-spark-1.3-contributor": {"input": 0.10, "output": 0.20, "cached_input": 0.002},
 }
