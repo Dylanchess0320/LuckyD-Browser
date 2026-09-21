@@ -2,7 +2,7 @@
 ; LuckyD Browser - Windows installer script (Inno Setup 6)
 ;
 ; Produces a single, shareable setup file:
-;   browser\installer\output\LuckyDBrowserSetup-9.8.0.exe
+;   browser\installer\output\LuckyDBrowserSetup-9.9.0.exe
 ;
 ; Anyone can run it - it installs per-user (no admin needed) to
 ; %LOCALAPPDATA%\Programs\LuckyDBrowser with Start Menu / Desktop
@@ -13,7 +13,7 @@
 ; -----------------------------------------------------------------------------
 
 #define AppName      "LuckyD Browser"
-#define AppVersion   "9.8.0"
+#define AppVersion   "9.9.0"
 #define AppPublisher "LuckyD"
 #define AppExeName   "LuckyDBrowser.exe"
 #define AppURL       "https://github.com/Dylanchess0320/LuckyD-Browser"
@@ -27,11 +27,11 @@ AppPublisher={#AppPublisher}
 AppPublisherURL={#AppURL}
 AppSupportURL={#AppURL}
 AppUpdatesURL={#AppURL}
-VersionInfoVersion=9.8.0.0
+VersionInfoVersion=9.9.0.0
 VersionInfoCompany={#AppPublisher}
 VersionInfoDescription={#AppName} Setup
 VersionInfoProductName={#AppName}
-VersionInfoProductVersion=9.8.0.0
+VersionInfoProductVersion=9.9.0.0
 ; Per-user install — no admin rights required (admin users may opt into all-users).
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
@@ -42,7 +42,7 @@ MinVersion=10.0
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir=output
-OutputBaseFilename=LuckyDBrowserSetup-9.8.0
+OutputBaseFilename=LuckyDBrowserSetup-9.9.0
 SetupIconFile=..\assets\professional_icon.ico
 CloseApplications=yes
 RestartApplications=no
@@ -82,7 +82,11 @@ Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: deskto
 ; Free, unlimited local AI: installs Ollama (if missing) and pulls the default
 ; model (~3 GB one-time download). Checked by default; runs detached in a
 ; console window so the download progress stays visible after Setup closes.
-Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\ollama_setup.ps1"""; Description: "Set up free unlimited local AI (Ollama + llama3.2:3b, one-time download)"; Flags: nowait postinstall skipifsilent
+; NOTE (9.9): intentionally NOT using the Bypass execution policy. Bypass is a
+; classic living-off-the-land flag that behavioral anti-ransomware engines
+; (Halcyon, Defender) treat as hostile on sight. RemoteSigned runs this local,
+; installer-written script identically with no reputation penalty.
+Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy RemoteSigned -File ""{app}\ollama_setup.ps1"""; Description: "Set up free unlimited local AI (Ollama + llama3.2:3b, one-time download)"; Flags: nowait postinstall skipifsilent
 Filename: "{app}\{#AppExeName}"; Description: "Launch {#AppName}"; Flags: nowait postinstall skipifsilent
 
 [Code]

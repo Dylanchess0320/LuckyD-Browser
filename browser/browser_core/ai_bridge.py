@@ -520,7 +520,7 @@ class AIBridge:
                     "research can't use it directly"
                 )
         key = (cfg["api_key"] or "").strip()
-        headers = {"User-Agent": "LuckyDBrowser/9.8", "Content-Type": "application/json"}
+        headers = {"User-Agent": "LuckyDBrowser/9.9", "Content-Type": "application/json"}
         if key:
             headers["Authorization"] = f"Bearer {key}"
         configured = cfg["model"]
@@ -905,7 +905,7 @@ class AIBridge:
             )
         )
         body["model"] = model
-        headers = {"User-Agent": "LuckyDBrowser/9.8"}
+        headers = {"User-Agent": "LuckyDBrowser/9.9"}
 
         if kind == "gemini":
             url = f"{base_url}/models/{model}:streamGenerateContent?key={api_key}&alt=sse"

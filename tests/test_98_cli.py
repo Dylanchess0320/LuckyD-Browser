@@ -260,3 +260,23 @@ def test_plugin_and_provider_cli_wiring() -> None:
     assert '"plugin"' in text or "'plugin'" in text or 'args[0] == "plugin"' in text
     assert "custom-provider" in text
     assert "--acp" in text
+
+
+def test_minimax_cli_tools_are_real_registry_tools() -> None:
+    """Importing tools.minimax_cli must not poison the agent's tool registry.
+
+    Regression test: McodeTool/MmxTool were once plain classes registered at
+    import time, so registry.openai_tools() (called on every agent turn)
+    crashed with AttributeError: 'McodeTool' object has no attribute
+    'to_openai_schema'.
+    """
+    from tools.base import ToolBase
+    from tools.minimax_cli import McodeTool, MmxTool
+    from tools.registry import registry
+
+    assert issubclass(McodeTool, ToolBase)
+    assert issubclass(MmxTool, ToolBase)
+    assert isinstance(registry.get("mcode"), ToolBase)
+    assert isinstance(registry.get("mmx"), ToolBase)
+    names = {s["function"]["name"] for s in registry.openai_tools()}
+    assert {"mcode", "mmx"} <= names

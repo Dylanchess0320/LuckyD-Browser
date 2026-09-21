@@ -171,17 +171,17 @@ class SwarmManager:
                     bridge = AIBridge()
                     target = pname if pname not in ("bridge", "cline") else ""
                     rprovider = target or bridge.default_provider() or pname
-                    cfg = bridge.provider_config(rprovider) or {}
-                    rmodel = str(cfg.get("model", "") or "")
+                    bcfg = bridge.provider_config(rprovider) or {}
+                    rmodel = str(bcfg.get("model", "") or "")
                 except Exception:
                     try:
-                        from browser_core.ai_bridge import AIBridge
+                        from browser_core.ai_bridge import AIBridge as _AIBridgeAlt
 
-                        bridge = AIBridge()
+                        bridge = _AIBridgeAlt()
                         target = pname if pname not in ("bridge", "cline") else ""
                         rprovider = target or bridge.default_provider() or pname
-                        cfg = bridge.provider_config(rprovider) or {}
-                        rmodel = str(cfg.get("model", "") or "")
+                        bcfg = bridge.provider_config(rprovider) or {}
+                        rmodel = str(bcfg.get("model", "") or "")
                     except Exception:
                         rprovider = pname
             elif pname == "gemini":

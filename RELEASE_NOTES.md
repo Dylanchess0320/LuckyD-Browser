@@ -1,15 +1,50 @@
-# LuckyD Browser v9.8.0 — Release Notes
+# LuckyD Browser v9.9.0 — Release Notes
 
 > **The AI browser that doesn't need an API key.** Free, unlimited, offline AI built in —
 > plus a full coding agent and developer terminal living in your tabs.
 
-*9.8.0 is on `main` — the installer below publishes with Dylan's 9.8.0 release.*
+*9.9.0 is on `main` — the installer below publishes with Dylan's 9.9.0 release.*
 
-**[⬇ Download `LuckyDBrowserSetup-9.8.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.8.0/LuckyDBrowserSetup-9.8.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed
+**[⬇ Download `LuckyDBrowserSetup-9.9.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.9.0/LuckyDBrowserSetup-9.9.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed
+
+Prefer no installer? **[`LuckyDBrowser-Portable-9.9.0.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.9.0/LuckyDBrowser-Portable-9.9.0.zip)** — unzip and run, best option for locked-down work PCs.
 
 ---
 
-## What's new in 9.8.0
+## What's new in 9.9.0
+
+- **Anti-block hardening** — the installer no longer runs PowerShell with
+  `-ExecutionPolicy Bypass` (the single biggest behavioral red flag for
+  endpoint protection like Halcyon anti-ransomware); it now uses
+  `-ExecutionPolicy RemoteSigned`.
+- **Portable ZIP on every release** — `LuckyDBrowser-Portable-9.9.0.zip` is
+  built alongside the installer: no installer heuristics fire at all,
+  unzip-and-run on machines where installers are blocked.
+- **Code signing wired in** — the build signs all binaries and the installer
+  automatically when a certificate is configured (`LUCKYD_CERT_PFX_B64` /
+  `LUCKYD_CERT_PASSWORD` secrets); without one it ships unsigned as before.
+  Free option for open source: SignPath Foundation.
+- **CI fully green** — fixed the 3 mypy errors that kept 9.8 red, plus test
+  fixes below.
+
+### Fixed
+- **Agent crash on MiniMax CLI import** — `mcode`/`mmx` are now real
+  `ToolBase` tools; importing `tools.minimax_cli` no longer breaks the
+  agent's tool list with `AttributeError`.
+- **Stale free-model fallback tests** — updated for the 9.8 Cline-gateway
+  fallback pool (`deepseek-chat`, `minimax-m2.5`, `qwen3-8b`, …).
+
+> **Heads-up:** 9.9.0 is still unsigned until a code-signing certificate is
+> set up, so Windows SmartScreen will show its usual "Unknown publisher"
+> warning, and strict IT allowlists may still need your IT admin to approve
+> the file hash. The Bypass removal + portable ZIP remove the biggest
+> behavioral triggers.
+
+On top of everything from 9.8.0 below.
+
+---
+
+## What's new in 9.8.0 (archive)
 
 - **OpenCode Zen retired, Cline is the free default** — the Zen keyless `$0`
   tier died and the gateway blocks these accounts, so LuckyD no longer offers

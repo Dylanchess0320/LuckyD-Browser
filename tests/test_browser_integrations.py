@@ -294,6 +294,26 @@ def test_installer_removes_legacy_desktop_shortcut() -> None:
     assert 'Name: "desktopicon"' in installer and "Flags: checkedonce" in installer
 
 
+def test_installer_has_no_execution_policy_bypass() -> None:
+    """9.9 anti-block: -ExecutionPolicy Bypass is a classic living-off-the-land
+    flag that behavioral anti-ransomware (Halcyon) treats as hostile."""
+    installer_dir = Path(__file__).parents[1] / "browser" / "installer"
+    iss = (installer_dir / "LuckyDBrowser.iss").read_text(encoding="utf-8-sig")
+    assert "-ExecutionPolicy Bypass" not in iss
+    assert "-ExecutionPolicy RemoteSigned" in iss
+
+
+def test_build_script_signs_binaries_and_builds_portable_zip() -> None:
+    """9.9 anti-block: the release build signs binaries when a cert is
+    configured and always produces a portable ZIP for locked-down PCs."""
+    installer_dir = Path(__file__).parents[1] / "browser" / "installer"
+    assert (installer_dir / "sign_binaries.ps1").is_file()
+    build = (installer_dir / "build_installer.ps1").read_text(encoding="utf-8-sig")
+    assert "sign_binaries.ps1" in build
+    assert "LuckyDBrowser-Portable-" in build
+    assert "Compress-Archive" in build
+
+
 def test_interactive_model_selection_is_persisted(tmp_path: Path, monkeypatch) -> None:
     """Both terminal agents run this code from their own checkout/.env."""
     env_file = tmp_path / ".env"

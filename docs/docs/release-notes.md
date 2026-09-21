@@ -1,5 +1,18 @@
 # LuckyD Browser — Release Notes
 
+## [9.9.0] — Anti-block hardening + portable ZIP — 2026-09-21
+
+**[`LuckyDBrowserSetup-9.9.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.9.0/LuckyDBrowserSetup-9.9.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed.
+**[`LuckyDBrowser-Portable-9.9.0.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.9.0/LuckyDBrowser-Portable-9.9.0.zip)** — unzip and run, for locked-down PCs.
+
+- **Anti-block hardening** — installer no longer uses `-ExecutionPolicy Bypass` (now `RemoteSigned`).
+- **Portable ZIP** on every release — no installer heuristics fire at all.
+- **Code signing wired in** — signs binaries + installer when a cert is configured (unsigned until then; free for open source via SignPath).
+- **CI green** — fixed the 3 mypy errors that kept 9.8 red.
+- **Fixed:** agent crash when MiniMax CLI tools were imported; stale free-model fallback tests updated for the 9.8 Cline-gateway pool.
+
+On top of everything from 9.8.0 below.
+
 ## [9.8.0] — Zen retired, Cline default + goals, plugins, ACP — 2026-09-21
 
 **[`LuckyDBrowserSetup-9.8.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.8.0/LuckyDBrowserSetup-9.8.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed

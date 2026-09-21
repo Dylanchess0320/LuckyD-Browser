@@ -5,6 +5,48 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [9.9.0] - 2026-09-21
+
+Anti-block hardening for Windows installs, a portable ZIP for locked-down
+PCs, code-signing wired into the build, and a fully green CI. Shipped as
+`LuckyDBrowserSetup-9.9.0.exe` + `LuckyDBrowser-Portable-9.9.0.zip`.
+
+### Added
+- **Portable ZIP on every release** — `LuckyDBrowser-Portable-9.9.0.zip`
+  built alongside the installer (`browser/installer/build_installer.ps1`);
+  unzip-and-run with no installer heuristics, aimed at locked-down work PCs.
+- **Code-signing support in the build** — `browser/installer/sign_binaries.ps1`
+  signs all binaries and the final installer when `LUCKYD_CERT_PFX_B64` /
+  `LUCKYD_CERT_PASSWORD` are configured; cleanly skips when no certificate
+  is set. CI workflow maps the secrets and uploads both assets.
+- **Installer regression tests** — fail if `-ExecutionPolicy Bypass` ever
+  returns to the Inno script; assert signing + portable ZIP stay wired in.
+
+### Changed
+- **No more `-ExecutionPolicy Bypass` in the installer** — the post-install
+  step now runs PowerShell with `-ExecutionPolicy RemoteSigned`
+  (`browser/installer/LuckyDBrowser.iss`), removing the biggest behavioral
+  red flag for endpoint protection (e.g. Halcyon anti-ransomware).
+- **Version unification to 9.9.0** — pyproject, browser `__version__`, Inno
+  Setup script, version_info, AI bridge User-Agent, docs, and version-pinned
+  tests.
+
+### Fixed
+- **3 mypy errors in `browser/browser_core/research_page.py`** that kept the
+  9.8 CI red (aliased fallback `AIBridge` import, renamed shadowed config
+  variable) — CI is fully green on 9.9.0.
+- **Agent crash when MiniMax CLI tools were imported** — `McodeTool`/`MmxTool`
+  are now real `ToolBase` subclasses, so `registry.openai_tools()` (called
+  on every agent turn) no longer raises `AttributeError`
+  (`tools/minimax_cli.py`).
+- **Stale free-model fallback tests** — updated to the 9.8 Cline-gateway
+  fallback pool (`tests/test_cov_agent_loop.py`).
+
+> **Note:** 9.9.0 ships unsigned until a code-signing certificate is
+> configured, so SmartScreen still shows "Unknown publisher" and strict IT
+> allowlists may need an admin-approved hash. Free signing for open source
+> is available via SignPath Foundation.
+
 ## [9.8.0] - 2026-09-21
 
 OpenCode Zen retired, Cline is the free default — plus goals, plugins,

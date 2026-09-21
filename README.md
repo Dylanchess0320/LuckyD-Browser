@@ -75,11 +75,11 @@ See [`kit/SKILL_AUTHORING.md`](kit/SKILL_AUTHORING.md) to publish your own skill
 
 ## Latest release
 
-**v9.8.0** — Zen retired, Cline is the free default + goals/plugins/ACP/MiniMax CLIs:
+**v9.9.0** — Anti-block hardening: no more `-ExecutionPolicy Bypass` in the installer, portable ZIP for locked-down PCs, code-signing wired in:
 
 | | |
 |---|---|
-| **⬇ Windows installer** | [`LuckyDBrowserSetup-9.8.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.8.0/LuckyDBrowserSetup-9.8.0.exe) — built on a real Windows runner with Inno Setup 6. Per-user, no admin, silent-install flags. |
+| **⬇ Windows installer** | [`LuckyDBrowserSetup-9.9.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.9.0/LuckyDBrowserSetup-9.9.0.exe) — built on a real Windows runner with Inno Setup 6. Per-user, no admin, silent-install flags. |
 | **🎯 Goals + steering** | `/goal <text>` with token budgets, `/steer` mid-run guidance, `/btw` queued follow-ups. |
 | **🔌 Plugins + providers** | `lucky-code plugin add/enable`, `lucky-code custom-provider add/test/use`, `lucky-code --acp` for editors. |
 | **🖥 MiniMax in the mesh** | `mesh-mcode`/`mesh-mmx` replace retired `mesh-opencode`; Cline session is the free default. |
@@ -277,14 +277,14 @@ Also in this lineage: Deep Research swarm (`Ctrl+Shift+R`), Agent Mesh, self-hea
 
 ## Install in 10 seconds
 
-1. Get **[LuckyDBrowserSetup-9.8.0.exe](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.8.0/LuckyDBrowserSetup-9.8.0.exe)**
+1. Get **[LuckyDBrowserSetup-9.9.0.exe](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.9.0/LuckyDBrowserSetup-9.9.0.exe)**
 2. Run it — per-user, **no admin**, installs to `%LOCALAPPDATA%\Programs\LuckyDBrowser`
 3. Leave **“Set up free unlimited local AI”** checked → Ollama + `llama3.2:3b` (~2 GB, one time)
 4. `Ctrl+Shift+A` → chat offline. Or bring your own keys (Gemini, Groq, DeepSeek, OpenAI, Anthropic, Z.ai, OpenRouter, Cline, MiniMax)
 
 No local model yet? With a logged-in Cline CLI session (`cline auth`), chat uses Cline's free models — no local server needed.
 
-Silent: `LuckyDBrowserSetup-9.8.0.exe /VERYSILENT /NORESTART`
+Silent: `LuckyDBrowserSetup-9.9.0.exe /VERYSILENT /NORESTART`
 
 Windows 10/11 x64 only.
 
@@ -325,7 +325,7 @@ browser\run_browser.bat
 
 # Shareable installer (needs Inno Setup 6)
 powershell -NoProfile -ExecutionPolicy Bypass -File browser\installer\build_installer.ps1
-# → browser\installer\output\LuckyDBrowserSetup-9.8.0.exe
+# → browser\installer\output\LuckyDBrowserSetup-9.9.0.exe
 ```
 
 ---

@@ -911,30 +911,31 @@ class TestRunLoop:
         ag.llm_client = FakeLLMClient(
             [
                 {"content": "[API Error: 429 rate limited]"},
-                {"content": "[API Error: still down]"},  # nemotron fails too
-                RuntimeError("gateway exploded"),  # hy3 raises
-                {"content": "recovered via fallback"},  # laguna works
+                {"content": "[API Error: still down]"},  # deepseek-chat fails too
+                RuntimeError("gateway exploded"),  # minimax-m2.5 raises
+                {"content": "recovered via fallback"},  # qwen3-8b works
             ]
         )
         result = await ag.run("hello", max_turns=5)
         assert result == "recovered via fallback"
-        assert ag.model == "laguna-s-2.1-free"
+        assert ag.model == "qwen/qwen3-8b"
 
     @pytest.mark.asyncio
     async def test_free_model_skips_current_model_in_fallbacks(self):
         ag = _make_agent()
         ag.messages = _seeded_messages()
         # First entry of the fallback list: the loop must skip it via `continue`.
-        ag.model = "nemotron-3-ultra-free"
+        ag.model = "deepseek/deepseek-chat"
+        ag._provider_config.provider = "cline-usage"  # free-tier fallback applies
         ag.llm_client = FakeLLMClient(
             [
                 {"content": "[API Error: 429]"},
-                {"content": "ok on hy3"},
+                {"content": "ok on minimax"},
             ]
         )
         result = await ag.run("hello", max_turns=5)
-        assert result == "ok on hy3"
-        assert ag.model == "hy3-free"
+        assert result == "ok on minimax"
+        assert ag.model == "minimax/minimax-m2.5"
 
     @pytest.mark.asyncio
     async def test_free_model_all_fallbacks_fail(self):
@@ -946,7 +947,7 @@ class TestRunLoop:
         )
         result = await ag.run("hello", max_turns=3)
         assert result == "[API Error: 429]"
-        assert ag.model == "big-pickle"  # loop ran through every fallback
+        assert ag.model == "z-ai/glm-5.3-flash"  # loop ran through every fallback
 
     @pytest.mark.asyncio
     async def test_llm_result_object_converted_via_to_dict(self, tool_registry):

@@ -8,6 +8,8 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from .base import ToolBase
+
 MCODE_INSTALL_HINT = "Install it: npm i -g @minimax-code/cli (provides the `mcode` command)"
 MMX_INSTALL_HINT = "Install it: npm i -g @minimax/mmi (provides the `mmx` command)"
 
@@ -98,7 +100,7 @@ def run_mmx(
     return _run_capture(cmd, timeout_sec, runner)
 
 
-class McodeTool:
+class McodeTool(ToolBase):
     """Passthrough to the external MiniMax Code CLI (`mcode exec`)."""
 
     name = "mcode"
@@ -132,7 +134,7 @@ class McodeTool:
         )
 
 
-class MmxTool:
+class MmxTool(ToolBase):
     """Passthrough to the external MiniMax media CLI (`mmx text chat`)."""
 
     name = "mmx"
@@ -165,7 +167,7 @@ class MmxTool:
 try:
     from .registry import register_tool
 
-    register_tool(McodeTool())  # type: ignore[arg-type]
-    register_tool(MmxTool())  # type: ignore[arg-type]
+    register_tool(McodeTool())
+    register_tool(MmxTool())
 except Exception:
     pass

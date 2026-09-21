@@ -77,11 +77,11 @@ function Rebuild-BackendExe([string]$SpecFile, [string]$ExeName) {
 }
 
 # -- 1. Rebuild the headless HQ/harness backend from current source --------
-Write-Step '[1/4] Rebuilding luckyd-code.exe (HQ/harness backend) from current source'
+Write-Step '[1/7] Rebuilding luckyd-code.exe (HQ/harness backend) from current source'
 Rebuild-BackendExe -SpecFile 'luckyd-code.spec' -ExeName 'luckyd-code.exe'
 
 # -- 2. Rebuild the interactive terminal CLI from current source -----------
-Write-Step '[2/4] Rebuilding luckyd-cli.exe (interactive terminal CLI) from current source'
+Write-Step '[2/7] Rebuilding luckyd-cli.exe (interactive terminal CLI) from current source'
 Rebuild-BackendExe -SpecFile 'main.spec' -ExeName 'luckyd-cli.exe'
 
 # -- 3. PyInstaller (browser) ------------------------------------------------
@@ -97,7 +97,7 @@ if (-not (Test-Path $envFile)) {
     Copy-Item $template $envFile -Force
     Write-Ok "Seeded installer/env/.env from .env.example (clean template, no keys)"
 }
-Write-Step '[3/4] Building LuckyDBrowser with PyInstaller'
+Write-Step '[3/7] Building LuckyDBrowser with PyInstaller'
 Push-Location $browserDir
 try {
     python -m PyInstaller --noconfirm --clean LuckyDBrowser.spec
@@ -110,8 +110,15 @@ $exe = Join-Path $browserDir 'dist\LuckyDBrowser\LuckyDBrowser.exe'
 if (-not (Test-Path $exe)) { throw "Build output missing: $exe" }
 Write-Ok 'LuckyDBrowser.exe built (bundles the freshly rebuilt luckyd-code.exe + luckyd-cli.exe above)'
 
+# -- 3b. Authenticode-sign the app binaries (before Inno packs them) --------
+# 9.9: signed binaries are the #1 lever against Defender/SmartScreen,
+# Halcyon, and IT allowlists. No cert configured -> clean no-op.
+Write-Step '[4/7] Authenticode-signing app binaries (skips cleanly without a cert)'
+& "$PSScriptRoot\sign_binaries.ps1" -TargetDir (Join-Path $browserDir 'dist\LuckyDBrowser')
+if ($LASTEXITCODE -ne 0) { throw "sign_binaries.ps1 failed (exit $LASTEXITCODE)" }
+
 # -- 4. Inno Setup ------------------------------------------------------------
-Write-Step '[4/4] Compiling installer with Inno Setup'
+Write-Step '[5/7] Compiling installer with Inno Setup'
 $iscc = @(
     "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe",
     "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
@@ -132,3 +139,22 @@ $setup = Get-ChildItem (Join-Path $PSScriptRoot 'output\*.exe') |
 Write-Host ''
 Write-Host "Done! Shareable installer: $($setup.FullName)" -ForegroundColor Green
 Write-Host ('Size: {0:N1} MB' -f ($setup.Length / 1MB))
+
+# -- 5b. Sign the installer itself (no cert -> clean no-op) -------------------
+Write-Step '[6/7] Authenticode-signing the installer'
+& "$PSScriptRoot\sign_binaries.ps1" -File $setup.FullName
+if ($LASTEXITCODE -ne 0) { throw "sign_binaries.ps1 failed on installer (exit $LASTEXITCODE)" }
+
+# -- 6. Portable ZIP (no installer -- for locked-down / IT-managed PCs) -------
+# 9.9: many work computers block installers outright but allow running
+# programs from the user's own folders. The portable ZIP is the same
+# signed app binaries, just zipped: extract anywhere and run
+# LuckyDBrowser\LuckyDBrowser.exe. No registry, no admin, no installer
+# heuristics for Halcyon/Defender to trip on.
+Write-Step '[7/7] Building portable ZIP'
+$issText = Get-Content $issScript -Raw
+$ver = if ($issText -match '#define AppVersion\s+"([^"]+)"') { $Matches[1] } else { throw 'Could not read AppVersion from LuckyDBrowser.iss' }
+$portableZip = Join-Path $PSScriptRoot ("output\LuckyDBrowser-Portable-{0}.zip" -f $ver)
+if (Test-Path $portableZip) { Remove-Item $portableZip -Force }
+Compress-Archive -Path (Join-Path $browserDir 'dist\LuckyDBrowser') -DestinationPath $portableZip -CompressionLevel Optimal
+Write-Ok ("Portable ZIP: $portableZip ({0:N1} MB)" -f ((Get-Item $portableZip).Length / 1MB))
