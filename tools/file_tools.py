@@ -5,6 +5,7 @@ These are the core tools every coding agent needs.
 
 from __future__ import annotations
 
+import asyncio
 import fnmatch
 import re
 from pathlib import Path
@@ -78,7 +79,8 @@ class ReadTool(ToolBase):
             if path.is_dir():
                 return ToolOutput(text=f"Error: Path is a directory: {file_path}", error=True)
 
-            lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+            content = await asyncio.to_thread(path.read_text, encoding="utf-8", errors="replace")
+            lines = content.splitlines()
             display_lines = []
             # A negative offset would wrap around via lines[-i]; clamp to 0.
             offset = max(0, offset)
@@ -124,10 +126,12 @@ class WriteTool(ToolBase):
             # Snapshot before for checkpoint
             old_content = None
             if path.exists():
-                old_content = path.read_text(encoding="utf-8", errors="replace")
+                old_content = await asyncio.to_thread(
+                    path.read_text, encoding="utf-8", errors="replace"
+                )
             path.parent.mkdir(parents=True, exist_ok=True)
             existed = path.exists()
-            path.write_text(content, encoding="utf-8")
+            await asyncio.to_thread(path.write_text, content, encoding="utf-8")
             size = path.stat().st_size
             # Record checkpoint
             try:
@@ -183,7 +187,7 @@ class EditTool(ToolBase):
             if not old_string:
                 return ToolOutput(text="Error: old_string must not be empty", error=True)
 
-            original = path.read_text(encoding="utf-8")
+            original = await asyncio.to_thread(path.read_text, encoding="utf-8")
             if not replace_all:
                 count = original.count(old_string)
                 if count == 0:
@@ -200,7 +204,7 @@ class EditTool(ToolBase):
                     return ToolOutput(text="Error: old_string not found in file", error=True)
                 new_content = original.replace(old_string, new_string)
 
-            path.write_text(new_content, encoding="utf-8")
+            await asyncio.to_thread(path.write_text, new_content, encoding="utf-8")
             try:
                 from core.checkpoint import get_checkpoint_manager
 
