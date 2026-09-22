@@ -146,3 +146,126 @@ class TestSandboxExecution:
         assert len(results) <= 2  # Should stop after the failing command
         assert results[0].exit_code == 0
         # Second command may fail or be blocked
+
+
+class TestSandboxRollback:
+    """Test sandboxed command execution with rollback."""
+
+    def test_execute_with_rollback_success(self, tmp_path):
+        """Test successful command execution (no rollback needed)."""
+        from sandbox import execute_with_rollback
+
+        cwd = tmp_path / "workdir"
+        cwd.mkdir()
+        (cwd / "file.txt").write_text("initial")
+
+        checkpoint_dir = tmp_path / "checkpoints"
+        checkpoint_dir.mkdir()
+
+        cmd = "echo new_content > file.txt"
+
+        result, checkpoint = execute_with_rollback(
+            cmd, cwd=str(cwd), checkpoint_dir=str(checkpoint_dir)
+        )
+
+        assert result.exit_code == 0
+        assert (cwd / "file.txt").read_text().strip() == "new_content"
+        assert checkpoint is not None
+
+    def test_execute_with_rollback_failure(self, tmp_path):
+        """Test failed command execution with successful rollback."""
+        from sandbox import execute_with_rollback
+
+        cwd = tmp_path / "workdir"
+        cwd.mkdir()
+        (cwd / "file.txt").write_text("initial")
+
+        checkpoint_dir = tmp_path / "checkpoints"
+        checkpoint_dir.mkdir()
+
+        # Command that fails
+        cmd = "exit 1" if __import__("sys").platform != "win32" else "cmd /c exit 1"
+
+        # We simulate a failure that would have changed a file by writing a wrapper script
+        # Actually, let's just make the command modify the file and then fail.
+        cmd = (
+            "echo changed > file.txt && exit 1"
+            if __import__("sys").platform != "win32"
+            else "echo changed > file.txt & exit 1"
+        )
+
+        result, checkpoint = execute_with_rollback(
+            cmd, cwd=str(cwd), checkpoint_dir=str(checkpoint_dir)
+        )
+
+        assert result.exit_code != 0
+        assert checkpoint is not None
+        # File should be rolled back to original content
+        assert (cwd / "file.txt").read_text().strip() == "initial"
+
+    def test_execute_with_rollback_checkpoint_fails(self, tmp_path, monkeypatch):
+        """Test failed command execution where checkpoint creation failed."""
+        import shutil
+
+        from sandbox import execute_with_rollback
+
+        cwd = tmp_path / "workdir"
+        cwd.mkdir()
+
+        def mock_copytree(*args, **kwargs):
+            raise Exception("Failed to copy")
+
+        monkeypatch.setattr(shutil, "copytree", mock_copytree)
+
+        cmd = "exit 1" if __import__("sys").platform != "win32" else "cmd /c exit 1"
+
+        result, checkpoint = execute_with_rollback(cmd, cwd=str(cwd), checkpoint_dir=str(tmp_path))
+
+        assert result.exit_code != 0
+        assert checkpoint is None
+
+    def test_execute_with_rollback_restore_fails(self, tmp_path, monkeypatch):
+        """Test failed command execution where rollback failed."""
+        import sandbox
+        from sandbox import execute_with_rollback
+
+        cwd = tmp_path / "workdir"
+        cwd.mkdir()
+        (cwd / "file.txt").write_text("initial")
+
+        checkpoint_dir = tmp_path / "checkpoints"
+        checkpoint_dir.mkdir()
+
+        # Command that fails
+        cmd = (
+            "echo changed > file.txt && exit 1"
+            if __import__("sys").platform != "win32"
+            else "echo changed > file.txt & exit 1"
+        )
+
+        def mock_restore(*args, **kwargs):
+            # Do nothing to simulate failure/exception handling in _restore_checkpoint
+            # Actually, _restore_checkpoint swallows exceptions, so let's mock it to do nothing
+            # Or better, let's mock rmtree to fail and check the exception is swallowed.
+            import shutil
+
+
+            def failing_rmtree(*a, **kw):
+                raise Exception("rmtree failed")
+
+            # Use original restore_checkpoint but with failing rmtree
+            monkeypatch.setattr(shutil, "rmtree", failing_rmtree)
+
+            # Let's just mock _restore_checkpoint to do nothing (simulate it failed and did nothing)
+            pass
+
+        monkeypatch.setattr(sandbox, "_restore_checkpoint", mock_restore)
+
+        result, checkpoint = execute_with_rollback(
+            cmd, cwd=str(cwd), checkpoint_dir=str(checkpoint_dir)
+        )
+
+        assert result.exit_code != 0
+        assert checkpoint is not None
+        # Because restore failed, file remains changed
+        assert (cwd / "file.txt").read_text().strip() == "changed"
