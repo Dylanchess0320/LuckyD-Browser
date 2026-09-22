@@ -11,6 +11,7 @@ import re
 import shutil
 import sys
 import time
+from collections.abc import Callable
 
 _IS_WINDOWS = platform.system() == "Windows"
 if _IS_WINDOWS:
@@ -611,6 +612,184 @@ class TerminalUI:
                 print(f"    {ANSI['dim']}•{ANSI['reset']} {name}")
             print()
 
+    def _show_models_ansi(
+        self,
+        sections: list[dict],
+        cur_norm: str,
+        current_model: str,
+        flat: dict[int, tuple[str, str]],
+    ) -> dict[int, tuple[str, str]]:
+        """ANSI fallback rendering path for model catalog."""
+        print(
+            f"\n  {ANSI['bold']}{ANSI['cyan']}Model Catalog{ANSI['reset']}  {ANSI['dim']}· free · $0 · fuzzy search{ANSI['reset']}"
+        )
+        if cur_norm:
+            print(f"  {ANSI['dim']}active: {current_model}{ANSI['reset']}")
+        for section in sections or []:
+            tier = section.get("tier", "free")
+            label = section.get("label", "")
+            c = ANSI["green"] if tier == "free" else ANSI["yellow"]
+            dot = "●" if tier == "free" else "○"
+            print(f"\n  {c}{dot} {label}{ANSI['reset']}")
+            print(f"  {ANSI['dim']}{'─' * 56}{ANSI['reset']}")
+            print(
+                f"  {ANSI['dim']} {'#':>3}  {'Model':<28} {'Provider':<18} {'Status'}{ANSI['reset']}"
+            )
+            print(f"  {ANSI['dim']} {'─' * 3}  {'─' * 28} {'─' * 18} {'─' * 8}{ANSI['reset']}")
+            g = 0
+            for group in section.get("groups", []) or []:
+                prov_label = str(group.get("provider", ""))
+                prov_clean = prov_label.replace(" ✓", "").replace("✓", "").strip()
+                if " (needs" in prov_clean:
+                    prov_clean = prov_clean.split(" (needs")[0].strip()
+                is_available = "✓" in prov_label
+                for m in group.get("models", []) or []:
+                    g += 1
+                    g_idx = next((k for k, v in flat.items() if v[1] == m), g)
+                    is_cur = m.lower() == cur_norm
+                    status = (
+                        "◀ active"
+                        if is_cur
+                        else (
+                            "✓ ready"
+                            if is_available
+                            else "needs key"
+                            if "needs" in prov_label.lower()
+                            else "—"
+                        )
+                    )
+                    sc = ANSI["green"] if is_cur or is_available else ANSI["dim"]
+                    cur_mark = f" {ANSI['green']}◀{ANSI['reset']}" if is_cur else ""
+                    print(
+                        f"  {ANSI['dim']}{g_idx:>3}{ANSI['reset']}  {ANSI['cyan']}{m:<28}{ANSI['reset']} {prov_clean:<18} {sc}{status}{ANSI['reset']}{cur_mark}"
+                    )
+        print(
+            f"\n  {ANSI['dim']}Pick: {ANSI['reset']}{ANSI['cyan']}/model 12{ANSI['reset']} {ANSI['dim']}or {ANSI['reset']}{ANSI['cyan']}/model nemotron{ANSI['reset']} {ANSI['dim']}· fuzzy: kimi, qwen, spark, gpt{ANSI['reset']}"
+        )
+        print(
+            f"  {ANSI['dim']}Tip: type part of the name — it knows what you want{ANSI['reset']}\n"
+        )
+        return flat
+
+    def _show_models_rich(
+        self,
+        sections: list[dict],
+        cur_norm: str,
+        current_model: str,
+        flat: dict[int, tuple[str, str]],
+        _provider_key: Callable[[str], str],
+    ) -> dict[int, tuple[str, str]]:
+        """Rich rendering path for model catalog."""
+        from rich import box
+        from rich.panel import Panel
+
+        self._console.print()
+
+        header_text = Text()
+        header_text.append("  Model Catalog", style=f"bold {BRAND['primary']}")
+        header_text.append("  ·  free · $0  ·  fuzzy search", style=BRAND["muted"])
+        if cur_norm:
+            header_text.append(f"  ·  active: {current_model}", style=BRAND["muted"])
+        self._console.print(header_text)
+
+        for section in sections or []:
+            tier = section.get("tier", "free")
+            label = section.get("label", "Free")
+            # Title bar colour by tier
+            tier_color = BRAND["success"] if tier == "free" else BRAND["warn"]
+            tier_dot = "●" if tier == "free" else "○"
+
+            table = Table(
+                box=box.ROUNDED,
+                show_header=True,
+                header_style=f"bold {BRAND['muted']}",
+                border_style=BRAND["muted"],
+                padding=(0, 1),
+                expand=False,
+            )
+            table.add_column("#", justify="right", style=BRAND["muted"], no_wrap=True, width=4)
+            table.add_column(
+                "Model",
+                style=BRAND["primary"],
+                no_wrap=False,
+                overflow="fold",
+                min_width=22,
+            )
+            table.add_column("Provider", style="white", no_wrap=True)
+            table.add_column("Status", justify="center", no_wrap=True, width=10)
+
+            n = 0
+            for group in section.get("groups", []) or []:
+                prov_label = str(group.get("provider", ""))
+                pkey = _provider_key(prov_label)
+                if group.get("provider_key"):
+                    pkey = str(group["provider_key"])
+                # Derive availability from label's ✓ / (needs …) suffix
+                is_available = "✓" in prov_label
+                needs_key = "needs" in prov_label.lower()
+                # Strip suffix for the Provider column (keep clean name)
+                prov_clean = prov_label.replace(" ✓", "").replace("✓", "").strip()
+                # Remove trailing "(needs …)" for cleaner column but keep status icon
+                if " (needs" in prov_clean:
+                    prov_clean = prov_clean.split(" (needs")[0].strip()
+
+                for m in group.get("models", []) or []:
+                    n += 1
+                    # Find global index for this model (first match)
+                    g_idx = next((k for k, v in flat.items() if v[1] == m and v[0] == pkey), n)
+                    is_current = m.lower() == cur_norm
+                    status = ""
+                    status_style = BRAND["muted"]
+                    if is_current:
+                        status = "◀ active"
+                        status_style = BRAND["success"]
+                    elif is_available:
+                        status = "✓ ready"
+                        status_style = BRAND["success"]
+                    elif needs_key:
+                        status = "needs key"
+                        status_style = BRAND["warn"]
+                    else:
+                        status = "—"
+
+                    num_txt = Text(
+                        str(g_idx),
+                        style=f"bold {BRAND['success']}" if is_current else BRAND["muted"],
+                    )
+                    model_txt = Text(
+                        m,
+                        style=(f"bold {BRAND['primary']}" if is_current else BRAND["primary"]),
+                    )
+                    if is_current:
+                        model_txt.append("  ◀", style=BRAND["success"])
+                    prov_txt = Text(prov_clean, style="white")
+                    status_txt = Text(status, style=status_style)
+                    table.add_row(num_txt, model_txt, prov_txt, status_txt)
+
+            title = Text()
+            title.append(f" {tier_dot} ", style=tier_color)
+            title.append(label, style=f"bold {tier_color}")
+
+            panel = Panel(
+                table,
+                title=title,
+                title_align="left",
+                border_style=BRAND["muted"],
+                box=box.ROUNDED,
+                padding=(0, 1),
+            )
+            self._console.print(panel)
+
+        # Footer hints — single dim line, no wall of text
+        self._console.print(
+            f"  {self._dim('Pick:')} {self._primary('/model 12')} {self._dim('or')} {self._primary('/model nemotron')} {self._dim('· fuzzy: kimi, qwen, spark, gpt ·')} {self._primary('/model free')} {self._dim('for ready-to-use only')}"
+        )
+        self._console.print(
+            f"  {self._dim('Tip: just type part of the name — it knows what you want  ·  Enter without args to browse')}"
+        )
+        self._console.print()
+        return flat
+
     def show_models(
         self,
         sections: list[dict],
@@ -664,264 +843,94 @@ class TerminalUI:
         # ── Rich path ─────────────────────────────────────────────────
         if self.rich:
             try:
-                from rich import box
-                from rich.panel import Panel
-
-                self._console.print()
-
-                header_text = Text()
-                header_text.append("  Model Catalog", style=f"bold {BRAND['primary']}")
-                header_text.append("  ·  free · $0  ·  fuzzy search", style=BRAND["muted"])
-                if cur_norm:
-                    header_text.append(f"  ·  active: {current_model}", style=BRAND["muted"])
-                self._console.print(header_text)
-
-                for section in sections or []:
-                    tier = section.get("tier", "free")
-                    label = section.get("label", "Free")
-                    # Title bar colour by tier
-                    tier_color = BRAND["success"] if tier == "free" else BRAND["warn"]
-                    tier_dot = "●" if tier == "free" else "○"
-
-                    table = Table(
-                        box=box.ROUNDED,
-                        show_header=True,
-                        header_style=f"bold {BRAND['muted']}",
-                        border_style=BRAND["muted"],
-                        padding=(0, 1),
-                        expand=False,
-                    )
-                    table.add_column(
-                        "#", justify="right", style=BRAND["muted"], no_wrap=True, width=4
-                    )
-                    table.add_column(
-                        "Model",
-                        style=BRAND["primary"],
-                        no_wrap=False,
-                        overflow="fold",
-                        min_width=22,
-                    )
-                    table.add_column("Provider", style="white", no_wrap=True)
-                    table.add_column("Status", justify="center", no_wrap=True, width=10)
-
-                    n = 0
-                    for group in section.get("groups", []) or []:
-                        prov_label = str(group.get("provider", ""))
-                        pkey = _provider_key(prov_label)
-                        if group.get("provider_key"):
-                            pkey = str(group["provider_key"])
-                        # Derive availability from label's ✓ / (needs …) suffix
-                        is_available = "✓" in prov_label
-                        needs_key = "needs" in prov_label.lower()
-                        # Strip suffix for the Provider column (keep clean name)
-                        prov_clean = prov_label.replace(" ✓", "").replace("✓", "").strip()
-                        # Remove trailing "(needs …)" for cleaner column but keep status icon
-                        if " (needs" in prov_clean:
-                            prov_clean = prov_clean.split(" (needs")[0].strip()
-
-                        for m in group.get("models", []) or []:
-                            n += 1
-                            # Find global index for this model (first match)
-                            g_idx = next(
-                                (k for k, v in flat.items() if v[1] == m and v[0] == pkey), n
-                            )
-                            is_current = m.lower() == cur_norm
-                            status = ""
-                            status_style = BRAND["muted"]
-                            if is_current:
-                                status = "◀ active"
-                                status_style = BRAND["success"]
-                            elif is_available:
-                                status = "✓ ready"
-                                status_style = BRAND["success"]
-                            elif needs_key:
-                                status = "needs key"
-                                status_style = BRAND["warn"]
-                            else:
-                                status = "—"
-
-                            num_txt = Text(
-                                str(g_idx),
-                                style=f"bold {BRAND['success']}" if is_current else BRAND["muted"],
-                            )
-                            model_txt = Text(
-                                m,
-                                style=(
-                                    f"bold {BRAND['primary']}" if is_current else BRAND["primary"]
-                                ),
-                            )
-                            if is_current:
-                                model_txt.append("  ◀", style=BRAND["success"])
-                            prov_txt = Text(prov_clean, style="white")
-                            status_txt = Text(status, style=status_style)
-                            table.add_row(num_txt, model_txt, prov_txt, status_txt)
-
-                    title = Text()
-                    title.append(f" {tier_dot} ", style=tier_color)
-                    title.append(label, style=f"bold {tier_color}")
-
-                    panel = Panel(
-                        table,
-                        title=title,
-                        title_align="left",
-                        border_style=BRAND["muted"],
-                        box=box.ROUNDED,
-                        padding=(0, 1),
-                    )
-                    self._console.print(panel)
-
-                # Footer hints — single dim line, no wall of text
-                self._console.print(
-                    f"  {self._dim('Pick:')} {self._primary('/model 12')} {self._dim('or')} {self._primary('/model nemotron')} {self._dim('· fuzzy: kimi, qwen, spark, gpt ·')} {self._primary('/model free')} {self._dim('for ready-to-use only')}"
+                return self._show_models_rich(
+                    sections, cur_norm, current_model, flat, _provider_key
                 )
-                self._console.print(
-                    f"  {self._dim('Tip: just type part of the name — it knows what you want  ·  Enter without args to browse')}"
-                )
-                self._console.print()
-                return flat
             except Exception:
                 # Fall through to ANSI fallback on any Rich error
                 pass
 
         # ── ANSI fallback ─────────────────────────────────────────────
-        print(
-            f"\n  {ANSI['bold']}{ANSI['cyan']}Model Catalog{ANSI['reset']}  {ANSI['dim']}· free · $0 · fuzzy search{ANSI['reset']}"
-        )
-        if cur_norm:
-            print(f"  {ANSI['dim']}active: {current_model}{ANSI['reset']}")
-        for section in sections or []:
-            tier = section.get("tier", "free")
-            label = section.get("label", "")
-            c = ANSI["green"] if tier == "free" else ANSI["yellow"]
-            dot = "●" if tier == "free" else "○"
-            print(f"\n  {c}{dot} {label}{ANSI['reset']}")
-            print(f"  {ANSI['dim']}{'─' * 56}{ANSI['reset']}")
-            print(
-                f"  {ANSI['dim']} {'#':>3}  {'Model':<28} {'Provider':<18} {'Status'}{ANSI['reset']}"
+        return self._show_models_ansi(sections, cur_norm, current_model, flat)
+
+    def _show_providers_rich(self, entries: list[dict]) -> bool:
+        if not self.rich:
+            return False
+        try:
+            from rich import box
+            from rich.panel import Panel
+
+            self._console.print()
+            header_text = Text()
+            header_text.append("  AI Providers", style=f"bold {BRAND['primary']}")
+            ready = sum(1 for p in entries if p.get("configured"))
+            header_text.append(f"  ·  {ready}/{len(entries)} ready", style=BRAND["muted"])
+            self._console.print(header_text)
+
+            table = Table(
+                box=box.ROUNDED,
+                show_header=True,
+                header_style=f"bold {BRAND['muted']}",
+                border_style=BRAND["muted"],
+                padding=(0, 1),
+                expand=False,
             )
-            print(f"  {ANSI['dim']} {'─' * 3}  {'─' * 28} {'─' * 18} {'─' * 8}{ANSI['reset']}")
-            g = 0
-            for group in section.get("groups", []) or []:
-                prov_label = str(group.get("provider", ""))
-                prov_clean = prov_label.replace(" ✓", "").replace("✓", "").strip()
-                if " (needs" in prov_clean:
-                    prov_clean = prov_clean.split(" (needs")[0].strip()
-                is_available = "✓" in prov_label
-                for m in group.get("models", []) or []:
-                    g += 1
-                    g_idx = next((k for k, v in flat.items() if v[1] == m), g)
-                    is_cur = m.lower() == cur_norm
-                    status = (
-                        "◀ active"
-                        if is_cur
-                        else (
-                            "✓ ready"
-                            if is_available
-                            else "needs key"
-                            if "needs" in prov_label.lower()
-                            else "—"
-                        )
-                    )
-                    sc = ANSI["green"] if is_cur or is_available else ANSI["dim"]
-                    cur_mark = f" {ANSI['green']}◀{ANSI['reset']}" if is_cur else ""
-                    print(
-                        f"  {ANSI['dim']}{g_idx:>3}{ANSI['reset']}  {ANSI['cyan']}{m:<28}{ANSI['reset']} {prov_clean:<18} {sc}{status}{ANSI['reset']}{cur_mark}"
-                    )
-        print(
-            f"\n  {ANSI['dim']}Pick: {ANSI['reset']}{ANSI['cyan']}/model 12{ANSI['reset']} {ANSI['dim']}or {ANSI['reset']}{ANSI['cyan']}/model nemotron{ANSI['reset']} {ANSI['dim']}· fuzzy: kimi, qwen, spark, gpt{ANSI['reset']}"
-        )
-        print(
-            f"  {ANSI['dim']}Tip: type part of the name — it knows what you want{ANSI['reset']}\n"
-        )
-        return flat
+            table.add_column("Provider", style="white", no_wrap=True)
+            table.add_column(
+                "Model",
+                style=BRAND["primary"],
+                no_wrap=False,
+                overflow="fold",
+                min_width=22,
+            )
+            table.add_column("Cost", justify="center", no_wrap=True, width=8)
+            table.add_column("Status", justify="center", no_wrap=True, width=12)
 
-    def show_providers(self, providers: list[dict]) -> None:
-        """Provider list — Panel + Table (Rich) or boxed ANSI fallback.
-
-        ``providers`` is a JSON-shaped list built by
-        ``core.providers.list_providers``::
-            [{"id", "name", "base_url", "model", "env_key", "key_present",
-              "local", "free_tier", "configured", "current"}, ...]
-        """
-        entries = list(providers or [])
-
-        # ── Rich path ─────────────────────────────────────────────────
-        if self.rich:
-            try:
-                from rich import box
-                from rich.panel import Panel
-
-                self._console.print()
-                header_text = Text()
-                header_text.append("  AI Providers", style=f"bold {BRAND['primary']}")
-                ready = sum(1 for p in entries if p.get("configured"))
-                header_text.append(f"  ·  {ready}/{len(entries)} ready", style=BRAND["muted"])
-                self._console.print(header_text)
-
-                table = Table(
-                    box=box.ROUNDED,
-                    show_header=True,
-                    header_style=f"bold {BRAND['muted']}",
-                    border_style=BRAND["muted"],
-                    padding=(0, 1),
-                    expand=False,
+            for p in entries:
+                is_cur = bool(p.get("current"))
+                is_ready = bool(p.get("configured"))
+                free = bool(p.get("free_tier") or p.get("local"))
+                name_txt = Text(
+                    str(p.get("name", p.get("id", ""))),
+                    style=f"bold {BRAND['success']}" if is_cur else "white",
                 )
-                table.add_column("Provider", style="white", no_wrap=True)
-                table.add_column(
-                    "Model",
-                    style=BRAND["primary"],
-                    no_wrap=False,
-                    overflow="fold",
-                    min_width=22,
+                if is_cur:
+                    name_txt.append("  ◀", style=BRAND["success"])
+                model_txt = Text(
+                    str(p.get("model", "")),
+                    style=(f"bold {BRAND['primary']}" if is_cur else BRAND["primary"]),
                 )
-                table.add_column("Cost", justify="center", no_wrap=True, width=8)
-                table.add_column("Status", justify="center", no_wrap=True, width=12)
-
-                for p in entries:
-                    is_cur = bool(p.get("current"))
-                    is_ready = bool(p.get("configured"))
-                    free = bool(p.get("free_tier") or p.get("local"))
-                    name_txt = Text(
-                        str(p.get("name", p.get("id", ""))),
-                        style=f"bold {BRAND['success']}" if is_cur else "white",
-                    )
-                    if is_cur:
-                        name_txt.append("  ◀", style=BRAND["success"])
-                    model_txt = Text(
-                        str(p.get("model", "")),
-                        style=(f"bold {BRAND['primary']}" if is_cur else BRAND["primary"]),
-                    )
-                    cost_txt = Text(
-                        "free" if free else "paid",
-                        style=BRAND["success"] if free else BRAND["muted"],
-                    )
-                    if is_cur:
-                        status_txt = Text("◀ active", style=BRAND["success"])
-                    elif is_ready:
-                        status_txt = Text("✓ ready", style=BRAND["success"])
-                    else:
-                        status_txt = Text("needs key", style=BRAND["warn"])
-                    table.add_row(name_txt, model_txt, cost_txt, status_txt)
-
-                panel = Panel(
-                    table,
-                    title=Text(" Providers", style=f"bold {BRAND['primary']}"),
-                    title_align="left",
-                    border_style=BRAND["muted"],
-                    box=box.ROUNDED,
-                    padding=(0, 1),
+                cost_txt = Text(
+                    "free" if free else "paid",
+                    style=BRAND["success"] if free else BRAND["muted"],
                 )
-                self._console.print(panel)
-                self._console.print(
-                    f"  {self._dim('Switch:')} {self._primary('/model <provider> <name>')} {self._dim('e.g.')} {self._primary('/model cline-usage kimi')}"
-                )
-                self._console.print()
-                return
-            except Exception:
-                # Fall through to ANSI fallback on any Rich error
-                pass
+                if is_cur:
+                    status_txt = Text("◀ active", style=BRAND["success"])
+                elif is_ready:
+                    status_txt = Text("✓ ready", style=BRAND["success"])
+                else:
+                    status_txt = Text("needs key", style=BRAND["warn"])
+                table.add_row(name_txt, model_txt, cost_txt, status_txt)
 
-        # ── ANSI fallback ─────────────────────────────────────────────
+            panel = Panel(
+                table,
+                title=Text(" Providers", style=f"bold {BRAND['primary']}"),
+                title_align="left",
+                border_style=BRAND["muted"],
+                box=box.ROUNDED,
+                padding=(0, 1),
+            )
+            self._console.print(panel)
+            self._console.print(
+                f"  {self._dim('Switch:')} {self._primary('/model <provider> <name>')} {self._dim('e.g.')} {self._primary('/model cline-usage kimi')}"
+            )
+            self._console.print()
+            return True
+        except Exception:
+            # Fall through to ANSI fallback on any Rich error
+            return False
+
+    def _show_providers_ansi(self, entries: list[dict]) -> None:
         ready = sum(1 for p in entries if p.get("configured"))
         print(
             f"\n  {ANSI['bold']}{ANSI['cyan']}AI Providers{ANSI['reset']}  {ANSI['dim']}· {ready}/{len(entries)} ready{ANSI['reset']}"
@@ -953,6 +962,23 @@ class TerminalUI:
         print(
             f"\n  {ANSI['dim']}Switch: {ANSI['reset']}{ANSI['cyan']}/model <provider> <name>{ANSI['reset']}\n"
         )
+
+    def show_providers(self, providers: list[dict]) -> None:
+        """Provider list — Panel + Table (Rich) or boxed ANSI fallback.
+
+        ``providers`` is a JSON-shaped list built by
+        ``core.providers.list_providers``::
+            [{"id", "name", "base_url", "model", "env_key", "key_present",
+              "local", "free_tier", "configured", "current"}, ...]
+        """
+        entries = list(providers or [])
+
+        # ── Rich path ─────────────────────────────────────────────────
+        if self._show_providers_rich(entries):
+            return
+
+        # ── ANSI fallback ─────────────────────────────────────────────
+        self._show_providers_ansi(entries)
 
     # ── Input prompt ───────────────────────────────────────────────
 

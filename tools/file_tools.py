@@ -5,6 +5,7 @@ These are the core tools every coding agent needs.
 
 from __future__ import annotations
 
+import asyncio
 import fnmatch
 import re
 from pathlib import Path
@@ -183,24 +184,32 @@ class EditTool(ToolBase):
             if not old_string:
                 return ToolOutput(text="Error: old_string must not be empty", error=True)
 
-            original = path.read_text(encoding="utf-8")
-            if not replace_all:
-                count = original.count(old_string)
-                if count == 0:
-                    return ToolOutput(text="Error: old_string not found in file", error=True)
-                if count > 1:
-                    return ToolOutput(
-                        text=f"Error: old_string found {count} times in file. Use replace_all=True or make it more specific.",
-                        error=True,
-                    )
-                new_content = original.replace(old_string, new_string, 1)
-            else:
-                count = original.count(old_string)
-                if count == 0:
-                    return ToolOutput(text="Error: old_string not found in file", error=True)
-                new_content = original.replace(old_string, new_string)
+            def _do_edit() -> ToolOutput | tuple[int, str, str]:
+                original = path.read_text(encoding="utf-8")
+                if not replace_all:
+                    count = original.count(old_string)
+                    if count == 0:
+                        return ToolOutput(text="Error: old_string not found in file", error=True)
+                    if count > 1:
+                        return ToolOutput(
+                            text=f"Error: old_string found {count} times in file. Use replace_all=True or make it more specific.",
+                            error=True,
+                        )
+                    new_content = original.replace(old_string, new_string, 1)
+                else:
+                    count = original.count(old_string)
+                    if count == 0:
+                        return ToolOutput(text="Error: old_string not found in file", error=True)
+                    new_content = original.replace(old_string, new_string)
 
-            path.write_text(new_content, encoding="utf-8")
+                path.write_text(new_content, encoding="utf-8")
+                return count, original, new_content
+
+            result = await asyncio.to_thread(_do_edit)
+            if isinstance(result, ToolOutput):
+                return result
+
+            count, original, new_content = result
             try:
                 from core.checkpoint import get_checkpoint_manager
 
