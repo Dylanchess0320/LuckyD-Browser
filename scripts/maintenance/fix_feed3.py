@@ -11,7 +11,7 @@ content = content.replace(
 )
 
 # Fix match text
-content = content.replace('text = "? \\${mp}% match"', 'text = "✨ \\${mp}% match"')
+content = content.replace('text = "? \\${mp}% match"', 'text = "⭐ \\${mp}% match"')
 
 with codecs.open(f, "w", "utf-8") as fh:
     fh.write(content)
