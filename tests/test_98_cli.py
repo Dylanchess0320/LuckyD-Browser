@@ -178,6 +178,12 @@ def test_custom_provider_test_probe(tmp_path: Path) -> None:
 def test_acp_initialize_ping_unknown() -> None:
     server = AcpServer(stdin=io.StringIO(""), stdout=io.StringIO())
     assert server.handle({"method": "ping", "id": 1})["result"] == {"ok": True}
+
+    # Test missing id edge case
+    res_no_id = server.handle({"method": "ping"})
+    assert res_no_id["id"] is None
+    assert res_no_id["result"] == {"ok": True}
+
     # Not initialized → prompt is rejected.
     err = server.handle({"method": "prompt", "params": {"text": "hi"}, "id": 2})
     assert "error" in err
