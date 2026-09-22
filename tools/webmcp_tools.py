@@ -25,6 +25,7 @@ import json
 import secrets
 from dataclasses import dataclass, field
 from pathlib import Path
+import functools
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -476,6 +477,11 @@ class WebMCPCallTool(ToolBase):
         )
 
 
+@functools.lru_cache(maxsize=1)
+def _get_shim_js() -> str:
+    return _SHIM_PATH.read_text(encoding="utf-8")
+
+
 class WebMCPShimTool(ToolBase):
     name = "WebMCPShim"
     description = (
@@ -491,7 +497,7 @@ class WebMCPShimTool(ToolBase):
 
     async def execute(self) -> ToolOutput:
         try:
-            shim_js = _SHIM_PATH.read_text(encoding="utf-8")
+            shim_js = _get_shim_js()
         except OSError as e:
             return ToolOutput(text=f"Error: cannot read WebMCP shim: {e}", error=True)
         try:
