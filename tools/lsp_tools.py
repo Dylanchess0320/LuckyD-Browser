@@ -172,7 +172,7 @@ class LspRenameTool(ToolBase):
     async def execute(
         self, file_path: str, line: int, new_name: str, character: int = 0
     ) -> ToolOutput:
-        try:
+        def _do_rename():
             jedi = _get_jedi()
             path = _resolve_path(file_path)
 
@@ -217,6 +217,9 @@ class LspRenameTool(ToolBase):
                     "files": len(by_file),
                 },
             )
+
+        try:
+            return await asyncio.to_thread(_do_rename)
         except Exception as e:
             return ToolOutput(text=f"Rename error: {e}", error=True)
 
