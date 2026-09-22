@@ -280,3 +280,21 @@ def test_minimax_cli_tools_are_real_registry_tools() -> None:
     assert isinstance(registry.get("mmx"), ToolBase)
     names = {s["function"]["name"] for s in registry.openai_tools()}
     assert {"mcode", "mmx"} <= names
+
+
+def test_acp_serve_forever_error_handling() -> None:
+    stdin = io.StringIO(
+        '{invalid json\n{"method": "ping", "id": 1}\n{"method": "shutdown", "id": 2}\n'
+    )
+    stdout = io.StringIO()
+    server = AcpServer(stdin=stdin, stdout=stdout)
+    exit_code = server.serve_forever()
+    assert exit_code == 0
+    out = stdout.getvalue()
+
+    # check that it responded with parse error for the first line
+    assert "parse error" in out
+    assert "-32700" in out
+
+    # check that it gracefully continued to ping
+    assert '"ok": true' in out
