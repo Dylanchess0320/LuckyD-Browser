@@ -85,8 +85,10 @@ def elements_js() -> str:
 
 def slugify(name: str) -> str:
     """Safe file/key name for a workflow."""
+    if not name:
+        return ""
     slug = re.sub(r"[^A-Za-z0-9._-]+", "-", (name or "").strip()).strip("-.")
-    return slug[:60] or "workflow"
+    return slug[:60] or ""
 
 
 def action_index(action: dict) -> int:

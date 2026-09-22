@@ -8,6 +8,7 @@ import re
 import shutil
 import subprocess
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import NamedTuple
 
@@ -183,13 +184,23 @@ def execute(command: str, cwd: str | None = None, timeout: int | None = None) ->
         return CommandResult(-1, "", f"ERROR: {e}", False, elapsed)
 
 
-def execute_batch(commands: list[str], cwd: str | None = None) -> list[CommandResult]:
+@dataclass
+class BatchOptions:
+    cwd: str | None = None
+    timeout: int | None = None
+    stop_on_failure: bool = True
+
+
+def execute_batch(commands: list[str], options: BatchOptions | None = None) -> list[CommandResult]:
     """Execute a list of commands sequentially, stopping on first failure."""
+    if options is None:
+        options = BatchOptions()
+
     results = []
     for cmd in commands:
-        result = execute(cmd, cwd=cwd)
+        result = execute(cmd, cwd=options.cwd, timeout=options.timeout)
         results.append(result)
-        if result.exit_code != 0 and not result.blocked:
+        if result.exit_code != 0 and not result.blocked and options.stop_on_failure:
             break  # stop on first failure
     return results
 
@@ -221,6 +232,20 @@ def isolated_workspace(prefix: str = "agent_sandbox_"):
         shutil.rmtree(workspace, ignore_errors=True)
 
 
+def _copy_files_to_workspace(copy_files: list[str] | None, workspace: str | Path) -> None:
+    """Helper to copy requested files into the sandbox workspace."""
+    if not copy_files:
+        return
+    for file_path in copy_files:
+        src = Path(file_path)
+        if src.exists():
+            dst = Path(workspace) / src.name
+            if src.is_file():
+                shutil.copy2(src, dst)
+            elif src.is_dir():
+                shutil.copytree(src, dst, dirs_exist_ok=True)
+
+
 def execute_isolated(
     command: str,
     timeout: int | None = None,
@@ -238,15 +263,7 @@ def execute_isolated(
     """
     with isolated_workspace() as workspace:
         # Copy requested files into the sandbox
-        if copy_files:
-            for file_path in copy_files:
-                src = Path(file_path)
-                if src.exists():
-                    dst = Path(workspace) / src.name
-                    if src.is_file():
-                        shutil.copy2(src, dst)
-                    elif src.is_dir():
-                        shutil.copytree(src, dst, dirs_exist_ok=True)
+        _copy_files_to_workspace(copy_files, workspace)
 
         return execute(command, cwd=workspace, timeout=timeout)
 
@@ -266,13 +283,7 @@ def execute_python_isolated(
         script_path.write_text(code, encoding="utf-8")
 
         # Copy any additional files
-        if copy_files:
-            for file_path in copy_files:
-                src = Path(file_path)
-                if src.exists():
-                    dst = Path(workspace) / src.name
-                    if src.is_file():
-                        shutil.copy2(src, dst)
+        _copy_files_to_workspace(copy_files, workspace)
 
         # Run the script
         return execute(f'python "{script_path}"', cwd=workspace, timeout=timeout)

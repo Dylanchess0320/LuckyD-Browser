@@ -45,10 +45,11 @@ class LspDefinitionTool(ToolBase):
             if not path.exists():
                 return ToolOutput(text=f"File not found: {file_path}", error=True)
 
-            source = await asyncio.to_thread(path.read_text)
-            results = await asyncio.to_thread(
-                lambda: jedi.Script(code=source, path=str(path)).goto(line=line, column=character)
-            )
+            def _get_results():
+                source = path.read_text()
+                return jedi.Script(code=source, path=str(path)).goto(line=line, column=character)
+
+            results = await asyncio.to_thread(_get_results)
 
             if not results:
                 return ToolOutput(text="No definition found.", title="Go to Definition")
@@ -85,12 +86,14 @@ class LspReferencesTool(ToolBase):
         try:
             jedi = _get_jedi()
             path = _resolve_path(file_path)
-            source = await asyncio.to_thread(path.read_text)
-            results = await asyncio.to_thread(
-                lambda: jedi.Script(code=source, path=str(path)).get_references(
+
+            def _get_results():
+                source = path.read_text()
+                return jedi.Script(code=source, path=str(path)).get_references(
                     line=line, column=character
                 )
-            )
+
+            results = await asyncio.to_thread(_get_results)
 
             if not results:
                 return ToolOutput(text="No references found.", title="Find References")
@@ -126,9 +129,13 @@ class LspHoverTool(ToolBase):
         try:
             jedi = _get_jedi()
             path = _resolve_path(file_path)
-            source = await asyncio.to_thread(path.read_text)
-            script = jedi.Script(code=source, path=str(path))
-            results = script.help(line=line, column=character)
+
+            def _get_results():
+                source = path.read_text()
+                script = jedi.Script(code=source, path=str(path))
+                return script.help(line=line, column=character)
+
+            results = await asyncio.to_thread(_get_results)
 
             if not results:
                 return ToolOutput(text="No type info found.", title="Hover")
@@ -168,9 +175,13 @@ class LspRenameTool(ToolBase):
         try:
             jedi = _get_jedi()
             path = _resolve_path(file_path)
-            source = await asyncio.to_thread(path.read_text)
-            script = jedi.Script(code=source, path=str(path))
-            refs = script.get_references(line=line, column=character)
+
+            def _get_refs():
+                source = path.read_text()
+                script = jedi.Script(code=source, path=str(path))
+                return script.get_references(line=line, column=character)
+
+            refs = await asyncio.to_thread(_get_refs)
 
             if not refs:
                 return ToolOutput(text="No references found to rename.", error=True)
@@ -224,12 +235,14 @@ class LspDocumentSymbolsTool(ToolBase):
         try:
             jedi = _get_jedi()
             path = _resolve_path(file_path)
-            source = await asyncio.to_thread(path.read_text)
-            names = await asyncio.to_thread(
-                lambda: jedi.Script(code=source, path=str(path)).get_names(
+
+            def _get_names():
+                source = path.read_text()
+                return jedi.Script(code=source, path=str(path)).get_names(
                     all_scopes=True, definitions=True
                 )
-            )
+
+            names = await asyncio.to_thread(_get_names)
 
             parts = []
             for n in names:
@@ -261,7 +274,7 @@ class LspWorkspaceSymbolsTool(ToolBase):
             # Search across all Python files in cwd
             cwd = Path.cwd()
 
-            def search_symbols():
+            def _search():
                 results = []
                 for py_file in cwd.rglob("*.py"):
                     if any(
@@ -280,7 +293,7 @@ class LspWorkspaceSymbolsTool(ToolBase):
                         continue
                 return results
 
-            results = await asyncio.to_thread(search_symbols)
+            results = await asyncio.to_thread(_search)
 
             shown = results[:50]
             output = "\n".join(shown) if shown else f"No symbols found matching '{query}'"
@@ -309,9 +322,13 @@ class LspImplementationTool(ToolBase):
         try:
             jedi = _get_jedi()
             path = _resolve_path(file_path)
-            source = await asyncio.to_thread(path.read_text)
-            script = jedi.Script(code=source, path=str(path))
-            results = script.goto(line=line, column=0)
+
+            def _get_results():
+                source = path.read_text()
+                script = jedi.Script(code=source, path=str(path))
+                return script.goto(line=line, column=0)
+
+            results = await asyncio.to_thread(_get_results)
 
             if not results or not results[0].name:
                 return ToolOutput(text="No implementations found.", title="Implementations")
@@ -320,7 +337,7 @@ class LspImplementationTool(ToolBase):
             # Search project for this method name in class bodies
             cwd = Path.cwd()
 
-            def search_impls():
+            def _search_impls():
                 found = []
                 for py_file in cwd.rglob("*.py"):
                     if any(
@@ -341,7 +358,7 @@ class LspImplementationTool(ToolBase):
                         continue
                 return found
 
-            found = await asyncio.to_thread(search_impls)
+            found = await asyncio.to_thread(_search_impls)
 
             if not found:
                 return ToolOutput(
@@ -371,17 +388,25 @@ class LspIncomingCallsTool(ToolBase):
         try:
             jedi = _get_jedi()
             path = _resolve_path(file_path)
-            source = await asyncio.to_thread(path.read_text)
-            script = jedi.Script(code=source, path=str(path))
-            results = await asyncio.to_thread(lambda: script.goto(line=line, column=character))
+
+            def _get_results():
+                source = path.read_text()
+                script = jedi.Script(code=source, path=str(path))
+                return script.goto(line=line, column=character)
+
+            results = await asyncio.to_thread(_get_results)
 
             if not results:
                 return ToolOutput(text="No callers found.", title="Callers")
 
             name = results[0].name
-            callers = await asyncio.to_thread(
-                lambda: script.get_references(line=line, column=character, include_builtins=False)
-            )
+
+            def _get_callers():
+                source = path.read_text()
+                script = jedi.Script(code=source, path=str(path))
+                return script.get_references(line=line, column=character, include_builtins=False)
+
+            callers = await asyncio.to_thread(_get_callers)
 
             parts = []
             for c in callers[:30]:
@@ -416,14 +441,15 @@ class LspOutgoingCallsTool(ToolBase):
         try:
             jedi = _get_jedi()
             path = _resolve_path(file_path)
-            source = await asyncio.to_thread(path.read_text)
-            script = jedi.Script(code=source, path=str(path))
 
-            # Get the function definition
-            def get_callees():
+            def _get_callees():
+                source = path.read_text()
+                script = jedi.Script(code=source, path=str(path))
+
+                # Get the function definition
                 func = script.get_context(line=line, column=character)
                 if not func or func.type != "function":
-                    return None
+                    return None, "Not inside a function."
 
                 # Find all names called within the function
                 func.get_line_code()
@@ -439,15 +465,14 @@ class LspOutgoingCallsTool(ToolBase):
 
                 return func.name, callees
 
-            result = await asyncio.to_thread(get_callees)
-            if result is None:
-                return ToolOutput(text="Not inside a function.", title="Callees")
+            func_name, callees_result = await asyncio.to_thread(_get_callees)
 
-            func_name, callees = result
+            if func_name is None:
+                return ToolOutput(text=callees_result, title="Callees")
 
             output = (
-                f"Callees from '{func_name}':\n" + "\n".join(sorted(callees)[:30])
-                if callees
+                f"Callees from '{func_name}':\n" + "\n".join(sorted(callees_result)[:30])
+                if callees_result
                 else "No callees found."
             )
             return ToolOutput(text=output, title=f"Callees of {func_name}")
