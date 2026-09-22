@@ -6,11 +6,13 @@ import pytest
 
 import config
 
+
 def test_project_dir_normal(monkeypatch):
     """Test _project_dir in normal execution."""
     monkeypatch.delattr(sys, "frozen", raising=False)
     expected = Path(config.__file__).parent.resolve()
     assert config._project_dir() == expected
+
 
 def test_project_dir_frozen(monkeypatch, tmp_path):
     """Test _project_dir in PyInstaller frozen execution."""
@@ -21,6 +23,7 @@ def test_project_dir_frozen(monkeypatch, tmp_path):
     monkeypatch.setattr(sys, "executable", str(mock_exe))
 
     assert config._project_dir() == mock_exe.resolve().parent
+
 
 def test_load_env_basic(monkeypatch, tmp_path):
     """Test basic environment variable loading."""
@@ -34,6 +37,7 @@ def test_load_env_basic(monkeypatch, tmp_path):
 
     assert os.environ.get("TEST_KEY") == "test_value"
     assert os.environ.get("ANOTHER_KEY") == "123"
+
 
 def test_load_env_bom_handling(monkeypatch, tmp_path):
     """Test loading .env file with UTF-8 BOM."""
@@ -49,6 +53,7 @@ def test_load_env_bom_handling(monkeypatch, tmp_path):
     assert os.environ.get("BOM_KEY") == "bom_value"
     # Ensure BOM isn't part of the key
     assert "\ufeff" not in os.environ.get("BOM_KEY", "")
+
 
 def test_load_env_edge_cases(monkeypatch, tmp_path):
     """Test edge cases like comments, empty lines, missing =, quotes."""
@@ -75,6 +80,7 @@ QUOTED_KEY2='quoted_value2'
     assert os.environ.get("QUOTED_KEY2") == "quoted_value2"
     assert os.environ.get("SPACES_KEY") == "spaced_value"
 
+
 def test_load_env_overlay(monkeypatch, tmp_path):
     """Test agent-specific overlay loading."""
     base_env = tmp_path / ".env"
@@ -91,6 +97,7 @@ def test_load_env_overlay(monkeypatch, tmp_path):
     assert os.environ.get("SHARED_KEY") == "shared"
     assert os.environ.get("OVERRIDE_KEY") == "overlay"
     assert os.environ.get("AGENT_KEY") == "agent"
+
 
 def test_get_config(monkeypatch):
     """Test get_config function."""
