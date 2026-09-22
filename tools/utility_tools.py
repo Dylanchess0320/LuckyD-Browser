@@ -64,15 +64,25 @@ class DiffTool(ToolBase):
                 path = Path(file_path).expanduser().resolve()
                 if not path.exists():
                     return ToolOutput(text=f"File not found: {file_path}", error=True)
-                old = path.read_text(encoding="utf-8", errors="replace").splitlines(keepends=True)
+
+                def read_and_split(p: Path) -> list[str]:
+                    return p.read_text(encoding="utf-8", errors="replace").splitlines(keepends=True)
+
+                old = await asyncio.to_thread(read_and_split, path)
                 new = proposed_content.splitlines(keepends=True)
                 label_a = label_a or str(path)
                 label_b = label_b or "proposed"
             elif mode == "file_vs_file":
                 path_a = Path(file_path).expanduser().resolve()
                 path_b = Path(file_path_b).expanduser().resolve()
-                old = path_a.read_text(encoding="utf-8", errors="replace").splitlines(keepends=True)
-                new = path_b.read_text(encoding="utf-8", errors="replace").splitlines(keepends=True)
+
+                def read_and_split(p: Path) -> list[str]:
+                    return p.read_text(encoding="utf-8", errors="replace").splitlines(keepends=True)
+
+                old, new = await asyncio.gather(
+                    asyncio.to_thread(read_and_split, path_a),
+                    asyncio.to_thread(read_and_split, path_b),
+                )
                 label_a = label_a or str(path_a)
                 label_b = label_b or str(path_b)
             elif mode == "string_vs_string":
@@ -83,8 +93,14 @@ class DiffTool(ToolBase):
             else:
                 return ToolOutput(text=f"Unknown mode: {mode}", error=True)
 
-            diff = difflib.unified_diff(old, new, fromfile=label_a, tofile=label_b, n=context_lines)
-            result = "".join(diff)
+            diff_gen = difflib.unified_diff(
+                old, new, fromfile=label_a, tofile=label_b, n=context_lines
+            )
+
+            def consume_diff():
+                return "".join(diff_gen)
+
+            result = await asyncio.to_thread(consume_diff)
             if not result:
                 result = "(no differences)"
 
