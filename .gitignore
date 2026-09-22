@@ -90,6 +90,7 @@ _res.json
 extract.json
 nav.json
 res.json
+snap.json
 
 # Local-only artifacts (kept on disk, not in repo)
 luckyd-code.exe
@@ -116,6 +117,8 @@ browser/build/
 browser/dist/
 browser/build_err.txt
 browser/build_log.txt
+browser/build_*_log.txt
+browser/installer/compile_err.txt
 # version_info.txt IS source (Windows version resource for PyInstaller) — must be tracked
 !browser/version_info.txt
 browser/_dbg_src.js
