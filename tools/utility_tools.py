@@ -19,6 +19,29 @@ try:
 except ImportError:
     _sandbox_is_safe = None
 
+
+def _evaluate_watch_condition(
+    condition: str, file_path_str: str, snapshot: dict, contains_text: str
+) -> bool:
+    file_path = Path(file_path_str)
+
+    if condition == "exists":
+        return file_path.exists()
+    elif condition == "deleted":
+        return not file_path.exists()
+    elif condition == "changed":
+        if file_path.exists():
+            mtime = file_path.stat().st_mtime
+            size = file_path.stat().st_size
+            return mtime != snapshot.get("mtime") or size != snapshot.get("size")
+        return False
+    elif condition == "contains" and file_path.exists():
+        content = file_path.read_text(errors="replace")
+        return contains_text in content
+
+    return False
+
+
 # ── Diff Tool ──
 
 
@@ -365,23 +388,14 @@ class WatchTool(ToolBase):
                 if watch_id not in _watches:
                     return ToolOutput(text=f"Watch not found: {watch_id}", error=True)
                 w = _watches[watch_id]
-                file_path = Path(w["path"])
-                fired = False
 
-                if w["condition"] == "exists":
-                    fired = file_path.exists()
-                elif w["condition"] == "deleted":
-                    fired = not file_path.exists()
-                elif w["condition"] == "changed":
-                    if file_path.exists():
-                        mtime = file_path.stat().st_mtime
-                        size = file_path.stat().st_size
-                        fired = mtime != w["snapshot"].get("mtime") or size != w["snapshot"].get(
-                            "size"
-                        )
-                elif w["condition"] == "contains" and file_path.exists():
-                    content = file_path.read_text(errors="replace")
-                    fired = w.get("contains_text", "") in content
+                fired = await asyncio.to_thread(
+                    _evaluate_watch_condition,
+                    w["condition"],
+                    w["path"],
+                    w.get("snapshot", {}),
+                    w.get("contains_text", ""),
+                )
 
                 w["fired"] = fired
                 return ToolOutput(
@@ -398,23 +412,15 @@ class WatchTool(ToolBase):
                 wait_limit = max(0.0, min(float(timeout_sec), 300.0))
                 deadline = time.time() + wait_limit
                 while time.time() < deadline:
-                    fired = False
                     w = _watches[watch_id]
-                    file_path = Path(w["path"])
-                    if w["condition"] == "exists":
-                        fired = file_path.exists()
-                    elif w["condition"] == "deleted":
-                        fired = not file_path.exists()
-                    elif w["condition"] == "changed":
-                        if file_path.exists():
-                            mtime = file_path.stat().st_mtime
-                            size = file_path.stat().st_size
-                            fired = mtime != w["snapshot"].get("mtime") or size != w[
-                                "snapshot"
-                            ].get("size")
-                    elif w["condition"] == "contains" and file_path.exists():
-                        content = file_path.read_text(errors="replace")
-                        fired = w.get("contains_text", "") in content
+
+                    fired = await asyncio.to_thread(
+                        _evaluate_watch_condition,
+                        w["condition"],
+                        w["path"],
+                        w.get("snapshot", {}),
+                        w.get("contains_text", ""),
+                    )
 
                     if fired:
                         w["fired"] = True
