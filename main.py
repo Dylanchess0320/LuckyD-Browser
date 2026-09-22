@@ -642,15 +642,14 @@ def _resolve_provider(provider_hint: str | None, model_name: str) -> dict:
         # ever prompting for a raw API key (mirrors core/providers.py).
         if provider_hint in ("clinepass", "cline-usage") and not api_key:
             try:
-                import sys as _sys
                 from pathlib import Path as _Path
 
                 try:
                     import cline_session  # type: ignore
                 except ImportError:
                     bc = str(_Path(__file__).resolve().parent / "browser" / "browser_core")
-                    if bc not in _sys.path:
-                        _sys.path.insert(0, bc)
+                    if bc not in sys.path:
+                        sys.path.insert(0, bc)
                     import cline_session  # type: ignore
                 api_key = cline_session.fresh_token()
             except Exception as exc:
@@ -1938,42 +1937,36 @@ lucky-code custom-provider — user-defined OpenAI-compatible providers (9.8)
     sys.exit(2)
 
 
-def main():
-    # Parse CLI args
-    args = sys.argv[1:]
+def _dispatch_early_subcommands(args: list[str]) -> bool:
+    """Dispatches early subcommands that don't need a full agent/API key. Returns True if handled."""
+    if not args:
+        return False
+    cmd = args[0]
 
-    # Dispatch "model" subcommand early (no API key needed)
-    if args and args[0] == "model":
+    if cmd == "model":
         _cli_model(args[1:])
-        return
-
-    # Dispatch "providers" subcommand early (no API key needed)
-    if args and args[0] in ("providers", "provider"):
+        return True
+    if cmd in ("providers", "provider"):
         _cli_providers(args[1:])
-        return
-
-    # Dispatch "plugin" subcommand early (9.8 — no API key needed)
-    if args and args[0] == "plugin":
+        return True
+    if cmd == "plugin":
         _cli_plugin(args[1:])
-        return
-
-    # Dispatch "custom-provider" subcommand early (9.8 — no API key needed)
-    if args and args[0] in ("custom-provider", "custom-providers"):
+        return True
+    if cmd in ("custom-provider", "custom-providers"):
         _cli_custom_provider(args[1:])
-        return
-
-    # ACP stdio server (9.8 — editor extensions speak JSON-RPC on stdio).
-    if args and args[0] == "--acp":
+        return True
+    if cmd == "--acp":
         from acp_server import main as _acp_main
 
         raise SystemExit(_acp_main())
-
-    # Dispatch "schedule" subcommand early (6.0 — background agents)
-    if args and args[0] == "schedule":
+    if cmd == "schedule":
         _cli_schedule(args[1:])
-        return
+        return True
+    return False
 
-    cfg = get_config()
+
+def _parse_agent_args(args: list[str], cfg: dict) -> tuple[dict, str, float, str, str, str, bool]:
+    """Parses the CLI arguments and returns (cfg, model, temperature, one_shot, resume_session_id, permission_mode, json_mode)."""
     model = cfg["model"]
     temperature = cfg["temperature"]
     one_shot = ""
@@ -2004,10 +1997,6 @@ def main():
             temperature = float(args[i + 1])
             i += 2
         elif args[i] in ("-y", "--yes", "--auto-approve", "--yolo"):
-            # Deprecated since 6.1: blanket auto-approval was removed. The
-            # flag is inert — approvals now follow the trust policy
-            # (core/trust.py). Kept parsing so old scripts warn instead of
-            # failing on an unknown flag.
             print(
                 "  [warn] --auto-approve is deprecated and inert since LuckyD 6.1: "
                 "blanket auto-approval was removed. Tool approvals now follow "
@@ -2109,11 +2098,18 @@ Environment:
             one_shot = " ".join(args[i:])
             break
 
-    # Validate API key
-    provider = cfg.get("provider", "deepseek")
-    if provider != "ollama" and (not cfg["api_key"] or cfg["api_key"] == "sk-your-api-key-here"):
-        from core.providers import PROVIDER_DEFAULTS, PROVIDER_NAMES
+    return cfg, model, temperature, one_shot, resume_session_id, permission_mode, json_mode
 
+
+def _validate_api_key(cfg: dict, one_shot: str) -> tuple[dict, str]:
+    """Validates the API key, prompts if needed, and returns updated cfg and model."""
+
+    from core.providers import PROVIDER_DEFAULTS, PROVIDER_NAMES
+
+    provider = cfg.get("provider", "deepseek")
+    model = cfg["model"]
+
+    if provider != "ollama" and (not cfg["api_key"] or cfg["api_key"] == "sk-your-api-key-here"):
         provider_defaults = PROVIDER_DEFAULTS.get(provider, PROVIDER_DEFAULTS["deepseek"])
         env_var = provider_defaults.get("env_key") or (provider.upper() + "_API_KEY")
         display_name = PROVIDER_NAMES.get(provider, provider.title())
@@ -2135,6 +2131,19 @@ Environment:
             cfg = get_config()
             model = cfg["model"]
 
+    return cfg, model
+
+
+def _run_agent(
+    cfg: dict,
+    model: str,
+    temperature: float,
+    permission_mode: str,
+    json_mode: bool,
+    resume_session_id: str,
+    one_shot: str,
+) -> None:
+    """Creates the agent, wires hooks, restores session, and runs the main loop."""
     # Create agent
     agent = CodingAgent(
         api_key=cfg["api_key"],
@@ -2145,20 +2154,16 @@ Environment:
         permission_mode=permission_mode,
     )
 
-    # Wire approval hook — every tool decision flows through the trust policy
-    # (core/trust.py). Approvals prompt on this console; the legacy blanket
-    # auto-approve (CODING_AGENT_AUTO_APPROVE / --yolo) is inert since 6.1.
-    # (--json mode gets no console callback so approval prompts can't corrupt
-    # the JSON-line protocol; those approvals park for the Trust dashboard.)
+    # Wire approval hook
     hook = ApprovalHook(
         session_id=agent.conversation_id,
         approval_callback=None if json_mode else _console_approval,
     )
     register_plugin(hook)
-    # Audit every tool execution ("agentic with receipts", 6.0)
+    # Audit every tool execution
     register_plugin(AuditHook(session_id=agent.conversation_id))
 
-    # Connect MCP servers (lazy: connected inside async loop when needed)
+    # Connect MCP servers
     mcp_manager = MCPManager()
     agent._mcp_manager = mcp_manager
 
@@ -2187,12 +2192,32 @@ Environment:
             agent.save_session()
         try:
             loop = asyncio.new_event_loop()
-            # Only close if there are connected clients
             if mcp_manager.is_connected:
                 loop.run_until_complete(mcp_manager.close_all())
             loop.close()
         except Exception:
             pass
+
+
+def main():
+    # Parse CLI args
+    args = sys.argv[1:]
+
+    # Early dispatch commands that don't need a full agent
+    if _dispatch_early_subcommands(args):
+        return
+
+    # Parse arguments for the agent
+    cfg = get_config()
+    cfg, model, temperature, one_shot, resume_session_id, permission_mode, json_mode = (
+        _parse_agent_args(args, cfg)
+    )
+
+    # Validate API key interactively if missing
+    cfg, model = _validate_api_key(cfg, one_shot)
+
+    # Run the agent session
+    _run_agent(cfg, model, temperature, permission_mode, json_mode, resume_session_id, one_shot)
 
 
 if __name__ == "__main__":
