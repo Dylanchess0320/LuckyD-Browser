@@ -676,10 +676,18 @@ def _resolve_provider(provider_hint: str | None, model_name: str) -> dict:
     }
 
 
-def _apply_model_to_agent(agent, new_cfg: dict, provider: str, model: str) -> None:
-    """Update the agent via its public API (no poking at internals)."""
+def _switch_model(agent, provider: str | None = None, model_name: str = ""):
+    """Switch agent to a new provider and/or model at runtime."""
     from llm import LLMConfig
 
+    new_cfg = _resolve_provider(provider, model_name)
+    if not new_cfg:
+        return
+
+    provider = new_cfg["provider"]
+    model = new_cfg["model"]
+
+    # Update the agent via its public API (no poking at internals)
     agent.switch_provider(
         LLMConfig(
             api_key=new_cfg["api_key"],
@@ -692,9 +700,7 @@ def _apply_model_to_agent(agent, new_cfg: dict, provider: str, model: str) -> No
         )
     )
 
-
-def _update_ui_for_model(agent, model: str) -> None:
-    """Update the UI session info with the new model."""
+    # Update the UI session info
     ui.set_session_info(
         project_name=(
             agent._project_info.name
@@ -704,20 +710,6 @@ def _update_ui_for_model(agent, model: str) -> None:
         provider=agent.provider_name,
         model=model,
     )
-
-
-def _switch_model(agent, provider: str | None = None, model_name: str = ""):
-    """Switch agent to a new provider and/or model at runtime."""
-    new_cfg = _resolve_provider(provider, model_name)
-    if not new_cfg:
-        return
-
-    provider = new_cfg["provider"]
-    model = new_cfg["model"]
-
-    _apply_model_to_agent(agent, new_cfg, provider, model)
-    _update_ui_for_model(agent, model)
-
     _persist_model_selection(provider, model)
     ui.success(f"Switched to {agent.provider_name} / {model}")
 
@@ -1341,137 +1333,6 @@ async def run_repl(agent: CodingAgent):
 # ── "model" CLI subcommand ─────────────────────────────────────────────
 
 
-def _read_env_pairs() -> dict:
-    from config import ENV_FILE
-
-    pairs = {}
-    if ENV_FILE.exists():
-        for line in ENV_FILE.read_text(encoding="utf-8-sig").splitlines():
-            line = line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            key, _, val = line.partition("=")
-            pairs[key.strip()] = val.strip().strip('"').strip("'")
-    return pairs
-
-
-def _current_model_and_provider() -> tuple[str, str]:
-    from core.providers import PROVIDER_DEFAULTS
-
-    pairs = _read_env_pairs()
-    prov = pairs.get("CODING_AGENT_PROVIDER", "").lower()
-    cur = ""
-    if prov == "cline-usage" and pairs.get("CLINE_USAGE_MODEL"):
-        cur = pairs["CLINE_USAGE_MODEL"]
-    elif prov == "clinepass" and pairs.get("CLINEPASS_MODEL"):
-        cur = pairs["CLINEPASS_MODEL"]
-    elif prov and pairs.get(PROVIDER_DEFAULTS.get(prov, {}).get("env_model", "")):
-        cur = pairs.get(PROVIDER_DEFAULTS[prov]["env_model"], "")
-    if not cur:
-        try:
-            from core.providers import resolve_provider_config
-
-            cfg = resolve_provider_config()
-            cur = cfg.get("model", "unknown")
-            prov = cfg.get("provider", prov)
-        except Exception:
-            cur = "unknown"
-    return cur, prov
-
-
-def _set_env_key(lines: list[str], key: str, value: str) -> list[str]:
-    """Replace (in place) or append `key=value` in a list of .env lines."""
-    prefix = key + "="
-    for idx, line in enumerate(lines):
-        stripped = line.strip()
-        if stripped.startswith(prefix) and not stripped.startswith("#"):
-            lines[idx] = f"{key}={value}"
-            return lines
-    if lines and lines[-1].strip():
-        lines.append("")
-    lines.append(f"{key}={value}")
-    return lines
-
-
-def _persist_model_to_env(provider: str, picked: str) -> None:
-    from config import ENV_FILE
-    from core.providers import PROVIDER_DEFAULTS
-
-    defaults = PROVIDER_DEFAULTS.get(provider, PROVIDER_DEFAULTS.get("cline-usage"))
-    env_model = defaults.get("env_model") if defaults else None
-
-    lines = []
-    if ENV_FILE.exists():
-        lines = ENV_FILE.read_text(encoding="utf-8-sig").splitlines()
-
-    if env_model:
-        lines = _set_env_key(lines, env_model, picked)
-    lines = _set_env_key(lines, "CODING_AGENT_PROVIDER", provider)
-
-    ENV_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8-sig")
-
-
-def _resolve_model_query(raw_query: str) -> tuple[str, str] | None:
-    from core.providers import provider_key_from_label
-
-    # Numeric pick: "12" from free catalog
-    if raw_query.strip().isdigit():
-        # Build flat index exactly like ui.show_models does
-        sections = model_catalog(free_only=True)
-        flat: dict[int, tuple[str, str]] = {}
-        idx = 0
-        for section in sections:
-            for group in section.get("groups", []):
-                pkey = provider_key_from_label(str(group.get("provider", "")))
-                if group.get("provider_key"):
-                    pkey = str(group["provider_key"])
-                for m in group.get("models", []) or []:
-                    idx += 1
-                    flat[idx] = (pkey, str(m))
-        n = int(raw_query.strip())
-        hit = flat.get(n)
-        if not hit:
-            print(f"No model #{n} — run: lucky-code model list  (1…{len(flat)})")
-            return None
-        return hit
-
-    # Provider-prefixed direct switch
-    provider = None
-    picked = ""
-    for p in (
-        "cline-usage",
-        "cline-pass",
-        "clinepass",
-        "cline",
-        "openrouter",
-        "groq",
-        "zai",
-        "google",
-        "ollama",
-        "deepseek",
-        "openai",
-        "anthropic",
-        "minimax",
-    ):
-        if raw_query.lower().startswith(p + " "):
-            provider = _PROVIDER_ALIASES.get(p, p)
-            picked = raw_query[len(p) + 1 :].strip()
-            break
-    if provider:
-        # direct — no fuzzy, use exactly what user typed
-        return provider, picked
-
-    # Fuzzy over the free catalog (Cline-style: knows what you want)
-    hit = _resolve_free_query(raw_query)
-    # Fallback to legacy exact Cline match for subscription models
-    if hit is None:
-        hit = _match_cline_model(raw_query)
-    if not hit:
-        print("Run: lucky-code model list  to browse free models")
-        return None
-    return hit
-
-
 def _cli_model(args):
     """luckyd-code model [list | <fuzzy-name> | <number>]
 
@@ -1484,6 +1345,53 @@ def _cli_model(args):
     - "<fuzzy>"           fuzzy — e.g. ``nemotron``, ``kimi``, ``qwen``, ``spark``
     - "<provider> <name>" direct — e.g. ``cline-usage kimi``
     """
+    from config import ENV_FILE
+    from core.providers import PROVIDER_DEFAULTS, provider_key_from_label
+
+    def _read_env_pairs() -> dict:
+        pairs = {}
+        if ENV_FILE.exists():
+            for line in ENV_FILE.read_text(encoding="utf-8-sig").splitlines():
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, _, val = line.partition("=")
+                pairs[key.strip()] = val.strip().strip('"').strip("'")
+        return pairs
+
+    def _set_env_key(lines: list[str], key: str, value: str) -> list[str]:
+        """Replace (in place) or append `key=value` in a list of .env lines."""
+        prefix = key + "="
+        for idx, line in enumerate(lines):
+            stripped = line.strip()
+            if stripped.startswith(prefix) and not stripped.startswith("#"):
+                lines[idx] = f"{key}={value}"
+                return lines
+        if lines and lines[-1].strip():
+            lines.append("")
+        lines.append(f"{key}={value}")
+        return lines
+
+    def _current_model_and_provider() -> tuple[str, str]:
+        pairs = _read_env_pairs()
+        prov = pairs.get("CODING_AGENT_PROVIDER", "").lower()
+        cur = ""
+        if prov == "cline-usage" and pairs.get("CLINE_USAGE_MODEL"):
+            cur = pairs["CLINE_USAGE_MODEL"]
+        elif prov == "clinepass" and pairs.get("CLINEPASS_MODEL"):
+            cur = pairs["CLINEPASS_MODEL"]
+        elif prov and pairs.get(PROVIDER_DEFAULTS.get(prov, {}).get("env_model", "")):
+            cur = pairs.get(PROVIDER_DEFAULTS[prov]["env_model"], "")
+        if not cur:
+            try:
+                from core.providers import resolve_provider_config
+
+                cfg = resolve_provider_config()
+                cur = cfg.get("model", "unknown")
+                prov = cfg.get("provider", prov)
+            except Exception:
+                cur = "unknown"
+        return cur, prov
 
     current, cur_prov = _current_model_and_provider()
 
@@ -1517,13 +1425,76 @@ def _cli_model(args):
     # ── Resolve the desired model ────────────────────────────────────
     raw_query = " ".join(args).strip()
 
-    hit = _resolve_model_query(raw_query)
-    if not hit:
-        return
-    provider, picked = hit
+    # Numeric pick: "12" from free catalog
+    if raw_query.strip().isdigit():
+        # Build flat index exactly like ui.show_models does
+        sections = model_catalog(free_only=True)
+        flat: dict[int, tuple[str, str]] = {}
+        idx = 0
+        for section in sections:
+            for group in section.get("groups", []):
+                pkey = provider_key_from_label(str(group.get("provider", "")))
+                if group.get("provider_key"):
+                    pkey = str(group["provider_key"])
+                for m in group.get("models", []) or []:
+                    idx += 1
+                    flat[idx] = (pkey, str(m))
+        n = int(raw_query.strip())
+        hit = flat.get(n)
+        if not hit:
+            print(f"No model #{n} — run: lucky-code model list  (1…{len(flat)})")
+            return
+        provider, picked = hit
+    else:
+        # Provider-prefixed direct switch
+        provider = None
+        picked = ""
+        for p in (
+            "cline-usage",
+            "cline-pass",
+            "clinepass",
+            "cline",
+            "openrouter",
+            "groq",
+            "zai",
+            "google",
+            "ollama",
+            "deepseek",
+            "openai",
+            "anthropic",
+            "minimax",
+        ):
+            if raw_query.lower().startswith(p + " "):
+                provider = _PROVIDER_ALIASES.get(p, p)
+                picked = raw_query[len(p) + 1 :].strip()
+                break
+        if provider:
+            # direct — no fuzzy, use exactly what user typed
+            pass
+        else:
+            # Fuzzy over the free catalog (Cline-style: knows what you want)
+            hit = _resolve_free_query(raw_query)
+            # Fallback to legacy exact Cline match for subscription models
+            if hit is None:
+                hit = _match_cline_model(raw_query)
+            if not hit:
+                print("Run: lucky-code model list  to browse free models")
+                return
+            provider, picked = hit
 
     # ── Persist to .env (generic — works for any provider) ──────────
-    _persist_model_to_env(provider, picked)
+    defaults = PROVIDER_DEFAULTS.get(provider, PROVIDER_DEFAULTS.get("cline-usage"))
+    env_model = defaults.get("env_model") if defaults else None
+
+    lines = []
+    if ENV_FILE.exists():
+        lines = ENV_FILE.read_text(encoding="utf-8-sig").splitlines()
+
+    if env_model:
+        lines = _set_env_key(lines, env_model, picked)
+    lines = _set_env_key(lines, "CODING_AGENT_PROVIDER", provider)
+
+    ENV_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8-sig")
 
     # Friendly tier label
     if provider == "clinepass":
