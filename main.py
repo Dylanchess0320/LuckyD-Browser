@@ -482,28 +482,24 @@ def _fuzzy_match_free(query: str, limit: int = 8) -> list[tuple[str, str, float]
     return scored[:limit]
 
 
-def _resolve_free_query(query: str) -> tuple[str, str] | None:
-    """Fuzzy-resolve query to a single free model. On ambiguity shows a picker.
+def _handle_no_free_candidates(query: str) -> None:
+    ui.warn(f"No free model matches '{query}'")
+    # Suggest closest 3
+    all_free = _free_entries()
+    import difflib as _dif
 
-    Returns (provider, model) on a confident match, otherwise None after
-    printing disambiguation. Never guesses.
-    """
-    candidates = _fuzzy_match_free(query, limit=8)
-    if not candidates:
-        ui.warn(f"No free model matches '{query}'")
-        # Suggest closest 3
-        all_free = _free_entries()
-        import difflib as _dif
+    names = [mid for _, mid in all_free]
+    close = _dif.get_close_matches(query, names, n=3, cutoff=0.45)
+    if close:
+        print("  Did you mean:")
+        for c in close:
+            print(f"    {c}  →  /model {c}")
+    print("  Run /model to browse all free models.")
 
-        names = [mid for _, mid in all_free]
-        close = _dif.get_close_matches(query, names, n=3, cutoff=0.45)
-        if close:
-            print("  Did you mean:")
-            for c in close:
-                print(f"    {c}  →  /model {c}")
-        print("  Run /model to browse all free models.")
-        return None
 
+def _get_high_confidence_free_match(
+    candidates: list[tuple[str, str, float]],
+) -> tuple[str, str] | None:
     # High-confidence single winner: score gap + absolute threshold
     top_score = candidates[0][2]
     second_score = candidates[1][2] if len(candidates) > 1 else 0.0
@@ -512,11 +508,12 @@ def _resolve_free_query(query: str) -> tuple[str, str] | None:
     # Exact substring uniqueness at top
     if top_score >= 76.0 and len([c for c in candidates if c[2] >= 70.0]) == 1:
         return candidates[0][0], candidates[0][1]
+    return None
 
+
+def _show_ambiguous_free_matches(query: str, candidates: list[tuple[str, str, float]]) -> None:
     # Ambiguous — show top 5 in a compact table
     top = candidates[:5]
-    if len(top) == 1:
-        return top[0][0], top[0][1]
     ui.warn(f"Multiple matches for '{query}':")
     try:
         from rich import box as _box
@@ -543,6 +540,27 @@ def _resolve_free_query(query: str) -> tuple[str, str] | None:
         for i, (prov, mid, sc) in enumerate(top, 1):
             print(f"  {i}. {mid:<36} {prov}  ({sc:.0f})")
     print(f"  Pick one: /model {top[0][1]}  or  /model 1  (number from list above)")
+
+
+def _resolve_free_query(query: str) -> tuple[str, str] | None:
+    """Fuzzy-resolve query to a single free model. On ambiguity shows a picker.
+
+    Returns (provider, model) on a confident match, otherwise None after
+    printing disambiguation. Never guesses.
+    """
+    candidates = _fuzzy_match_free(query, limit=8)
+    if not candidates:
+        _handle_no_free_candidates(query)
+        return None
+
+    match = _get_high_confidence_free_match(candidates)
+    if match:
+        return match
+
+    if len(candidates) == 1:
+        return candidates[0][0], candidates[0][1]
+
+    _show_ambiguous_free_matches(query, candidates)
     # If exactly 2-3 and scores close, don't auto-pick — let user choose
     return None
 
