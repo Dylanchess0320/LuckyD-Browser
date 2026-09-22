@@ -179,21 +179,7 @@ def _is_free_provider_available(pid: str, pinfo: dict) -> bool:
     return bool(os.environ.get(env_key, "").strip())
 
 
-def model_catalog(free_only: bool = False) -> list[dict]:
-    """Tiered model catalog for ui.show_models() and the web /api/models panel.
-
-    Returns a list of sections, each with a cost ``tier`` ("free" | "paid"),
-    a human ``label``, and ``groups`` of {provider, models}. Free covers local
-    Ollama + all $0 models from browser/models/providers_config.json.
-
-    When ``free_only`` is True, returns only the free tier — filtered to
-    providers where the free models would actually work (API key present or
-    local). This powers ``/model free`` for v9.7.
-    """
-    cline_free = [m for m in _CLINE_USAGE_CATALOG if m in _CLINE_USAGE_FREE_TIER]
-    cline_paid = [m for m in _CLINE_USAGE_CATALOG if m not in _CLINE_USAGE_FREE_TIER]
-    clinepass_paid = list(_CLINEPASS_CATALOG)
-
+def _build_free_groups(free_only: bool, cline_free: list[str]) -> list[dict]:
     # Build free groups from providers_config.json (single source of truth for $0 models)
     free_providers = _load_free_providers()
     # Providers with no $0 tier (e.g. keyed OpenCode Zen — restored to the
@@ -259,6 +245,74 @@ def model_catalog(free_only: bool = False) -> list[dict]:
             {"provider": "Ollama", "models": ["codellama", "llama3.1", "mistral", "phi3"]},
             {"provider": "Cline Usage (free tier)", "models": cline_free},
         ]
+    return free_groups
+
+
+def _build_paid_groups(cline_paid: list[str], clinepass_paid: list[str]) -> list[dict]:
+    return [
+        {
+            "provider": "OpenAI",
+            "models": ["gpt-4o", "gpt-4o-mini", "o1-preview", "o1-mini"],
+        },
+        {
+            "provider": "Anthropic",
+            "models": [
+                "claude-sonnet-4-20250514",
+                "claude-opus-4-20250514",
+                "claude-3-5-haiku-20241022",
+            ],
+        },
+        {
+            "provider": "Google Gemini",
+            "models": [
+                "gemini-2.5-flash",
+                "gemini-2.5-flash-lite",
+                "gemini-2.0-flash",
+                "gemini-3.5-flash-lite",
+                "gemini-3.5-flash",
+                "gemini-1.5-pro",
+                "gemini-1.5-flash",
+            ],
+        },
+        {
+            "provider": "DeepSeek",
+            "models": ["deepseek-chat", "deepseek-reasoner", "deepseek-coder"],
+        },
+        {"provider": "Z.ai", "models": ["glm-4.6", "glm-4.5", "glm-4.5-air"]},
+        {
+            "provider": "OpenRouter",
+            "models": [
+                "deepseek/deepseek-chat-v3.1",
+                "anthropic/claude-sonnet-4",
+                "google/gemini-2.0-flash-001",
+            ],
+        },
+        {
+            "provider": "Cline Usage (Muse Spark)",
+            "models": (["muse-spark-1.3"] + (_CONTRIBUTOR_MODELS if _contributor_on() else [])),
+            "provider_key": "cline-usage",
+        },
+        {"provider": "ClinePass (subscription)", "models": clinepass_paid},
+        {"provider": "Cline Usage (credit-billed)", "models": cline_paid},
+    ]
+
+
+def model_catalog(free_only: bool = False) -> list[dict]:
+    """Tiered model catalog for ui.show_models() and the web /api/models panel.
+
+    Returns a list of sections, each with a cost ``tier`` ("free" | "paid"),
+    a human ``label``, and ``groups`` of {provider, models}. Free covers local
+    Ollama + all $0 models from browser/models/providers_config.json.
+
+    When ``free_only`` is True, returns only the free tier — filtered to
+    providers where the free models would actually work (API key present or
+    local). This powers ``/model free`` for v9.7.
+    """
+    cline_free = [m for m in _CLINE_USAGE_CATALOG if m in _CLINE_USAGE_FREE_TIER]
+    cline_paid = [m for m in _CLINE_USAGE_CATALOG if m not in _CLINE_USAGE_FREE_TIER]
+    clinepass_paid = list(_CLINEPASS_CATALOG)
+
+    free_groups = _build_free_groups(free_only, cline_free)
 
     free_section = {
         "tier": "free",
@@ -268,59 +322,14 @@ def model_catalog(free_only: bool = False) -> list[dict]:
     if free_only:
         return [free_section]
 
+    paid_groups = _build_paid_groups(cline_paid, clinepass_paid)
+
     return [
         free_section,
         {
             "tier": "paid",
             "label": "Paid — costs money",
-            "groups": [
-                {
-                    "provider": "OpenAI",
-                    "models": ["gpt-4o", "gpt-4o-mini", "o1-preview", "o1-mini"],
-                },
-                {
-                    "provider": "Anthropic",
-                    "models": [
-                        "claude-sonnet-4-20250514",
-                        "claude-opus-4-20250514",
-                        "claude-3-5-haiku-20241022",
-                    ],
-                },
-                {
-                    "provider": "Google Gemini",
-                    "models": [
-                        "gemini-2.5-flash",
-                        "gemini-2.5-flash-lite",
-                        "gemini-2.0-flash",
-                        "gemini-3.5-flash-lite",
-                        "gemini-3.5-flash",
-                        "gemini-1.5-pro",
-                        "gemini-1.5-flash",
-                    ],
-                },
-                {
-                    "provider": "DeepSeek",
-                    "models": ["deepseek-chat", "deepseek-reasoner", "deepseek-coder"],
-                },
-                {"provider": "Z.ai", "models": ["glm-4.6", "glm-4.5", "glm-4.5-air"]},
-                {
-                    "provider": "OpenRouter",
-                    "models": [
-                        "deepseek/deepseek-chat-v3.1",
-                        "anthropic/claude-sonnet-4",
-                        "google/gemini-2.0-flash-001",
-                    ],
-                },
-                {
-                    "provider": "Cline Usage (Muse Spark)",
-                    "models": (
-                        ["muse-spark-1.3"] + (_CONTRIBUTOR_MODELS if _contributor_on() else [])
-                    ),
-                    "provider_key": "cline-usage",
-                },
-                {"provider": "ClinePass (subscription)", "models": clinepass_paid},
-                {"provider": "Cline Usage (credit-billed)", "models": cline_paid},
-            ],
+            "groups": paid_groups,
         },
     ]
 
