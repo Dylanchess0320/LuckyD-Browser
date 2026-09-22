@@ -373,3 +373,68 @@ def test_remove_tree_best_effort(tmp_path):
     _remove_tree(str(target))
     assert not target.exists()
     _remove_tree(str(tmp_path / "never-existed"))  # must not raise
+
+
+def test_generate_tests_assertions(sandbox):
+    code = """
+def test_bool() -> bool:
+    return True
+
+def test_int() -> int:
+    return 1
+
+def test_str() -> str:
+    return "a"
+
+def test_list() -> list[int]:
+    return [1]
+
+def test_dict() -> dict[str, int]:
+    return {"a": 1}
+
+def test_set() -> set[str]:
+    return {"a"}
+
+def test_tuple() -> tuple[int, int]:
+    return (1, 2)
+
+def test_none() -> None:
+    return None
+
+def test_bytes() -> bytes:
+    return b"a"
+
+def test_unannotated():
+    return 1
+"""
+    skeleton = sandbox.generate_tests(code)
+
+    assert "def test_test_bool():" in skeleton
+    assert "assert result is True  # TODO: real assertion" in skeleton
+
+    assert "def test_test_int():" in skeleton
+    assert "assert result == 0  # TODO: real assertion" in skeleton
+
+    assert "def test_test_str():" in skeleton
+    assert 'assert result == ""  # TODO: real assertion' in skeleton
+
+    assert "def test_test_list():" in skeleton
+    assert "assert result == []  # TODO: real assertion" in skeleton
+
+    assert "def test_test_dict():" in skeleton
+    assert "assert result == {}  # TODO: real assertion" in skeleton
+
+    assert "def test_test_set():" in skeleton
+    assert "assert result == set()  # TODO: real assertion" in skeleton
+
+    assert "def test_test_tuple():" in skeleton
+    assert "assert result == ()  # TODO: real assertion" in skeleton
+
+    assert "def test_test_none():" in skeleton
+    assert "assert result is None  # TODO: real assertion" in skeleton
+
+    assert "def test_test_bytes():" in skeleton
+    assert "assert result == b''  # TODO: real assertion" in skeleton
+
+    assert "def test_test_unannotated():" in skeleton
+    assert "assert result is not None  # TODO: real assertion" in skeleton

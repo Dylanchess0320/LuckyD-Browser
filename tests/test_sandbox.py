@@ -135,18 +135,34 @@ class TestSandboxExecution:
 
     def test_execute_batch_stops_on_failure(self):
         """Test batch execution stops on first failure."""
-        from sandbox import execute_batch
+        from sandbox import BatchOptions, execute_batch
 
         commands = [
             "echo first",
             "nonexistent_command_xyz",
             "echo third",
         ]
-        results = execute_batch(commands)
+        results = execute_batch(commands, options=BatchOptions(stop_on_failure=True))
         assert len(results) <= 2  # Should stop after the failing command
         assert results[0].exit_code == 0
         # Second command may fail or be blocked
 
+    def test_execute_batch_continue_on_failure(self):
+        """Test batch execution continues on failure when stop_on_failure=False."""
+        from sandbox import BatchOptions, execute_batch
+
+        commands = [
+            "echo first",
+            "nonexistent_command_xyz",
+            "echo third",
+        ]
+        results = execute_batch(commands, options=BatchOptions(stop_on_failure=False))
+        assert len(results) == 3  # Should execute all commands
+        assert results[0].exit_code == 0
+        # Second command fails (exit_code != 0), but it shouldn't stop
+        assert results[1].exit_code != 0
+        # Third command succeeds
+        assert results[2].exit_code == 0
 
 class TestSandboxRollback:
     """Test sandboxed command execution with rollback."""
