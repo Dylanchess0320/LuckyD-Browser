@@ -676,10 +676,18 @@ def _resolve_provider(provider_hint: str | None, model_name: str) -> dict:
     }
 
 
-def _apply_model_to_agent(agent, new_cfg: dict, provider: str, model: str) -> None:
-    """Update the agent via its public API (no poking at internals)."""
+def _switch_model(agent, provider: str | None = None, model_name: str = ""):
+    """Switch agent to a new provider and/or model at runtime."""
     from llm import LLMConfig
 
+    new_cfg = _resolve_provider(provider, model_name)
+    if not new_cfg:
+        return
+
+    provider = new_cfg["provider"]
+    model = new_cfg["model"]
+
+    # Update the agent via its public API (no poking at internals)
     agent.switch_provider(
         LLMConfig(
             api_key=new_cfg["api_key"],
@@ -692,9 +700,7 @@ def _apply_model_to_agent(agent, new_cfg: dict, provider: str, model: str) -> No
         )
     )
 
-
-def _update_ui_for_model(agent, model: str) -> None:
-    """Update the UI session info with the new model."""
+    # Update the UI session info
     ui.set_session_info(
         project_name=(
             agent._project_info.name
@@ -704,20 +710,6 @@ def _update_ui_for_model(agent, model: str) -> None:
         provider=agent.provider_name,
         model=model,
     )
-
-
-def _switch_model(agent, provider: str | None = None, model_name: str = ""):
-    """Switch agent to a new provider and/or model at runtime."""
-    new_cfg = _resolve_provider(provider, model_name)
-    if not new_cfg:
-        return
-
-    provider = new_cfg["provider"]
-    model = new_cfg["model"]
-
-    _apply_model_to_agent(agent, new_cfg, provider, model)
-    _update_ui_for_model(agent, model)
-
     _persist_model_selection(provider, model)
     ui.success(f"Switched to {agent.provider_name} / {model}")
 
