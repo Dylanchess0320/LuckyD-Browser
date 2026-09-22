@@ -217,8 +217,11 @@ def resolve_model(
 
 def invalidate_cache() -> None:
     """Force re-fetch on next call."""
+    from contextlib import suppress
+
     if CACHE_FILE.exists():
-        CACHE_FILE.unlink()
+        with suppress(OSError):
+            CACHE_FILE.unlink()
 
 
 def get_cached_models() -> list[str]:
