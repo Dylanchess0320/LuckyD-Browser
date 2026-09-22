@@ -1,11 +1,10 @@
 import json
-import os
-import sys
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from bridge import handle_request, main, run_agent, run_agent_stream
+
 
 @pytest.mark.asyncio
 @patch("bridge.get_config")
@@ -35,6 +34,7 @@ async def test_run_agent_success(mock_agent_cls, mock_resolve_model, mock_get_co
     mock_agent_cls.assert_called_once_with(model="resolved_model")
     mock_agent.run.assert_awaited_once_with("Test prompt")
 
+
 @pytest.mark.asyncio
 @patch("bridge.get_config")
 @patch("bridge.resolve_model")
@@ -52,6 +52,7 @@ async def test_run_agent_exception(mock_agent_cls, mock_resolve_model, mock_get_
     assert result["type"] == "error"
     assert result["content"] == "Test exception"
     assert "traceback" in result
+
 
 @pytest.mark.asyncio
 @patch("bridge.get_config")
@@ -88,6 +89,7 @@ async def test_run_agent_stream_success(mock_agent_cls, mock_resolve_model, mock
     mock_agent_cls.assert_called_once_with(model="resolved_model")
     mock_agent.stream.assert_called_once_with("Test stream prompt")
 
+
 @pytest.mark.asyncio
 @patch("bridge.get_config")
 @patch("bridge.resolve_model")
@@ -114,16 +116,22 @@ async def test_run_agent_stream_exception(mock_agent_cls, mock_resolve_model, mo
     assert chunks[0]["content"] == "Stream exception"
     assert "traceback" in chunks[0]
 
+
 @pytest.mark.asyncio
 @patch("bridge.run_agent")
 async def test_handle_request_chat(mock_run_agent):
     mock_run_agent.return_value = {"type": "response", "content": "hello"}
-    request = {"method": "chat", "params": {"prompt": "hi", "model": "test_model", "thinking": True}, "id": "1"}
+    request = {
+        "method": "chat",
+        "params": {"prompt": "hi", "model": "test_model", "thinking": True},
+        "id": "1",
+    }
 
     result = await handle_request(request)
 
     assert result == {"type": "response", "content": "hello", "id": "1"}
     mock_run_agent.assert_awaited_once_with("hi", model="test_model", thinking=True)
+
 
 @pytest.mark.asyncio
 @patch("bridge.run_agent_stream")
@@ -133,7 +141,11 @@ async def test_handle_request_chat_stream(mock_run_agent_stream, capsys):
         yield json.dumps({"type": "chunk", "content": " there"})
 
     mock_run_agent_stream.return_value = fake_stream()
-    request = {"method": "chat_stream", "params": {"prompt": "hi", "model": "test_model", "thinking": False}, "id": "2"}
+    request = {
+        "method": "chat_stream",
+        "params": {"prompt": "hi", "model": "test_model", "thinking": False},
+        "id": "2",
+    }
 
     result = await handle_request(request)
 
@@ -145,6 +157,7 @@ async def test_handle_request_chat_stream(mock_run_agent_stream, capsys):
     assert len(lines) == 2
     assert json.loads(lines[0]) == {"type": "chunk", "content": "hi", "id": "2"}
     assert json.loads(lines[1]) == {"type": "chunk", "content": " there", "id": "2"}
+
 
 @pytest.mark.asyncio
 @patch("bridge.get_memory")
@@ -168,8 +181,9 @@ async def test_handle_request_get_context(mock_getcwd, mock_get_config, mock_get
             "model": "test_model",
             "cwd": "/test/dir",
             "memory_summary": "Test memory summary",
-        }
+        },
     }
+
 
 @pytest.mark.asyncio
 async def test_handle_request_reset():
@@ -177,11 +191,13 @@ async def test_handle_request_reset():
     result = await handle_request(request)
     assert result == {"type": "ok", "id": "4", "content": "Agent reset"}
 
+
 @pytest.mark.asyncio
 async def test_handle_request_unknown_method():
     request = {"method": "unknown", "id": "5"}
     result = await handle_request(request)
     assert result == {"type": "error", "id": "5", "content": "Unknown method: unknown"}
+
 
 @pytest.mark.asyncio
 @patch("bridge.run_agent")
@@ -197,15 +213,18 @@ async def test_handle_request_exception(mock_run_agent):
     assert result["content"] == "Internal chat error"
     assert "traceback" in result
 
+
 @pytest.mark.asyncio
 @patch("bridge.sys.stdin")
 @patch("bridge.handle_request")
 async def test_main(mock_handle_request, mock_stdin, capsys):
-    mock_stdin.__iter__.return_value = iter([
-        '{"method": "chat", "id": "1"}',
-        '',  # empty line
-        '{"method": "reset", "id": "2"}'
-    ])
+    mock_stdin.__iter__.return_value = iter(
+        [
+            '{"method": "chat", "id": "1"}',
+            "",  # empty line
+            '{"method": "reset", "id": "2"}',
+        ]
+    )
 
     async def fake_handle_request(req):
         return {"type": "ok", "id": req["id"]}
@@ -222,12 +241,11 @@ async def test_main(mock_handle_request, mock_stdin, capsys):
     assert json.loads(lines[1]) == {"type": "ok", "id": "1"}
     assert json.loads(lines[2]) == {"type": "ok", "id": "2"}
 
+
 @pytest.mark.asyncio
 @patch("bridge.sys.stdin")
 async def test_main_json_error(mock_stdin, capsys):
-    mock_stdin.__iter__.return_value = iter([
-        '{invalid_json}'
-    ])
+    mock_stdin.__iter__.return_value = iter(["{invalid_json}"])
 
     await main()
 
@@ -239,13 +257,12 @@ async def test_main_json_error(mock_stdin, capsys):
     assert json.loads(lines[1])["type"] == "error"
     assert "Invalid JSON:" in json.loads(lines[1])["content"]
 
+
 @pytest.mark.asyncio
 @patch("bridge.sys.stdin")
 @patch("bridge.handle_request")
 async def test_main_done_type_ignored(mock_handle_request, mock_stdin, capsys):
-    mock_stdin.__iter__.return_value = iter([
-        '{"method": "chat_stream", "id": "1"}'
-    ])
+    mock_stdin.__iter__.return_value = iter(['{"method": "chat_stream", "id": "1"}'])
 
     async def fake_handle_request(req):
         return {"type": "done", "id": req["id"]}
