@@ -1719,19 +1719,129 @@ lucky-code plugin — local + official plugin management (9.8)
     sys.exit(2)
 
 
+def _cmd_custom_provider_list() -> None:
+    from core.custom_providers import list_providers as list_custom
+
+    rows = list_custom()
+    if not rows:
+        print("No custom providers. Add one with: lucky-code custom-provider add --help")
+        return
+    for p in rows:
+        models = ", ".join(p.models)
+        print(f"  {p.id} — {p.name} [{p.api_format}] {p.base_url} (models: {models})")
+
+
+def _cmd_custom_provider_add(rest: list[str]) -> None:
+    from core.custom_providers import add_provider
+
+    def _flag(name: str) -> list[str]:
+        out: list[str] = []
+        i = 0
+        while i < len(rest):
+            if rest[i] == name and i + 1 < len(rest):
+                out.append(rest[i + 1])
+                i += 2
+            else:
+                i += 1
+        return out
+
+    def _single(name: str) -> str:
+        vals = _flag(name)
+        return vals[-1] if vals else ""
+
+    pid = _single("--id")
+    base = _single("--base-url")
+    fmt = _single("--api-format")
+    models = _flag("--model")
+    key_env = _single("--api-key-env")
+    label = _single("--name")
+    overwrite = "--overwrite" in rest
+    try:
+        info = add_provider(pid, base, fmt, models, key_env, label, overwrite=overwrite)
+    except ValueError as exc:
+        print(f"Error: {exc}")
+        sys.exit(2)
+    print(f"Saved custom provider '{info.id}' ({len(info.models)} model(s)).")
+
+
+def _cmd_custom_provider_remove(rest: list[str]) -> None:
+    from core.custom_providers import remove_provider
+
+    if not rest:
+        return
+    if remove_provider(rest[0]):
+        print(f"Removed custom provider '{rest[0]}'.")
+    else:
+        print(f"Custom provider '{rest[0]}' not found.")
+        sys.exit(2)
+
+
+def _cmd_custom_provider_test(rest: list[str]) -> None:
+    from core.custom_providers import get_provider, test_provider
+
+    if not rest:
+        return
+    provider = get_provider(rest[0])
+    if provider is None:
+        print(f"Custom provider '{rest[0]}' not found.")
+        sys.exit(2)
+    model = ""
+    if "--model" in rest:
+        idx = rest.index("--model")
+        if idx + 1 < len(rest):
+            model = rest[idx + 1]
+    result = test_provider(provider, model=model)
+    if result["ok"]:
+        found = ", ".join(result["models"][:5])
+        print(f"OK (HTTP {result['status']}){': ' + found if found else ''}")
+    else:
+        print(f"FAILED: {result['error']}")
+        sys.exit(1)
+
+
+def _cmd_custom_provider_use(rest: list[str]) -> None:
+    from config import ENV_FILE
+    from core.custom_providers import get_provider, use_provider_env
+
+    if not rest:
+        return
+    provider = get_provider(rest[0])
+    if provider is None:
+        print(f"Custom provider '{rest[0]}' not found.")
+        sys.exit(2)
+    model = ""
+    if "--model" in rest:
+        idx = rest.index("--model")
+        if idx + 1 < len(rest):
+            model = rest[idx + 1]
+    env = use_provider_env(provider, model)
+    try:
+        lines = ENV_FILE.read_text(encoding="utf-8-sig").splitlines() if ENV_FILE.exists() else []
+        pending = dict(env)
+        rewritten: list[str] = []
+        for line in lines:
+            key = (
+                line.split("=", 1)[0].strip()
+                if "=" in line and not line.lstrip().startswith("#")
+                else ""
+            )
+            if key in pending:
+                rewritten.append(f"{key}={pending.pop(key)}")
+            else:
+                rewritten.append(line)
+        if pending:
+            if rewritten and rewritten[-1].strip():
+                rewritten.append("")
+            rewritten.extend(f"{k}={v}" for k, v in sorted(pending.items()))
+        ENV_FILE.write_text("\n".join(rewritten) + "\n", encoding="utf-8")
+    except OSError as exc:
+        print(f"Error saving .env: {exc}")
+        sys.exit(1)
+    print(f"Now using custom provider '{provider.id}' (saved to .env).")
+
+
 def _cli_custom_provider(args: list[str]) -> None:
     """lucky-code custom-provider <list|add|remove|test|use> [...] (9.8)."""
-    from core.custom_providers import (
-        add_provider,
-        get_provider,
-        remove_provider,
-        test_provider,
-        use_provider_env,
-    )
-    from core.custom_providers import (
-        list_providers as list_custom,
-    )
-
     if not args or args[0] in ("-h", "--help", "help"):
         print(
             """
@@ -1747,110 +1857,23 @@ lucky-code custom-provider — user-defined OpenAI-compatible providers (9.8)
         return
     cmd = args[0].lower()
     rest = args[1:]
+
     if cmd == "list":
-        rows = list_custom()
-        if not rows:
-            print("No custom providers. Add one with: lucky-code custom-provider add --help")
-            return
-        for p in rows:
-            models = ", ".join(p.models)
-            print(f"  {p.id} — {p.name} [{p.api_format}] {p.base_url} (models: {models})")
+        _cmd_custom_provider_list()
         return
-    if cmd == "add":
+    elif cmd == "add":
+        _cmd_custom_provider_add(rest)
+        return
+    elif cmd == "remove" and rest:
+        _cmd_custom_provider_remove(rest)
+        return
+    elif cmd == "test" and rest:
+        _cmd_custom_provider_test(rest)
+        return
+    elif cmd == "use" and rest:
+        _cmd_custom_provider_use(rest)
+        return
 
-        def _flag(name: str) -> list[str]:
-            out: list[str] = []
-            i = 0
-            while i < len(rest):
-                if rest[i] == name and i + 1 < len(rest):
-                    out.append(rest[i + 1])
-                    i += 2
-                else:
-                    i += 1
-            return out
-
-        def _single(name: str) -> str:
-            vals = _flag(name)
-            return vals[-1] if vals else ""
-
-        pid = _single("--id")
-        base = _single("--base-url")
-        fmt = _single("--api-format")
-        models = _flag("--model")
-        key_env = _single("--api-key-env")
-        label = _single("--name")
-        overwrite = "--overwrite" in rest
-        try:
-            info = add_provider(pid, base, fmt, models, key_env, label, overwrite=overwrite)
-        except ValueError as exc:
-            print(f"Error: {exc}")
-            sys.exit(2)
-        print(f"Saved custom provider '{info.id}' ({len(info.models)} model(s)).")
-        return
-    if cmd == "remove" and rest:
-        if remove_provider(rest[0]):
-            print(f"Removed custom provider '{rest[0]}'.")
-        else:
-            print(f"Custom provider '{rest[0]}' not found.")
-            sys.exit(2)
-        return
-    if cmd == "test" and rest:
-        provider = get_provider(rest[0])
-        if provider is None:
-            print(f"Custom provider '{rest[0]}' not found.")
-            sys.exit(2)
-        model = ""
-        if "--model" in rest:
-            idx = rest.index("--model")
-            if idx + 1 < len(rest):
-                model = rest[idx + 1]
-        result = test_provider(provider, model=model)
-        if result["ok"]:
-            found = ", ".join(result["models"][:5])
-            print(f"OK (HTTP {result['status']}){': ' + found if found else ''}")
-        else:
-            print(f"FAILED: {result['error']}")
-            sys.exit(1)
-        return
-    if cmd == "use" and rest:
-        from config import ENV_FILE
-
-        provider = get_provider(rest[0])
-        if provider is None:
-            print(f"Custom provider '{rest[0]}' not found.")
-            sys.exit(2)
-        model = ""
-        if "--model" in rest:
-            idx = rest.index("--model")
-            if idx + 1 < len(rest):
-                model = rest[idx + 1]
-        env = use_provider_env(provider, model)
-        try:
-            lines = (
-                ENV_FILE.read_text(encoding="utf-8-sig").splitlines() if ENV_FILE.exists() else []
-            )
-            pending = dict(env)
-            rewritten: list[str] = []
-            for line in lines:
-                key = (
-                    line.split("=", 1)[0].strip()
-                    if "=" in line and not line.lstrip().startswith("#")
-                    else ""
-                )
-                if key in pending:
-                    rewritten.append(f"{key}={pending.pop(key)}")
-                else:
-                    rewritten.append(line)
-            if pending:
-                if rewritten and rewritten[-1].strip():
-                    rewritten.append("")
-                rewritten.extend(f"{k}={v}" for k, v in sorted(pending.items()))
-            ENV_FILE.write_text("\n".join(rewritten) + "\n", encoding="utf-8")
-        except OSError as exc:
-            print(f"Error saving .env: {exc}")
-            sys.exit(1)
-        print(f"Now using custom provider '{provider.id}' (saved to .env).")
-        return
     print(f"Unknown custom-provider command: {' '.join(args)} (try --help)")
     sys.exit(2)
 
