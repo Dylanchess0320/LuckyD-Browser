@@ -835,93 +835,84 @@ class TerminalUI:
         )
         return flat
 
-    def show_providers(self, providers: list[dict]) -> None:
-        """Provider list — Panel + Table (Rich) or boxed ANSI fallback.
+    def _show_providers_rich(self, entries: list[dict]) -> bool:
+        if not self.rich:
+            return False
+        try:
+            from rich import box
+            from rich.panel import Panel
 
-        ``providers`` is a JSON-shaped list built by
-        ``core.providers.list_providers``::
-            [{"id", "name", "base_url", "model", "env_key", "key_present",
-              "local", "free_tier", "configured", "current"}, ...]
-        """
-        entries = list(providers or [])
+            self._console.print()
+            header_text = Text()
+            header_text.append("  AI Providers", style=f"bold {BRAND['primary']}")
+            ready = sum(1 for p in entries if p.get("configured"))
+            header_text.append(f"  ·  {ready}/{len(entries)} ready", style=BRAND["muted"])
+            self._console.print(header_text)
 
-        # ── Rich path ─────────────────────────────────────────────────
-        if self.rich:
-            try:
-                from rich import box
-                from rich.panel import Panel
+            table = Table(
+                box=box.ROUNDED,
+                show_header=True,
+                header_style=f"bold {BRAND['muted']}",
+                border_style=BRAND["muted"],
+                padding=(0, 1),
+                expand=False,
+            )
+            table.add_column("Provider", style="white", no_wrap=True)
+            table.add_column(
+                "Model",
+                style=BRAND["primary"],
+                no_wrap=False,
+                overflow="fold",
+                min_width=22,
+            )
+            table.add_column("Cost", justify="center", no_wrap=True, width=8)
+            table.add_column("Status", justify="center", no_wrap=True, width=12)
 
-                self._console.print()
-                header_text = Text()
-                header_text.append("  AI Providers", style=f"bold {BRAND['primary']}")
-                ready = sum(1 for p in entries if p.get("configured"))
-                header_text.append(f"  ·  {ready}/{len(entries)} ready", style=BRAND["muted"])
-                self._console.print(header_text)
-
-                table = Table(
-                    box=box.ROUNDED,
-                    show_header=True,
-                    header_style=f"bold {BRAND['muted']}",
-                    border_style=BRAND["muted"],
-                    padding=(0, 1),
-                    expand=False,
+            for p in entries:
+                is_cur = bool(p.get("current"))
+                is_ready = bool(p.get("configured"))
+                free = bool(p.get("free_tier") or p.get("local"))
+                name_txt = Text(
+                    str(p.get("name", p.get("id", ""))),
+                    style=f"bold {BRAND['success']}" if is_cur else "white",
                 )
-                table.add_column("Provider", style="white", no_wrap=True)
-                table.add_column(
-                    "Model",
-                    style=BRAND["primary"],
-                    no_wrap=False,
-                    overflow="fold",
-                    min_width=22,
+                if is_cur:
+                    name_txt.append("  ◀", style=BRAND["success"])
+                model_txt = Text(
+                    str(p.get("model", "")),
+                    style=(f"bold {BRAND['primary']}" if is_cur else BRAND["primary"]),
                 )
-                table.add_column("Cost", justify="center", no_wrap=True, width=8)
-                table.add_column("Status", justify="center", no_wrap=True, width=12)
-
-                for p in entries:
-                    is_cur = bool(p.get("current"))
-                    is_ready = bool(p.get("configured"))
-                    free = bool(p.get("free_tier") or p.get("local"))
-                    name_txt = Text(
-                        str(p.get("name", p.get("id", ""))),
-                        style=f"bold {BRAND['success']}" if is_cur else "white",
-                    )
-                    if is_cur:
-                        name_txt.append("  ◀", style=BRAND["success"])
-                    model_txt = Text(
-                        str(p.get("model", "")),
-                        style=(f"bold {BRAND['primary']}" if is_cur else BRAND["primary"]),
-                    )
-                    cost_txt = Text(
-                        "free" if free else "paid",
-                        style=BRAND["success"] if free else BRAND["muted"],
-                    )
-                    if is_cur:
-                        status_txt = Text("◀ active", style=BRAND["success"])
-                    elif is_ready:
-                        status_txt = Text("✓ ready", style=BRAND["success"])
-                    else:
-                        status_txt = Text("needs key", style=BRAND["warn"])
-                    table.add_row(name_txt, model_txt, cost_txt, status_txt)
-
-                panel = Panel(
-                    table,
-                    title=Text(" Providers", style=f"bold {BRAND['primary']}"),
-                    title_align="left",
-                    border_style=BRAND["muted"],
-                    box=box.ROUNDED,
-                    padding=(0, 1),
+                cost_txt = Text(
+                    "free" if free else "paid",
+                    style=BRAND["success"] if free else BRAND["muted"],
                 )
-                self._console.print(panel)
-                self._console.print(
-                    f"  {self._dim('Switch:')} {self._primary('/model <provider> <name>')} {self._dim('e.g.')} {self._primary('/model cline-usage kimi')}"
-                )
-                self._console.print()
-                return
-            except Exception:
-                # Fall through to ANSI fallback on any Rich error
-                pass
+                if is_cur:
+                    status_txt = Text("◀ active", style=BRAND["success"])
+                elif is_ready:
+                    status_txt = Text("✓ ready", style=BRAND["success"])
+                else:
+                    status_txt = Text("needs key", style=BRAND["warn"])
+                table.add_row(name_txt, model_txt, cost_txt, status_txt)
 
-        # ── ANSI fallback ─────────────────────────────────────────────
+            panel = Panel(
+                table,
+                title=Text(" Providers", style=f"bold {BRAND['primary']}"),
+                title_align="left",
+                border_style=BRAND["muted"],
+                box=box.ROUNDED,
+                padding=(0, 1),
+            )
+            self._console.print(panel)
+            self._console.print(
+                f"  {self._dim('Switch:')} {self._primary('/model <provider> <name>')} {self._dim('e.g.')} {self._primary('/model cline-usage kimi')}"
+            )
+            self._console.print()
+            return True
+        except Exception:
+            # Fall through to ANSI fallback on any Rich error
+            return False
+
+    def _show_providers_ansi(self, entries: list[dict]) -> None:
         ready = sum(1 for p in entries if p.get("configured"))
         print(
             f"\n  {ANSI['bold']}{ANSI['cyan']}AI Providers{ANSI['reset']}  {ANSI['dim']}· {ready}/{len(entries)} ready{ANSI['reset']}"
@@ -953,6 +944,23 @@ class TerminalUI:
         print(
             f"\n  {ANSI['dim']}Switch: {ANSI['reset']}{ANSI['cyan']}/model <provider> <name>{ANSI['reset']}\n"
         )
+
+    def show_providers(self, providers: list[dict]) -> None:
+        """Provider list — Panel + Table (Rich) or boxed ANSI fallback.
+
+        ``providers`` is a JSON-shaped list built by
+        ``core.providers.list_providers``::
+            [{"id", "name", "base_url", "model", "env_key", "key_present",
+              "local", "free_tier", "configured", "current"}, ...]
+        """
+        entries = list(providers or [])
+
+        # ── Rich path ─────────────────────────────────────────────────
+        if self._show_providers_rich(entries):
+            return
+
+        # ── ANSI fallback ─────────────────────────────────────────────
+        self._show_providers_ansi(entries)
 
     # ── Input prompt ───────────────────────────────────────────────
 
