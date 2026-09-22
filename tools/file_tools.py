@@ -5,6 +5,7 @@ These are the core tools every coding agent needs.
 
 from __future__ import annotations
 
+import asyncio
 import fnmatch
 import re
 from pathlib import Path
@@ -272,44 +273,50 @@ class GrepTool(ToolBase):
             base = Path(path).expanduser().resolve()
             compiled = re.compile(pattern)
 
-            files = list(base.rglob("*")) if base.is_dir() else [base]
-            if glob:
-                files = [f for f in files if fnmatch.fnmatch(f.name, glob)]
+            def _search():
+                files = list(base.rglob("*")) if base.is_dir() else [base]
+                if glob:
+                    files = [f for f in files if fnmatch.fnmatch(f.name, glob)]
 
-            results: list[str] = []
-            match_count = 0
-            seen_files = set()
+                results: list[str] = []
+                match_count = 0
+                seen_files = set()
 
-            for f in sorted(files):
-                if not f.is_file():
-                    continue
-                if any(
-                    p.name in {".git", "__pycache__", "node_modules", ".venv"} for p in f.parents
-                ):
-                    continue
-                try:
-                    content = f.read_text(encoding="utf-8", errors="replace")
-                except Exception:
-                    continue
+                for f in sorted(files):
+                    if not f.is_file():
+                        continue
+                    if any(
+                        p.name in {".git", "__pycache__", "node_modules", ".venv"}
+                        for p in f.parents
+                    ):
+                        continue
+                    try:
+                        content = f.read_text(encoding="utf-8", errors="replace")
+                    except Exception:
+                        continue
 
-                file_matches = []
-                for i, line in enumerate(content.splitlines(), 1):
-                    if compiled.search(line):
-                        file_matches.append((i, line))
-                        match_count += 1
+                    file_matches = []
+                    for i, line in enumerate(content.splitlines(), 1):
+                        if compiled.search(line):
+                            file_matches.append((i, line))
+                            match_count += 1
 
-                if file_matches:
-                    seen_files.add(str(f))
-                    if output_mode == "files_with_matches":
-                        results.append(str(f))
-                    elif output_mode == "count":
-                        results.append(f"{f!s}: {len(file_matches)} matches")
-                    else:
-                        results.append(f"\n  {f}:")
-                        for lineno, line in file_matches[:20]:
-                            results.append(f"    {lineno:4d}: {line[:150]}")
-                        if len(file_matches) > 20:
-                            results.append(f"    ... and {len(file_matches) - 20} more matches")
+                    if file_matches:
+                        seen_files.add(str(f))
+                        if output_mode == "files_with_matches":
+                            results.append(str(f))
+                        elif output_mode == "count":
+                            results.append(f"{f!s}: {len(file_matches)} matches")
+                        else:
+                            results.append(f"\n  {f}:")
+                            for lineno, line in file_matches[:20]:
+                                results.append(f"    {lineno:4d}: {line[:150]}")
+                            if len(file_matches) > 20:
+                                results.append(f"    ... and {len(file_matches) - 20} more matches")
+
+                return results, match_count, seen_files
+
+            results, match_count, seen_files = await asyncio.to_thread(_search)
 
             if not results:
                 return ToolOutput(text=f"No matches for '{pattern}'", title="0 matches")
