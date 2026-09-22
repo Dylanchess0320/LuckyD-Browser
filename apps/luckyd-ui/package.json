@@ -30,11 +30,11 @@
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.15",
     "typescript": "^5.6.3",
-    "vite": "^5.4.11"
+    "vite": "^6.4.2"
   },
   "optionalDependencies": {
-    "electron": "^33.0.0",
-    "electron-builder": "^25.1.8"
+    "electron": "^35.7.5",
+    "electron-builder": "^26.15.0"
   },
   "build": {
     "appId": "ai.luckyd.app",
@@ -90,7 +90,7 @@
     }
   },
   "allowScripts": {
-    "electron@33.4.11": true,
-    "esbuild@0.21.5": true
+    "electron@35.7.5": true,
+    "esbuild@0.25.12": true
   }
 }
