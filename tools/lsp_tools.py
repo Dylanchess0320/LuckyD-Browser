@@ -193,19 +193,24 @@ class LspRenameTool(ToolBase):
                 if fp:
                     by_file.setdefault(fp, []).append(r)
 
-            changes = 0
             old_name = refs[0].name
-            for fp, file_refs in by_file.items():
-                lines = Path(fp).read_text().splitlines()
-                # Apply from bottom up to preserve line numbers
-                sorted_refs = sorted(file_refs, key=lambda r: r.line, reverse=True)
-                for r in sorted_refs:
-                    line_str = lines[r.line - 1]
-                    lines[r.line - 1] = (
-                        line_str[: r.column] + new_name + line_str[r.column + len(old_name) :]
-                    )
-                    changes += 1
-                Path(fp).write_text("\n".join(lines) + "\n")
+
+            def _apply_renames(file_groups: dict[str, list], old_sym: str, new_sym: str) -> int:
+                total_changes = 0
+                for fp, file_refs in file_groups.items():
+                    lines = Path(fp).read_text().splitlines()
+                    # Apply from bottom up to preserve line numbers
+                    sorted_refs = sorted(file_refs, key=lambda r: r.line, reverse=True)
+                    for r in sorted_refs:
+                        line_str = lines[r.line - 1]
+                        lines[r.line - 1] = (
+                            line_str[: r.column] + new_sym + line_str[r.column + len(old_sym) :]
+                        )
+                        total_changes += 1
+                    Path(fp).write_text("\n".join(lines) + "\n")
+                return total_changes
+
+            changes = await asyncio.to_thread(_apply_renames, by_file, old_name, new_name)
 
             return ToolOutput(
                 text=f"Renamed '{old_name}' → '{new_name}' in {changes} location(s) across {len(by_file)} file(s).",
