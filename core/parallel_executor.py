@@ -134,7 +134,7 @@ class BatchResult:
 
     results: list[ToolResult]
     total_duration_ms: float
-    parallel_speedup: float  # actual_time / sequential_estimate
+    parallel_speedup: float  # sequential_estimate / actual_time
     succeeded: int
     failed: int
 

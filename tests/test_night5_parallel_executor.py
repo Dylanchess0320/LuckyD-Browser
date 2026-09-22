@@ -88,7 +88,11 @@ async def test_execute_batch_parallel_order_and_counts(stub_registry):
     ]
     assert batch.succeeded == 3 and batch.failed == 0
     assert batch.total_duration_ms > 0
-    assert batch.parallel_speedup >= 1.0
+    # parallel_speedup is intentionally NOT asserted >= 1.0 here: it is a
+    # wall-clock ratio (sequential_estimate / elapsed) whose numerator omits
+    # gather scheduling overhead, so a loaded CI runner can measure < 1.0.
+    # Real concurrency is covered by test_parallel_actually_concurrent.
+    assert batch.parallel_speedup > 0
 
 
 async def test_parallel_actually_concurrent(stub_registry):
