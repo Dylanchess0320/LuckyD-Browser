@@ -6,11 +6,11 @@ from __future__ import annotations
 
 import asyncio
 import os
+import shlex
 import subprocess
 import time
 import uuid
 from pathlib import Path
-import shlex
 
 from .base import ToolBase, ToolOutput
 from .registry import register_tool

@@ -1,10 +1,11 @@
 import io
 import json
-import sys
 from unittest.mock import patch
+
 import pytest
 
-from bridge import main, READY_MESSAGE
+from bridge import READY_MESSAGE, main
+
 
 @pytest.mark.asyncio
 async def test_main_invalid_json(capsys):

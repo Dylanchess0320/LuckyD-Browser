@@ -31,7 +31,6 @@ from browser_core.workflows import (
     fingerprint_js,
     resolve_index,
     score_fingerprint,
-    slugify,
     step_record,
 )
 

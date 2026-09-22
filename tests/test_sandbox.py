@@ -164,6 +164,7 @@ class TestSandboxExecution:
         # Third command succeeds
         assert results[2].exit_code == 0
 
+
 class TestSandboxRollback:
     """Test sandboxed command execution with rollback."""
 
@@ -264,7 +265,6 @@ class TestSandboxRollback:
             # Actually, _restore_checkpoint swallows exceptions, so let's mock it to do nothing
             # Or better, let's mock rmtree to fail and check the exception is swallowed.
             import shutil
-
 
             def failing_rmtree(*a, **kw):
                 raise Exception("rmtree failed")
