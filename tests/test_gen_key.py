@@ -1,4 +1,3 @@
-import pytest
 from browser.extension.gen_key import ext_id_from_der
 
 
@@ -42,10 +41,12 @@ def test_ext_id_from_der_known_input():
     expected_id = "jpignaibiiemhngfjkcpokkamffknabf"
     assert ext_id_from_der(der_input) == expected_id
 
+
 def test_ext_id_from_der_empty():
     der_input = b""
     expected_id = "odlameecjipmbmbejkplpemijjgpljce"
     assert ext_id_from_der(der_input) == expected_id
+
 
 def test_ext_id_from_der_determinism():
     der_input = b"another test"

@@ -27,10 +27,9 @@ CRX_HEADER = HERE / "crx_header.bin"
 
 def ext_id_from_der(der_bytes: bytes) -> str:
     """Generate Chrome extension ID from DER public key."""
-    import hashlib
     h = hashlib.sha256(der_bytes).hexdigest()[:32]
     # Chrome extension IDs use characters a-p (base 16 offset by 'a')
-    return "".join(chr(int(c, 16) + ord('a')) for c in h)
+    return "".join(chr(int(c, 16) + ord("a")) for c in h)
 
 
 def main() -> int:
