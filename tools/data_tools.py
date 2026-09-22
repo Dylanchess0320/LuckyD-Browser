@@ -142,27 +142,37 @@ class CSVTool(ToolBase):
         "limit": {"type": "integer", "description": "Max rows to return (default: 200)"},
     }
 
+    def _read_csv(self, path, delimiter, limit):
+        with open(path, newline="", encoding="utf-8-sig") as f:
+            reader = csv.DictReader(f, delimiter=delimiter)
+            rows = []
+            for row in reader:
+                rows.append(row)
+                if len(rows) >= limit:
+                    break
+
+        if not rows:
+            return None, None, None
+
+        cols = list(rows[0].keys())
+        lines = [" | ".join(cols), " | ".join("---" for _ in cols)]
+        for row in rows:
+            lines.append(" | ".join(str(row.get(c, ""))[:80] for c in cols))
+
+        return rows, cols, lines
+
     async def execute(self, file_path, delimiter=",", limit=200):
         try:
+            import asyncio
+
             path = Path(file_path).expanduser().resolve()
             if not path.exists():
                 return ToolOutput(text=f"File not found: {file_path}", error=True)
 
-            with open(path, newline="", encoding="utf-8-sig") as f:
-                reader = csv.DictReader(f, delimiter=delimiter)
-                rows = []
-                for row in reader:
-                    rows.append(row)
-                    if len(rows) >= limit:
-                        break
+            rows, cols, lines = await asyncio.to_thread(self._read_csv, path, delimiter, limit)
 
             if not rows:
                 return ToolOutput(text="(empty file or no rows)", title="0 rows")
-
-            cols = list(rows[0].keys())
-            lines = [" | ".join(cols), " | ".join("---" for _ in cols)]
-            for row in rows:
-                lines.append(" | ".join(str(row.get(c, ""))[:80] for c in cols))
 
             return ToolOutput(
                 text="\n".join(lines),
