@@ -289,6 +289,30 @@ def execute_python_isolated(
         return execute(f'python "{script_path}"', cwd=workspace, timeout=timeout)
 
 
+def _restore_checkpoint(cwd: str, checkpoint_path: Path) -> None:
+    """Restore the working directory from a checkpoint."""
+    try:
+        shutil.rmtree(cwd, ignore_errors=True)
+        shutil.copytree(checkpoint_path, cwd, dirs_exist_ok=True)
+    except Exception:
+        pass  # Rollback failed — leave as-is
+
+
+def _create_checkpoint(cwd: str, checkpoint_dir: str) -> Path | None:
+    """Create a checkpoint of the working directory."""
+    checkpoint_path = Path(checkpoint_dir) / f"checkpoint_{int(time.time())}"
+    try:
+        shutil.copytree(
+            cwd,
+            checkpoint_path,
+            dirs_exist_ok=True,
+            ignore=shutil.ignore_patterns(".git", "__pycache__", "node_modules", ".venv"),
+        )
+        return checkpoint_path
+    except Exception:
+        return None
+
+
 def execute_with_rollback(
     command: str,
     cwd: str | None = None,
@@ -308,27 +332,14 @@ def execute_with_rollback(
     # Create checkpoint
     checkpoint_path = None
     if checkpoint_dir:
-        checkpoint_path = Path(checkpoint_dir) / f"checkpoint_{int(time.time())}"
-        try:
-            shutil.copytree(
-                cwd,
-                checkpoint_path,
-                dirs_exist_ok=True,
-                ignore=shutil.ignore_patterns(".git", "__pycache__", "node_modules", ".venv"),
-            )
-        except Exception:
-            checkpoint_path = None
+        checkpoint_path = _create_checkpoint(cwd, checkpoint_dir)
 
     # Execute
     result = execute(command, cwd=cwd, timeout=timeout)
 
     # Rollback on failure
     if result.exit_code != 0 and not result.blocked and checkpoint_path:
-        try:
-            shutil.rmtree(cwd, ignore_errors=True)
-            shutil.copytree(checkpoint_path, cwd, dirs_exist_ok=True)
-        except Exception:
-            pass  # Rollback failed — leave as-is
+        _restore_checkpoint(cwd, checkpoint_path)
 
     return result, str(checkpoint_path) if checkpoint_path else None
 
