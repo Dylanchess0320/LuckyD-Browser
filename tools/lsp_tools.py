@@ -258,24 +258,28 @@ class LspWorkspaceSymbolsTool(ToolBase):
         try:
             import jedi
 
-            # Search across all Python files in cwd
-            cwd = Path.cwd()
-            results = []
-            for py_file in cwd.rglob("*.py"):
-                if any(
-                    p.name in {".git", "__pycache__", "node_modules", ".venv"}
-                    for p in py_file.parents
-                ):
-                    continue
-                try:
-                    source = py_file.read_text(errors="replace")
-                    script = jedi.Script(code=source, path=str(py_file))
-                    names = script.get_names(all_scopes=True)
-                    for n in names:
-                        if not query or query.lower() in n.name.lower():
-                            results.append(f"  {n.type}: {n.name} — {py_file.name}:{n.line}")
-                except Exception:
-                    continue
+            def _search_files():
+                # Search across all Python files in cwd
+                cwd = Path.cwd()
+                results = []
+                for py_file in cwd.rglob("*.py"):
+                    if any(
+                        p.name in {".git", "__pycache__", "node_modules", ".venv"}
+                        for p in py_file.parents
+                    ):
+                        continue
+                    try:
+                        source = py_file.read_text(errors="replace")
+                        script = jedi.Script(code=source, path=str(py_file))
+                        names = script.get_names(all_scopes=True)
+                        for n in names:
+                            if not query or query.lower() in n.name.lower():
+                                results.append(f"  {n.type}: {n.name} — {py_file.name}:{n.line}")
+                    except Exception:
+                        continue
+                return results
+
+            results = await asyncio.to_thread(_search_files)
 
             shown = results[:50]
             output = "\n".join(shown) if shown else f"No symbols found matching '{query}'"
