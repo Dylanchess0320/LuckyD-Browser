@@ -466,7 +466,7 @@ class AdvancedMemorySystem:
         Returns the number of memories updated.
         """
         now = _utcnow()
-        updated = 0
+        updates = []
         with self._lock, self._conn:
             rows = self._conn.execute(
                 "SELECT id, importance, last_accessed, access_count FROM memories"
@@ -480,12 +480,14 @@ class AdvancedMemorySystem:
                 factor = 0.5 ** (age_days / max(effective_half_life, 1e-6))
                 new_importance = max(DECAY_FLOOR, row["importance"] * factor)
                 if abs(new_importance - row["importance"]) > 1e-4:
-                    self._conn.execute(
-                        "UPDATE memories SET importance = ? WHERE id = ?",
-                        (new_importance, row["id"]),
-                    )
-                    updated += 1
-        return updated
+                    updates.append((new_importance, row["id"]))
+
+            if updates:
+                self._conn.executemany(
+                    "UPDATE memories SET importance = ? WHERE id = ?",
+                    updates,
+                )
+        return len(updates)
 
     # ── compression ────────────────────────────────────────────────
 
