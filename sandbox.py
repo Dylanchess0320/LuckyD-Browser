@@ -221,6 +221,27 @@ def isolated_workspace(prefix: str = "agent_sandbox_"):
         shutil.rmtree(workspace, ignore_errors=True)
 
 
+def _copy_files_to_workspace(copy_files: list[str] | None, workspace: str) -> None:
+    """Helper to copy files or directories to the workspace."""
+    if not copy_files:
+        return
+    for file_path in copy_files:
+        src = Path(file_path)
+        if src.exists():
+            dst = Path(workspace) / src.name
+            if src.is_file():
+                shutil.copy2(src, dst)
+            elif src.is_dir():
+                shutil.copytree(src, dst, dirs_exist_ok=True)
+
+
+def _write_python_script(code: str, workspace: str) -> Path:
+    """Helper to write python script to workspace."""
+    script_path = Path(workspace) / "_sandbox_script.py"
+    script_path.write_text(code, encoding="utf-8")
+    return script_path
+
+
 def execute_isolated(
     command: str,
     timeout: int | None = None,
@@ -237,17 +258,7 @@ def execute_isolated(
         CommandResult with output from the isolated execution
     """
     with isolated_workspace() as workspace:
-        # Copy requested files into the sandbox
-        if copy_files:
-            for file_path in copy_files:
-                src = Path(file_path)
-                if src.exists():
-                    dst = Path(workspace) / src.name
-                    if src.is_file():
-                        shutil.copy2(src, dst)
-                    elif src.is_dir():
-                        shutil.copytree(src, dst, dirs_exist_ok=True)
-
+        _copy_files_to_workspace(copy_files, workspace)
         return execute(command, cwd=workspace, timeout=timeout)
 
 
@@ -261,20 +272,8 @@ def execute_python_isolated(
     Writes the code to a temp file and runs it with the system Python.
     """
     with isolated_workspace() as workspace:
-        # Write the code to a file
-        script_path = Path(workspace) / "_sandbox_script.py"
-        script_path.write_text(code, encoding="utf-8")
-
-        # Copy any additional files
-        if copy_files:
-            for file_path in copy_files:
-                src = Path(file_path)
-                if src.exists():
-                    dst = Path(workspace) / src.name
-                    if src.is_file():
-                        shutil.copy2(src, dst)
-
-        # Run the script
+        script_path = _write_python_script(code, workspace)
+        _copy_files_to_workspace(copy_files, workspace)
         return execute(f'python "{script_path}"', cwd=workspace, timeout=timeout)
 
 
