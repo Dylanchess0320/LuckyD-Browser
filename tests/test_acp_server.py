@@ -1,6 +1,6 @@
-import pytest
 from unittest.mock import MagicMock
-from acp_server import AcpServer, AGENT_NAME, AGENT_VERSION, ACP_VERSION
+
+from acp_server import ACP_VERSION, AGENT_NAME, AGENT_VERSION, AcpServer
 
 
 def test_handle_invalid_request_not_dict():

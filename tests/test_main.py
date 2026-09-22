@@ -1,11 +1,12 @@
-import pytest
-import sys
 import io
 import json
 from unittest.mock import AsyncMock, patch
 
-from main import run_one_shot_json
+import pytest
+
 from agent import CodingAgent
+from main import run_one_shot_json
+
 
 @pytest.mark.asyncio
 async def test_run_one_shot_json_exception_handling():
@@ -15,12 +16,11 @@ async def test_run_one_shot_json_exception_handling():
     # Capture stdout
     stdout_capture = io.StringIO()
 
-    with patch('sys.stdout', stdout_capture):
-        with patch('main.run_exclusive'): # Mocking run_exclusive
-            await run_one_shot_json(agent, "test message")
+    with patch("sys.stdout", stdout_capture), patch("main.run_exclusive"):
+        await run_one_shot_json(agent, "test message")
 
     output = stdout_capture.getvalue()
-    lines = [line for line in output.split('\n') if line]
+    lines = [line for line in output.split("\n") if line]
 
     # Assert there is at least one line (the error line)
     assert len(lines) >= 1
