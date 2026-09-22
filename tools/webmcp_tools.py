@@ -21,11 +21,11 @@ on that origin. Navigating cross-origin purges the stale registration.
 
 from __future__ import annotations
 
+import functools
 import json
 import secrets
 from dataclasses import dataclass, field
 from pathlib import Path
-import functools
 from typing import Any
 from urllib.parse import urlsplit
 
