@@ -182,3 +182,4 @@ external/
 
 browser/installer/compile_log.txt
 coverage.json
+dummy_dir/
