@@ -31,6 +31,7 @@ from browser_core.workflows import (
     fingerprint_js,
     resolve_index,
     score_fingerprint,
+    slugify,
     step_record,
 )
 
@@ -60,6 +61,10 @@ def test_elements_js_returns_all_elements_probe():
     js = elements_js()
     assert "data-ld-agent" in js
     assert "JSON.stringify" in js
+
+
+def test_slugify_empty_string_returns_empty():
+    assert slugify("") == ""
 
 
 # ── step_record ──────────────────────────────────────────────────────
