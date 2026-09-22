@@ -45,10 +45,11 @@ class LspDefinitionTool(ToolBase):
             if not path.exists():
                 return ToolOutput(text=f"File not found: {file_path}", error=True)
 
-            source = path.read_text()
-            results = await asyncio.to_thread(
-                lambda: jedi.Script(code=source, path=str(path)).goto(line=line, column=character)
-            )
+            def _do_jedi():
+                source = path.read_text()
+                return jedi.Script(code=source, path=str(path)).goto(line=line, column=character)
+
+            results = await asyncio.to_thread(_do_jedi)
 
             if not results:
                 return ToolOutput(text="No definition found.", title="Go to Definition")
@@ -85,12 +86,14 @@ class LspReferencesTool(ToolBase):
         try:
             jedi = _get_jedi()
             path = _resolve_path(file_path)
-            source = path.read_text()
-            results = await asyncio.to_thread(
-                lambda: jedi.Script(code=source, path=str(path)).get_references(
+
+            def _do_jedi():
+                source = path.read_text()
+                return jedi.Script(code=source, path=str(path)).get_references(
                     line=line, column=character
                 )
-            )
+
+            results = await asyncio.to_thread(_do_jedi)
 
             if not results:
                 return ToolOutput(text="No references found.", title="Find References")
@@ -126,9 +129,13 @@ class LspHoverTool(ToolBase):
         try:
             jedi = _get_jedi()
             path = _resolve_path(file_path)
-            source = path.read_text()
-            script = jedi.Script(code=source, path=str(path))
-            results = script.help(line=line, column=character)
+
+            def _do_jedi():
+                source = path.read_text()
+                script = jedi.Script(code=source, path=str(path))
+                return script.help(line=line, column=character)
+
+            results = await asyncio.to_thread(_do_jedi)
 
             if not results:
                 return ToolOutput(text="No type info found.", title="Hover")
@@ -168,42 +175,52 @@ class LspRenameTool(ToolBase):
         try:
             jedi = _get_jedi()
             path = _resolve_path(file_path)
-            source = path.read_text()
-            script = jedi.Script(code=source, path=str(path))
-            refs = script.get_references(line=line, column=character)
 
-            if not refs:
+            def _do_rename():
+                source = path.read_text()
+                script = jedi.Script(code=source, path=str(path))
+                refs = script.get_references(line=line, column=character)
+
+                if not refs:
+                    return None
+
+                # Group refs by file and apply edits bottom-to-top
+                by_file: dict[str, list] = {}
+                for r in refs:
+                    fp = r.module_path
+                    if fp:
+                        by_file.setdefault(fp, []).append(r)
+
+                changes = 0
+                old_name = refs[0].name
+                for fp, file_refs in by_file.items():
+                    lines = Path(fp).read_text().splitlines()
+                    # Apply from bottom up to preserve line numbers
+                    sorted_refs = sorted(file_refs, key=lambda r: r.line, reverse=True)
+                    for r in sorted_refs:
+                        line_str = lines[r.line - 1]
+                        lines[r.line - 1] = (
+                            line_str[: r.column] + new_name + line_str[r.column + len(old_name) :]
+                        )
+                        changes += 1
+                    Path(fp).write_text("\n".join(lines) + "\n")
+
+                return old_name, changes, len(by_file)
+
+            result = await asyncio.to_thread(_do_rename)
+
+            if not result:
                 return ToolOutput(text="No references found to rename.", error=True)
 
-            # Group refs by file and apply edits bottom-to-top
-            by_file: dict[str, list] = {}
-            for r in refs:
-                fp = r.module_path
-                if fp:
-                    by_file.setdefault(fp, []).append(r)
-
-            changes = 0
-            old_name = refs[0].name
-            for fp, file_refs in by_file.items():
-                lines = Path(fp).read_text().splitlines()
-                # Apply from bottom up to preserve line numbers
-                sorted_refs = sorted(file_refs, key=lambda r: r.line, reverse=True)
-                for r in sorted_refs:
-                    line_str = lines[r.line - 1]
-                    lines[r.line - 1] = (
-                        line_str[: r.column] + new_name + line_str[r.column + len(old_name) :]
-                    )
-                    changes += 1
-                Path(fp).write_text("\n".join(lines) + "\n")
-
+            old_name, changes, num_files = result
             return ToolOutput(
-                text=f"Renamed '{old_name}' → '{new_name}' in {changes} location(s) across {len(by_file)} file(s).",
+                text=f"Renamed '{old_name}' → '{new_name}' in {changes} location(s) across {num_files} file(s).",
                 title=f"🔀 Renamed {old_name}",
                 metadata={
                     "old_name": old_name,
                     "new_name": new_name,
                     "changes": changes,
-                    "files": len(by_file),
+                    "files": num_files,
                 },
             )
         except Exception as e:
@@ -224,12 +241,14 @@ class LspDocumentSymbolsTool(ToolBase):
         try:
             jedi = _get_jedi()
             path = _resolve_path(file_path)
-            source = path.read_text()
-            names = await asyncio.to_thread(
-                lambda: jedi.Script(code=source, path=str(path)).get_names(
+
+            def _do_jedi():
+                source = path.read_text()
+                return jedi.Script(code=source, path=str(path)).get_names(
                     all_scopes=True, definitions=True
                 )
-            )
+
+            names = await asyncio.to_thread(_do_jedi)
 
             parts = []
             for n in names:
@@ -258,24 +277,28 @@ class LspWorkspaceSymbolsTool(ToolBase):
         try:
             import jedi
 
-            # Search across all Python files in cwd
-            cwd = Path.cwd()
-            results = []
-            for py_file in cwd.rglob("*.py"):
-                if any(
-                    p.name in {".git", "__pycache__", "node_modules", ".venv"}
-                    for p in py_file.parents
-                ):
-                    continue
-                try:
-                    source = py_file.read_text(errors="replace")
-                    script = jedi.Script(code=source, path=str(py_file))
-                    names = script.get_names(all_scopes=True)
-                    for n in names:
-                        if not query or query.lower() in n.name.lower():
-                            results.append(f"  {n.type}: {n.name} — {py_file.name}:{n.line}")
-                except Exception:
-                    continue
+            def _do_search():
+                # Search across all Python files in cwd
+                cwd = Path.cwd()
+                results = []
+                for py_file in cwd.rglob("*.py"):
+                    if any(
+                        p.name in {".git", "__pycache__", "node_modules", ".venv"}
+                        for p in py_file.parents
+                    ):
+                        continue
+                    try:
+                        source = py_file.read_text(errors="replace")
+                        script = jedi.Script(code=source, path=str(py_file))
+                        names = script.get_names(all_scopes=True)
+                        for n in names:
+                            if not query or query.lower() in n.name.lower():
+                                results.append(f"  {n.type}: {n.name} — {py_file.name}:{n.line}")
+                    except Exception:
+                        continue
+                return results
+
+            results = await asyncio.to_thread(_do_search)
 
             shown = results[:50]
             output = "\n".join(shown) if shown else f"No symbols found matching '{query}'"
@@ -304,34 +327,44 @@ class LspImplementationTool(ToolBase):
         try:
             jedi = _get_jedi()
             path = _resolve_path(file_path)
-            source = path.read_text()
-            script = jedi.Script(code=source, path=str(path))
-            results = script.goto(line=line, column=0)
 
-            if not results or not results[0].name:
+            def _do_search():
+                source = path.read_text()
+                script = jedi.Script(code=source, path=str(path))
+                results = script.goto(line=line, column=0)
+
+                if not results or not results[0].name:
+                    return None
+
+                name = results[0].name
+                # Search project for this method name in class bodies
+                cwd = Path.cwd()
+                found = []
+                for py_file in cwd.rglob("*.py"):
+                    if any(
+                        p.name in {".git", "__pycache__", "node_modules", ".venv"}
+                        for p in py_file.parents
+                    ):
+                        continue
+                    try:
+                        content = py_file.read_text(errors="replace")
+                        # Simple heuristic: find 'def name' in class context
+                        pattern = re.compile(
+                            rf"class\s+\w+.*:[\s\S]*?def\s+{re.escape(name)}\s*\(", re.MULTILINE
+                        )
+                        for match in pattern.finditer(content):
+                            line_num = content[: match.start()].count("\n") + 1
+                            found.append(f"  {py_file.name}:{line_num}")
+                    except Exception:
+                        continue
+                return name, found
+
+            result = await asyncio.to_thread(_do_search)
+
+            if not result:
                 return ToolOutput(text="No implementations found.", title="Implementations")
 
-            name = results[0].name
-            # Search project for this method name in class bodies
-            cwd = Path.cwd()
-            found = []
-            for py_file in cwd.rglob("*.py"):
-                if any(
-                    p.name in {".git", "__pycache__", "node_modules", ".venv"}
-                    for p in py_file.parents
-                ):
-                    continue
-                try:
-                    content = py_file.read_text(errors="replace")
-                    # Simple heuristic: find 'def name' in class context
-                    pattern = re.compile(
-                        rf"class\s+\w+.*:[\s\S]*?def\s+{re.escape(name)}\s*\(", re.MULTILINE
-                    )
-                    for match in pattern.finditer(content):
-                        line_num = content[: match.start()].count("\n") + 1
-                        found.append(f"  {py_file.name}:{line_num}")
-                except Exception:
-                    continue
+            name, found = result
 
             if not found:
                 return ToolOutput(
@@ -361,17 +394,25 @@ class LspIncomingCallsTool(ToolBase):
         try:
             jedi = _get_jedi()
             path = _resolve_path(file_path)
-            source = path.read_text()
-            script = jedi.Script(code=source, path=str(path))
-            results = await asyncio.to_thread(lambda: script.goto(line=line, column=character))
 
-            if not results:
+            def _do_search():
+                source = path.read_text()
+                script = jedi.Script(code=source, path=str(path))
+                results = script.goto(line=line, column=character)
+
+                if not results:
+                    return None
+
+                name = results[0].name
+                callers = script.get_references(line=line, column=character, include_builtins=False)
+                return name, callers
+
+            result = await asyncio.to_thread(_do_search)
+
+            if not result:
                 return ToolOutput(text="No callers found.", title="Callers")
 
-            name = results[0].name
-            callers = await asyncio.to_thread(
-                lambda: script.get_references(line=line, column=character, include_builtins=False)
-            )
+            name, callers = result
 
             parts = []
             for c in callers[:30]:
@@ -406,32 +447,43 @@ class LspOutgoingCallsTool(ToolBase):
         try:
             jedi = _get_jedi()
             path = _resolve_path(file_path)
-            source = path.read_text()
-            script = jedi.Script(code=source, path=str(path))
 
-            # Get the function definition
-            func = script.get_context(line=line, column=character)
-            if not func or func.type != "function":
+            def _do_search():
+                source = path.read_text()
+                script = jedi.Script(code=source, path=str(path))
+
+                # Get the function definition
+                func = script.get_context(line=line, column=character)
+                if not func or func.type != "function":
+                    return None
+
+                # Find all names called within the function
+                func.get_line_code()
+                # Parse the function body
+                callees = set()
+                tree = jedi.Script(code=source, path=str(path))
+                names = tree.get_names(all_scopes=True)
+                for n in names:
+                    if (
+                        n.line > func.line and n.line < func.line + 100 and n.type == "function"
+                    ):  # rough bounds
+                        callees.add(f"  {n.full_name} — {path.name}:{n.line}")
+
+                return func.name, callees
+
+            result = await asyncio.to_thread(_do_search)
+
+            if not result:
                 return ToolOutput(text="Not inside a function.", title="Callees")
 
-            # Find all names called within the function
-            func.get_line_code()
-            # Parse the function body
-            callees = set()
-            tree = jedi.Script(code=source, path=str(path))
-            names = tree.get_names(all_scopes=True)
-            for n in names:
-                if (
-                    n.line > func.line and n.line < func.line + 100 and n.type == "function"
-                ):  # rough bounds
-                    callees.add(f"  {n.full_name} — {path.name}:{n.line}")
+            func_name, callees = result
 
             output = (
-                f"Callees from '{func.name}':\n" + "\n".join(sorted(callees)[:30])
+                f"Callees from '{func_name}':\n" + "\n".join(sorted(callees)[:30])
                 if callees
                 else "No callees found."
             )
-            return ToolOutput(text=output, title=f"Callees of {func.name}")
+            return ToolOutput(text=output, title=f"Callees of {func_name}")
         except Exception as e:
             return ToolOutput(text=f"Callee search error: {e}", error=True)
 
