@@ -1577,6 +1577,45 @@ Switch providers with:  lucky-code model <provider> <name>
 # ── Entry point ────────────────────────────────────────────────────────
 
 
+def _schedule_list(store):
+    schedules = store.list()
+    if not schedules:
+        print("No schedules. Create one from the agent (ScheduleCreate) or HQ /schedules.")
+        return
+    for s in schedules:
+        state = "enabled" if s.enabled else "disabled"
+        when = (
+            s.cron
+            if s.kind == "cron"
+            else (f"every {s.every_minutes}m" if s.kind == "every" else f"daily {s.daily_at}")
+        )
+        print(
+            f"- {s.name} [{s.id}] ({state}) — {when} — next: {s.next_run_at or '—'}"
+            f" — last: {s.last_status or 'never'}"
+        )
+
+
+def _schedule_run_now(store, schedule_id):
+    from core.schedule_runner import run_schedule
+
+    record = run_schedule(store, schedule_id, force=True, reason="manual", retry_delay_sec=5)
+    print(f"Run {record['run_id']}: {record['status']}")
+    if record.get("summary"):
+        print(record["summary"][:500])
+
+
+def _schedule_history(store, schedule_id):
+    runs = store.history(schedule_id, 20)
+    if not runs:
+        print("No runs recorded yet.")
+        return
+    for r in runs:
+        print(
+            f"- {r['schedule_name']} [{r['started_at']}] {r['status']} "
+            f"({r['duration_sec']:.0f}s): {(r['summary'] or r['error'])[:120]}"
+        )
+
+
 def _cli_schedule(args):
     """luckyd-code schedule [--daemon | --list | --run-now ID | --history [ID]]
 
@@ -1600,39 +1639,12 @@ def _cli_schedule(args):
 
         daemon_main()
     elif args[0] == "--list":
-        schedules = store.list()
-        if not schedules:
-            print("No schedules. Create one from the agent (ScheduleCreate) or HQ /schedules.")
-            return
-        for s in schedules:
-            state = "enabled" if s.enabled else "disabled"
-            when = (
-                s.cron
-                if s.kind == "cron"
-                else (f"every {s.every_minutes}m" if s.kind == "every" else f"daily {s.daily_at}")
-            )
-            print(
-                f"- {s.name} [{s.id}] ({state}) — {when} — next: {s.next_run_at or '—'}"
-                f" — last: {s.last_status or 'never'}"
-            )
+        _schedule_list(store)
     elif args[0] == "--run-now" and len(args) > 1:
-        from core.schedule_runner import run_schedule
-
-        record = run_schedule(store, args[1], force=True, reason="manual", retry_delay_sec=5)
-        print(f"Run {record['run_id']}: {record['status']}")
-        if record.get("summary"):
-            print(record["summary"][:500])
+        _schedule_run_now(store, args[1])
     elif args[0] == "--history":
         sid = args[1] if len(args) > 1 else None
-        runs = store.history(sid, 20)
-        if not runs:
-            print("No runs recorded yet.")
-            return
-        for r in runs:
-            print(
-                f"- {r['schedule_name']} [{r['started_at']}] {r['status']} "
-                f"({r['duration_sec']:.0f}s): {(r['summary'] or r['error'])[:120]}"
-            )
+        _schedule_history(store, sid)
     else:
         print(f"Unknown schedule command: {' '.join(args)} (try --help)")
         sys.exit(2)
