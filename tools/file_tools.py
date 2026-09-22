@@ -5,6 +5,7 @@ These are the core tools every coding agent needs.
 
 from __future__ import annotations
 
+import asyncio
 import fnmatch
 import re
 from pathlib import Path
@@ -78,7 +79,10 @@ class ReadTool(ToolBase):
             if path.is_dir():
                 return ToolOutput(text=f"Error: Path is a directory: {file_path}", error=True)
 
-            lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+            def _read_and_split():
+                return path.read_text(encoding="utf-8", errors="replace").splitlines()
+
+            lines = await asyncio.to_thread(_read_and_split)
             display_lines = []
             # A negative offset would wrap around via lines[-i]; clamp to 0.
             offset = max(0, offset)
