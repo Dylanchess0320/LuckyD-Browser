@@ -4,6 +4,7 @@ Data source tools: SQLite query, CSV, JSON, document reading, and secrets access
 
 from __future__ import annotations
 
+import asyncio
 import csv
 import os
 import sqlite3
@@ -193,18 +194,43 @@ class SecretsTool(ToolBase):
         },
     }
 
+    def _read_list_env(self, target: str) -> list[str]:
+        keys = []
+        with open(target, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    keys.append(line.split("=")[0].strip())
+        return keys
+
+    def _read_check_env(self, target: str, key: str) -> bool:
+        with open(target, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith("#") or "=" not in line:
+                    continue
+                if line.split("=")[0].strip() == key:
+                    return True
+        return False
+
+    def _read_get_env_len(self, target: str, key: str) -> int:
+        with open(target, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith("#") or "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                if k.strip() == key:
+                    return len(v.strip())
+        return -1
+
     async def execute(self, op, key="", env_file=""):
         try:
             if op == "list_env":
                 target = env_file or ".env"
                 if not os.path.exists(target):
                     return ToolOutput(text=f"{target} not found", error=True)
-                keys = []
-                with open(target, encoding="utf-8") as f:
-                    for line in f:
-                        line = line.strip()
-                        if line and not line.startswith("#") and "=" in line:
-                            keys.append(line.split("=")[0].strip())
+                keys = await asyncio.to_thread(self._read_list_env, target)
                 return ToolOutput(
                     text="\n".join(keys) if keys else "(no keys found)",
                     title=f"Keys in {target} ({len(keys)})",
@@ -217,15 +243,7 @@ class SecretsTool(ToolBase):
                 target = env_file or ".env"
                 if not os.path.exists(target):
                     return ToolOutput(text=f"{target} not found", error=True)
-                found = False
-                with open(target, encoding="utf-8") as f:
-                    for line in f:
-                        line = line.strip()
-                        if line.startswith("#") or "=" not in line:
-                            continue
-                        if line.split("=")[0].strip() == key:
-                            found = True
-                            break
+                found = await asyncio.to_thread(self._read_check_env, target, key)
                 return ToolOutput(
                     text=f"Key '{key}': {'found' if found else 'not found'}",
                     metadata={"key": key, "found": found},
@@ -237,21 +255,17 @@ class SecretsTool(ToolBase):
                 target = env_file or ".env"
                 if not os.path.exists(target):
                     return ToolOutput(text=f"{target} not found", error=True)
-                with open(target, encoding="utf-8") as f:
-                    for line in f:
-                        line = line.strip()
-                        if line.startswith("#") or "=" not in line:
-                            continue
-                        k, v = line.split("=", 1)
-                        if k.strip() == key:
-                            return ToolOutput(
-                                text=f"Key '{key}' found and set (value hidden)",
-                                metadata={
-                                    "key": key,
-                                    "found": True,
-                                    "length": len(v.strip()),
-                                },
-                            )
+
+                v_len = await asyncio.to_thread(self._read_get_env_len, target, key)
+                if v_len != -1:
+                    return ToolOutput(
+                        text=f"Key '{key}' found and set (value hidden)",
+                        metadata={
+                            "key": key,
+                            "found": True,
+                            "length": v_len,
+                        },
+                    )
                 return ToolOutput(text=f"Key '{key}' not found", error=True)
 
             else:
