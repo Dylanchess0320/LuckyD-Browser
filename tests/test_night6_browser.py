@@ -193,7 +193,9 @@ class TestGetPlaywright:
         assert not _ok(r)
         assert "Playwright not installed" in r.text
 
-    async def test_click_type_snapshot_evaluate_errors_without_playwright(self, clean_browser, monkeypatch):
+    async def test_click_type_snapshot_evaluate_errors_without_playwright(
+        self, clean_browser, monkeypatch
+    ):
         monkeypatch.setitem(sys.modules, "playwright", None)
         monkeypatch.setitem(sys.modules, "playwright.async_api", None)
         for name, kw in [
