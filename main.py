@@ -1600,6 +1600,65 @@ def _cli_schedule(args):
         sys.exit(2)
 
 
+from collections.abc import Callable
+
+
+def _plugin_cmd_list(rest: list[str], list_plugins: Callable, path_cls: type) -> None:
+    include_available = "--available" in rest
+    market = ""
+    for i, tok in enumerate(rest):
+        if tok == "--marketplace" and i + 1 < len(rest):
+            market = rest[i + 1]
+    try:
+        rows = list_plugins(
+            marketplace=market,
+            include_available=include_available,
+            repo_root=path_cls(__file__).resolve().parent,
+        )
+    except ValueError as exc:
+        print(f"Error: {exc}")
+        sys.exit(2)
+    if not rows:
+        print("No plugins installed. Try: lucky-code plugin list --available")
+        return
+    for p in rows:
+        state = "enabled" if p.enabled else "disabled"
+        desc = f" — {p.description}" if p.description else ""
+        print(f"  {p.name} [{p.marketplace}/{state}]{desc}")
+
+
+def _plugin_cmd_marketplace(marketplace_names: Callable) -> None:
+    for name in marketplace_names():
+        print(f"  {name}")
+
+
+def _plugin_cmd_add(rest: list[str], add_plugin: Callable, path_cls: type) -> None:
+    try:
+        info = add_plugin(rest[0], repo_root=path_cls(__file__).resolve().parent)
+    except ValueError as exc:
+        print(f"Error: {exc}")
+        sys.exit(2)
+    print(f"Installed plugin '{info.name}' from {info.marketplace}.")
+
+
+def _plugin_cmd_enable_disable(
+    cmd: str, rest: list[str], enable_plugin: Callable, disable_plugin: Callable
+) -> None:
+    ok = enable_plugin(rest[0]) if cmd == "enable" else disable_plugin(rest[0])
+    if not ok:
+        print(f"Plugin '{rest[0]}' is not installed.")
+        sys.exit(2)
+    print(f"Plugin '{rest[0]}' {cmd}d.")
+
+
+def _plugin_cmd_remove(rest: list[str], remove_plugin: Callable) -> None:
+    if remove_plugin(rest[0]):
+        print(f"Removed plugin '{rest[0]}'.")
+    else:
+        print(f"Plugin '{rest[0]}' is not installed.")
+        sys.exit(2)
+
+
 def _cli_plugin(args: list[str]) -> None:
     """lucky-code plugin <list|add|enable|disable|remove|marketplaces> [...] (9.8)."""
     from pathlib import Path
@@ -1629,53 +1688,19 @@ lucky-code plugin — local + official plugin management (9.8)
     cmd = args[0].lower()
     rest = args[1:]
     if cmd == "list":
-        include_available = "--available" in rest
-        market = ""
-        for i, tok in enumerate(rest):
-            if tok == "--marketplace" and i + 1 < len(rest):
-                market = rest[i + 1]
-        try:
-            rows = list_plugins(
-                marketplace=market,
-                include_available=include_available,
-                repo_root=Path(__file__).resolve().parent,
-            )
-        except ValueError as exc:
-            print(f"Error: {exc}")
-            sys.exit(2)
-        if not rows:
-            print("No plugins installed. Try: lucky-code plugin list --available")
-            return
-        for p in rows:
-            state = "enabled" if p.enabled else "disabled"
-            desc = f" — {p.description}" if p.description else ""
-            print(f"  {p.name} [{p.marketplace}/{state}]{desc}")
+        _plugin_cmd_list(rest, list_plugins, Path)
         return
     if cmd == "marketplace" and rest[:1] == ["list"]:
-        for name in marketplace_names():
-            print(f"  {name}")
+        _plugin_cmd_marketplace(marketplace_names)
         return
     if cmd == "add" and rest:
-        try:
-            info = add_plugin(rest[0], repo_root=Path(__file__).resolve().parent)
-        except ValueError as exc:
-            print(f"Error: {exc}")
-            sys.exit(2)
-        print(f"Installed plugin '{info.name}' from {info.marketplace}.")
+        _plugin_cmd_add(rest, add_plugin, Path)
         return
     if cmd in ("enable", "disable") and rest:
-        ok = enable_plugin(rest[0]) if cmd == "enable" else disable_plugin(rest[0])
-        if not ok:
-            print(f"Plugin '{rest[0]}' is not installed.")
-            sys.exit(2)
-        print(f"Plugin '{rest[0]}' {cmd}d.")
+        _plugin_cmd_enable_disable(cmd, rest, enable_plugin, disable_plugin)
         return
     if cmd == "remove" and rest:
-        if remove_plugin(rest[0]):
-            print(f"Removed plugin '{rest[0]}'.")
-        else:
-            print(f"Plugin '{rest[0]}' is not installed.")
-            sys.exit(2)
+        _plugin_cmd_remove(rest, remove_plugin)
         return
     print(f"Unknown plugin command: {' '.join(args)} (try: lucky-code plugin --help)")
     sys.exit(2)
