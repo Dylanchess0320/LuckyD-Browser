@@ -7,7 +7,7 @@ with codecs.open(f, "r", "utf-8") as fh:
 # Fix indentation - add 4 spaces before binding.backdrop.load
 content = content.replace(
     "binding.backdrop.load(t.backdropUrl()) {",
-    "            binding.backdrop.load(t.backdropUrl()) {",
+    "    binding.backdrop.load(t.backdropUrl()) {",
 )
 
 # Fix indentation - add 12 spaces before binding.meta.text
