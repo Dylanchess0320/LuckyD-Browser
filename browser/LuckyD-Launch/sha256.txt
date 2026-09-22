@@ -1,8 +1,0 @@
-﻿# LuckyD Browser release checksums (SHA256)
-
-LuckyDBrowserSetup-2.3.0.exe
-ef6a06c18a6280bed62bce34b8e01d374020e2d7d7ebbac4db33aa11ce1d60d6
-size: 168 MB
-
-Verify with PowerShell:
-  Get-FileHash .\LuckyDBrowserSetup-2.3.0.exe -Algorithm SHA256
