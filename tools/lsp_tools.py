@@ -181,7 +181,7 @@ class LspRenameTool(ToolBase):
                 script = jedi.Script(code=source, path=str(path))
                 return script.get_references(line=line, column=character)
 
-            refs = await asyncio.to_thread(_get_refs)
+            refs = _get_refs()
 
             if not refs:
                 return ToolOutput(text="No references found to rename.", error=True)
@@ -210,7 +210,7 @@ class LspRenameTool(ToolBase):
                     Path(fp).write_text("\n".join(lines) + "\n")
                 return total_changes
 
-            changes = await asyncio.to_thread(_apply_renames, by_file, old_name, new_name)
+            changes = _apply_renames(by_file, old_name, new_name)
 
             return ToolOutput(
                 text=f"Renamed '{old_name}' → '{new_name}' in {changes} location(s) across {len(by_file)} file(s).",
