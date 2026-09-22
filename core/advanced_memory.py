@@ -524,6 +524,9 @@ class AdvancedMemorySystem:
                 groups.setdefault(row["category"], []).append(row)
 
             merged = 0
+            insert_params = []
+            delete_ids = []
+
             for category, group in groups.items():
                 if len(group) < 2:
                     continue
@@ -546,13 +549,8 @@ class AdvancedMemorySystem:
                 digest = self._summarize(" | ".join(contents), max_chars=500)
                 now = _iso(_utcnow())
                 merged_id = uuid.uuid4().hex
-                self._conn.execute(
-                    """
-                    INSERT INTO memories
-                        (id, content, category, tags, importance, created_at,
-                         last_accessed, access_count, embedding, summary, source)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
+
+                insert_params.append(
                     (
                         merged_id,
                         digest,
@@ -565,10 +563,25 @@ class AdvancedMemorySystem:
                         _serialize_vector(self._embed(digest, sorted(tags))),
                         digest,
                         ",".join(sorted(sources)) or "compressed",
-                    ),
+                    )
                 )
-                self._conn.executemany("DELETE FROM memories WHERE id = ?", [(i,) for i in ids])
+
+                delete_ids.extend([(i,) for i in ids])
                 merged += len(ids)
+
+            if insert_params:
+                self._conn.executemany(
+                    """
+                    INSERT INTO memories
+                        (id, content, category, tags, importance, created_at,
+                         last_accessed, access_count, embedding, summary, source)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    insert_params,
+                )
+            if delete_ids:
+                self._conn.executemany("DELETE FROM memories WHERE id = ?", delete_ids)
+
         return merged
 
     # ── export / stats ─────────────────────────────────────────────
