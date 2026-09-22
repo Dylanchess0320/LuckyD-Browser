@@ -341,6 +341,8 @@ def configure(
 
 def redact_sensitive(text: str) -> str:
     """Redact API keys, tokens, and passwords from log messages."""
+    if not text:
+        return text
     for pattern, replacement in SENSITIVE_PATTERNS:
         text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
     return text
