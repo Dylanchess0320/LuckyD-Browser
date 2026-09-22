@@ -10,6 +10,7 @@ import subprocess
 import time
 import uuid
 from pathlib import Path
+import shlex
 
 from .base import ToolBase, ToolOutput
 from .registry import register_tool
@@ -171,9 +172,16 @@ class ProcessTool(ToolBase):
                             text=f"Refused to start background process: {reason}",
                             error=True,
                         )
+                try:
+                    cmd_list = shlex.split(command)
+                    if not cmd_list:
+                        return ToolOutput(text="Empty command.", error=True)
+                except ValueError as e:
+                    return ToolOutput(text=f"Invalid command format: {e}", error=True)
+
                 proc = subprocess.Popen(
-                    command,
-                    shell=True,  # nosec B602 — pre-validated by sandbox.is_safe above
+                    cmd_list,
+                    shell=False,
                     cwd=work_dir,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
