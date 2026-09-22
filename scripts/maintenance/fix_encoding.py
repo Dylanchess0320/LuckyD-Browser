@@ -8,10 +8,10 @@ content = content.replace(
     'sheet.detailMatch.text = "✨ \\${mp}% match"',
 )
 content = content.replace(
-    'append(title.year).append("  ·  ")', 'append(title.year).append("  ·  ")'
+    'append(title.year).append("  ?  ")', 'append(title.year).append("  ·  ")'
 )
-content = content.replace('append("  ·  ★ ")', 'append("  ·  ★ ")')
-content = content.replace('joinToString("  ·  ")', 'joinToString("  ·  ")')
+content = content.replace('append("  ?  ? ")', 'append("  ·  ★ ")')
+content = content.replace('joinToString("  ?  ")', 'joinToString("  ·  ")')
 
 with open(f, "w", encoding="utf-8") as fh:
     fh.write(content)
