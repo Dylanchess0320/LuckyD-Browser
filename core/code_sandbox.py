@@ -324,6 +324,43 @@ class CodeExecutionSandbox:
         issues.sort(key=lambda i: i.line)
         return issues
 
+    def _infer_assertion(self, returns_node: ast.expr | None) -> str:
+        """Infer a more realistic assertion based on the AST returns node."""
+        if not returns_node:
+            return "assert result is not None  # TODO: real assertion"
+
+        if isinstance(returns_node, ast.Name):
+            if returns_node.id == "bool":
+                return "assert result is True  # TODO: real assertion"
+            elif returns_node.id in ("int", "float"):
+                return "assert result == 0  # TODO: real assertion"
+            elif returns_node.id == "str":
+                return 'assert result == ""  # TODO: real assertion'
+            elif returns_node.id == "list":
+                return "assert result == []  # TODO: real assertion"
+            elif returns_node.id == "dict":
+                return "assert result == {}  # TODO: real assertion"
+            elif returns_node.id == "set":
+                return "assert result == set()  # TODO: real assertion"
+            elif returns_node.id == "tuple":
+                return "assert result == ()  # TODO: real assertion"
+            elif returns_node.id == "bytes":
+                return "assert result == b''  # TODO: real assertion"
+        elif isinstance(returns_node, ast.Constant):
+            if returns_node.value is None:
+                return "assert result is None  # TODO: real assertion"
+        elif isinstance(returns_node, ast.Subscript) and isinstance(returns_node.value, ast.Name):
+            if returns_node.value.id == "list":
+                return "assert result == []  # TODO: real assertion"
+            elif returns_node.value.id == "dict":
+                return "assert result == {}  # TODO: real assertion"
+            elif returns_node.value.id == "set":
+                return "assert result == set()  # TODO: real assertion"
+            elif returns_node.value.id == "tuple":
+                return "assert result == ()  # TODO: real assertion"
+
+        return "assert result is not None  # TODO: real assertion"
+
     def generate_tests(self, code: str) -> str:
         """Generate a pytest skeleton with one stub test per top-level function."""
         ok, err = self.validate_syntax(code)
@@ -356,7 +393,7 @@ class CodeExecutionSandbox:
                 "    # Act",
                 f"    result = {fn.name}({call_args})" if args else f"    result = {fn.name}()",
                 "    # Assert",
-                "    assert result is not None  # TODO: real assertion",
+                f"    {self._infer_assertion(fn.returns)}",
                 "",
             ]
         if not funcs:
