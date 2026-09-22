@@ -808,6 +808,205 @@ def _console_approval(request) -> type(None):
     }
 
 
+async def handle_model_command(agent: CodingAgent, cmd: str) -> bool:
+    """Handle the /model slash command."""
+    # ── Professional free-model browser + fuzzy picker (Cline-style) ──
+    # "/model"              → browse free catalog with numbers + interactive prompt
+    # "/model free" / list  → same (explicit)
+    # "/model all"          → full catalog (free + paid)
+    # "/model 12"           → pick by number from free catalog
+    # "/model <provider> <name>" → direct provider switch
+    # "/model <fuzzy>"      → fuzzy across all free models (e.g. nemotron, kimi, qwen, spark)
+    raw = cmd[len("model") :].strip()
+    low = raw.lower()
+
+    def _current_provider_name() -> str:
+        try:
+            return getattr(getattr(agent, "_provider_config", None), "provider", "") or ""
+        except Exception:
+            return ""
+
+    def _flat_for_catalog(free_only: bool) -> dict[int, tuple[str, str]]:
+        """Build the same number→(provider,model) map that ui.show_models() uses."""
+        from core.providers import provider_key_from_label
+
+        sections = model_catalog(free_only=free_only)
+        flat: dict[int, tuple[str, str]] = {}
+        idx = 0
+        for section in sections or []:
+            for group in section.get("groups", []) or []:
+                label = str(group.get("provider", ""))
+                pkey = provider_key_from_label(label)
+                if group.get("provider_key"):
+                    pkey = str(group["provider_key"])
+                for m in group.get("models", []) or []:
+                    idx += 1
+                    flat[idx] = (pkey, str(m))
+        return flat
+
+    # ── No args → browse free catalog + interactive picker
+    if not raw:
+        sections = model_catalog(free_only=True)
+        flat = ui.show_models(
+            sections,
+            current_model=getattr(agent, "model", "") or "",
+            current_provider=_current_provider_name(),
+        )
+        # Built-in terminal picker — no separate bat file needed
+        if sys.stdin.isatty():
+            try:
+                choice = await asyncio.to_thread(
+                    ui.prompt_text, "Select model (number / name, Enter to cancel)"
+                )
+            except Exception:
+                choice = ""
+            choice = (choice or "").strip()
+            if not choice:
+                return False
+            if choice.isdigit():
+                n = int(choice)
+                hit = flat.get(n)
+                if hit:
+                    _switch_model(agent, provider=hit[0], model_name=hit[1])
+                else:
+                    ui.warn(f"No model #{n} — pick 1…{len(flat)}")
+                return False
+            # Text choice → try provider-prefixed first, then fuzzy
+            prov = None
+            des = choice
+            for p in (
+                "cline-usage",
+                "cline-pass",
+                "clinepass",
+                "cline",
+                "openrouter",
+                "groq",
+                "zai",
+                "google",
+                "ollama",
+                "deepseek",
+                "openai",
+                "anthropic",
+            ):
+                if choice.lower().startswith(p + " "):
+                    prov = _PROVIDER_ALIASES.get(p, p)
+                    des = choice[len(p) + 1 :].strip()
+                    break
+            if prov:
+                _switch_model(agent, provider=prov, model_name=des)
+            else:
+                hit = _resolve_free_query(choice)
+                if hit is None:
+                    # also try legacy cline exact (covers paid ClinePass picks)
+                    hit2 = _match_cline_model(choice)
+                    if hit2:
+                        _switch_model(agent, provider=hit2[0], model_name=hit2[1])
+                else:
+                    _switch_model(agent, provider=hit[0], model_name=hit[1])
+        return False
+
+    # Explicit browse variants
+    if low in (
+        "free",
+        "--free",
+        "free --check",
+        "--free --check",
+        "list",
+        "free list",
+        "list free",
+    ):
+        sections = model_catalog(free_only=True)
+        flat = ui.show_models(
+            sections,
+            current_model=getattr(agent, "model", "") or "",
+            current_provider=_current_provider_name(),
+        )
+        if sys.stdin.isatty():
+            try:
+                choice = await asyncio.to_thread(
+                    ui.prompt_text, "Select model (number / name, Enter to cancel)"
+                )
+            except Exception:
+                choice = ""
+            choice = (choice or "").strip()
+            if choice.isdigit() and choice:
+                hit = flat.get(int(choice))
+                if hit:
+                    _switch_model(agent, provider=hit[0], model_name=hit[1])
+                else:
+                    ui.warn(f"No model #{choice}")
+            elif choice:
+                hit = _resolve_free_query(choice)
+                if hit:
+                    _switch_model(agent, provider=hit[0], model_name=hit[1])
+        return False
+
+    if low in ("all", "paid", "free all", "all free", "show all", "full"):
+        ui.show_models(
+            model_catalog(free_only=False),
+            current_model=getattr(agent, "model", "") or "",
+            current_provider=_current_provider_name(),
+        )
+        ui.info("Tip: /model <name> fuzzy-switches free models · /model free for free-only picker")
+        return False
+
+    # Numeric pick without prior browse: "/model 12"
+    if low.isdigit():
+        flat = _flat_for_catalog(free_only=True)
+        n = int(low)
+        hit = flat.get(n)
+        if hit:
+            _switch_model(agent, provider=hit[0], model_name=hit[1])
+        else:
+            ui.warn(f"No model #{n} — run /model to see 1…{len(flat)}")
+            # Show catalog to help
+            ui.show_models(
+                model_catalog(free_only=True),
+                current_model=getattr(agent, "model", "") or "",
+                current_provider=_current_provider_name(),
+            )
+        return False
+
+    # Provider-prefixed direct switch: "/model cline kimi"
+    provider = None
+    desired = raw
+    for p in (
+        "cline-usage",
+        "cline-pass",
+        "clinepass",
+        "cline",
+        "openrouter",
+        "groq",
+        "anthropic",
+        "deepseek",
+        "openai",
+        "google",
+        "ollama",
+        "zai",
+        "minimax",
+    ):
+        if low.startswith(p + " "):
+            provider = _PROVIDER_ALIASES.get(p, p)
+            desired = raw[len(p) + 1 :].strip()
+            break
+    if provider:
+        _switch_model(agent, provider=provider, model_name=desired)
+        return False
+
+    # ── Fuzzy free-model resolve (the main Cline-style path) ──
+    # "/model kimi" / "/model qwen" / "/model spark" etc.
+    hit = _resolve_free_query(raw)
+    if hit:
+        _switch_model(agent, provider=hit[0], model_name=hit[1])
+        return False
+    # Fallback: legacy exact Cline match (covers subscription picks like kimi-k3)
+    hit2 = _match_cline_model(raw)
+    if hit2:
+        _switch_model(agent, provider=hit2[0], model_name=hit2[1])
+
+    return False
+
+
 async def handle_command(agent: CodingAgent, cmd: str) -> bool:
     """
     Handle a slash command. Returns True if the REPL should exit,
@@ -856,201 +1055,7 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
             ui.error(f"Memory error: {e}")
 
     elif cmd.startswith("model"):
-        # ── Professional free-model browser + fuzzy picker (Cline-style) ──
-        # "/model"              → browse free catalog with numbers + interactive prompt
-        # "/model free" / list  → same (explicit)
-        # "/model all"          → full catalog (free + paid)
-        # "/model 12"           → pick by number from free catalog
-        # "/model <provider> <name>" → direct provider switch
-        # "/model <fuzzy>"      → fuzzy across all free models (e.g. nemotron, kimi, qwen, spark)
-        raw = cmd[len("model") :].strip()
-        low = raw.lower()
-
-        def _current_provider_name() -> str:
-            try:
-                return getattr(getattr(agent, "_provider_config", None), "provider", "") or ""
-            except Exception:
-                return ""
-
-        def _flat_for_catalog(free_only: bool) -> dict[int, tuple[str, str]]:
-            """Build the same number→(provider,model) map that ui.show_models() uses."""
-            from core.providers import provider_key_from_label
-
-            sections = model_catalog(free_only=free_only)
-            flat: dict[int, tuple[str, str]] = {}
-            idx = 0
-            for section in sections or []:
-                for group in section.get("groups", []) or []:
-                    label = str(group.get("provider", ""))
-                    pkey = provider_key_from_label(label)
-                    if group.get("provider_key"):
-                        pkey = str(group["provider_key"])
-                    for m in group.get("models", []) or []:
-                        idx += 1
-                        flat[idx] = (pkey, str(m))
-            return flat
-
-        # ── No args → browse free catalog + interactive picker
-        if not raw:
-            sections = model_catalog(free_only=True)
-            flat = ui.show_models(
-                sections,
-                current_model=getattr(agent, "model", "") or "",
-                current_provider=_current_provider_name(),
-            )
-            # Built-in terminal picker — no separate bat file needed
-            if sys.stdin.isatty():
-                try:
-                    choice = await asyncio.to_thread(
-                        ui.prompt_text, "Select model (number / name, Enter to cancel)"
-                    )
-                except Exception:
-                    choice = ""
-                choice = (choice or "").strip()
-                if not choice:
-                    return False
-                if choice.isdigit():
-                    n = int(choice)
-                    hit = flat.get(n)
-                    if hit:
-                        _switch_model(agent, provider=hit[0], model_name=hit[1])
-                    else:
-                        ui.warn(f"No model #{n} — pick 1…{len(flat)}")
-                    return False
-                # Text choice → try provider-prefixed first, then fuzzy
-                prov = None
-                des = choice
-                for p in (
-                    "cline-usage",
-                    "cline-pass",
-                    "clinepass",
-                    "cline",
-                    "openrouter",
-                    "groq",
-                    "zai",
-                    "google",
-                    "ollama",
-                    "deepseek",
-                    "openai",
-                    "anthropic",
-                ):
-                    if choice.lower().startswith(p + " "):
-                        prov = _PROVIDER_ALIASES.get(p, p)
-                        des = choice[len(p) + 1 :].strip()
-                        break
-                if prov:
-                    _switch_model(agent, provider=prov, model_name=des)
-                else:
-                    hit = _resolve_free_query(choice)
-                    if hit is None:
-                        # also try legacy cline exact (covers paid ClinePass picks)
-                        hit2 = _match_cline_model(choice)
-                        if hit2:
-                            _switch_model(agent, provider=hit2[0], model_name=hit2[1])
-                    else:
-                        _switch_model(agent, provider=hit[0], model_name=hit[1])
-            return False
-
-        # Explicit browse variants
-        if low in (
-            "free",
-            "--free",
-            "free --check",
-            "--free --check",
-            "list",
-            "free list",
-            "list free",
-        ):
-            sections = model_catalog(free_only=True)
-            flat = ui.show_models(
-                sections,
-                current_model=getattr(agent, "model", "") or "",
-                current_provider=_current_provider_name(),
-            )
-            if sys.stdin.isatty():
-                try:
-                    choice = await asyncio.to_thread(
-                        ui.prompt_text, "Select model (number / name, Enter to cancel)"
-                    )
-                except Exception:
-                    choice = ""
-                choice = (choice or "").strip()
-                if choice.isdigit() and choice:
-                    hit = flat.get(int(choice))
-                    if hit:
-                        _switch_model(agent, provider=hit[0], model_name=hit[1])
-                    else:
-                        ui.warn(f"No model #{choice}")
-                elif choice:
-                    hit = _resolve_free_query(choice)
-                    if hit:
-                        _switch_model(agent, provider=hit[0], model_name=hit[1])
-            return False
-
-        if low in ("all", "paid", "free all", "all free", "show all", "full"):
-            ui.show_models(
-                model_catalog(free_only=False),
-                current_model=getattr(agent, "model", "") or "",
-                current_provider=_current_provider_name(),
-            )
-            ui.info(
-                "Tip: /model <name> fuzzy-switches free models · /model free for free-only picker"
-            )
-            return False
-
-        # Numeric pick without prior browse: "/model 12"
-        if low.isdigit():
-            flat = _flat_for_catalog(free_only=True)
-            n = int(low)
-            hit = flat.get(n)
-            if hit:
-                _switch_model(agent, provider=hit[0], model_name=hit[1])
-            else:
-                ui.warn(f"No model #{n} — run /model to see 1…{len(flat)}")
-                # Show catalog to help
-                ui.show_models(
-                    model_catalog(free_only=True),
-                    current_model=getattr(agent, "model", "") or "",
-                    current_provider=_current_provider_name(),
-                )
-            return False
-
-        # Provider-prefixed direct switch: "/model cline kimi"
-        provider = None
-        desired = raw
-        for p in (
-            "cline-usage",
-            "cline-pass",
-            "clinepass",
-            "cline",
-            "openrouter",
-            "groq",
-            "anthropic",
-            "deepseek",
-            "openai",
-            "google",
-            "ollama",
-            "zai",
-            "minimax",
-        ):
-            if low.startswith(p + " "):
-                provider = _PROVIDER_ALIASES.get(p, p)
-                desired = raw[len(p) + 1 :].strip()
-                break
-        if provider:
-            _switch_model(agent, provider=provider, model_name=desired)
-            return False
-
-        # ── Fuzzy free-model resolve (the main Cline-style path) ──
-        # "/model kimi" / "/model qwen" / "/model spark" etc.
-        hit = _resolve_free_query(raw)
-        if hit:
-            _switch_model(agent, provider=hit[0], model_name=hit[1])
-            return False
-        # Fallback: legacy exact Cline match (covers subscription picks like kimi-k3)
-        hit2 = _match_cline_model(raw)
-        if hit2:
-            _switch_model(agent, provider=hit2[0], model_name=hit2[1])
+        return await handle_model_command(agent, cmd)
 
     elif cmd.startswith("contributor"):
         # ── Contributor tier (explicit opt-in; never a silent default) ──
