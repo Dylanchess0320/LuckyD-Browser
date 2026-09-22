@@ -301,50 +301,53 @@ class LspImplementationTool(ToolBase):
     }
 
     async def execute(self, file_path: str, line: int) -> ToolOutput:
-        try:
-            jedi = _get_jedi()
-            path = _resolve_path(file_path)
-            source = path.read_text()
-            script = jedi.Script(code=source, path=str(path))
-            results = script.goto(line=line, column=0)
+        def _sync_execute() -> ToolOutput:
+            try:
+                jedi = _get_jedi()
+                path = _resolve_path(file_path)
+                source = path.read_text()
+                script = jedi.Script(code=source, path=str(path))
+                results = script.goto(line=line, column=0)
 
-            if not results or not results[0].name:
-                return ToolOutput(text="No implementations found.", title="Implementations")
+                if not results or not results[0].name:
+                    return ToolOutput(text="No implementations found.", title="Implementations")
 
-            name = results[0].name
-            # Search project for this method name in class bodies
-            cwd = Path.cwd()
-            found = []
-            for py_file in cwd.rglob("*.py"):
-                if any(
-                    p.name in {".git", "__pycache__", "node_modules", ".venv"}
-                    for p in py_file.parents
-                ):
-                    continue
-                try:
-                    content = py_file.read_text(errors="replace")
-                    # Simple heuristic: find 'def name' in class context
-                    pattern = re.compile(
-                        rf"class\s+\w+.*:[\s\S]*?def\s+{re.escape(name)}\s*\(", re.MULTILINE
+                name = results[0].name
+                # Search project for this method name in class bodies
+                cwd = Path.cwd()
+                found = []
+                for py_file in cwd.rglob("*.py"):
+                    if any(
+                        p.name in {".git", "__pycache__", "node_modules", ".venv"}
+                        for p in py_file.parents
+                    ):
+                        continue
+                    try:
+                        content = py_file.read_text(errors="replace")
+                        # Simple heuristic: find 'def name' in class context
+                        pattern = re.compile(
+                            rf"class\s+\w+.*:[\s\S]*?def\s+{re.escape(name)}\s*\(", re.MULTILINE
+                        )
+                        for match in pattern.finditer(content):
+                            line_num = content[: match.start()].count("\n") + 1
+                            found.append(f"  {py_file.name}:{line_num}")
+                    except Exception:
+                        continue
+
+                if not found:
+                    return ToolOutput(
+                        text=f"No implementations found for '{name}'.", title="Implementations"
                     )
-                    for match in pattern.finditer(content):
-                        line_num = content[: match.start()].count("\n") + 1
-                        found.append(f"  {py_file.name}:{line_num}")
-                except Exception:
-                    continue
 
-            if not found:
                 return ToolOutput(
-                    text=f"No implementations found for '{name}'.", title="Implementations"
+                    text=f"Implementations of '{name}':\n" + "\n".join(found[:30]),
+                    title=f"Implementations of {name}",
+                    metadata={"count": len(found)},
                 )
+            except Exception as e:
+                return ToolOutput(text=f"Implementation search error: {e}", error=True)
 
-            return ToolOutput(
-                text=f"Implementations of '{name}':\n" + "\n".join(found[:30]),
-                title=f"Implementations of {name}",
-                metadata={"count": len(found)},
-            )
-        except Exception as e:
-            return ToolOutput(text=f"Implementation search error: {e}", error=True)
+        return await asyncio.to_thread(_sync_execute)
 
 
 class LspIncomingCallsTool(ToolBase):
