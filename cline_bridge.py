@@ -171,16 +171,31 @@ async def health() -> JSONResponse:
         return JSONResponse({"ok": False, "error": f"{type(e).__name__}: {e}"}, status_code=500)
 
 
+def _live_model_ids() -> list[str]:
+    """Upstream /v1/models ids, or [] when unreachable (caller falls back)."""
+    try:
+        resp = httpx.get(
+            f"{UPSTREAM_BASE}/models",
+            headers={"Authorization": f"Bearer {_upstream_token()}"},
+            timeout=5.0,
+        )
+        resp.raise_for_status()
+        data = resp.json().get("data", [])
+        return [str(m.get("id")) for m in data if m.get("id")][:200]
+    except Exception:
+        return []
+
+
 @app.get("/v1/models")
 async def models(request: Request) -> JSONResponse:
     if not _inbound_authorized(request):
         return _UNAUTHORIZED
+    ids = _live_model_ids() or KNOWN_MODELS
     return JSONResponse(
         {
             "object": "list",
             "data": [
-                {"id": m, "object": "model", "created": 0, "owned_by": "cline-pass"}
-                for m in KNOWN_MODELS
+                {"id": m, "object": "model", "created": 0, "owned_by": "cline-pass"} for m in ids
             ],
         }
     )
