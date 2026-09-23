@@ -1,5 +1,16 @@
 # LuckyD Browser — Release Notes
 
+## [10.2.1] — Dashboard cleanup + HQ auto-rotation — 2026-09-23
+
+**[`LuckyDBrowserSetup-10.2.1.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.2.1/LuckyDBrowserSetup-10.2.1.exe)** — Windows 10/11 x64 · per-user install · no admin needed.
+**[`LuckyDBrowser-Portable-10.2.1.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.2.1/LuckyDBrowser-Portable-10.2.1.zip)** — unzip and run, for locked-down PCs.
+
+- **Cleaner home dashboard** — the four AI preset chips are gone.
+- **Ask Lucky reliability** — real error messages, no double-fires, picks up new keys without a restart.
+- **HQ auto-rotates to a working model** — retired/rate-limited/down models rotate transparently and pin the winner; OpenCode Zen default fixed to `gemini-3.5-flash-lite`.
+
+On top of everything from 10.2.0 below.
+
 ## [10.2.0] — Performance + hardening edition — 2026-09-23
 
 **[`LuckyDBrowserSetup-10.2.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.2.0/LuckyDBrowserSetup-10.2.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed.

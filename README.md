@@ -75,11 +75,11 @@ See [`kit/SKILL_AUTHORING.md`](kit/SKILL_AUTHORING.md) to publish your own skill
 
 ## Latest release
 
-**v10.2.0** — Performance + hardening edition: async non-blocking agent tools, command-injection hardening, Windows-safe process execution, green everywhere, Agent 1 + Agent 2 on v10.2.0:
+**v10.2.1** — Dashboard cleanup + HQ auto-rotation: AI preset chips removed, Ask Lucky reliability fixes, HQ rotates to a working model when the configured one is retired or down:
 
 | | |
 |---|---|
-| **⬇ Windows installer** | [`LuckyDBrowserSetup-10.2.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.2.0/LuckyDBrowserSetup-10.2.0.exe) — built on a real Windows runner with Inno Setup 6. Per-user, no admin, silent-install flags. |
+| **⬇ Windows installer** | [`LuckyDBrowserSetup-10.2.1.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.2.1/LuckyDBrowserSetup-10.2.1.exe) — built on a real Windows runner with Inno Setup 6. Per-user, no admin, silent-install flags. |
 | **⚡ Faster agent loop** | Grep, file read/edit, CSV, LSP rename, secrets, file watching, and memory compression off the event loop; batched memory-decay SQL. |
 | **🛡 Hardened + Windows-correct** | `ProcessTool` command-injection fix plus `shell=True` behind the blocklist gate for builtins, pipes, and redirects. |
 | **🤖 Agent 1 + Agent 2 v10.2.0** | Both mesh slots report `LuckyD Code v10.2.0` in terminal, CLI, and ACP. |
@@ -288,14 +288,14 @@ Also in this lineage: Deep Research swarm (`Ctrl+Shift+R`), Agent Mesh, self-hea
 
 ## Install in 10 seconds
 
-1. Get **[LuckyDBrowserSetup-10.2.0.exe](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.2.0/LuckyDBrowserSetup-10.2.0.exe)**
+1. Get **[LuckyDBrowserSetup-10.2.1.exe](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.2.1/LuckyDBrowserSetup-10.2.1.exe)**
 2. Run it — per-user, **no admin**, installs to `%LOCALAPPDATA%\Programs\LuckyDBrowser`
 3. Leave **“Set up free unlimited local AI”** checked → Ollama + `llama3.2:3b` (~2 GB, one time)
 4. `Ctrl+Shift+A` → chat offline. Or bring your own keys (Gemini, Groq, DeepSeek, OpenAI, Anthropic, Z.ai, OpenRouter, Cline, MiniMax)
 
 No local model yet? With a logged-in Cline CLI session (`cline auth`), chat uses Cline's free models — no local server needed.
 
-Silent: `LuckyDBrowserSetup-10.2.0.exe /VERYSILENT /NORESTART`
+Silent: `LuckyDBrowserSetup-10.2.1.exe /VERYSILENT /NORESTART`
 
 Windows 10/11 x64 only.
 
@@ -336,7 +336,7 @@ browser\run_browser.bat
 
 # Shareable installer (needs Inno Setup 6)
 powershell -NoProfile -ExecutionPolicy Bypass -File browser\installer\build_installer.ps1
-# → browser\installer\output\LuckyDBrowserSetup-10.2.0.exe
+# → browser\installer\output\LuckyDBrowserSetup-10.2.1.exe
 ```
 
 ---
