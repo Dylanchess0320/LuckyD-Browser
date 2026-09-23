@@ -10,6 +10,7 @@ clipboard read/write.
 
 from __future__ import annotations
 
+import importlib.util
 import sys
 import types
 from pathlib import Path
@@ -18,6 +19,30 @@ import pytest
 
 import tools.desktop_tools as dt  # noqa: F401  # side effect: registers tools
 from tools.registry import registry
+
+
+def _pkg_installed(name: str) -> bool:
+    """True when the optional dependency is importable in this environment."""
+    try:
+        return importlib.util.find_spec(name) is not None
+    except (ImportError, ValueError):  # pragma: no cover - defensive
+        return False
+
+
+# The "missing dependency" tests assert the genuine no-module error path, so
+# they only make sense where the package really is absent. CI runners are
+# bare; a dev box with desktop extras installed skips them instead of
+# failing. The fakes below exercise the happy paths on every machine.
+missing_mss = pytest.mark.skipif(_pkg_installed("mss"), reason="mss is installed here")
+missing_pyautogui = pytest.mark.skipif(
+    _pkg_installed("pyautogui"), reason="pyautogui is installed here"
+)
+missing_pygetwindow = pytest.mark.skipif(
+    _pkg_installed("pygetwindow"), reason="pygetwindow is installed here"
+)
+missing_pyperclip = pytest.mark.skipif(
+    _pkg_installed("pyperclip"), reason="pyperclip is installed here"
+)
 
 
 def _ok(result) -> bool:
@@ -34,6 +59,7 @@ def _tool(name):
 
 
 class TestScreenshot:
+    @missing_mss
     async def test_missing_mss(self):
         assert "mss" not in sys.modules
         r = await _tool("DesktopScreenshot").execute()
@@ -125,6 +151,7 @@ def fake_gui(monkeypatch):
 
 
 class TestMouse:
+    @missing_pyautogui
     async def test_missing_pyautogui(self):
         assert "pyautogui" not in sys.modules
         r = await _tool("DesktopMouse").execute(action="click")
@@ -267,6 +294,7 @@ def fake_gw(monkeypatch):
 
 
 class TestWindow:
+    @missing_pygetwindow
     async def test_missing_pygetwindow(self):
         assert "pygetwindow" not in sys.modules
         r = await _tool("DesktopWindow").execute()
@@ -328,6 +356,7 @@ def fake_clip(monkeypatch):
 
 
 class TestClipboard:
+    @missing_pyperclip
     async def test_missing_pyperclip(self):
         assert "pyperclip" not in sys.modules
         r = await _tool("DesktopClipboard").execute()

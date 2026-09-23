@@ -19,8 +19,8 @@ _WS_PORT = 9881  # must match browser_app's "terminal_port" default
 
 # Keep in sync with terminal_server.SHELLS (allowlist lives there).
 _SHELL_LABELS = {
-    "agent": "Agent 1 (LuckyD Code v9.7)",
-    "agent2": "Agent 2 (LuckyD Code v9.7)",
+    "agent": "Agent 1 (LuckyD Code v10.2)",
+    "agent2": "Agent 2 (LuckyD Code v10.2)",
     "powershell": "PowerShell",
     "cmd": "CMD",
     "mesh-agy": "Antigravity",
@@ -201,8 +201,8 @@ _TERM_CSS = r"""  html,body{margin:0;height:100%;background:var(--ld-window);ove
 
 _TERM_BODY = """<body>
 <div id="bar"><span id="dot" class="dot"></span><b id="title">&#9000; Terminal</b>
-  <button class="sh" data-sh="agent" title="LuckyD Code v9.7 Nuitka Agent CLI (Agent 1)">Agent 1 (v9.7)</button>
-  <button class="sh" data-sh="agent2" title="LuckyD Code v9.7 Standalone Agent CLI (Agent 2)">Agent 2 (v9.7)</button>
+  <button class="sh" data-sh="agent" title="LuckyD Code v10.2 Nuitka Agent CLI (Agent 1)">Agent 1 (v10.2)</button>
+  <button class="sh" data-sh="agent2" title="LuckyD Code v10.2 Standalone Agent CLI (Agent 2)">Agent 2 (v10.2)</button>
   <button class="sh" data-sh="powershell" title="Plain PowerShell console">PowerShell</button>
   <button class="sh" data-sh="cmd" title="Plain cmd.exe console">CMD</button>
   <span id="status">connecting&hellip;</span>
@@ -221,7 +221,7 @@ __MESH_DOCK__
 <script>
 const WS_URL = "__WS_URL__";
 let SHELL = "__SHELL__";
-const S_CORE = {agent:'Agent 1 (v9.7)', agent2:'Agent 2 (v9.7)', powershell:'PowerShell', cmd:'CMD', cline:'Cline'};
+const S_CORE = {agent:'Agent 1 (v10.2)', agent2:'Agent 2 (v10.2)', powershell:'PowerShell', cmd:'CMD', cline:'Cline'};
 const MESH_META = __MESH_META__;
 const SHELL_LABELS = Object.assign({}, S_CORE, MESH_META);
 const dot = document.getElementById('dot');

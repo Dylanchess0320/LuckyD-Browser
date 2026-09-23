@@ -155,8 +155,10 @@ def _cli_command(cli_path: str = "") -> list[str]:
     if desktop is not None:
         return [str(desktop)]
     for n_cand in (
+        _REPO_ROOT / "luckyd-code-v10.2.exe",
         _REPO_ROOT / "luckyd-code-v9.7.exe",
         _REPO_ROOT / "luckyd-cli-nuitka.exe",
+        _REPO_ROOT / "dist" / "luckyd-code-v10.2.exe",
         _REPO_ROOT / "dist" / "luckyd-code-v9.7.exe",
         _REPO_ROOT / "dist" / "luckyd-cli-nuitka.exe",
         _REPO_ROOT / "build" / "luckyd-code.dist" / "luckyd-cli.exe",
@@ -168,8 +170,10 @@ def _cli_command(cli_path: str = "") -> list[str]:
         # PyInstaller extracts to _internal/ beside the running exe.
         base_dir = Path(sys.executable).resolve().parent
         for cand in (
+            base_dir / "luckyd-code-v10.2.exe",
             base_dir / "luckyd-code-v9.7.exe",
             base_dir / "luckyd-cli.exe",
+            base_dir / "_internal" / "luckyd-code-v10.2.exe",
             base_dir / "_internal" / "luckyd-code-v9.7.exe",
             base_dir / "_internal" / "luckyd-cli.exe",
         ):
@@ -182,7 +186,7 @@ def _cli_command(cli_path: str = "") -> list[str]:
             return [interp, str(live)]
     raise FileNotFoundError(
         "no LuckyD Code CLI found — set the browser's terminal_cli setting "
-        "(or the LUCKYD_CLI env var) to luckyd-code-v9.7.exe, luckyd-cli.exe, or main.py, "
+        "(or the LUCKYD_CLI env var) to luckyd-code-v10.2.exe, luckyd-cli.exe, or main.py, "
         "or put luckyd-cli.exe back on the Desktop"
     )
 
@@ -606,11 +610,11 @@ def _spawn_pty(
     if shell == "agent":
         env["LUCKYD_AGENT_SLOT"] = "1"
         env["LUCKYD_AGENT_NAME"] = "Agent 1"
-        env["LUCKYD_AGENT_VERSION"] = "v10.1.0"
+        env["LUCKYD_AGENT_VERSION"] = "v10.2.0"
     elif shell == "agent2":
         env["LUCKYD_AGENT_SLOT"] = "2"
         env["LUCKYD_AGENT_NAME"] = "Agent 2"
-        env["LUCKYD_AGENT_VERSION"] = "v10.1.0"
+        env["LUCKYD_AGENT_VERSION"] = "v10.2.0"
     # pywinpty's PTY.spawn() expects the environment as a NUL-joined block
     # string ("name=value\0name=value\0…"), NOT a dict — passing a dict
     # raises cffi's "argument env: 'dict' object is not an instance of str",

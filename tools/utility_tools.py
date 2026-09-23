@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import asyncio
 import os
-import shlex
 import subprocess
 import time
 import uuid
@@ -196,15 +195,19 @@ class ProcessTool(ToolBase):
                             error=True,
                         )
                 try:
-                    cmd_list = shlex.split(command)
-                    if not cmd_list:
+                    if not command or not command.strip():
                         return ToolOutput(text="Empty command.", error=True)
-                except ValueError as e:
-                    return ToolOutput(text=f"Invalid command format: {e}", error=True)
+                except AttributeError:
+                    return ToolOutput(text="Empty command.", error=True)
 
+                # shell=True so Windows builtins, pipes, redirects and env vars
+                # behave the way the agent types them — the same execution model
+                # as BashTool/PowerShellTool. Safety comes from the blocklist
+                # gate above, not from the shell flag: with shell=False a plain
+                # `echo hello` dies with WinError 2 on a default Windows PATH.
                 proc = subprocess.Popen(
-                    cmd_list,
-                    shell=False,
+                    command,
+                    shell=True,
                     cwd=work_dir,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,

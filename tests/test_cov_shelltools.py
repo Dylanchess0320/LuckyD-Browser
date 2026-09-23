@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import shutil
 import subprocess
 import sys
 import types
@@ -32,6 +33,20 @@ import tools.utility_tools as utility_tools
 from core.scheduler import ScheduleStore
 from tools.bash_tool import BashTool, PowerShellTool
 from tools.utility_tools import DiffTool, NotifyTool, ProcessTool, WatchTool
+
+# ── Environment guards ────────────────────────────────────────────────
+# A few tests drive real POSIX utilities (`cat`, `ls`, `sleep`, `true`).
+# Those are present on the Linux runners and on GitHub's Windows images
+# (Git's usr/bin is on PATH there), but not on a stock Windows box — skip
+# instead of failing when a utility is genuinely unavailable.
+requires_cat = pytest.mark.skipif(shutil.which("cat") is None, reason="needs GNU cat on PATH")
+requires_ls = pytest.mark.skipif(shutil.which("ls") is None, reason="needs GNU ls on PATH")
+requires_sleep = pytest.mark.skipif(shutil.which("sleep") is None, reason="needs GNU sleep on PATH")
+requires_true = pytest.mark.skipif(shutil.which("true") is None, reason="needs GNU true on PATH")
+requires_posix_killpg = pytest.mark.skipif(
+    os.name == "nt" or shutil.which("sleep") is None,
+    reason="POSIX process groups (start_new_session/killpg) only",
+)
 
 
 class _FakeProc:
@@ -124,6 +139,7 @@ async def test_execute_spawn_failure(monkeypatch) -> None:
     assert "Error executing command: spawn failed" in out.text
 
 
+@requires_cat
 async def test_execute_truncates_long_stdout(tmp_path) -> None:
     big = tmp_path / "big.txt"
     big.write_text("y" * 20000)
@@ -137,6 +153,7 @@ async def test_execute_truncates_long_stdout(tmp_path) -> None:
     assert len(out.text) < 20000
 
 
+@requires_ls
 async def test_execute_truncates_long_stderr() -> None:
     paths = " ".join(f"/nonexistent-path-{i}" for i in range(120))
     out = await BashTool().execute(
@@ -180,6 +197,7 @@ async def test_kill_process_tree_windows_taskkill_fails(monkeypatch) -> None:
     assert proc.killed is True  # lines 156-158 fallback
 
 
+@requires_posix_killpg
 async def test_kill_process_tree_posix_killpg() -> None:
     proc = await asyncio.create_subprocess_exec(
         "sleep",
@@ -667,6 +685,7 @@ async def test_process_list_shows_started_process(tmp_path) -> None:
         assert f"Killed: {pid}" in killed.text
 
 
+@requires_true
 async def test_process_read_no_output_uses_select_timeout() -> None:
     tool = ProcessTool()
     started = await tool.execute(op="start", command="true")
@@ -976,6 +995,7 @@ async def test_execute_timeout_kills_tree(monkeypatch) -> None:
     assert proc.killed is True
 
 
+@requires_ls
 async def test_execute_short_stderr_not_truncated() -> None:
     out = await BashTool().execute(
         command="ls /nonexistent-path-0", description="short stderr", timeout=30000
@@ -1069,6 +1089,7 @@ async def test_process_read_no_stdout_handle() -> None:
         utility_tools._processes.pop("nostdout", None)
 
 
+@requires_sleep
 async def test_process_read_select_timeout_break() -> None:
     """Live process, no output yet -> select() times out -> '(no output)'."""
     tool = ProcessTool()

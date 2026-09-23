@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [10.2.0] - 2026-09-23
+
+Performance + hardening edition. The agent's hot-path tools no longer block
+the event loop, `ProcessTool` is hardened against command injection and runs
+Windows builtins correctly, and the suite is green on stock Windows boxes as
+well as Linux CI. Agent 1 and Agent 2 both run LuckyD Code v10.2.0. Shipped
+as `LuckyDBrowserSetup-10.2.0.exe` + `LuckyDBrowser-Portable-10.2.0.zip`.
+
+### Added
+- **Windows-safe `ProcessTool` execution** — `shell=True` with the existing
+  blocklist gate, so plain builtins (`echo`, pipes, redirects, env vars)
+  work on a default Windows PATH (`tools/utility_tools.py`).
+- **POSIX/desktop test guards** — tests that need `cat`/`ls`/`sleep`/`true`
+  or optional desktop packages (`mss`, `pyautogui`, `pygetwindow`,
+  `pyperclip`) skip cleanly instead of failing
+  (`tests/test_cov_shelltools.py`, `tests/test_night6_desktop.py`).
+
+### Changed
+- **Async non-blocking tools** — `GrepTool`, `ReadTool`/`EditTool`,
+  `CSVTool`, `LspRenameTool`, `SecretsTool`, `FileWatcher`, diff tool,
+  memory-decay batching, and the WebMCP shim cache all offload blocking I/O
+  to threads / batched SQL, keeping the agent loop responsive.
+- **Agent 1 + Agent 2 unified on v10.2.0** — `LUCKYD_AGENT_VERSION`,
+  terminal labels, and CLI help all report v10.2.0; the CLI resolver also
+  probes `luckyd-code-v10.2.exe` candidates (with v9.7 fallback).
+- **Version unification to 10.2.0** — pyproject, browser `__version__`, Inno
+  Setup script, version_info, AI bridge User-Agent, docs, and version-pinned
+  tests.
+
+### Fixed
+- **Command-injection risk in `ProcessTool`** — `shell=False` + `shlex`
+  parsing with empty/invalid-command guards.
+- **CI green** — ruff format + lint fixes, flaky-test repairs
+  (slash commands, browser tools, parallel speedup), and salvage-PR
+  coverage (model catalog, checkpoints, bridge error paths, correlation
+  IDs, redaction guards).
+
 ## [10.1.0] - 2026-09-21
 
 Google AI Pro edition. OpenCode is restored to the Agent Mesh (keyed,

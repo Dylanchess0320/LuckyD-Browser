@@ -302,6 +302,10 @@ def test_agent2_dir_ctypes_desktop(monkeypatch, tmp_path) -> None:
 def test_agent2_dir_onedrive_env(monkeypatch, tmp_path) -> None:
     checkout = tmp_path / "Desktop" / "coding-agent"
     checkout.mkdir(parents=True)
+    # Neutralize the real Known-Folder Desktop: on a dev box whose actual
+    # Desktop holds a coding-agent checkout, the unpatched probe would win
+    # and the test would go non-hermetic.
+    _fake_ctypes(monkeypatch, tmp_path / "bogus-desktop", rc=1)
     monkeypatch.setenv("ONEDRIVE", str(tmp_path))
     _home_to(monkeypatch, tmp_path / "nohome")
     assert _agent2_dir() == checkout
@@ -310,12 +314,14 @@ def test_agent2_dir_onedrive_env(monkeypatch, tmp_path) -> None:
 def test_agent2_dir_home_fallback(monkeypatch, tmp_path) -> None:
     checkout = tmp_path / "Desktop" / "coding-agent"
     checkout.mkdir(parents=True)
+    _fake_ctypes(monkeypatch, tmp_path / "bogus-desktop", rc=1)
     _home_to(monkeypatch, tmp_path)
     monkeypatch.delenv("ONEDRIVE", raising=False)
     assert _agent2_dir() == checkout
 
 
 def test_agent2_dir_nothing_found(monkeypatch, tmp_path) -> None:
+    _fake_ctypes(monkeypatch, tmp_path / "bogus-desktop", rc=1)
     _home_to(monkeypatch, tmp_path)
     monkeypatch.delenv("ONEDRIVE", raising=False)
     assert _agent2_dir() is None
@@ -662,7 +668,7 @@ def test_spawn_pty_agent_gets_workspace_cwd_and_env(monkeypatch, tmp_path) -> No
     parts = _env_parts(kw["env"])
     assert "LUCKYD_AGENT_SLOT=1" in parts
     assert "LUCKYD_AGENT_NAME=Agent 1" in parts
-    assert "LUCKYD_AGENT_VERSION=v10.1.0" in parts
+    assert "LUCKYD_AGENT_VERSION=v10.2.0" in parts
 
 
 def test_spawn_pty_agent2_gets_slot2_env(monkeypatch, tmp_path) -> None:
@@ -677,7 +683,7 @@ def test_spawn_pty_agent2_gets_slot2_env(monkeypatch, tmp_path) -> None:
     parts = _env_parts(kw["env"])
     assert "LUCKYD_AGENT_SLOT=2" in parts
     assert "LUCKYD_AGENT_NAME=Agent 2" in parts
-    assert "LUCKYD_AGENT_VERSION=v10.1.0" in parts
+    assert "LUCKYD_AGENT_VERSION=v10.2.0" in parts
 
 
 def test_spawn_pty_env_block_sanitizes_bad_entries(monkeypatch) -> None:

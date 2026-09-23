@@ -1,5 +1,17 @@
 # LuckyD Browser — Release Notes
 
+## [10.2.0] — Performance + hardening edition — 2026-09-23
+
+**[`LuckyDBrowserSetup-10.2.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.2.0/LuckyDBrowserSetup-10.2.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed.
+**[`LuckyDBrowser-Portable-10.2.0.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.2.0/LuckyDBrowser-Portable-10.2.0.zip)** — unzip and run, for locked-down PCs.
+
+- **Faster agent loop** — grep, file read/edit, CSV, LSP rename, secrets, file watching, and memory compression off the event loop; batched memory-decay SQL.
+- **Safer + Windows-correct `ProcessTool`** — command-injection hardening plus `shell=True` behind the blocklist gate for builtins, pipes, and redirects.
+- **Green everywhere** — POSIX/desktop-optional tests skip cleanly; CI green.
+- **Agent 1 + Agent 2 on v10.2.0** — terminal, CLI, and ACP all report v10.2.0.
+
+On top of everything from 10.1.0 below.
+
 ## [10.1.0] — Google AI Pro edition — 2026-09-21
 
 **[`LuckyDBrowserSetup-10.1.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.1.0/LuckyDBrowserSetup-10.1.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed.

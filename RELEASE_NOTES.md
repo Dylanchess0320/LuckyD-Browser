@@ -1,17 +1,34 @@
-# LuckyD Browser v10.1.0 — Release Notes
+# LuckyD Browser v10.2.0 — Release Notes
 
 > **The AI browser that doesn't need an API key.** Free, unlimited, offline AI built in —
 > plus a full coding agent and developer terminal living in your tabs.
 
-*10.1.0 is on `main` — the installer below publishes with Dylan's 10.1.0 release.*
+*10.2.0 is on `main` — the installer below publishes with Dylan's 10.2.0 release.*
 
-**[⬇ Download `LuckyDBrowserSetup-10.1.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.1.0/LuckyDBrowserSetup-10.1.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed
+**[⬇ Download `LuckyDBrowserSetup-10.2.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.2.0/LuckyDBrowserSetup-10.2.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed
 
-Prefer no installer? **[`LuckyDBrowser-Portable-10.1.0.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.1.0/LuckyDBrowser-Portable-10.1.0.zip)** — unzip and run, best option for locked-down work PCs.
+Prefer no installer? **[`LuckyDBrowser-Portable-10.2.0.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.2.0/LuckyDBrowser-Portable-10.2.0.zip)** — unzip and run, best option for locked-down work PCs.
 
 ---
 
-## What's new in 10.1.0 — Google AI Pro edition
+## What's new in 10.2.0 — Performance + hardening edition
+
+- **Faster agent loop** — grep, file read/edit, CSV, LSP rename, secrets,
+  file watching, and memory compression no longer block the event loop;
+  memory decay now batches SQL instead of N+1 queries.
+- **Safer + Windows-correct `ProcessTool`** — command-injection hardening,
+  with `shell=True` behind the blocklist gate so `echo`, pipes, redirects,
+  and env vars behave the way the agent types them on stock Windows.
+- **Green on every box** — POSIX-utility and optional-desktop-dependency
+  tests skip cleanly where the tool isn't installed; CI stays green.
+- **Agent 1 + Agent 2 on v10.2.0** — both mesh slots report
+  `LuckyD Code v10.2.0` in the terminal, CLI `--version`, and ACP.
+
+On top of everything from 10.1.0 below.
+
+---
+
+## What's new in 10.1.0 — Google AI Pro edition (archive)
 
 - **OpenCode restored to the Agent Mesh** — `mesh-opencode` is back, keyed via
   `OPENCODE_API_KEY`, sitting alongside MiniMax and Cline (not replacing them).
