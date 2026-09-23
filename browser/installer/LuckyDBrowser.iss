@@ -1,4 +1,4 @@
-; -----------------------------------------------------------------------------
+﻿; -----------------------------------------------------------------------------
 ; LuckyD Browser - Windows installer script (Inno Setup 6)
 ;
 ; Produces a single, shareable setup file:
@@ -13,7 +13,7 @@
 ; -----------------------------------------------------------------------------
 
 #define AppName      "LuckyD Browser"
-#define AppVersion   "10.2.1"
+#define AppVersion   "10.2.3"
 #define AppPublisher "LuckyD"
 #define AppExeName   "LuckyDBrowser.exe"
 #define AppURL       "https://github.com/Dylanchess0320/LuckyD-Browser"
@@ -27,12 +27,12 @@ AppPublisher={#AppPublisher}
 AppPublisherURL={#AppURL}
 AppSupportURL={#AppURL}
 AppUpdatesURL={#AppURL}
-VersionInfoVersion=10.2.1.0
+VersionInfoVersion=10.2.3.0
 VersionInfoCompany={#AppPublisher}
 VersionInfoDescription={#AppName} Setup
 VersionInfoProductName={#AppName}
-VersionInfoProductVersion=10.2.1.0
-; Per-user install — no admin rights required (admin users may opt into all-users).
+VersionInfoProductVersion=10.2.3.0
+; Per-user install â€” no admin rights required (admin users may opt into all-users).
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 DefaultDirName={localappdata}\Programs\LuckyDBrowser
@@ -42,7 +42,7 @@ MinVersion=10.0
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir=output
-OutputBaseFilename=LuckyDBrowserSetup-10.2.1
+OutputBaseFilename=LuckyDBrowserSetup-10.2.3
 SetupIconFile=..\assets\professional_icon.ico
 CloseApplications=yes
 RestartApplications=no
@@ -55,10 +55,10 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: checkedonce
 
 [Files]
-; Everything PyInstaller produced — LuckyDBrowser.exe plus the _internal
+; Everything PyInstaller produced â€” LuckyDBrowser.exe plus the _internal
 ; folder (Qt WebEngine runtime, assets, bundled luckyd-code.exe backend).
 Source: "..\dist\LuckyDBrowser\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-; Free local AI bootstrap — bundled for MANUAL opt-in only (double-click it in
+; Free local AI bootstrap â€” bundled for MANUAL opt-in only (double-click it in
 ; the install folder or run it from PowerShell). It is never executed by the
 ; installer itself: silent post-install downloads that install third-party
 ; software are a classic behavioral anti-ransomware flag.
@@ -76,7 +76,7 @@ Type: files; Name: "{userprograms}\LuckyDBrowser\LuckyDBrowser.lnk"
 Type: files; Name: "{userprograms}\LuckyD Browser.lnk"
 
 [Icons]
-Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Comment: "{#AppName} — Chromium-based AI browser by LuckyD"
+Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Comment: "{#AppName} â€” Chromium-based AI browser by LuckyD"
 Name: "{group}\Uninstall {#AppName}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: desktopicon
 
@@ -88,7 +88,7 @@ Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: deskto
 Filename: "{app}\{#AppExeName}"; Description: "Launch {#AppName}"; Flags: nowait postinstall skipifsilent
 
 [Code]
-// A running browser would lock files during install/upgrade — stop it first.
+// A running browser would lock files during install/upgrade â€” stop it first.
 procedure KillRunningApp;
 var
   ResultCode: Integer;
@@ -102,6 +102,7 @@ begin
   KillRunningApp;
   Result := '';
 end;
+
 
 
 

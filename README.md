@@ -75,14 +75,17 @@ See [`kit/SKILL_AUTHORING.md`](kit/SKILL_AUTHORING.md) to publish your own skill
 
 ## Latest release
 
-**v10.2.1** — Dashboard cleanup + HQ auto-rotation: AI preset chips removed, Ask Lucky reliability fixes, HQ rotates to a working model when the configured one is retired or down:
+**v10.2.3** — Smarter-agent edition: the agent loop got live goals, enforced plan mode, verifier-gated answers, and retrieval that works without ONNX, plus 402 balance-exhausted failover that escapes to ClinePass or local Ollama instead of stopping:
 
 | | |
 |---|---|
-| **⬇ Windows installer** | [`LuckyDBrowserSetup-10.2.1.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.2.1/LuckyDBrowserSetup-10.2.1.exe) — built on a real Windows runner with Inno Setup 6. Per-user, no admin, silent-install flags. |
-| **⚡ Faster agent loop** | Grep, file read/edit, CSV, LSP rename, secrets, file watching, and memory compression off the event loop; batched memory-decay SQL. |
-| **🛡 Hardened + Windows-correct** | `ProcessTool` command-injection fix plus `shell=True` behind the blocklist gate for builtins, pipes, and redirects. |
-| **🤖 Agent 1 + Agent 2 v10.2.0** | Both mesh slots report `LuckyD Code v10.2.0` in terminal, CLI, and ACP. |
+| **⬇ Windows installer** | [`LuckyDBrowserSetup-10.2.3.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.2.3/LuckyDBrowserSetup-10.2.3.exe) — built on a real Windows runner with Inno Setup 6. Per-user, no admin, silent-install flags. |
+| **🧠 Smarter agent** | Active goal injected into the prompt with real token-budget accrual, `EnterPlanMode` actually blocks writes, MCP servers connect in one-shot/JSON mode too, opt-in `--verify` polishes final answers. |
+| **⚡ Leaner context** | Token-aware compaction per model window, task-scoped tool pruning, and `FindRelevantFiles` retrieval for unfamiliar code. |
+| **💳 402 failover** | An exhausted Cline Credits balance rotates to ClinePass subscription models, then local Ollama — no more dead-end `[API Error: 402]`. |
+| **🌐 Browser fixes** | Trust/debug/harness/GUI/updater/catalog hardening across the browser shell. |
+
+**v10.2.1** — Dashboard cleanup + HQ auto-rotation: AI preset chips removed, Ask Lucky reliability fixes, HQ rotates to a working model when the configured one is retired or down: [release page](https://github.com/Dylanchess0320/LuckyD-Browser/releases/tag/v10.2.1).
 
 **v10.1.0** — Google AI Pro edition: OpenCode is back in the Agent Mesh, Gemini refreshed, Nano Banana + Veo media generation, 2TB Drive backup: [release page](https://github.com/Dylanchess0320/LuckyD-Browser/releases/tag/v10.1.0).
 
@@ -288,14 +291,14 @@ Also in this lineage: Deep Research swarm (`Ctrl+Shift+R`), Agent Mesh, self-hea
 
 ## Install in 10 seconds
 
-1. Get **[LuckyDBrowserSetup-10.2.1.exe](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.2.1/LuckyDBrowserSetup-10.2.1.exe)**
+1. Get **[LuckyDBrowserSetup-10.2.3.exe](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.2.3/LuckyDBrowserSetup-10.2.3.exe)**
 2. Run it — per-user, **no admin**, installs to `%LOCALAPPDATA%\Programs\LuckyDBrowser`
 3. Leave **“Set up free unlimited local AI”** checked → Ollama + `llama3.2:3b` (~2 GB, one time)
 4. `Ctrl+Shift+A` → chat offline. Or bring your own keys (Gemini, Groq, DeepSeek, OpenAI, Anthropic, Z.ai, OpenRouter, Cline, MiniMax)
 
 No local model yet? With a logged-in Cline CLI session (`cline auth`), chat uses Cline's free models — no local server needed.
 
-Silent: `LuckyDBrowserSetup-10.2.1.exe /VERYSILENT /NORESTART`
+Silent: `LuckyDBrowserSetup-10.2.3.exe /VERYSILENT /NORESTART`
 
 Windows 10/11 x64 only.
 
@@ -336,7 +339,7 @@ browser\run_browser.bat
 
 # Shareable installer (needs Inno Setup 6)
 powershell -NoProfile -ExecutionPolicy Bypass -File browser\installer\build_installer.ps1
-# → browser\installer\output\LuckyDBrowserSetup-10.2.1.exe
+# → browser\installer\output\LuckyDBrowserSetup-10.2.3.exe
 ```
 
 ---
