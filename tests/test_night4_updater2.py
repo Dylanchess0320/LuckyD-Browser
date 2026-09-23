@@ -306,7 +306,7 @@ def test_checker_same_version_is_up_to_date(signals, monkeypatch) -> None:
 
 def test_checker_403_with_working_atom(signals) -> None:
     src = _Src(_http_error(403))
-    src.fetch_latest_atom = lambda: ReleaseInfo(version="10.2.0", url="https://x")
+    src.fetch_latest_atom = lambda: ReleaseInfo(version="10.3.0", url="https://x")
     UpdateChecker(src).run()
     UpdateChecker.update_available.emit.assert_called_once()
 
