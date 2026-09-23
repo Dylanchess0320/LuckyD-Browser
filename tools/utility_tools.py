@@ -207,7 +207,9 @@ class ProcessTool(ToolBase):
                 # `echo hello` dies with WinError 2 on a default Windows PATH.
                 proc = subprocess.Popen(
                     command,
-                    shell=True,
+                    shell=True,  # nosec B602: shell execution is this tool's
+                    # purpose (same model as BashTool); untrusted input is
+                    # gated by the sandbox blocklist above.
                     cwd=work_dir,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
