@@ -310,6 +310,146 @@ class CodingAgent:
         except Exception:
             return False
 
+    # HTTP codes worth rotating away from: dead/retired model (400/404),
+    # rate-limited (429), gateway down (5xx). Auth failures (401/403) are
+    # excluded — another model on the same dead key fails identically.
+    _ROTATE_CODES = frozenset({400, 404, 429, 500, 502, 503, 504})
+
+    # Same-gateway rotation pool for api.cline.bot (9.8: these replaced the
+    # retired OpenCode Zen "-free" pool). Ordered free-first.
+    _CLINE_ROTATION_POOL = (
+        "deepseek/deepseek-chat",
+        "minimax/minimax-m2.5",
+        "qwen/qwen3-8b",
+        "deepseek/deepseek-v4-flash",
+        "z-ai/glm-5.3-flash",
+    )
+
+    @staticmethod
+    def _api_error_code(content: str) -> int | None:
+        """Extract the HTTP code from an '[API Error: <code>...]' message."""
+        try:
+            head = content.split("]", 1)[0]
+            digits = "".join(c for c in head if c.isdigit())
+            return int(digits[:3]) if len(digits) >= 3 else None
+        except Exception:
+            return None
+
+    def _same_provider_candidates(self) -> list[str]:
+        """Working-model candidates that run on the current base_url/key."""
+        # Free-tier model names always rotate through the Cline gateway pool
+        # (9.8: it replaced the retired OpenCode Zen "-free" pool), no matter
+        # which provider label the session started on.
+        if self._is_cline_provider() or self.model.endswith("-free") or ":free" in self.model:
+            pool = list(self._CLINE_ROTATION_POOL)
+            try:
+                from core.contributor import (
+                    contributor_enabled,
+                    contributor_models_enabled_only,
+                )
+
+                pool = contributor_models_enabled_only(pool)
+                if contributor_enabled():
+                    pool.append("muse-spark-1.2-contributor-free")
+            except Exception:
+                pass
+            return [m for m in pool if m != self.model]
+        # Other providers: a 404/400 usually means the configured model id
+        # retired — retry once on the provider's current default.
+        try:
+            from core.providers import PROVIDER_DEFAULTS
+
+            pname = str(getattr(self._provider_config, "provider", "")).lower()
+            default = str(PROVIDER_DEFAULTS.get(pname, {}).get("default_model", ""))
+            if default and default != self.model:
+                return [default]
+        except Exception:
+            pass
+        return []
+
+    async def _try_candidate_model(self, model: str, messages, tools):
+        """One rotation attempt on a same-provider model; None when still bad."""
+        self.model = model
+        self.llm_client.model = model
+        try:
+            msg = await self.llm_client.chat_stream(
+                messages=messages,
+                tools=tools,
+                stream_callback=self.callbacks.stream_token,
+                think_callback=self.callbacks.stream_think_token,
+            )
+        except Exception:
+            return None
+        if msg and not str(msg.get("content", "")).startswith("[API Error:"):
+            return msg
+        return None
+
+    async def _auto_rotate_model(self, failed_msg: dict, messages, tools):
+        """Rotate to a working model after an [API Error].
+
+        Returns the first successful assistant message (leaving the winner
+        pinned as the active model), or None when nothing worked — in which
+        case the original model/provider is restored and the caller keeps
+        the original error message.
+        """
+        content = str(failed_msg.get("content", ""))
+        code = self._api_error_code(content)
+        if code in (401, 403):
+            return None
+        if code is not None and code not in self._ROTATE_CODES:
+            return None
+
+        original_model = self.model
+        # 1) Same-provider rotation (same key, same gateway — cheapest fix).
+        for alt in self._same_provider_candidates():
+            print(
+                f"\n  [AUTO-ROTATE] '{original_model}' unavailable"
+                f"{f' (HTTP {code})' if code else ''}; trying '{alt}'..."
+            )
+            good = await self._try_candidate_model(alt, messages, tools)
+            if good is not None:
+                print(f"  [AUTO-ROTATE] Succeeded on '{alt}' — pinned for this session")
+                return good
+        self.model = original_model
+        with contextlib.suppress(Exception):
+            self.llm_client.model = original_model
+
+        # 2) Cross-provider escape hatch: the whole provider may be down or
+        # its key dead — fail over to the Cline free tier when it is usable
+        # (logged-in CLI session or CLINEPASS_API_KEY).
+        try:
+            from core.providers import cline_session_token
+
+            if str(getattr(self._provider_config, "provider", "")).lower() == "cline-usage":
+                return None  # already on the escape target — nothing left
+            usable = bool(cline_session_token()) or bool(
+                (os.environ.get("CLINEPASS_API_KEY", "") or "").strip()
+            )
+            if not usable:
+                return None
+            original_config = self._provider_config
+            from core.providers import build_llm_config
+
+            escape = build_llm_config("cline-usage")
+            self.switch_provider(escape)
+            for alt in [m for m in self._same_provider_candidates() if m != self.model]:
+                print(f"\n  [AUTO-ROTATE] Escaping to Cline free tier '{alt}'...")
+                good = await self._try_candidate_model(alt, messages, tools)
+                if good is not None:
+                    print(f"  [AUTO-ROTATE] Succeeded on Cline '{alt}' — pinned")
+                    return good
+            self.switch_provider(original_config)
+            # switch_provider resets the model from the config object, which
+            # may predate a direct ag.model assignment — restore the string.
+            self.model = original_model
+            with contextlib.suppress(Exception):
+                self.llm_client.model = original_model
+        except Exception:
+            with contextlib.suppress(Exception):
+                self.model = original_model
+                self.llm_client.model = original_model
+        return None
+
     @property
     def provider_name(self) -> str:
         names = {
@@ -933,58 +1073,18 @@ class CodingAgent:
                     return final_text or self._api_unreachable_message()
                 continue
 
-            # If the response returned an API error on a free-tier model, attempt transparent fallback
-            if (
-                isinstance(assistant_msg, dict)
-                and assistant_msg.get("content", "").startswith("[API Error:")
-                and (
-                    self.model.endswith("-free")
-                    or ":free" in self.model
-                    or self._is_cline_provider()
-                )
+            # HQ auto-rotation: when the current model is dead (404/400),
+            # rate-limited (429) or the gateway is down (5xx), transparently
+            # rotate to a working model instead of surfacing [API Error] text.
+            # Auth failures (401/403) are NOT rotated — another model on the
+            # same dead key would fail identically; the error text already
+            # tells the user how to re-login / fix the key.
+            if isinstance(assistant_msg, dict) and assistant_msg.get("content", "").startswith(
+                "[API Error:"
             ):
-                # 9.8: Cline gateway free-tier models replaced the retired
-                # OpenCode Zen "-free" pool (big-pickle, hy3, nemotron…).
-                _free_fallbacks = [
-                    "deepseek/deepseek-chat",
-                    "minimax/minimax-m2.5",
-                    "qwen/qwen3-8b",
-                    "deepseek/deepseek-v4-flash",
-                    "z-ai/glm-5.3-flash",
-                ]
-                # Contributor-tier fallbacks only appear after explicit opt-in.
-                try:
-                    from core.contributor import (
-                        contributor_enabled,
-                        contributor_models_enabled_only,
-                    )
-
-                    _free_fallbacks = contributor_models_enabled_only(_free_fallbacks)
-                    if contributor_enabled():
-                        _free_fallbacks.append("muse-spark-1.2-contributor-free")
-                except Exception:
-                    pass
-                for _alt_model in _free_fallbacks:
-                    if _alt_model == self.model:
-                        continue
-                    print(
-                        f"\n  [AUTO-FALLBACK] Free model '{self.model}' unavailable; switching to '{_alt_model}'..."
-                    )
-                    self.model = _alt_model
-                    self.llm_client.model = _alt_model
-                    try:
-                        _alt_msg = await self.llm_client.chat_stream(
-                            messages=modified_messages,
-                            tools=tools,
-                            stream_callback=self.callbacks.stream_token,
-                            think_callback=self.callbacks.stream_think_token,
-                        )
-                        if _alt_msg and not _alt_msg.get("content", "").startswith("[API Error:"):
-                            print(f"  [AUTO-FALLBACK] Succeeded on '{_alt_model}'")
-                            assistant_msg = _alt_msg
-                            break
-                    except Exception:
-                        continue
+                _alt_msg = await self._auto_rotate_model(assistant_msg, modified_messages, tools)
+                if _alt_msg is not None:
+                    assistant_msg = _alt_msg
 
             consecutive_errors = 0
             for hook in self.hooks.after_model:

@@ -119,13 +119,15 @@ PROVIDER_DEFAULTS: dict[str, ProviderDefaults] = {
         "default_model": "deepseek/deepseek-chat-v3.1",
     },
     # OpenCode Zen (opencode.ai gateway) — OpenAI-compatible.
-    # Key comes from OPENCODE_API_KEY.
+    # Key comes from OPENCODE_API_KEY. The old $0 "-free" tier died in
+    # 2026-09 (every keyless call 401s), so the default must be a live
+    # catalog model, not a retired "-free" id.
     "opencode": {
         "env_key": "OPENCODE_API_KEY",
         "env_base": "OPENCODE_BASE_URL",
         "env_model": "OPENCODE_MODEL",
         "default_base": "https://opencode.ai/zen/v1",
-        "default_model": "nemotron-3-ultra-free",
+        "default_model": "gemini-3.5-flash-lite",
     },
     # ClinePass (Cline flat-subscription gateway) — OpenAI-compatible.
     # Key comes from CLINEPASS_API_KEY, else the logged-in Cline CLI session.

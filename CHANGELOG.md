@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [10.2.1] - 2026-09-23
+
+Dashboard cleanup + Ask Lucky reliability + HQ model auto-rotation. Shipped
+as `LuckyDBrowserSetup-10.2.1.exe` + `LuckyDBrowser-Portable-10.2.1.zip`.
+
+### Removed
+- Home dashboard AI preset chips (AI News Digest, Agent Architecture,
+  Python Automation, Security Checklist) —
+  `browser/browser_core/dashboard.py`.
+
+### Fixed
+- **Ask Lucky reliability** — the dashboard's `/ask` call now surfaces the
+  real server error instead of a bare HTTP status, handles `ok: false`
+  payloads, guards double-submits with a busy state + 2-minute timeout, and
+  the backend rebuilds a stale AI bridge when no usable provider is cached
+  (`browser/browser_core/dashboard.py`,
+  `browser/browser_core/control_server.py`).
+- **LuckyD HQ auto-rotation** — the agent loop now rotates to a working
+  model on any rotation-worthy `[API Error]` (retired model 400/404,
+  rate-limit 429, gateway 5xx) instead of only free-tier models: same-gateway
+  rotation first, provider-default retry, then a cross-provider escape to the
+  Cline free tier when usable; the winner is pinned and the original model is
+  restored when everything fails. OpenCode Zen's dead `nemotron-3-ultra-free`
+  default is now `gemini-3.5-flash-lite` (`core/agent_loop.py`,
+  `core/providers.py`).
+
 ## [10.2.0] - 2026-09-23
 
 Performance + hardening edition. The agent's hot-path tools no longer block

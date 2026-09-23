@@ -1,12 +1,10 @@
 """LuckyD Browser - a full-featured Chromium-based web browser for Windows."""
 
-__version__ = "10.2.0"
+__version__ = "10.2.1"
 
 # Shown once after an update (first launch with a new version).
 WHATS_NEW = (
-    "LuckyD v10.2.0 - Performance + hardening: async non-blocking agent "
-    "tools (grep, read, CSV, LSP, secrets, memory), command-injection "
-    "hardening in ProcessTool, Windows-safe ProcessTool execution plus "
-    "POSIX/desktop test guards, and Agent 1 + Agent 2 unified on LuckyD "
-    "Code v10.2.0."
+    "LuckyD v10.2.1 - Dashboard cleanup (AI preset chips removed), "
+    "Ask Lucky reliability fixes, and LuckyD HQ auto-rotation to a "
+    "working AI model when the configured one is retired or down."
 )

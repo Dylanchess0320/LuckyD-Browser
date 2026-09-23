@@ -222,13 +222,6 @@ _BODY = r"""<body>
     <button type="submit" id="searchbtn">Go</button>
   </form>
 
-  <div class="ai-chips" id="ai-chips">
-    <button type="button" class="ai-chip" onclick="askPreset('Summarize the top AI developments and breakthroughs today')">📰 AI News Digest</button>
-    <button type="button" class="ai-chip" onclick="askPreset('Explain how browser agents work with CDP and local Control APIs')">🧠 Agent Architecture</button>
-    <button type="button" class="ai-chip" onclick="askPreset('Write a Python script to scrape live tables and export clean CSV')">💻 Python Automation</button>
-    <button type="button" class="ai-chip" onclick="askPreset('What are the top security & privacy hardening practices for Windows 11?')">🛡️ Security Checklist</button>
-  </div>
-
   <div id="ai-card">
     <div id="ai-card-header">
       <div class="title"><span>◈</span> <span>Lucky's answer</span></div>
@@ -474,30 +467,54 @@ function setSearchMode(mode) {
 setSearchMode(currentSearchMode);
 
 window.__lastAiAnswer = '';
+let __askBusy = false;
 async function askAI(query) {
-  if (!query.trim()) return;
+  if (!query.trim() || __askBusy) return;
   const card = document.getElementById('ai-card');
   const body = document.getElementById('ai-card-body');
+  const btn = document.getElementById('searchbtn');
+  __askBusy = true;
+  if (btn) { btn.disabled = true; btn.textContent = 'Thinking…'; }
   card.style.display = 'block';
   body.textContent = 'Thinking…';
   card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
   try {
-    const res = await fetch('/ask', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ question: query })
-    });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const data = await res.json();
-    const text = data.text || data.answer || (typeof data === 'string' ? data : JSON.stringify(data));
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 120000);
+    let res;
+    try {
+      res = await fetch('/ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: query }),
+        signal: ctrl.signal,
+      });
+    } finally { clearTimeout(timer); }
+    let data = null;
+    try { data = await res.json(); } catch (e) { data = null; }
+    if (!res.ok) {
+      const detail = (data && (data.error || data.message)) || ('HTTP ' + res.status);
+      throw new Error(detail);
+    }
+    if (data && data.ok === false) throw new Error(data.error || 'AI request failed');
+    const text = (data && (data.answer || data.text || data.result)) ||
+      (typeof data === 'string' ? data : JSON.stringify(data));
+    if (!text || !String(text).trim()) throw new Error('Empty AI response — try again.');
     body.textContent = text;
     window.__lastAiAnswer = text;
   } catch (err) {
-    body.textContent = 'Could not get an AI answer — ' + err.message +
+    const msg = (err && err.name === 'AbortError')
+      ? 'Timed out after 2 minutes — the model may be overloaded. Try again.'
+      : ('Could not get an AI answer — ' + (err.message || err));
+    body.textContent = msg +
       '\n\nTip: open the AI Assistant (Ctrl+Shift+A) or check your provider in Settings.';
+  } finally {
+    __askBusy = false;
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = (typeof currentSearchMode !== 'undefined' && currentSearchMode === 'ask') ? 'Ask AI' : 'Go';
+    }
   }
 }
 

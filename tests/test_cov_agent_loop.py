@@ -947,7 +947,9 @@ class TestRunLoop:
         )
         result = await ag.run("hello", max_turns=3)
         assert result == "[API Error: 429]"
-        assert ag.model == "z-ai/glm-5.3-flash"  # loop ran through every fallback
+        # Exhausted rotation restores the original model instead of pinning a
+        # known-bad fallback.
+        assert ag.model == "my-model-free"
 
     @pytest.mark.asyncio
     async def test_llm_result_object_converted_via_to_dict(self, tool_registry):

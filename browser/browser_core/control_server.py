@@ -1010,10 +1010,15 @@ class QtBrowserBackend:
         snap: dict = {}
         with contextlib.suppress(Exception):
             snap = self.snapshot()  # page context is best-effort
-        if self._ai is None:
-            from browser_core.ai_bridge import AIBridge
+        from browser_core.ai_bridge import AIBridge
 
+        # Rebuild the bridge when nothing usable is cached: keys added or a
+        # local server started after boot must work without a restart.
+        if self._ai is None:
             self._ai = AIBridge()
+        elif not self._ai.providers() or (provider is None and self._ai.default_provider() is None):
+            with contextlib.suppress(Exception):
+                self._ai = AIBridge()
         messages = [{"role": "system", "content": _ASK_SYSTEM}]
         if snap:
             messages.append(
