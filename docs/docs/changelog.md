@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [10.2.3] - 2026-09-23
+
+Smarter-agent edition + 402 balance-exhausted failover. Shipped
+as `LuckyDBrowserSetup-10.2.3.exe` + `LuckyDBrowser-Portable-10.2.3.zip`.
+
+### Fixed
+- **402 balance-exhausted failover** — HQ auto-rotation treats HTTP 402
+  like other recoverable codes; the escape chain tries ClinePass
+  subscription models, then local Ollama.
+- **Browser hardening** — trust/debug/harness/GUI/updater/catalog fixes.
+
+### Added
+- **Live goals, enforced plan mode, MCP everywhere, `--verify`**,
+  token-aware compaction, task tool pruning, `FindRelevantFiles`
+  retrieval, trajectory log + eval harness.
+
 ## [10.2.1] - 2026-09-23
 
 Dashboard cleanup + Ask Lucky reliability + HQ model auto-rotation. Shipped

@@ -1,4 +1,4 @@
-﻿"""LuckyD Browser - a full-featured Chromium-based web browser for Windows."""
+"""LuckyD Browser - a full-featured Chromium-based web browser for Windows."""
 
 __version__ = "10.2.3"
 

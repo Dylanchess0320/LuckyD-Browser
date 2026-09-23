@@ -5,6 +5,93 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [10.2.3] - 2026-09-23
+
+Smarter-agent edition + 402 balance-exhausted failover. Shipped
+as `LuckyDBrowserSetup-10.2.3.exe` + `LuckyDBrowser-Portable-10.2.3.zip`.
+
+### Fixed
+- **402 balance-exhausted failover** — HQ auto-rotation now treats HTTP 402
+  like the other recoverable codes instead of surfacing `[API Error: 402]`
+  and stopping. After the same-provider pool, the cross-provider escape
+  chain gained two legs: ClinePass subscription models
+  (`cline-pass/*`, billed against the flat quota so they survive a $0
+  balance) and local Ollama (free; tried when the server answers).
+  `core/agent_loop.py`, `tests/test_rotation_escape.py`.
+- **402/403 error guidance** — 402 now names the free outs (top up, a
+  free-tier `/model`, or local Ollama) and a 403 from `api.cline.bot` no
+  longer suggests "switch to ClinePass" when already on the Cline gateway.
+  `core/llm_client.py`.
+- **`lucky-code providers` duplicate row** — `cline` is an alias of
+  `cline-usage` again (canonicalized in `core/providers.py`), not a second
+  table row; sessions can no longer start on the half-wired `cline` id.
+- **`-y/--yolo` help text** — the flag has been inert since 6.1 (tested
+  security contract); `--help` now says so and points at the working
+  replacement, `--permission-mode bypassPermissions`. `main.py`.
+
+### Added (frontier swarm: smarter agent)
+- **Live goals** — the active goal is injected into the prompt once per
+  revision (was display-only) and the token budget accrues real usage.
+  `core/agent_loop.py`, `tests/test_goal_plan_mcp.py`.
+- **Enforced plan mode** — `EnterPlanMode` now actually blocks
+  state-modifying tools (read-only + exit allowed); previously the flag
+  had no consumers. `core/agent_loop.py`, `tools/plan_tools.py`.
+- **MCP in one-shot/JSON** — server connect moved to shared `_connect_mcp`
+  and wired into all entry paths (was REPL-only). `main.py`.
+- **Verifier-gated completion** — dormant `ReflectionEngine` wired behind
+  `CODING_AGENT_VERIFY=1` / `--verify`: final answers get one
+  score/improve/rescore pass, adopted only on real improvement, never
+  breaking the run on failure. `core/agent_loop.py`, `main.py`,
+  `tests/test_verifier.py`.
+- **Token-aware compaction** — thresholds scale with the model's context
+  window (unknown models keep 30/60/6); compaction runs before the dumb
+  truncate fallback (previously unreachable); the split keeps
+  tool_calls/tool pairs together; transcripts include tool names.
+  `core/context_manager.py`, `core/compaction.py`, `tests/test_compaction_tok.py`.
+- **Task-scoped tool pruning** — per-turn schemas drop from ~114 tools
+  (~14K tokens) to core + keyword families + recent + unmapped
+  (`CODING_AGENT_NO_PRUNE=1` restores full). Execution unchanged.
+  `core/agent_loop.py`, `tools/registry.py`, `tests/test_tool_prune.py`.
+- **FindRelevantFiles tool** — dormant `SmartContextEngine` (file ranking
+  + budget packing) is now model-invokable, always advertised, plan-mode
+  safe. `tools/context_tools.py`, `tests/test_retrieval.py`.
+- **Trajectory log + evals** — opt-in JSONL run audit trail
+  (`CODING_AGENT_TRAJECTORY=1`); YAML eval tasks in `tests/evals/` load
+  into the benchmarks harness (`--live` for real runs); new CI evals job
+  (hermetic tests + harness smoke, report artifact). Also fixed two real
+  harness bugs the smoke caught (`r.success` typo, cp1252 `✓` crash).
+  `core/trajectory.py`, `tests/benchmarks.py`, `tests/test_trajectory.py`.
+
+### Added (frontier swarm: browser + full stack)
+- **JS dialogs fail closed** — `confirm()` during agent sessions now
+  auto-declines (was auto-accept) while still recording its text.
+  `browser/browser_ui/web_view.py`, `tests/test_trust.py`.
+- **CDP debugging setting** — the loopback debug port is now a real
+  setting (default on: the agent needs it at engine startup) with a
+  `LUCKYD_CDP_DEBUG` override, Settings checkbox, docs, and truthful
+  `/status` reporting. `browser/main.py`, `browser/browser_core/settings.py`,
+  `browser/browser_core/control_server.py`, `tests/test_debug_tog.py`.
+- **Frozen-safe harness spawn** — `.py` launchers resolve a real Python
+  (`LUCKYD_PYTHON`, else PATH) instead of re-spawning the frozen browser
+  exe. `browser/browser_core/harness_bridge.py`, `tests/test_harness_rel.py`.
+- **Unique swarm run ids** — `run-<ts>-<uuid8>` so back-to-back research
+  runs can never cross-route stale events. `browser/browser_core/research_page.py`.
+- **GuiInvoker reentrancy guard** — GUI-thread callers run inline instead
+  of deadlocking on their own signal (~20s UI freeze). Includes a
+  segfault lesson: never delete Qt stubs from `sys.modules` in tests.
+  `browser/browser_core/control_server.py`, `tests/test_gui_resp.py`.
+- **release.ps1 fixed** — resolves the real Desktop (repo moved off it),
+  drops stale repo-path comments and the false auto-update promise
+  (in-app updater is retired). `browser/installer/release.ps1`,
+  `tests/test_release_ps1.py`.
+- **Live bridge model catalog** — `cline_bridge /v1/models` proxies
+  upstream with KNOWN fallback. `cline_bridge.py`, `tests/test_model_catalog.py`.
+- **Night-6 hermeticity** — the two pre-existing onnx-env test failures
+  fixed by simulating module absence instead of assuming it.
+  `tests/test_night6_memory_vec.py`.
+
 ## [10.2.1] - 2026-09-23
 
 Dashboard cleanup + Ask Lucky reliability + HQ model auto-rotation. Shipped

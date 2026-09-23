@@ -11,10 +11,8 @@
 # What it does, in order:
 #   1. Bumps the version number in the 3 places that must agree:
 #        browser\__init__.py, browser\version_info.txt, browser\installer\LuckyDBrowser.iss
-#      (a NEW version number is required for the in-app updater to ever
-#      notice a release -- publishing the same version again is invisible
-#      to installed users, since updater.py only fires on a strictly-newer
-#      version comparison).
+#      (a NEW version number keeps releases, tags, and installer names
+#      unambiguous -- never republish a version.)
 #   2. Kills any running LuckyD Browser process (so the rebuild isn't
 #      blocked by locked files).
 #   3. Rebuilds with PyInstaller --clean + compiles the Inno Setup installer
@@ -24,9 +22,8 @@
 #      ONE installer on the Desktop and it is unambiguously the latest.
 #   5. Commits the version bump, tags it vX.Y.Z, and pushes both to GitHub.
 #   6. Publishes a GitHub Release for that tag with the installer .exe
-#      attached as a release asset (this is what browser_core/updater.py
-#      polls for -- GET /repos/<repo>/releases/latest -- so every installed
-#      copy will offer this update automatically ~8s after their next launch).
+#      attached as a release asset. (The in-app auto-updater is retired:
+#      users update from the releases page via Help > Check for Updates.)
 
 param(
     [ValidateSet('major', 'minor', 'patch')]
@@ -39,8 +36,8 @@ $ErrorActionPreference = 'Stop'
 
 $installerDir = $PSScriptRoot                                   # ...\browser\installer
 $browserDir   = Split-Path $installerDir -Parent                 # ...\browser
-$repoRoot     = Split-Path $browserDir -Parent                   # ...\coding-agent
-$desktopDir   = Split-Path $repoRoot -Parent                     # ...\Desktop (repo sits directly on Desktop)
+$repoRoot     = Split-Path $browserDir -Parent                   # repo root (browser/..)
+$desktopDir   = [Environment]::GetFolderPath('Desktop')    # real Desktop, wherever the repo lives
 
 $initPy       = Join-Path $browserDir '__init__.py'
 $versionInfo  = Join-Path $browserDir 'version_info.txt'
@@ -50,6 +47,11 @@ $ghRepo       = 'Dylanchess0320/LuckyD-Browser'
 function Write-Step($msg) { Write-Host "" ; Write-Host "== $msg ==" -ForegroundColor Cyan }
 function Write-Ok($msg)   { Write-Host "  OK: $msg" -ForegroundColor Green }
 function Write-Warn2($msg) { Write-Host "  WARNING: $msg" -ForegroundColor Yellow }
+# BOM-less UTF-8 write: Set-Content -Encoding UTF8 emits a BOM on Windows
+# PowerShell 5.1, which broke AST-based version checks after the 10.2.3 bump.
+function Write-Utf8NoBom([string]$Path, [string]$Content) {
+    [System.IO.File]::WriteAllText($Path, $Content, (New-Object System.Text.UTF8Encoding $false))
+}
 
 # ---- 1. Bump version -------------------------------------------------------
 Write-Step 'Bumping version'
@@ -72,7 +74,7 @@ Write-Ok "$current -> $new"
 
 # __init__.py
 $initContent = $initContent -replace '__version__\s*=\s*"[^"]*"', "__version__ = `"$new`""
-Set-Content -Path $initPy -Value $initContent -NoNewline -Encoding UTF8
+Write-Utf8NoBom -Path $initPy -Content $initContent
 Write-Ok "browser\__init__.py"
 
 # version_info.txt (PyInstaller Windows version resource)
@@ -81,7 +83,7 @@ $vi = $vi -replace 'filevers=\([^)]*\)', "filevers=($($parts[0]), $($parts[1]), 
 $vi = $vi -replace 'prodvers=\([^)]*\)', "prodvers=($($parts[0]), $($parts[1]), $($parts[2]), 0)"
 $vi = $vi -replace "StringStruct\('FileVersion', '[^']*'\)", "StringStruct('FileVersion', '$new.0')"
 $vi = $vi -replace "StringStruct\('ProductVersion', '[^']*'\)", "StringStruct('ProductVersion', '$new.0')"
-Set-Content -Path $versionInfo -Value $vi -NoNewline -Encoding UTF8
+Write-Utf8NoBom -Path $versionInfo -Content $vi
 Write-Ok "browser\version_info.txt"
 
 # LuckyDBrowser.iss (Inno Setup script)
@@ -90,7 +92,7 @@ $iss = $iss -replace '#define AppVersion\s+"[^"]*"', "#define AppVersion   `"$ne
 $iss = $iss -replace 'VersionInfoVersion=\S*', "VersionInfoVersion=$new.0"
 $iss = $iss -replace 'VersionInfoProductVersion=\S*', "VersionInfoProductVersion=$new.0"
 $iss = $iss -replace 'OutputBaseFilename=\S*', "OutputBaseFilename=LuckyDBrowserSetup-$new"
-Set-Content -Path $issScript -Value $iss -Encoding UTF8
+Write-Utf8NoBom -Path $issScript -Content $iss
 Write-Ok "browser\installer\LuckyDBrowser.iss"
 
 # ---- 2. Close any running instance so the rebuild isn't file-locked -------
@@ -186,6 +188,6 @@ Write-Host "=================================================================" -
 Write-Host " LuckyD Browser $new is live." -ForegroundColor Green
 Write-Host " Desktop installer : Desktop\$($builtInstaller.Name)" -ForegroundColor Green
 Write-Host " GitHub release    : $releaseUrl" -ForegroundColor Green
-Write-Host " Existing installs will be offered this update automatically" -ForegroundColor Green
-Write-Host " (checked ~8s after launch, since $new > their current version)." -ForegroundColor Green
+Write-Host " Users update from the GitHub releases page" -ForegroundColor Green
+Write-Host " (Help > Check for Updates opens it)." -ForegroundColor Green
 Write-Host "=================================================================" -ForegroundColor Green

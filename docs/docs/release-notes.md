@@ -1,5 +1,16 @@
 # LuckyD Browser — Release Notes
 
+## [10.2.3] — Smarter-agent edition + 402 failover — 2026-09-23
+
+**[`LuckyDBrowserSetup-10.2.3.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.2.3/LuckyDBrowserSetup-10.2.3.exe)** — Windows 10/11 x64 · per-user install · no admin needed.
+**[`LuckyDBrowser-Portable-10.2.3.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.2.3/LuckyDBrowser-Portable-10.2.3.zip)** — unzip and run, for locked-down PCs.
+
+- **Smarter agent** — live goals in the prompt, enforced plan mode, MCP in one-shot mode, opt-in `--verify`, token-aware compaction, task tool pruning, `FindRelevantFiles` retrieval.
+- **402 failover** — exhausted Cline Credits balance escapes to ClinePass, then local Ollama, instead of dead-ending.
+- **Browser hardening** — trust/debug/harness/GUI/updater/catalog fixes.
+
+On top of everything from 10.2.1 below.
+
 ## [10.2.1] — Dashboard cleanup + HQ auto-rotation — 2026-09-23
 
 **[`LuckyDBrowserSetup-10.2.1.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.2.1/LuckyDBrowserSetup-10.2.1.exe)** — Windows 10/11 x64 · per-user install · no admin needed.
