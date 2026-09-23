@@ -398,6 +398,12 @@ class TestVersionUnification:
 
         iss = (_BROWSER_DIR / "installer" / "LuckyDBrowser.iss").read_text(encoding="utf-8")
         assert '#define AppVersion   "10.2.1"' in iss
+        # The output filename + setup version resources are separate
+        # hardcodes (regression: 10.2.1 first shipped a Setup-10.2.0.exe).
+        assert "OutputBaseFilename=LuckyDBrowserSetup-10.2.1" in iss
+        assert "VersionInfoVersion=10.2.1.0" in iss
+        assert "VersionInfoProductVersion=10.2.1.0" in iss
+        assert "10.2.0" not in iss
 
 
 # ── cline_bridge: inbound bearer auth ───────────────────────────────────────
