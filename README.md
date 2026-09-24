@@ -51,7 +51,7 @@ LuckyD also works with cloud providers if you prefer: Gemini, Groq, DeepSeek, Op
 ## See it
 
 <p align="center">
-  <img src="docs/screenshots/dashboard-v2.png" alt="LuckyD Browser dashboard" width="920">
+  <img src="docs/screenshots/agent-terminal-dashboard.png" alt="LuckyD Browser — agent terminal and HQ dashboard" width="920">
 </p>
 
 <p align="center">
