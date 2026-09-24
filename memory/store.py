@@ -173,6 +173,26 @@ class MemoryStore:
         # Fallback: BM25 text similarity
         return self.graph.search_text(content, limit)
 
+    def search_hybrid(self, query: str, limit: int = 10, rrf_k: int = 60) -> list[tuple]:
+        """Reciprocal-rank-fused BM25 + semantic search.
+
+        Either ranking alone misses: BM25 needs exact terms, semantic
+        needs embeddings installed (else it falls back to BM25 itself).
+        RRF fuses both orderings so a hit ranked highly anywhere
+        surfaces, with agreement across both ranking highest.
+        """
+        seen: dict = {}
+        fused: dict = {}
+        for hits in (
+            self.search_text(query, limit=limit * 2),
+            self.search_similar(query, limit=limit * 2),
+        ):
+            for rank, (node, _score) in enumerate(hits):
+                seen.setdefault(node.id, node)
+                fused[node.id] = fused.get(node.id, 0.0) + 1.0 / (rrf_k + rank + 1)
+        ranked = sorted(fused.items(), key=lambda kv: kv[1], reverse=True)
+        return [(seen[mid], score) for mid, score in ranked[:limit]]
+
     def search_by_tag(self, tag: str) -> list[tuple]:
         return self.graph.search_by_tag(tag)
 
@@ -187,9 +207,7 @@ class MemoryStore:
 
     def get_context(self, query: str, limit: int = 5) -> str:
         """Return top memories formatted as context for the LLM."""
-        results = self.search_text(query, limit=limit)
-        if not results:
-            results = self.search_similar(query, limit=limit)
+        results = self.search_hybrid(query, limit=limit)
         lines = []
         for i, (node, score) in enumerate(results):
             tags = ", ".join(node.tags) if node.tags else "none"

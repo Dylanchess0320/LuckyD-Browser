@@ -54,13 +54,35 @@ class FakeLLMClient:
 
 
 class TestRecorder:
-    def test_disabled_by_default(self, tmp_path, monkeypatch):
+    def test_enabled_by_default(self, tmp_path, monkeypatch):
         import core.trajectory as traj
 
         monkeypatch.delenv("CODING_AGENT_TRAJECTORY", raising=False)
         monkeypatch.setattr(traj, "DATA_DIR", tmp_path)
+        rec = traj.TrajectoryRecorder.attach_if_enabled(_make_agent())
+        assert rec is not None
+        rec.close()
+        assert len(list((tmp_path / "trajectories").glob("*.jsonl"))) == 1
+
+    def test_explicit_disable(self, tmp_path, monkeypatch):
+        import core.trajectory as traj
+
+        monkeypatch.setenv("CODING_AGENT_TRAJECTORY", "0")
+        monkeypatch.setattr(traj, "DATA_DIR", tmp_path)
         assert traj.TrajectoryRecorder.attach_if_enabled(_make_agent()) is None
         assert list(tmp_path.iterdir()) == []
+
+    def test_retention_prunes_old_files(self, tmp_path, monkeypatch):
+        import core.trajectory as traj
+
+        monkeypatch.setattr(traj, "DATA_DIR", tmp_path)
+        monkeypatch.setattr(traj, "MAX_RETAINED_TRAJECTORIES", 3)
+        traj_dir = tmp_path / "trajectories"
+        traj_dir.mkdir(parents=True)
+        for i in range(5):
+            (traj_dir / f"old_{i}.jsonl").write_text("{}\n", encoding="utf-8")
+        traj._prune_old_trajectories(traj_dir)
+        assert len(list(traj_dir.glob("*.jsonl"))) == 3
 
     def test_records_events_as_jsonl(self, tmp_path):
         from core.trajectory import TrajectoryRecorder

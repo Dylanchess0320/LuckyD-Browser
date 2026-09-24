@@ -356,8 +356,19 @@ class BenchmarkRunner:
                     error=None,
                 )
 
-            # Run the agent
-            output = await self._call_agent(task.prompt)
+            # Run the agent (bounded: a hung agent fails the task, not the suite)
+            timeout = task.timeout_sec if task.timeout_sec and task.timeout_sec > 0 else 300
+            try:
+                output = await asyncio.wait_for(self._call_agent(task.prompt), timeout=timeout)
+            except asyncio.TimeoutError:
+                latency = (time.monotonic() - start) * 1000
+                return TaskResult(
+                    task_id=task.id,
+                    success=False,
+                    output="",
+                    latency_ms=latency,
+                    error=f"Timed out after {timeout}s",
+                )
             latency = (time.monotonic() - start) * 1000
 
             # Check success
@@ -471,7 +482,14 @@ def load_suite_from_yaml(path: str | Path, suite_name: str = "evals") -> Benchma
 # ── CLI ────────────────────────────────────────────────────────────────
 
 
-async def main():
+def regression_exit_code(comparison: dict[str, Any] | None) -> int:
+    """Process exit for a baseline comparison: 2 on regressions, else 0."""
+    if comparison and comparison.get("regressions"):
+        return 2
+    return 0
+
+
+async def main(argv: list[str] | None = None) -> int:
     """CLI entry point for running benchmarks."""
     import argparse
 
@@ -497,7 +515,18 @@ async def main():
         help="Run tasks against the real configured agent (needs keys or Ollama); "
         "without it the harness runs in simulate mode",
     )
-    args = parser.parse_args()
+    parser.add_argument(
+        "--fail-on-regression",
+        action="store_true",
+        help="Exit 2 when the --baseline comparison reports regressions",
+    )
+    parser.add_argument(
+        "--save-baseline",
+        default=None,
+        metavar="NAME",
+        help="Also save this report as NAME.json for future --baseline runs",
+    )
+    args = parser.parse_args(argv)
 
     if args.suite == "evals":
         evals_dir = args.suite_dir or str(Path(__file__).parent / "evals")
@@ -536,6 +565,7 @@ async def main():
         print(f"Avg quality: {report.avg_quality_score:.2f}")
 
     # Compare to baseline
+    exit_code = 0
     if args.baseline:
         baseline = runner.load_baseline(args.baseline)
         if baseline:
@@ -549,14 +579,19 @@ async def main():
                     print(f"    - {reg['task_id']}: {reg['issue']}")
             if comparison["improvements"]:
                 print(f"  Improvements: {len(comparison['improvements'])}")
+            if args.fail_on_regression:
+                exit_code = regression_exit_code(comparison)
 
     runner.save_report(report)
+    if args.save_baseline:
+        runner.save_report(report, f"{args.save_baseline}.json")
+    return exit_code
 
 
 if __name__ == "__main__":
     import asyncio
 
-    asyncio.run(main())
+    raise SystemExit(asyncio.run(main()))
 
 
 import asyncio

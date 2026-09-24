@@ -20,6 +20,7 @@ import os
 import time
 import traceback
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import httpx
@@ -910,6 +911,33 @@ class CodingAgent:
                 "content": f"Error: Unknown tool '{tool_name}'. Available: {known}",
             }
 
+        # Plan-approval gate: after ExitPlanMode, writes stay blocked until
+        # the user approves and the agent calls ApprovePlan. Reads and plan
+        # tools keep working so the plan can still be refined.
+        if tool_name not in ("EnterPlanMode", "ExitPlanMode", "ApprovePlan"):
+            try:
+                from tools.plan_tools import is_awaiting_approval
+
+                if is_awaiting_approval():
+                    level = getattr(tool, "permission_level", "NORMAL")
+                    level = (
+                        level.value.upper()
+                        if hasattr(level, "value")
+                        else str(level or "NORMAL").upper()
+                    )
+                    if level == "REQUIRES_APPROVAL":
+                        return {
+                            "role": "tool",
+                            "tool_call_id": call_id,
+                            "content": (
+                                f"Error: Tool '{tool_name}' blocked: a proposed plan "
+                                "is awaiting user approval. Call ApprovePlan once the "
+                                "user accepts the plan."
+                            ),
+                        }
+            except Exception:
+                pass
+
         # Permission-mode gate (9.7): enforced BEFORE the approval hook.
         # "allow" pre-approves the call (the approval hook is skipped, other
         # before_tool hooks still run); "defer" runs the hooks as usual;
@@ -1003,6 +1031,12 @@ class CodingAgent:
             if len(content) > self.max_output_chars:
                 content = content[: self.max_output_chars] + "\n... [output truncated]"
 
+        if tool_name in ("Write", "Edit") and not content.startswith("Error"):
+            verify_error = self._verify_python_edit(tool_args)
+            if verify_error is not None:
+                content = verify_error
+                self._emit_event(AgentEventType.TOOL_ERROR, {"tool": tool_name, "verify": True})
+
         tool_result_msg = {"role": "tool", "tool_call_id": call_id, "content": content}
 
         # Run after_tool hooks
@@ -1015,6 +1049,30 @@ class CodingAgent:
                 print(f"\n  [HOOK ERR] after_tool hook failed: {e}")
 
         return tool_result_msg
+
+    @staticmethod
+    def _verify_python_edit(tool_args: dict) -> str | None:
+        """Syntax-check a just-written .py file; error text or None.
+
+        Catches broken edits at the source so the next turn fixes real
+        code instead of building on a SyntaxError. Fail-open: anything
+        unexpected (missing/unreadable file) keeps the original success.
+        """
+        try:
+            path = tool_args.get("file_path", "")
+            if not isinstance(path, str) or not path.endswith(".py"):
+                return None
+            source = Path(path).expanduser().read_text(encoding="utf-8")
+        except Exception:
+            return None
+        try:
+            compile(source, path, "exec")
+        except SyntaxError as exc:
+            return (
+                f"Error: {path} has a syntax error after your edit "
+                f"(line {exc.lineno}: {exc.msg}). Fix it before continuing."
+            )
+        return None
 
     async def _extract_session_memories(self, user_message: str) -> None:
         """Extract key facts/preferences/corrections from conversation via LLM."""
@@ -1246,6 +1304,82 @@ class CodingAgent:
         except Exception:
             return content
 
+    @staticmethod
+    def _parse_tool_call(tc: dict, fallback_idx: int) -> tuple[str, dict]:
+        """Split one provider tool_call into (name, args with _id)."""
+        func = tc.get("function", {})
+        tool_name = func.get("name", "")
+        try:
+            tool_args = json.loads(func.get("arguments", "{}"))
+        except json.JSONDecodeError:
+            tool_args = {}
+        tool_args["_id"] = tc.get("id", f"call_{fallback_idx}")
+        return tool_name, tool_args
+
+    @staticmethod
+    def _parallel_safe(tool_name: str) -> bool:
+        """True when a call may run alongside other calls in its batch.
+
+        Both conditions are required: the ParallelExecutor classifies the
+        tool read-only AND its permission level is ALWAYS_ALLOW (so no
+        interactive approval prompt can fire mid-batch). CODING_AGENT_NO_PARALLEL
+        disables batching entirely.
+        """
+        if os.environ.get("CODING_AGENT_NO_PARALLEL", "").lower() in ("1", "true", "yes"):
+            return False
+        try:
+            from core.parallel_executor import READ_ONLY_TOOLS
+            from tools.registry import registry
+        except Exception:
+            return False
+        if tool_name not in READ_ONLY_TOOLS:
+            return False
+        tool = registry.get(tool_name)
+        if tool is None:
+            return False
+        level = getattr(tool, "permission_level", "NORMAL")
+        level = level.value.upper() if hasattr(level, "value") else str(level or "NORMAL").upper()
+        return level == "ALWAYS_ALLOW"
+
+    def _batch_tool_calls(self, tool_calls: list[dict]) -> list[list[tuple[str, dict]]]:
+        """Group parsed calls into order-preserving batches.
+
+        Consecutive parallel-safe calls form one batch (run together);
+        everything else runs alone, in program order — so a Read after a
+        Write still sees the write. Single-call turns batch trivially.
+        """
+        batches: list[list[tuple[str, dict]]] = []
+        current: list[tuple[str, dict]] = []
+        for i, tc in enumerate(tool_calls):
+            parsed = self._parse_tool_call(tc, i)
+            if self._parallel_safe(parsed[0]):
+                current.append(parsed)
+            else:
+                if current:
+                    batches.append(current)
+                    current = []
+                batches.append([parsed])
+        if current:
+            batches.append(current)
+        return batches
+
+    async def _run_tool_call(self, parsed: tuple[str, dict]) -> dict:
+        """Execute one parsed call with timing, events, and console status."""
+        tool_name, tool_args = parsed
+        start_time = time.monotonic()
+        self._emit_event(AgentEventType.TOOL_START, {"tool": tool_name, "args": tool_args})
+        result_msg = await self._execute_tool(tool_name, tool_args)
+        elapsed = time.monotonic() - start_time
+        content_preview = result_msg["content"][:100].replace("\n", " ")
+        is_err = result_msg["content"].startswith("Error")
+        status = "[ERR]" if is_err else "[OK]"
+        print(f"  {status} [{tool_name}] {elapsed:.1f}s — {content_preview}")
+        self._emit_event(
+            AgentEventType.TOOL_END if not is_err else AgentEventType.TOOL_ERROR,
+            {"tool": tool_name, "elapsed": elapsed, "error": is_err},
+        )
+        return result_msg
+
     async def run(self, user_message: str, max_turns: int | None = None) -> str:
         """Run the full agent loop with hooks, events, checkpointing, and memory extraction.
 
@@ -1445,27 +1579,13 @@ class CodingAgent:
             self._no_tool_call_turns = 0
 
             tool_results: list = []
-            for tc in tool_calls:
-                func = tc.get("function", {})
-                tool_name = func.get("name", "")
-                try:
-                    tool_args = json.loads(func.get("arguments", "{}"))
-                except json.JSONDecodeError:
-                    tool_args = {}
-                tool_args["_id"] = tc.get("id", f"call_{len(tool_results)}")
-                start_time = time.monotonic()
-                self._emit_event(AgentEventType.TOOL_START, {"tool": tool_name, "args": tool_args})
-                result_msg = await self._execute_tool(tool_name, tool_args)
-                elapsed = time.monotonic() - start_time
-                content_preview = result_msg["content"][:100].replace("\n", " ")
-                is_err = result_msg["content"].startswith("Error")
-                status = "[ERR]" if is_err else "[OK]"
-                print(f"  {status} [{tool_name}] {elapsed:.1f}s — {content_preview}")
-                self._emit_event(
-                    AgentEventType.TOOL_END if not is_err else AgentEventType.TOOL_ERROR,
-                    {"tool": tool_name, "elapsed": elapsed, "error": is_err},
-                )
-                tool_results.append(result_msg)
+            for batch in self._batch_tool_calls(tool_calls):
+                if len(batch) == 1:
+                    tool_results.append(await self._run_tool_call(batch[0]))
+                else:
+                    tool_results.extend(
+                        await asyncio.gather(*(self._run_tool_call(parsed) for parsed in batch))
+                    )
 
             # Nudge the model toward a different approach when failures repeat,
             # but only once per turn: several failing tool calls in one turn

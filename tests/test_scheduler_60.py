@@ -316,8 +316,13 @@ class TestRunner:
         before = get_hooks()
         s = _sched(name="restore")
         store.create(s)
-        runner.run_schedule(store, s.id, force=True, retry_delay_sec=0)
-        assert get_hooks() is before
+        try:
+            runner.run_schedule(store, s.id, force=True, retry_delay_sec=0)
+            assert get_hooks() is before
+        finally:
+            # The sentinel hook must not leak: global hooks are shared by
+            # every agent created later in the suite.
+            reset_hooks()
 
     def test_disabled_requires_force(self, store):
         import core.schedule_runner as runner

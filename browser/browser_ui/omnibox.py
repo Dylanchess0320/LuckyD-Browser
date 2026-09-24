@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from PySide6.QtCore import QStringListModel, Qt, QTimer, QUrl, Signal
+from PySide6.QtCore import QStringListModel, Qt, QThread, QTimer, QUrl, Signal
 from PySide6.QtWidgets import QCompleter, QLineEdit
 
 _DOMAIN_RE = re.compile(
@@ -18,6 +18,51 @@ _LOCALHOST_RE = re.compile(
 )
 
 
+def build_completion_entries(history_rows, bookmark_rows) -> tuple[list[str], dict[str, str]]:
+    """Merge history + bookmarks into (labels, label→url), deduped.
+
+    Pure so the GUI thread can build the final model from rows fetched
+    on a worker thread. Titles win over raw URLs as display labels.
+    """
+    label_url: dict[str, str] = {}
+    seen: set[str] = set()
+    labels: list[str] = []
+    for url, title, *_ in history_rows:
+        label = title if title and title != url else url
+        if label and label not in seen:
+            seen.add(label)
+            labels.append(label)
+            label_url[label] = url
+    for url, title, *_ in bookmark_rows:
+        label = title if title and title != url else url
+        if label and label not in seen:
+            seen.add(label)
+            labels.append(label)
+            label_url[label] = url
+    return labels, label_url
+
+
+class _CompletionLoader(QThread):
+    """Fetch completion rows off the GUI thread (fresh connection)."""
+
+    loaded = Signal(list, list)
+
+    def __init__(self, db_path, parent=None):
+        super().__init__(parent)
+        self._db_path = db_path
+
+    def run(self) -> None:
+        try:
+            from browser_core.storage import Storage
+
+            store = Storage(self._db_path)
+            rows = store.recent(300)
+            marks = store.bookmarks()[:50]
+        except Exception:
+            rows, marks = [], []
+        self.loaded.emit(list(rows), list(marks))
+
+
 class Omnibox(QLineEdit):
     """Single input for both URLs and web searches (like Chrome's omnibox)."""
 
@@ -28,6 +73,7 @@ class Omnibox(QLineEdit):
         super().__init__(parent)
         self._settings = settings
         self._storage = storage
+        self._loader = None
         self.setPlaceholderText(
             "Search the web or type a URL  •  ?ask AI about this page  •  Ctrl+K commands"
         )
@@ -89,20 +135,28 @@ class Omnibox(QLineEdit):
         return QUrl(self._settings.search_url_for(text))
 
     def refresh_completions(self) -> None:
-        """Rebuild completion candidates from recent history and bookmarks."""
-        self._label_url.clear()
-        seen: set[str] = set()
-        labels: list[str] = []
-        for url, title, _ts in self._storage.recent(300):
-            label = title if title and title != url else url
-            if label and label not in seen:
-                seen.add(label)
-                labels.append(label)
-                self._label_url[label] = url
-        for url, title, *_ in self._storage.bookmarks()[:50]:
-            label = title if title and title != url else url
-            if label and label not in seen:
-                seen.add(label)
-                labels.append(label)
-                self._label_url[label] = url
+        """Rebuild completion candidates without blocking the GUI thread.
+
+        Rows load on a worker (fresh sqlite connection — the shared one
+        must stay on the GUI thread); the model swaps in on the signal.
+        """
+        if self._loader is not None and self._loader.isRunning():
+            return  # one flight is enough; results land via the signal
+        try:
+            db_path = self._storage.db_path
+        except Exception:
+            return
+        loader = _CompletionLoader(db_path, self)
+        loader.loaded.connect(self._apply_completions)
+        loader.finished.connect(loader.deleteLater)
+        loader.finished.connect(self._clear_loader)
+        self._loader = loader
+        loader.start()
+
+    def _clear_loader(self) -> None:
+        self._loader = None
+
+    def _apply_completions(self, history_rows, bookmark_rows) -> None:
+        labels, label_url = build_completion_entries(history_rows, bookmark_rows)
+        self._label_url = label_url
         self._model.setStringList(labels)

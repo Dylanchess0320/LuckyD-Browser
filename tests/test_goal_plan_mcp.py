@@ -114,10 +114,12 @@ class TestGoalPrompt:
 
 class TestPlanModeEnforcement:
     async def test_writes_blocked_reads_and_exit_allowed(self):
+        import tools.plan_tools as plans
         from tools.plan_tools import EnterPlanModeTool, ExitPlanModeTool
         from tools.registry import registry
 
         ag = _make_agent()
+        plans._awaiting_approval = False
         await EnterPlanModeTool().execute()
         try:
             decision, reason = ag._permission_mode_decision(registry.get("Write"), "Write")
@@ -134,6 +136,7 @@ class TestPlanModeEnforcement:
             assert decision == "allow"
         finally:
             await ExitPlanModeTool().execute(plan="cleanup")
+            plans._awaiting_approval = False
 
         decision, _ = ag._permission_mode_decision(registry.get("Write"), "Write")
         assert decision in ("allow", "defer")

@@ -126,6 +126,22 @@ class TaskUpdateTool(ToolBase):
         for t in tasks:
             if t["id"] == task_id:
                 if status:
+                    if status in ("in_progress", "completed"):
+                        by_id = {x["id"]: x for x in tasks}
+                        open_blockers = [
+                            b
+                            for b in (t.get("blocked_by") or [])
+                            if by_id.get(b, {}).get("status", "completed")
+                            not in ("completed", "cancelled")
+                        ]
+                        if open_blockers:
+                            return ToolOutput(
+                                text=(
+                                    f"Cannot mark [{task_id}] {status}: "
+                                    f"blocked by open tasks: {', '.join(open_blockers)}"
+                                ),
+                                error=True,
+                            )
                     t["status"] = status
                 if subject:
                     t["subject"] = subject

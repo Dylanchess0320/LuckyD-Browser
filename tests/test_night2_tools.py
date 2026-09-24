@@ -510,9 +510,11 @@ def clean_plan():
 
     m._plan_mode = False
     m._plan_context = {}
+    m._awaiting_approval = False
     yield
     m._plan_mode = False
     m._plan_context = {}
+    m._awaiting_approval = False
 
 
 class TestPlanTools:

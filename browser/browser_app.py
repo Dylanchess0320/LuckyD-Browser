@@ -14,6 +14,7 @@ from browser_core.scheduler import ScheduleStore
 from browser_core.scripts import ScriptEngine
 from browser_core.session import SessionStore
 from browser_core.settings import SettingsStore
+from browser_core.startup import startup_urls_from_argv
 from browser_core.storage import Storage
 from browser_core.workspaces import WorkspaceStore
 from browser_ui.main_window import MainWindow
@@ -102,6 +103,8 @@ class BrowserApp:
         self.windows: list[MainWindow] = []
         first_window = self.new_window()
         self._restore_previous_session(first_window)
+        for url in startup_urls_from_argv(argv):
+            first_window.open_in_new_tab(url)
         self._announce_whats_new(first_window)
 
         # Auto-start the coding-agent backend (luckyd-code.exe) in the

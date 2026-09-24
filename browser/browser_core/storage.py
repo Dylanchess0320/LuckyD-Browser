@@ -34,6 +34,15 @@ CREATE TABLE IF NOT EXISTS bookmarks (
     folder TEXT NOT NULL DEFAULT '',
     created REAL NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS downloads (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    url TEXT NOT NULL DEFAULT '',
+    filename TEXT NOT NULL DEFAULT '',
+    state TEXT NOT NULL DEFAULT '',
+    finished_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_downloads_time ON downloads(finished_at DESC);
 """
 
 
@@ -64,6 +73,7 @@ class _BookmarkHTMLParser(HTMLParser):
 class Storage:
     def __init__(self, db_path: Path = DB_PATH):
         db_path.parent.mkdir(parents=True, exist_ok=True)
+        self.db_path = Path(db_path)
         self._conn = sqlite3.connect(str(db_path), check_same_thread=False)
         self._conn.executescript(_SCHEMA)
         self._conn.commit()
@@ -135,3 +145,25 @@ class Storage:
                 self.add_bookmark(href, title or href)
                 count += 1
         return count
+
+    # ── downloads ────────────────────────────────────────────────────
+
+    def record_download(self, url: str, filename: str, state: str) -> None:
+        """Persist one finished download (completed/cancelled/interrupted)."""
+        self._conn.execute(
+            "INSERT INTO downloads (url, filename, state, finished_at) VALUES (?, ?, ?, ?)",
+            (url or "", filename or "", state or "", time.time()),
+        )
+        self._conn.commit()
+
+    def download_history(self, limit: int = 100) -> list[tuple[str, str, str, float]]:
+        cur = self._conn.execute(
+            "SELECT url, filename, state, finished_at FROM downloads "
+            "ORDER BY finished_at DESC LIMIT ?",
+            (limit,),
+        )
+        return cur.fetchall()
+
+    def clear_download_history(self) -> None:
+        self._conn.execute("DELETE FROM downloads")
+        self._conn.commit()

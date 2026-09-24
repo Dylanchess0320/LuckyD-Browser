@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import time
 from pathlib import Path
 
@@ -29,11 +30,18 @@ def _fmt_size(num: int | float) -> str:
     return f"{size:.1f} TB"
 
 
+_FINISH_ICONS = {"completed": "✅", "cancelled": "🚫", "interrupted": "⚠"}
+
+
 class DownloadsDock(QDockWidget):
-    def __init__(self, settings, parent=None):
+    def __init__(self, settings, parent=None, storage=None, retry_handler=None):
         super().__init__("Downloads", parent)
         self.setObjectName("downloads_dock")  # required for saveState()
         self._settings = settings
+        #: Persisted download history (None in bare/legacy constructions).
+        self._storage = storage
+        #: Callable(url) re-issuing a download; wired to the current tab.
+        self._retry_handler = retry_handler
         self.setAllowedAreas(
             Qt.DockWidgetArea.BottomDockWidgetArea
             | Qt.DockWidgetArea.LeftDockWidgetArea
@@ -64,6 +72,8 @@ class DownloadsDock(QDockWidget):
         self._downloads: dict[int, QWebEngineDownloadRequest] = {}
         self._cancel_btns: dict[int, QWidget] = {}
         self._marks: dict[int, tuple[int, float]] = {}  # did → (bytes, monotonic) for rate
+        self._urls: dict[int, str] = {}  # did → source URL (for retry)
+        self._load_history()
 
     # ── entry point (called by profile.downloadRequested) ────────────
 
@@ -75,6 +85,10 @@ class DownloadsDock(QDockWidget):
         did = download.id()
         self._downloads[did] = download
         self._marks[did] = (0, time.monotonic())
+        try:
+            self._urls[did] = download.url().toString()
+        except Exception:
+            self._urls[did] = ""
 
         item = QListWidgetItem(f"⬇ {download.suggestedFileName()} — starting…")
         item.setData(Qt.ItemDataRole.UserRole, did)
@@ -154,14 +168,54 @@ class DownloadsDock(QDockWidget):
             self._marks.pop(did, None)
             self.list.setItemWidget(item, None)
 
+        finished: str | None = None
         if state == states.DownloadCompleted:
             item.setText(f"✅ {download.downloadFileName()} — done (double-click to open)")
+            finished = "completed"
         elif state == states.DownloadCancelled:
             item.setText(f"🚫 {download.downloadFileName()} — cancelled")
+            finished = "cancelled"
         elif state == states.DownloadInterrupted:
             item.setText(
                 f"⚠ {download.downloadFileName()} — interrupted: {download.interruptReasonString()}"
             )
+            finished = "interrupted"
+            # Qt offers no restart API — offer a retry that re-issues the
+            # download through the current tab instead of a dead end.
+            if self._retry_handler is not None:
+                retry_btn = QPushButton("↻ Retry", self.list)
+                retry_btn.setToolTip("Download again from the source URL")
+                retry_btn.clicked.connect(lambda _=False, d=did: self._retry_download(d))
+                self.list.setItemWidget(item, retry_btn)
+        if finished is not None and self._storage is not None:
+            # History persistence must never break the UI.
+            with contextlib.suppress(Exception):
+                self._storage.record_download(
+                    self._urls.get(did, ""), download.downloadFileName(), finished
+                )
+
+    def _retry_download(self, did: int) -> None:
+        """Re-issue an interrupted download through the retry handler."""
+        url = self._urls.get(did, "")
+        if url and self._retry_handler is not None:
+            with contextlib.suppress(Exception):
+                self._retry_handler(url)
+
+    def _load_history(self) -> None:
+        """Show persisted downloads from previous sessions (negative dids)."""
+        if self._storage is None:
+            return
+        try:
+            rows = self._storage.download_history()
+        except Exception:
+            return
+        for i, (url, filename, state, _ts) in enumerate(rows):
+            icon = _FINISH_ICONS.get(state, "•")
+            item = QListWidgetItem(f"{icon} {filename} — {state} (previous session)")
+            did = -(i + 1)
+            item.setData(Qt.ItemDataRole.UserRole, did)
+            self._urls[did] = url or ""
+            self.list.addItem(item)
 
     def _clear_completed(self) -> None:
         """Remove completed/cancelled/interrupted downloads from the list."""
@@ -170,12 +224,20 @@ class DownloadsDock(QDockWidget):
         for i in range(self.list.count() - 1, -1, -1):
             item = self.list.item(i)
             did = item.data(Qt.ItemDataRole.UserRole)
+            if isinstance(did, int) and did < 0:
+                self._urls.pop(did, None)  # persisted history row
+                self.list.takeItem(i)
+                continue
             dl = self._downloads.get(did)
             if dl is not None and dl.state() in finished:
                 self._downloads.pop(did, None)
                 self._paths.pop(did, None)
                 self._marks.pop(did, None)
+                self._urls.pop(did, None)
                 self.list.takeItem(i)
+        if self._storage is not None:
+            with contextlib.suppress(Exception):
+                self._storage.clear_download_history()
 
     def _context_menu(self, pos) -> None:
         """Right-click menu on download items."""
@@ -194,6 +256,7 @@ class DownloadsDock(QDockWidget):
         self._paths.pop(did, None)
         self._cancel_btns.pop(did, None)
         self._marks.pop(did, None)
+        self._urls.pop(did, None)
         self.list.takeItem(self.list.row(item))
 
     # ── helpers ──────────────────────────────────────────────────────

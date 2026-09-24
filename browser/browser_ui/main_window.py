@@ -195,6 +195,21 @@ class MainWindow(QMainWindow):
         self.downloads.show()
         self.downloads.raise_()
 
+    def _retry_download_url(self, url: str) -> None:
+        """Re-issue an interrupted download through the current tab's page.
+
+        Qt offers no restart on a dead QWebEngineDownloadRequest — asking
+        the live page to download the same URL raises a fresh request,
+        which lands back in the dock as a new entry.
+        """
+        try:
+            view = self.tabs.current_view()
+            if view is not None and url:
+                view.page().download(QUrl(url))
+                self.show_downloads()
+        except Exception:
+            pass
+
     def show_palette(self) -> None:
         """Show the command palette (Ctrl+K)."""
         self._palette.show_palette()
@@ -439,7 +454,12 @@ class MainWindow(QMainWindow):
         self.find_bar.hide()
 
     def _build_docks(self) -> None:
-        self.downloads = DownloadsDock(self.settings, self)
+        self.downloads = DownloadsDock(
+            self.settings,
+            self,
+            storage=self._app.storage,
+            retry_handler=self._retry_download_url,
+        )
         self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.downloads)
         self.downloads.hide()
 

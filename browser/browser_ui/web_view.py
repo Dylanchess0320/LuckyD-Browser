@@ -26,6 +26,8 @@ class WebPage(QWebEnginePage):
         self._mw = main_window
         with contextlib.suppress(Exception):
             self.featurePermissionRequested.connect(self._on_feature_permission)
+        with contextlib.suppress(Exception):
+            self.renderProcessTerminated.connect(self._on_render_terminated)
 
     def acceptNavigationRequest(self, url, nav_type, is_main_frame):  # noqa: N802
         if url.scheme() == "luckyd":
@@ -42,6 +44,30 @@ class WebPage(QWebEnginePage):
         handler = getattr(self._mw, "handle_feature_permission", None)
         if callable(handler):
             handler(self, origin, feature)
+
+    def _on_render_terminated(self, status, exit_code) -> None:
+        """Dead-tab overlay + toast when the renderer process dies.
+
+        Crashes used to leave a frozen or blank tab with no recovery path.
+        The overlay's Reload link navigates to the crashed URL, which
+        spawns a fresh renderer. Never raises — this runs on a signal
+        from a half-torn-down page.
+        """
+        del status, exit_code
+        try:
+            crashed = self.url().toString()
+        except Exception:
+            crashed = ""
+        if not crashed or crashed in ("about:blank", "chrome-error://chromewebdata/"):
+            crashed = ""
+        try:
+            palette = _theme_palette(self._mw.settings)
+        except Exception:
+            palette = _theme_palette(None)
+        with contextlib.suppress(Exception):
+            self.setHtml(_crash_html(palette, crashed), QUrl(crashed or "about:blank"))
+        with contextlib.suppress(Exception):
+            self._mw.toasts.show("Tab crashed — Reload to try again", kind="error")
 
     # ── JavaScript dialogs (alert / confirm / prompt) ────────────────
     # While an agent session is active, a modal JS dialog would freeze the
@@ -178,6 +204,45 @@ def _offline_html(p: dict) -> str:
 # Default-theme rendering, kept as a module constant for the selftest sanity
 # check (browser/selftest.py asserts the offline page still has the arcade).
 _OFFLINE_HTML = _offline_html(_theme_palette(None))
+
+_CRASH_TEMPLATE = Template(
+    """<!doctype html><html><head><meta charset="utf-8"><style>
+body{background:$window;color:$text;font-family:'Segoe UI',system-ui,sans-serif;
+display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
+.card{background:$panel;border:1px solid $border;border-radius:12px;
+padding:32px 40px;max-width:460px;text-align:center}
+h1{font-size:20px;margin:0 0 8px;color:$danger}
+p{color:$muted;font-size:14px;line-height:1.5}
+a.reload{display:inline-block;margin-top:12px;background:$accent;color:#fff;
+text-decoration:none;font-weight:600;padding:10px 28px;border-radius:8px}
+.url{font-size:12px;word-break:break-all;margin-top:12px}
+</style></head><body><div class="card">
+<h1>☠ Tab crashed</h1>
+<p>The page's renderer process died. Your other tabs are fine — reload to try again.</p>
+<a class="reload" href="$url">Reload tab</a>
+<div class="url">$url</div>
+</div></body></html>"""
+)
+
+
+def _crash_html(p: dict, url: str) -> str:
+    """Dead-tab overlay, tinted to the active palette.
+
+    The Reload link is a plain anchor to the crashed URL — clicking it
+    navigates, which spawns a fresh renderer, so no custom scheme or JS
+    bridge is needed to recover the tab.
+    """
+    safe = url or "about:blank"
+    return _CRASH_TEMPLATE.substitute(
+        window=p["window"],
+        text=p["text"],
+        muted=p["muted"],
+        panel=p["panel"],
+        border=p["border"],
+        accent=p["accent"],
+        danger=p["danger"],
+        url=safe,
+    )
 
 
 class WebView(QWebEngineView):

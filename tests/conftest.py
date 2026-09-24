@@ -44,6 +44,10 @@ def _mock_env(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("ZAI_API_KEY", "sk-test-zai-key")
         monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test-openrouter-key")
         monkeypatch.setenv("CODING_AGENT_LOG_LEVEL", "CRITICAL")
+        # Trajectory recording is on by default in production; keep it off
+        # for the suite so agent.run() tests don't write data/trajectories/.
+        # (test_trajectory.py opts back in per-test.)
+        monkeypatch.setenv("CODING_AGENT_TRAJECTORY", "0")
 
 
 # ── Temporary directory fixtures ───────────────────────────────────────

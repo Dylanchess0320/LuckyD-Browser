@@ -1,12 +1,13 @@
-"""Turn-by-turn trajectory recorder (opt-in JSONL audit trail).
+"""Turn-by-turn trajectory recorder (on-by-default JSONL audit trail).
 
-Enable with ``CODING_AGENT_TRAJECTORY=1``. Each :meth:`run` call then
-appends one ``<conversation>_<timestamp>.jsonl`` file under
-``data/trajectories/`` with the run's typed events (turns, model
-responses, tool calls, approvals, errors). Token-chunk and debug
-events are excluded to keep files small. Attaching chains the agent's
-existing ``on_event`` callback, so recorders compose with REPL/ACP
-consumers instead of replacing them.
+Each :meth:`run` call appends one ``<conversation>_<timestamp>.jsonl``
+file under ``data/trajectories/`` with the run's typed events (turns,
+model responses, tool calls, approvals, errors). Token-chunk and debug
+events are excluded to keep files small, and only the newest
+``MAX_RETAINED_TRAJECTORIES`` files are kept (old ones are pruned on
+attach). Disable with ``CODING_AGENT_TRAJECTORY=0``. Attaching chains
+the agent's existing ``on_event`` callback, so recorders compose with
+REPL/ACP consumers instead of replacing them.
 """
 
 from __future__ import annotations
@@ -22,7 +23,23 @@ from config import DATA_DIR
 
 from .types import AgentEventType
 
-_TRUTHY = {"1", "true", "yes"}
+_FALSY = {"0", "false", "no", "off"}
+
+#: Retention cap — attach prunes older files so the audit trail cannot
+#: fill the disk on long-lived machines.
+MAX_RETAINED_TRAJECTORIES = 50
+
+
+def _prune_old_trajectories(traj_dir: Path) -> None:
+    """Keep only the newest files; never raises (audit must not break runs)."""
+    try:
+        files = sorted(traj_dir.glob("*.jsonl"), key=lambda p: p.stat().st_mtime, reverse=True)
+        for stale in files[MAX_RETAINED_TRAJECTORIES:]:
+            with contextlib.suppress(Exception):
+                stale.unlink()
+    except Exception:
+        pass
+
 
 #: High-volume event types never recorded.
 SKIP_EVENT_TYPES = frozenset(
@@ -60,16 +77,18 @@ class TrajectoryRecorder:
 
     @classmethod
     def attach_if_enabled(cls, agent: Any) -> TrajectoryRecorder | None:
-        """Attach a recorder for this run when the env flag is on."""
-        if os.environ.get("CODING_AGENT_TRAJECTORY", "").lower() not in _TRUTHY:
+        """Attach a recorder for this run unless explicitly disabled."""
+        if os.environ.get("CODING_AGENT_TRAJECTORY", "").lower() in _FALSY:
             return None
         stale = getattr(agent, "_trajectory_recorder", None)
         if stale is not None:
             with contextlib.suppress(Exception):
                 stale.close()
+        traj_dir = Path(DATA_DIR) / "trajectories"
+        _prune_old_trajectories(traj_dir)
         stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
         conv = str(getattr(agent, "conversation_id", "noconv"))
-        rec = cls.attach(agent, Path(DATA_DIR) / "trajectories" / f"{conv}_{stamp}.jsonl")
+        rec = cls.attach(agent, traj_dir / f"{conv}_{stamp}.jsonl")
         agent._trajectory_recorder = rec
         return rec
 

@@ -76,6 +76,7 @@ class TestFindRelevantFiles:
         assert "findrelevantfiles" in ALWAYS_ADVERTISED_TOOLS
 
     async def test_allowed_in_plan_mode(self):
+        import tools.plan_tools as plans
         from tools.plan_tools import EnterPlanModeTool, ExitPlanModeTool
         from tools.registry import registry
 
@@ -91,3 +92,4 @@ class TestFindRelevantFiles:
             assert decision == "allow"
         finally:
             await ExitPlanModeTool().execute(plan="cleanup")
+            plans._awaiting_approval = False
