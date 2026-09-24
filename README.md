@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/screenshots/hero.svg" alt="LuckyD Browser" width="100%">
+
 
 # LuckyD Browser
 
