@@ -1,56 +1,70 @@
-"""Tests for the model_catalog logic in main.py."""
+"""B6: cline_bridge /v1/models serves the live upstream catalog.
+
+The endpoint returned only the hardcoded KNOWN_MODELS list, which rots
+whenever the gateway adds/retires ids. It now proxies the upstream
+/v1/models catalog and falls back to KNOWN_MODELS when unreachable —
+same OpenAI list shape either way.
+"""
 
 from __future__ import annotations
 
-from main import model_catalog
+from types import SimpleNamespace
 
 
-def test_model_catalog_free_only_filters_missing_keys(monkeypatch):
-    """Test that model_catalog(free_only=True) correctly uses os.environ to filter out providers without keys."""
+def _authed_client(monkeypatch):
+    monkeypatch.setenv("CLINE_BRIDGE_TOKEN", "bridge-test-secret")
+    monkeypatch.delenv("CODING_AGENT_API_KEY", raising=False)
+    from fastapi.testclient import TestClient
 
-    # Clear all keys first to ensure a clean state
-    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
-    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
-    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    monkeypatch.delenv("GROQ_API_KEY", raising=False)
-    monkeypatch.delenv("ZAI_API_KEY", raising=False)
-    monkeypatch.delenv("OPENCODE_API_KEY", raising=False)
-    monkeypatch.delenv("CLINEPASS_API_KEY", raising=False)
+    import cline_bridge
 
-    # 1. Test when no keys are present
-    free_catalog_no_keys = model_catalog(free_only=True)
+    return TestClient(cline_bridge.app)
 
-    assert len(free_catalog_no_keys) == 1
-    free_section = free_catalog_no_keys[0]
-    assert free_section["tier"] == "free"
 
-    groups = free_section["groups"]
-    provider_labels = [g["provider"] for g in groups]
+def _models_response(ids):
+    return SimpleNamespace(
+        status_code=200,
+        raise_for_status=lambda: None,
+        json=lambda: {"data": [{"id": i} for i in ids]},
+    )
 
-    # "Ollama ✓" (local, no key needed) should be present
-    assert any("Ollama" in label and "✓" in label for label in provider_labels)
-    # Cline requires CLINEPASS_API_KEY, which is deleted, so it won't be available here.
 
-    # Providers requiring keys should NOT have "✓" and should be completely excluded because free_only=True
-    assert not any("OpenRouter" in label for label in provider_labels)
-    assert not any("Google" in label for label in provider_labels)
+class TestLiveModels:
+    def test_live_catalog_served(self, monkeypatch):
+        import httpx
 
-    # 2. Test when a key is present
-    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-fake-openrouter-key")
-    monkeypatch.setenv("GOOGLE_API_KEY", "sk-fake-google-key")
+        import cline_bridge
 
-    free_catalog_with_keys = model_catalog(free_only=True)
-    free_section_with_keys = free_catalog_with_keys[0]
-    groups_with_keys = free_section_with_keys["groups"]
-    provider_labels_with_keys = [g["provider"] for g in groups_with_keys]
+        monkeypatch.setattr(cline_bridge, "_upstream_token", lambda: "test-token")
+        monkeypatch.setattr(httpx, "get", lambda *a, **k: _models_response(["live-a", "live-b"]))
+        client = _authed_client(monkeypatch)
+        r = client.get("/v1/models", headers={"Authorization": "Bearer bridge-test-secret"})
+        assert r.status_code == 200
+        ids = [m["id"] for m in r.json()["data"]]
+        assert ids == ["live-a", "live-b"]
 
-    # Ollama should still be there
-    assert any("Ollama" in label and "✓" in label for label in provider_labels_with_keys)
+    def test_falls_back_to_known_models(self, monkeypatch):
+        import httpx
 
-    # OpenRouter and Google should now be included and marked as available ("✓")
-    assert any("OpenRouter ✓" in label for label in provider_labels_with_keys)
-    assert any("Google Gemini ✓" in label for label in provider_labels_with_keys)
+        import cline_bridge
 
-    # Other keyed providers without keys in env should still be excluded
-    assert not any("Groq" in label for label in provider_labels_with_keys)
+        def _boom(*args, **kwargs):
+            raise httpx.ConnectError("down")
+
+        monkeypatch.setattr(cline_bridge, "_upstream_token", lambda: "test-token")
+        monkeypatch.setattr(httpx, "get", _boom)
+        client = _authed_client(monkeypatch)
+        r = client.get("/v1/models", headers={"Authorization": "Bearer bridge-test-secret"})
+        assert r.status_code == 200
+        body = r.json()
+        assert body["object"] == "list"
+        assert [m["id"] for m in body["data"]] == cline_bridge.KNOWN_MODELS
+
+    def test_blank_ids_dropped(self, monkeypatch):
+        import httpx
+
+        import cline_bridge
+
+        monkeypatch.setattr(cline_bridge, "_upstream_token", lambda: "test-token")
+        monkeypatch.setattr(httpx, "get", lambda *a, **k: _models_response(["ok", "", None]))
+        assert cline_bridge._live_model_ids() == ["ok"]

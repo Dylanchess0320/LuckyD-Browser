@@ -28,9 +28,12 @@ def _ok(result) -> bool:
 
 
 class TestBackendSelection:
-    def test_auto_falls_back_to_tfidf_without_onnx(self):
+    def test_auto_falls_back_to_tfidf_without_onnx(self, monkeypatch):
+        # Mirror of test_auto_selects_onnx_when_importable: simulate the
+        # import failing instead of assuming the ambient environment.
+        monkeypatch.setitem(sys.modules, "onnxruntime", None)
         vs = VectorStore(backend="auto")
-        assert vs.backend == "tfidf"  # onnxruntime not installed here
+        assert vs.backend == "tfidf"
 
     def test_explicit_backends_kept(self):
         assert VectorStore(backend="hash").backend == "hash"
@@ -310,6 +313,10 @@ def fresh_emb_state(monkeypatch):
     monkeypatch.setattr(emb_mod, "_onnx_available", None)
     monkeypatch.setattr(emb_mod, "_session", None)
     monkeypatch.setattr(emb_mod, "_tokenizer", None)
+    # Simulate onnxruntime being absent hermetically: importing a None entry
+    # raises ImportError. Without this the no-ONNX tests below depend on the
+    # ambient environment (and on test order).
+    monkeypatch.setitem(sys.modules, "onnxruntime", None)
     yield
     monkeypatch.setattr(emb_mod, "_onnx_available", None)
     monkeypatch.setattr(emb_mod, "_session", None)
@@ -318,7 +325,8 @@ def fresh_emb_state(monkeypatch):
 
 class TestIsAvailable:
     def test_unavailable_without_onnxruntime(self, fresh_emb_state):
-        assert "onnxruntime" not in sys.modules
+        # Absence is simulated by the fixture; the product assertion is that
+        # availability is False (not that the ambient env lacks the package).
         assert emb_mod.is_available() is False
 
     def test_result_cached(self, fresh_emb_state):

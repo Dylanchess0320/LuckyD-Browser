@@ -1,0 +1,9 @@
+id: summarize-sentinel
+name: Constrained summary
+description: One-sentence summary ending with a sentinel word.
+prompt: |
+  Summarize this in exactly one sentence and end your reply with the word DONE:
+  LuckyD is a local-first AI browser and coding agent.
+expected_output: DONE
+tags: [instruction-following]
+difficulty: easy

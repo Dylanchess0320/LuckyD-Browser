@@ -1,0 +1,7 @@
+id: riddle-42
+name: Factual recall
+description: Short factual answer with an exact substring to match.
+prompt: "What is 6 times 7? Reply with just the number."
+expected_output: "42"
+tags: [factual]
+difficulty: easy

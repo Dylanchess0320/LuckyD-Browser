@@ -141,6 +141,45 @@ jobs:
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
 
+  # ── Evals (harness smoke + trajectory tests; live evals stay manual) ──
+  evals:
+    name: "Evals report"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [test]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: "pip"
+
+      - name: Install Dependencies
+        run: |
+          pip install -r requirements-dev.txt
+          pip install -e .
+
+      - name: Trajectory + eval-loader tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: pytest tests/test_trajectory.py -q --timeout=120
+
+      - name: Benchmark harness smoke (simulate mode)
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: python -m tests.benchmarks --suite quick --output benchmark_results
+
+      - name: Upload evals artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: evals-report
+          path: benchmark_results/
+          retention-days: 7
+
   # ── Build ───────────────────────────────────────────────────────────
   build:
     name: "Build Package"

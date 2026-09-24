@@ -945,7 +945,14 @@ class TestRunLoop:
         ag.llm_client = FakeLLMClient(
             [{"content": "[API Error: 429]"}] + [{"content": "[API Error: down]"}] * 8
         )
-        result = await ag.run("hello", max_turns=3)
+        # Isolate the cross-provider escape legs: on a dev box with a Cline
+        # session/keys and a live Ollama server they would really fail over
+        # (and really call the network). This test covers exhaustion.
+        with (
+            patch.object(CodingAgent, "_cline_gateway_usable", return_value=False),
+            patch.object(CodingAgent, "_ollama_reachable", return_value=False),
+        ):
+            result = await ag.run("hello", max_turns=3)
         assert result == "[API Error: 429]"
         # Exhausted rotation restores the original model instead of pinning a
         # known-bad fallback.
@@ -1325,7 +1332,7 @@ class TestRunFreshConversation:
         system_msgs = [
             m
             for m in ag.messages
-            if m.get("role") == "system" and "Relevant" not in m.get("content", "")
+            if m.get("role") == "system" and "Relevant memories" not in m.get("content", "")
         ]
         assert system_msgs and isinstance(system_msgs[0]["content"], str)
 

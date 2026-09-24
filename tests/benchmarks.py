@@ -314,11 +314,11 @@ class BenchmarkRunner:
             print(f"  [{task.id}] {task.name}...", end=" ", flush=True)
             result = await self._run_task(task)
             results.append(result)
-            status = "✓" if result.success else "✗"
+            status = "ok" if result.success else "FAIL"
             print(f"{status} ({result.latency_ms:.0f}ms)")
 
         # Aggregate
-        succeeded = sum(1 for r in results if r.succeeded)
+        succeeded = sum(1 for r in results if r.success)
         total_latency = sum(r.latency_ms for r in results)
         total_tokens = sum(r.tokens_used for r in results)
         total_cost = sum(r.cost_usd for r in results)
@@ -431,6 +431,43 @@ class BenchmarkRunner:
         return BenchmarkReport(results=results, **data)
 
 
+# ── YAML suites ────────────────────────────────────────────────────────────
+
+
+def load_suite_from_yaml(path: str | Path, suite_name: str = "evals") -> BenchmarkSuite:
+    """Load a suite from one YAML task file or a directory of them.
+
+    Each document maps onto BenchmarkTask fields (id + prompt required;
+    expected_output is coerced to str since graders substring-match).
+    """
+    import yaml
+
+    root = Path(path)
+    files = sorted(root.glob("*.yaml")) if root.is_dir() else [root]
+    if not files:
+        raise ValueError(f"No eval tasks found under {root}")
+    tasks = []
+    for file in files:
+        data = yaml.safe_load(file.read_text(encoding="utf-8")) or {}
+        if not data.get("id") or not str(data.get("prompt", "")).strip():
+            raise ValueError(f"Eval task {file} needs 'id' and 'prompt'")
+        expected = data.get("expected_output")
+        tasks.append(
+            BenchmarkTask(
+                id=str(data["id"]),
+                name=str(data.get("name", data["id"])),
+                description=str(data.get("description", "")),
+                prompt=str(data["prompt"]),
+                expected_output=None if expected is None else str(expected),
+                expected_files=list(data.get("expected_files", [])),
+                timeout_sec=int(data.get("timeout_sec", 60)),
+                tags=list(data.get("tags", [])),
+                difficulty=str(data.get("difficulty", "medium")),
+            )
+        )
+    return BenchmarkSuite(name=suite_name, tasks=tasks)
+
+
 # ── CLI ────────────────────────────────────────────────────────────────
 
 
@@ -440,19 +477,55 @@ async def main():
 
     parser = argparse.ArgumentParser(description="Run agent benchmarks")
     parser.add_argument(
-        "--suite", default="quick", choices=list(ALL_SUITES.keys()), help="Benchmark suite to run"
+        "--suite",
+        default="quick",
+        choices=[*list(ALL_SUITES.keys()), "evals"],
+        help="Benchmark suite to run ('evals' loads tests/evals/*.yaml)",
     )
     parser.add_argument("--baseline", help="Baseline report JSON for comparison")
     parser.add_argument(
         "--output", default="benchmark_results", help="Output directory for reports"
     )
+    parser.add_argument(
+        "--suite-dir",
+        default=None,
+        help="YAML task directory for --suite evals (default: tests/evals)",
+    )
+    parser.add_argument(
+        "--live",
+        action="store_true",
+        help="Run tasks against the real configured agent (needs keys or Ollama); "
+        "without it the harness runs in simulate mode",
+    )
     args = parser.parse_args()
+
+    if args.suite == "evals":
+        evals_dir = args.suite_dir or str(Path(__file__).parent / "evals")
+        ALL_SUITES["evals"] = load_suite_from_yaml(evals_dir)
 
     print(f"Running benchmark suite: {args.suite}")
     print(f"Tasks: {len(ALL_SUITES[args.suite].tasks)}")
     print()
 
-    runner = BenchmarkRunner(output_dir=args.output)
+    agent_fn = None
+    if args.live:
+        import os
+
+        from config import get_config
+        from core.agent_loop import CodingAgent
+
+        os.environ["CODING_AGENT_TRAJECTORY"] = "1"
+        cfg = get_config()
+        live_agent = CodingAgent(
+            api_key=cfg["api_key"],
+            base_url=cfg["base_url"],
+            model=cfg["model"],
+            temperature=cfg.get("temperature", 0.0),
+            max_tokens=cfg.get("max_tokens", 8192),
+        )
+        agent_fn = live_agent.run
+
+    runner = BenchmarkRunner(agent_fn=agent_fn, output_dir=args.output)
     report = await runner.run_suite(args.suite)
 
     print(f"\n{'=' * 50}")
@@ -471,11 +544,11 @@ async def main():
             print(f"  Success rate: {comparison['success_rate_delta']:+.0%}")
             print(f"  Latency: {comparison['latency_delta_ms']:+.0f}ms")
             if comparison["regressions"]:
-                print(f"  ⚠ Regressions: {len(comparison['regressions'])}")
+                print(f"  Regressions: {len(comparison['regressions'])}")
                 for reg in comparison["regressions"]:
                     print(f"    - {reg['task_id']}: {reg['issue']}")
             if comparison["improvements"]:
-                print(f"  ✓ Improvements: {len(comparison['improvements'])}")
+                print(f"  Improvements: {len(comparison['improvements'])}")
 
     runner.save_report(report)
 

@@ -1,0 +1,7 @@
+id: reply-ok
+name: Minimal reply
+description: Model follows an exact-output instruction.
+prompt: "Reply with exactly the word OK and nothing else."
+expected_output: OK
+tags: [smoke]
+difficulty: easy

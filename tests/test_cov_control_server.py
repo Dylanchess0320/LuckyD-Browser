@@ -904,6 +904,14 @@ def test_gui_invoker_is_a_real_class():
     assert issubclass(cs.GuiInvoker, _QtObjectStub)
 
 
+def test_gui_invoker_runs_inline_on_gui_thread(monkeypatch):
+    # Regression: run() from the GUI thread used to block on its own
+    # signal (a ~20s UI freeze per call). GUI-thread callers now run
+    # inline — nested QEventLoops inside the closures still pump.
+    monkeypatch.setattr(cs, "_on_gui_thread", lambda: True)
+    assert cs.GuiInvoker.run(object(), lambda: "inline-ok") == "inline-ok"
+
+
 def _fresh_invoker():
     inv = cs.GuiInvoker()
     inv.invoke = _FakeSignal()  # fresh signal: no cross-test slot buildup
@@ -1083,7 +1091,10 @@ def test_wait_ready_times_out_silently():
 # ── QtBrowserBackend: browser state / tabs ───────────────────────────
 
 
-def test_status_reports_browser_state():
+def test_status_reports_browser_state(monkeypatch):
+    # /status reports the EFFECTIVE CDP endpoint (or "disabled"), not a
+    # constant — main.py may leave the debug port off per user setting.
+    monkeypatch.setenv("QTWEBENGINE_REMOTE_DEBUGGING", "127.0.0.1:9222")
     be, _app, win, _view, _page = _qt_backend()
     win.tabs._views.append(_FakeView("https://b.com/"))
     info = be.status()
@@ -1094,6 +1105,12 @@ def test_status_reports_browser_state():
     assert info["cdp"] == "127.0.0.1:9222"
     assert info["ads_blocked"] == 7
     assert info["harness"] is False  # nothing listens on :8000
+
+
+def test_status_reports_cdp_disabled(monkeypatch):
+    monkeypatch.delenv("QTWEBENGINE_REMOTE_DEBUGGING", raising=False)
+    be, _app, _win, _view, _page = _qt_backend()
+    assert be.status()["cdp"] == "disabled"
 
 
 def test_tabs_lists_views():
