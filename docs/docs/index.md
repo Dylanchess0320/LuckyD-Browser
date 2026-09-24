@@ -5,7 +5,7 @@
 <p class="tagline">The AI browser that runs <em>your</em> models — local, unlimited, offline — plus a full coding agent and real terminals in one window.</p>
 
 <div class="cta-row" markdown>
-[⬇ Download v10.5.0](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.5.0/LuckyDBrowserSetup-10.5.0.exe){ .luckyd-btn }
+[⬇ Download v10.6.0](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.6.0/LuckyDBrowserSetup-10.6.0.exe){ .luckyd-btn }
 [Getting started](getting-started.md){ .luckyd-btn-ghost }
 [What's new](release-notes.md){ .luckyd-btn-ghost }
 </div>
@@ -76,12 +76,12 @@
 
 ## Install in 10 seconds
 
-1. Get [**LuckyDBrowserSetup-10.5.0.exe**](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.5.0/LuckyDBrowserSetup-10.5.0.exe)
+1. Get [**LuckyDBrowserSetup-10.6.0.exe**](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.6.0/LuckyDBrowserSetup-10.6.0.exe)
 2. Run it — per-user, **no admin**, installs to `%LOCALAPPDATA%\Programs\LuckyDBrowser`
 3. Optional: run `ollama_setup.ps1` from the install folder → Ollama + `llama3.2:3b` (~2 GB, one time)
 4. `Ctrl+Shift+A` → chat offline. Or bring your own keys (Gemini, Groq, DeepSeek, OpenAI, Anthropic, Z.ai, OpenRouter, Cline, OpenCode)
 
-Windows 10/11 x64 only. Silent install: `LuckyDBrowserSetup-10.5.0.exe /VERYSILENT /NORESTART`
+Windows 10/11 x64 only. Silent install: `LuckyDBrowserSetup-10.6.0.exe /VERYSILENT /NORESTART`
 
 ## Why LuckyD
 
@@ -97,6 +97,10 @@ Most "AI browsers" rent you a chatbot behind an account. LuckyD is a **real Chro
 | Open source MIT · no admin to install | ✅ | ❌ | ❌ | ❌ |
 
 > The others rent you their AI. **LuckyD runs yours.**
+
+## New in 10.6.0 — Latest AI tools
+
+xAI Grok 4.7 and Moonshot Kimi K3 join as providers, every flagship model default is refreshed to current (gpt-6-sol, claude-opus-5-5, gemini-3.8-flash, deepseek-v4, glm-5.3-flash), and the Aider agent joins the mesh alongside Jules, OpenCode, and Cline. Free-tier rotation stays untouched.
 
 ## New in 10.5.0 — Provider/model switching polish
 
@@ -210,6 +214,6 @@ A hardened foundation: every local service now authenticates with HttpOnly sessi
 
 <p align="center">
   <b>MIT © LuckyD</b> · Chromium · Ollama · Qt · xterm.js · pywinpty · PyInstaller · Inno Setup<br>
-  <a href="https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.5.0/LuckyDBrowserSetup-10.5.0.exe">Download v10.5.0</a>
+  <a href="https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.6.0/LuckyDBrowserSetup-10.6.0.exe">Download v10.6.0</a>
   · <a href="https://www.youtube.com/@LuckyDYoutube">YouTube</a>
 </p>

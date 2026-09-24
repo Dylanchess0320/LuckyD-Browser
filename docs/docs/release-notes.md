@@ -1,5 +1,31 @@
 # LuckyD Browser — Release Notes
 
+## [10.6.0] — Latest AI tools — 2026-09-24
+
+**[`LuckyDBrowserSetup-10.6.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.6.0/LuckyDBrowserSetup-10.6.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed.
+**[`LuckyDBrowser-Portable-10.6.0.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.6.0/LuckyDBrowser-Portable-10.6.0.zip)** — unzip and run, for locked-down PCs.
+
+- **xAI (Grok 4.7)** — keyed provider (`XAI_API_KEY`), OpenAI-compatible
+  endpoint, xAI's current flagship for coding and long agentic runs.
+- **Moonshot (Kimi K3)** — keyed provider (`MOONSHOT_API_KEY`), huge
+  open-weight MoE with 1M context and native vision.
+
+
+No more stale 2025 picks: OpenAI → `gpt-6-sol`, Anthropic →
+`claude-opus-5-5`, Google → `gemini-3.8-flash`, DeepSeek → `deepseek-v4`,
+Z.ai → `glm-5.3-flash`. Free-tier rotation is untouched — Gemini free
+(`gemini-2.5-flash`) stays the cost-conscious default.
+
+
+The open-source, git-native pair programmer now runs alongside
+Jules, OpenCode, and Cline in the agent mesh.
+
+
+- Dead-code cleanup: 57 lines removed across 5 files, zero behavior change.
+- New README hero image showing the agent terminal and the HQ dashboard.
+
+On top of everything from 10.5.0 below.
+
 ## [10.5.0] — Provider/model switching polish — 2026-09-24
 
 **[`LuckyDBrowserSetup-10.5.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.5.0/LuckyDBrowserSetup-10.5.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed.

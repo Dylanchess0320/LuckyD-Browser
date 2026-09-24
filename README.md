@@ -62,7 +62,7 @@ LuckyD also works with cloud providers if you prefer: Gemini, Groq, DeepSeek, Op
 
 ## What's new
 
-**v10.5.0** — Model & provider handling rebuilt: the browser now shows which AI providers are actually working, warns you before you pick a dead one, and switches to the best working option in one click. Free models stay the default. Plus a BEAST speed pass: CLI `--help` in 0.14s, provider commands in ~1.3s, HQ dashboard first load in 65ms.
+**v10.6.0** — Latest AI tools: xAI Grok 4.7 + Moonshot Kimi K3 providers, fresh flagship model defaults, and the Aider agent joins the mesh
 
 Older changes: [full changelog](CHANGELOG.md) · [all releases](https://github.com/Dylanchess0320/LuckyD-Browser/releases)
 

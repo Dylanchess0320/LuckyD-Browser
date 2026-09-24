@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [10.6.0] - 2026-09-24
+
+Latest AI tools: xAI Grok 4.7 + Moonshot Kimi K3 providers, fresh flagship model defaults, and the Aider agent joins the mesh.
+
+### New AI providers
+
+- **xAI (Grok 4.7)** — keyed provider (`XAI_API_KEY`), OpenAI-compatible
+  endpoint, xAI's current flagship for coding and long agentic runs.
+- **Moonshot (Kimi K3)** — keyed provider (`MOONSHOT_API_KEY`), huge
+  open-weight MoE with 1M context and native vision.
+
+### Fresh flagship model defaults
+
+No more stale 2025 picks: OpenAI → `gpt-6-sol`, Anthropic →
+`claude-opus-5-5`, Google → `gemini-3.8-flash`, DeepSeek → `deepseek-v4`,
+Z.ai → `glm-5.3-flash`. Free-tier rotation is untouched — Gemini free
+(`gemini-2.5-flash`) stays the cost-conscious default.
+
+### Aider joins the agent mesh
+
+The open-source, git-native pair programmer now runs alongside
+Jules, OpenCode, and Cline in the agent mesh.
+
+### Also in this release
+
+- Dead-code cleanup: 57 lines removed across 5 files, zero behavior change.
+- New README hero image showing the agent terminal and the HQ dashboard.
+
+
 ## [10.5.0] - 2026-09-24
 
 Provider/model switching polish: HQ Models view now shows per-provider health badges (Ready / Needs key / Exhausted) with rotation order, a one-click 'Switch to best working' button, and the live answering provider/model in the sidebar. LuckyD remembers the last working provider and prefers it automatically.

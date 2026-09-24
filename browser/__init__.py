@@ -1,12 +1,10 @@
 """LuckyD Browser - a full-featured Chromium-based web browser for Windows."""
 
-__version__ = "10.5.0"
+__version__ = "10.6.0"
 
 # Shown once after an update (first launch with a new version).
 WHATS_NEW = (
-    "LuckyD v10.5.0 - Provider/model switching polish: HQ Models view now "
-    "shows per-provider health badges (Ready / Needs key / Exhausted) with "
-    "rotation order, a one-click 'Switch to best working' button, and the "
-    "live answering provider/model in the sidebar. LuckyD remembers the last "
-    "working provider and prefers it automatically "
+    "LuckyD v10.6.0 - Latest AI tools: xAI Grok 4.7 + Moonshot Kimi K3 "
+    "providers, fresh flagship model defaults, and the Aider agent joins the "
+    "mesh "
 )
