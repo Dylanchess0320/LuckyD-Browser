@@ -1,9 +1,35 @@
-import { useEffect, useState } from 'react';
-import { useAgents, type CatalogProvider } from '../state/agents';
+import { useEffect, useMemo, useState } from 'react';
+import { useAgents, type CatalogProvider, type ProviderHealth } from '../state/agents';
 import { useLuckyBase } from '../state/chat';
 
+function HealthBadge({ h }: { h: ProviderHealth }) {
+  if (h.credit_exhausted) {
+    return (
+      <span
+        title="Credits exhausted (HTTP 402) — top up, then clear the marker"
+        className="rounded-full bg-ld-danger/15 px-2 py-0.5 text-[10px] font-semibold text-ld-danger"
+      >
+        Exhausted
+      </span>
+    );
+  }
+  if (h.configured) {
+    return (
+      <span className="rounded-full bg-ld-ok/15 px-2 py-0.5 text-[10px] font-semibold text-ld-ok">
+        Ready
+      </span>
+    );
+  }
+  return (
+    <span className="rounded-full bg-ld-warn/15 px-2 py-0.5 text-[10px] font-semibold text-ld-warn">
+      Needs key
+    </span>
+  );
+}
+
 export default function Models() {
-  const { catalog, current, switching, refresh, setModel } = useAgents();
+  const { catalog, current, switching, refresh, setModel, health, bestFree, switchToBest } =
+    useAgents();
   const { connected, checkHealth } = useLuckyBase();
   const [filter, setFilter] = useState('');
 
@@ -16,6 +42,25 @@ export default function Models() {
     // The backend mirrors settings.json per request — nudge the health dot.
     void checkHealth();
   };
+
+  const fixToBest = async () => {
+    await switchToBest();
+    void checkHealth();
+  };
+
+  const healthById = useMemo(() => {
+    const m = new Map<string, ProviderHealth>();
+    for (const h of health ?? []) m.set(h.id, h);
+    return m;
+  }, [health]);
+
+  // Warning banner when the *selected* model is currently unusable.
+  const currentHealth = current ? healthById.get(current.provider) : undefined;
+  const currentUnusable =
+    currentHealth != null && (!currentHealth.configured || currentHealth.credit_exhausted);
+  const unusableReason = currentHealth?.credit_exhausted
+    ? 'its credits are exhausted (HTTP 402)'
+    : 'it has no API key configured';
 
   const entries = Object.entries(catalog?.ai_providers ?? {}) as [
     string,
@@ -42,6 +87,31 @@ export default function Models() {
           </div>
         )}
 
+        {currentUnusable && current && (
+          <div className="mt-3 rounded-xl border border-ld-danger/50 bg-ld-danger/10 px-4 py-3 text-xs">
+            <div className="font-semibold text-ld-danger">
+              ⚠️ {current.provider}/{current.model || 'auto'} is currently unusable —{' '}
+              {unusableReason}.
+            </div>
+            <button
+              onClick={() => void fixToBest()}
+              disabled={switching || !bestFree}
+              title={
+                bestFree
+                  ? `Switch to ${bestFree.provider}/${bestFree.model}`
+                  : 'No working free model found'
+              }
+              className="mt-2 rounded-lg bg-ld-accent px-3 py-1.5 font-semibold text-white transition disabled:opacity-50"
+            >
+              {switching
+                ? 'Switching…'
+                : bestFree
+                  ? `Switch to best working (${bestFree.provider}/${bestFree.model})`
+                  : 'No working model available'}
+            </button>
+          </div>
+        )}
+
         <input
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
@@ -56,13 +126,40 @@ export default function Models() {
             );
             if (models.length === 0) return null;
             const active = current?.provider === pid;
+            const h = healthById.get(pid);
             return (
               <section key={pid}>
-                <h3 className="flex items-center gap-2 text-sm font-semibold">
+                <h3 className="flex flex-wrap items-center gap-2 text-sm font-semibold">
                   {p.name}
                   <span className="rounded-full border border-ld-border px-2 py-0.5 text-[10px] font-normal text-ld-muted">
                     {models.length} free
                   </span>
+                  {h && <HealthBadge h={h} />}
+                  {h?.rotation_order != null && (
+                    <span
+                      title={
+                        h.next_in_rotation
+                          ? 'Next in the free-model rotation'
+                          : `Rotation order #${h.rotation_order + 1}`
+                      }
+                      className={`rounded-full border px-2 py-0.5 text-[10px] font-normal ${
+                        h.next_in_rotation
+                          ? 'border-ld-accent/60 text-ld-accent'
+                          : 'border-ld-border text-ld-muted'
+                      }`}
+                    >
+                      #{h.rotation_order + 1}
+                      {h.next_in_rotation ? ' · next' : ''}
+                    </span>
+                  )}
+                  {h?.last_working && h.last_working_ago && (
+                    <span
+                      title={h.last_working_model ?? undefined}
+                      className="rounded-full border border-ld-border px-2 py-0.5 text-[10px] font-normal text-ld-muted"
+                    >
+                      ✓ {h.last_working_ago}
+                    </span>
+                  )}
                   {active && (
                     <span className="rounded-full bg-ld-ok/15 px-2 py-0.5 text-[10px] text-ld-ok">
                       active

@@ -33,6 +33,8 @@ bridge reuses them verbatim instead of reimplementing any of it:
   * GET  /api/catalog         -> free-model catalog (providers_config.json)
 
   * GET  /api/model           -> current provider/model pick
+  * GET  /api/providers       -> health snapshot (list_providers + live pair)
+  * GET  /api/best-free        -> best_free_provider() as a concrete pair
 
   * POST /api/model           -> switch provider/model (writes the same
 
@@ -219,16 +221,26 @@ class Bridge:
 
         return {"ai_providers": out}
 
-    def read_current_model(self) -> dict:
+    def reload_settings(self) -> dict:
+        """Live re-read of browser/data/settings.json (10.5 instant apply).
+
+        The settings file is the single source of truth shared with the
+        browser's AI sidebar; every read goes to disk so a POST /api/model
+        (or an external sidebar edit) is visible on the very next GET with
+        no bridge restart. Never raises — {} when unreadable.
+        """
 
         try:
             data = json.loads(self.settings_path.read_text(encoding="utf-8-sig"))
 
         except Exception:
-            data = {}
+            return {}
 
-        if not isinstance(data, dict):
-            data = {}
+        return data if isinstance(data, dict) else {}
+
+    def read_current_model(self) -> dict:
+
+        data = self.reload_settings()
 
         provider = str(data.get("ai_provider", "") or "auto")
 
@@ -252,14 +264,7 @@ class Bridge:
         if not provider or not model:
             raise ValueError("provider and model are both required")
 
-        try:
-            data = json.loads(self.settings_path.read_text(encoding="utf-8-sig"))
-
-        except Exception:
-            data = {}
-
-        if not isinstance(data, dict):
-            data = {}
+        data = self.reload_settings()
 
         overrides = data.get("ai_model_overrides")
 
@@ -278,7 +283,99 @@ class Bridge:
 
         self.settings_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8-sig")
 
+        # 10.5 instant apply: re-read from disk so the POST response (and
+        # every later GET) reflects exactly what is on disk — no restart.
         return self.read_current_model()
+
+    # ── provider health snapshot (10.5) ─────────────────────────────────
+
+    def _ensure_core_import(self) -> bool:
+        """Make ``core.*`` importable (repo root on sys.path); False if absent.
+
+        The frozen bridge bundles only browser_core, so core/providers.py may
+        legitimately be missing — callers degrade to available: False.
+        """
+
+        import importlib.util
+
+        try:
+            if importlib.util.find_spec("core.providers") is not None:
+                return True
+            if str(self.root) not in sys.path:
+                sys.path.insert(0, str(self.root))
+            return importlib.util.find_spec("core.providers") is not None
+        except Exception:
+            return False
+
+    def read_providers(self) -> dict:
+        """Health snapshot — the same ``list_providers()`` HQ uses (10.5).
+
+        One source of truth for "what would work right now": per-provider
+        rotation order, next-in-rotation, Cline 402 TTL, and last-working
+        info, plus the live answering pair.
+        """
+
+        if not self._ensure_core_import():
+            return {"providers": [], "available": False}
+
+        try:
+            from core.free_rotation import get_active_pair
+            from core.providers import list_providers
+
+            live = get_active_pair()
+
+            return {
+                "providers": list_providers(),
+                "active": ({"provider": live[0], "model": live[1]} if live else None),
+                "available": True,
+            }
+        except Exception as exc:
+            return {
+                "providers": [],
+                "available": False,
+                "error": f"{type(exc).__name__}: {exc}",
+            }
+
+    def read_best_free(self) -> dict:
+        """The ``best_free_provider()`` pick as a concrete pair (10.5).
+
+        Powers the Models view's one-click "Switch to best working" fix.
+        """
+
+        if not self._ensure_core_import():
+            return {"provider": "", "model": "", "available": False}
+
+        try:
+            from core.free_rotation import FREE_MODEL_PRIORITY, best_free_provider
+            from core.last_working import last_working_age_label
+
+            best = best_free_provider()
+            if not best:
+                return {"provider": "", "model": "", "available": False}
+
+            model = ""
+            for pid, mid in FREE_MODEL_PRIORITY:
+                if pid == best:
+                    model = mid
+                    break
+            if not model:
+                from core.providers import PROVIDER_DEFAULTS
+
+                model = str((PROVIDER_DEFAULTS.get(best) or {}).get("default_model", ""))
+
+            return {
+                "provider": best,
+                "model": model,
+                "available": True,
+                "last_working_ago": last_working_age_label(),
+            }
+        except Exception as exc:
+            return {
+                "provider": "",
+                "model": "",
+                "available": False,
+                "error": f"{type(exc).__name__}: {exc}",
+            }
 
 
 def make_handler(bridge: Bridge):
@@ -400,6 +497,16 @@ def make_handler(bridge: Bridge):
 
             if path == "/api/model":
                 self._send_json(bridge.read_current_model())
+
+                return
+
+            if path == "/api/providers":
+                self._send_json(bridge.read_providers())
+
+                return
+
+            if path == "/api/best-free":
+                self._send_json(bridge.read_best_free())
 
                 return
 

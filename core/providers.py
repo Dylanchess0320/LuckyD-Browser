@@ -586,6 +586,16 @@ def list_providers() -> list[dict[str, object]]:
     ``credit_exhausted`` (10.4: True for the Cline rows while a 402 marker is
     valid — those rows report ``configured`` False and are never auto-current).
 
+    10.5 health snapshot (one source of truth for "what would work right
+    now"): ``rotation_order`` (0-based index into
+    ``core.free_rotation.FREE_MODEL_PRIORITY``, None when the provider is not
+    in the rotation), ``next_in_rotation`` (True for the single provider
+    ``best_free_provider()`` would pick), ``credit_ttl_remaining_sec`` (whole
+    seconds until the Cline 402 marker expires on the Cline rows, else 0),
+    ``last_working`` (True when this provider last answered successfully),
+    ``last_working_ago`` ("worked 2h ago", else None), and
+    ``last_working_model`` (the recorded model id, else None).
+
     No network calls — availability is derived from env vars only.
     """
     explicit = normalize_provider_id(os.environ.get("CODING_AGENT_PROVIDER", ""))
@@ -594,6 +604,37 @@ def list_providers() -> list[dict[str, object]]:
     # 10.4: a valid 402 marker steers auto-selection away from Cline (an
     # explicit CODING_AGENT_PROVIDER still wins — see detect_provider()).
     cline_blocked = is_cline_credit_exhausted()
+
+    # 10.5 health snapshot inputs — each guarded so a failure here can never
+    # break the provider list itself.
+    rotation_order: dict[str, int] = {}
+    next_free: str | None = None
+    try:
+        from core.free_rotation import FREE_MODEL_PRIORITY, best_free_provider
+
+        rotation_order = {p: i for i, (p, _m) in enumerate(FREE_MODEL_PRIORITY)}
+        next_free = best_free_provider()
+    except Exception:
+        rotation_order, next_free = {}, None
+    credit_ttl = 0
+    try:
+        from core.cline_credit import credit_ttl_remaining
+
+        credit_ttl = int(credit_ttl_remaining())
+    except Exception:
+        credit_ttl = 0
+    lw_provider: str | None = None
+    lw_model: str | None = None
+    lw_ago: str | None = None
+    try:
+        from core.last_working import last_working_age_label, read_last_working
+
+        _lw = read_last_working()
+        if _lw is not None:
+            lw_provider, lw_model = _lw.provider, _lw.model
+            lw_ago = last_working_age_label()
+    except Exception:
+        lw_provider, lw_model, lw_ago = None, None, None
 
     providers: list[dict[str, object]] = []
     for pid in PROVIDER_ORDER:
@@ -616,6 +657,7 @@ def list_providers() -> list[dict[str, object]]:
         else:
             key_present = bool((os.environ.get(env_key or "", "") or "").strip())
             configured = key_present
+        is_last_working = lw_provider is not None and pid == lw_provider
         providers.append(
             {
                 "id": pid,
@@ -629,6 +671,15 @@ def list_providers() -> list[dict[str, object]]:
                 "configured": configured,
                 "current": pid == current,
                 "credit_exhausted": cline_blocked and pid in ("clinepass", "cline-usage"),
+                # 10.5 health snapshot — "what would work right now".
+                "rotation_order": rotation_order.get(pid),
+                "next_in_rotation": next_free is not None and pid == next_free,
+                "credit_ttl_remaining_sec": (
+                    credit_ttl if pid in ("clinepass", "cline-usage") else 0
+                ),
+                "last_working": is_last_working,
+                "last_working_ago": lw_ago if is_last_working else None,
+                "last_working_model": lw_model if is_last_working else None,
             }
         )
     return providers

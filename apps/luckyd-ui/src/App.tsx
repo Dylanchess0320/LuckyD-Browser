@@ -25,7 +25,7 @@ const TABS: { id: Tab; label: string; icon: string }[] = [
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('chat');
-  const { connected, checkHealth, lastError } = useLuckyBase();
+  const { connected, checkHealth, lastError, provider, model } = useLuckyBase();
   const pending = useTrust((s) => s.pending);
   const refreshTrust = useTrust((s) => s.refreshTrust);
   useGlobalKeys(setTab);
@@ -62,7 +62,18 @@ export default function App() {
             )}
           </button>
         ))}
-        <div className="mt-auto">
+        <div className="mt-auto flex w-full flex-col items-center gap-1.5 px-1">
+          {/* 10.5 always-visible active-model indicator (live answering pair). */}
+          {provider && (
+            <span
+              title={`${provider}/${model || 'auto'} — currently answering`}
+              className="w-full truncate text-center font-mono text-[9px] leading-tight text-ld-muted"
+            >
+              {provider}
+              <br />
+              <span className="text-ld-faint">{(model || 'auto').slice(0, 14)}</span>
+            </span>
+          )}
           <span
             title={connected ? 'backend connected' : 'backend offline'}
             className={`block h-2.5 w-2.5 rounded-full ${connected ? 'bg-ld-ok' : 'bg-ld-danger'}`}

@@ -745,6 +745,14 @@ def _switch_model(agent, provider: str | None = None, model_name: str = ""):
     _update_ui_for_model(agent, model)
 
     _persist_model_selection(provider, model)
+    # 10.5: a /model switch re-points the live answering pair immediately
+    # (the REPL prompt reads it — never guess).
+    try:
+        from core.free_rotation import set_active_pair
+
+        set_active_pair(provider, model)
+    except Exception:
+        pass
     ui.success(f"Switched to {agent.provider_name} / {model}")
 
 
@@ -1335,6 +1343,24 @@ async def run_repl(agent: CodingAgent):
         model=getattr(agent, "model", "") or "",
     )
     ui.enhanced_banner()
+    # 10.5: seed the live answering pair + show the last-known-working pair.
+    try:
+        from core.free_rotation import set_active_pair
+
+        set_active_pair(
+            str(getattr(agent._provider_config, "provider", "") or ""),
+            getattr(agent, "model", "") or "",
+        )
+    except Exception:
+        pass
+    try:
+        from core.last_working import last_working_age_label, read_last_working
+
+        _lw = read_last_working()
+        if _lw is not None:
+            print(f"  Last worked: {_lw.provider}/{_lw.model} ({last_working_age_label()})")
+    except Exception:
+        pass
 
     while True:
         try:
@@ -1578,6 +1604,53 @@ def _cli_model(args):
         tier = provider
 
     print(f"Model set to: {picked}  [{tier} → {provider}]")
+    # 10.5 instant apply: hot-reload the provider config in-process instead
+    # of telling the user to restart the terminal.
+    if _hot_reload_model_switch(provider, picked):
+        print("Live now — new runs use it immediately, no restart needed.")
+    else:
+        _reexec_or_restart_hint()
+
+
+def _hot_reload_model_switch(provider: str, picked: str) -> bool:
+    """Re-read .env/settings in-process after ``lucky-code model`` (10.5).
+
+    Returns True when the freshly written config resolves live; False when
+    anything fails (the caller falls back to a self-exec restart).
+    """
+    try:
+        import config as _cfg
+
+        _cfg.load_env()  # re-read .env in-process (no restart)
+        os.environ["CODING_AGENT_PROVIDER"] = provider
+        from core.providers import resolve_provider_config
+
+        cfg = resolve_provider_config(provider)
+        if str(cfg.get("provider", "")).lower() != provider.lower():
+            return False
+        try:
+            from core.free_rotation import set_active_pair
+
+            set_active_pair(provider, picked or str(cfg.get("model", "")))
+        except Exception:
+            pass
+        return True
+    except Exception:
+        return False
+
+
+def _reexec_or_restart_hint() -> None:
+    """Self-exec restart fallback when in-process reload fails (10.5).
+
+    Re-executes this same command once (guarded by LUCKYD_MODEL_REEXEC so it
+    can never loop): the fresh process imports config naturally and picks up
+    the written .env. Only when even that fails is the legacy restart hint
+    printed.
+    """
+    if os.environ.get("LUCKYD_MODEL_REEXEC") != "1":
+        os.environ["LUCKYD_MODEL_REEXEC"] = "1"
+        with contextlib.suppress(Exception):
+            os.execv(sys.executable, [sys.executable, *sys.argv])
     print("Restart the terminal (or /model inside the REPL) for the change to take effect.")
 
 

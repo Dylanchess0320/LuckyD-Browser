@@ -379,7 +379,17 @@ class HQHandler(BaseHTTPRequestHandler):
             if path == "/api/providers":
                 from core.providers import list_providers
 
-                return self._send_json({"providers": list_providers()})
+                payload: dict = {"providers": list_providers()}
+                # 10.5: one source of truth for "what would work right now".
+                try:
+                    from core.free_rotation import best_free_provider, get_active_pair
+
+                    payload["best_free"] = best_free_provider()
+                    _live = get_active_pair()
+                    payload["active"] = {"provider": _live[0], "model": _live[1]} if _live else None
+                except Exception:
+                    pass
+                return self._send_json(payload)
             if path == "/api/files":
                 files = sorted(
                     str(p.relative_to(PROJECT_DIR))
@@ -418,10 +428,21 @@ class HQHandler(BaseHTTPRequestHandler):
                 )
             if path == "/api/settings":
                 cfg = get_config()
+                provider, model = cfg.get("provider"), cfg.get("model")
+                # 10.5: the live answering pair (rotation-pinned) wins over
+                # the static config — the HQ status surfaces read this.
+                try:
+                    from core.free_rotation import get_active_pair
+
+                    _live = get_active_pair()
+                    if _live and _live[0] and _live[1]:
+                        provider, model = _live
+                except Exception:
+                    pass
                 return self._send_json(
                     {
-                        "provider": cfg.get("provider"),
-                        "model": cfg.get("model"),
+                        "provider": provider,
+                        "model": model,
                         "base_url": cfg.get("base_url"),
                         "max_turns": cfg.get("max_turns"),
                     }

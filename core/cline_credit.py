@@ -30,6 +30,7 @@ __all__ = [
     "ClineCreditState",
     "clear_cline_credit_state",
     "credit_state_path",
+    "credit_ttl_remaining",
     "is_cline_credit_exhausted",
     "read_cline_credit_state",
     "record_cline_credit_exhausted",
@@ -109,6 +110,20 @@ def is_cline_credit_exhausted(*, now: float | None = None) -> bool:
         return False
     current = now if now is not None else time.time()
     return (current - state.exhausted_at) < CREDIT_STATE_TTL_SEC
+
+
+def credit_ttl_remaining(*, now: float | None = None) -> float:
+    """Seconds until a valid 402 marker expires (10.5 health snapshot).
+
+    Returns 0.0 when no marker is stored, it is expired, or it is
+    unreadable — so the health snapshot can carry "how much longer Cline
+    stays steered-away" without a second file read.
+    """
+    state = read_cline_credit_state()
+    if state is None:
+        return 0.0
+    current = now if now is not None else time.time()
+    return max(0.0, CREDIT_STATE_TTL_SEC - (current - state.exhausted_at))
 
 
 def clear_cline_credit_state() -> bool:

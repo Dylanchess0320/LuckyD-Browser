@@ -33,7 +33,7 @@ export default function Chat() {
       <div className="flex items-center justify-between border-b border-ld-border px-5 py-3">
         <div>
           <h1 className="text-lg font-semibold text-ld-text">Chat</h1>
-          <p className="text-xs text-ld-muted">
+          <p className="text-xs text-ld-muted" title="Currently answering model (live)">
             {provider || '…'} · {model || '…'}
             {busy && workingLabel ? ` · ${workingLabel}` : ''}
           </p>

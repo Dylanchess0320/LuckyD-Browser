@@ -25,6 +25,30 @@ export interface MeshPing {
   ws_port: number;
   shells: Record<string, boolean>;
 }
+// 10.5 health snapshot — mirrors core/providers.list_providers() 1:1.
+export interface ProviderHealth {
+  id: string;
+  name: string;
+  model: string;
+  configured: boolean;
+  key_present: boolean;
+  local: boolean;
+  free_tier: boolean;
+  current: boolean;
+  credit_exhausted: boolean;
+  rotation_order: number | null;
+  next_in_rotation: boolean;
+  credit_ttl_remaining_sec: number;
+  last_working: boolean;
+  last_working_ago: string | null;
+  last_working_model: string | null;
+}
+export interface BestFree {
+  provider: string;
+  model: string;
+  available: boolean;
+  last_working_ago?: string | null;
+}
 
 export const BRIDGE_URL = 'http://127.0.0.1:9885';
 
@@ -59,8 +83,21 @@ interface AgentsState {
   catalog: Catalog | null;
   current: CurrentModel | null;
   switching: boolean;
+  health: ProviderHealth[] | null;
+  bestFree: BestFree | null;
   refresh: () => Promise<void>;
   setModel: (provider: string, model: string) => Promise<void>;
+  switchToBest: () => Promise<boolean>;
+}
+
+async function fetchJson<T>(url: string): Promise<T | null> {
+  try {
+    const r = await fetch(url);
+    if (!r.ok) return null;
+    return (await r.json()) as T;
+  } catch {
+    return null;
+  }
 }
 
 export const useAgents = create<AgentsState>((set, get) => ({
@@ -68,14 +105,29 @@ export const useAgents = create<AgentsState>((set, get) => ({
   catalog: null,
   current: null,
   switching: false,
+  health: null,
+  bestFree: null,
   refresh: async () => {
     try {
-      const [ping, catalog, current] = await Promise.all([
-        fetch(`${BRIDGE_URL}/api/ping`).then((r) => r.json()),
-        fetch(`${BRIDGE_URL}/api/catalog`).then((r) => r.json()),
-        fetch(`${BRIDGE_URL}/api/model`).then((r) => r.json()),
+      const [ping, catalog, current, providers, bestFree] = await Promise.all([
+        fetchJson<MeshPing>(`${BRIDGE_URL}/api/ping`),
+        fetchJson<Catalog>(`${BRIDGE_URL}/api/catalog`),
+        fetchJson<CurrentModel>(`${BRIDGE_URL}/api/model`),
+        // 10.5 health snapshot + one-click fix target (null on old bridges).
+        fetchJson<{ providers: ProviderHealth[] }>(`${BRIDGE_URL}/api/providers`),
+        fetchJson<BestFree>(`${BRIDGE_URL}/api/best-free`),
       ]);
-      set({ ping, catalog, current });
+      if (!ping && !catalog && !current && !providers && !bestFree) {
+        set({ ping: null });
+        return;
+      }
+      set({
+        ping,
+        catalog,
+        current,
+        health: providers?.providers ?? null,
+        bestFree: bestFree && bestFree.available ? bestFree : null,
+      });
     } catch {
       set({ ping: null });
     }
@@ -95,6 +147,16 @@ export const useAgents = create<AgentsState>((set, get) => ({
     } finally {
       set({ switching: false });
     }
+  },
+  // 10.5 one-click fix: switch to best_free_provider(). Refreshes first so
+  // the pick is never stale. Returns true when a switch was performed.
+  switchToBest: async () => {
+    await get().refresh();
+    const best = get().bestFree;
+    if (!best?.provider || !best.model) return false;
+    await get().setModel(best.provider, best.model);
+    await get().refresh();
+    return true;
   },
 }));
 

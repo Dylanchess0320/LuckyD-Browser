@@ -52,6 +52,18 @@ def _mock_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         # results — point the credit-state file at a per-test path that
         # starts nonexistent. (tests/test_cline_credit.py overrides this.)
         monkeypatch.setenv("LUCKYD_CLINE_CREDIT_STATE", str(tmp_path / "cline_credit_state.json"))
+        # 10.5: same for the last-known-working record — a developer's real
+        # ~/.luckyd/last_working_model.json must never reorder rotation in
+        # the suite. (tests/test_last_working_105.py overrides this.)
+        monkeypatch.setenv("LUCKYD_LAST_WORKING_STATE", str(tmp_path / "last_working_model.json"))
+    # 10.5: the rotator's live active pair is module-global — reset it every
+    # test so agent constructions can't leak state across tests.
+    try:
+        from core.free_rotation import reset_active_pair
+
+        reset_active_pair()
+    except Exception:
+        pass
 
 
 # ── Temporary directory fixtures ───────────────────────────────────────

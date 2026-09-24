@@ -987,7 +987,9 @@ class TerminalUI:
         ``core.providers.list_providers``::
             [{"id", "name", "base_url", "model", "env_key", "key_present",
               "local", "free_tier", "configured", "current",
-              "credit_exhausted"}, ...]
+              "credit_exhausted", "rotation_order", "next_in_rotation",
+              "credit_ttl_remaining_sec", "last_working", "last_working_ago",
+              "last_working_model"}, ...]
         """
         entries = list(providers or [])
 
@@ -1046,17 +1048,37 @@ class TerminalUI:
 
         return "\n".join(lines)
 
+    def _active_model_label(self) -> str:
+        """Live ``provider/model`` for the REPL prompt (10.5).
+
+        Read from the FreeModelRotator's live state — never guessed. Falls
+        back to this session's known provider/model (set at startup and on
+        every /model switch), else "" (bare chevron, as before).
+        """
+        try:
+            from core.free_rotation import get_active_pair
+
+            live = get_active_pair()
+            if live and live[0] and live[1]:
+                return f"{live[0]}/{live[1]}"
+        except Exception:
+            pass
+        if self._provider_name and self._model_name:
+            return f"{self._provider_name}/{self._model_name}"
+        return self._session_header()
+
     def prompt(self) -> str:
+        label = self._active_model_label()
         if self.rich:
             from rich.prompt import Prompt
 
-            first = Prompt.ask(
-                f"[{BRAND['primary']}]›[/{BRAND['primary']}]",
-                console=self._console,
-            )
+            chev = f"[{BRAND['primary']}]›[/{BRAND['primary']}]"
+            text = f"[{BRAND['muted']}]{label}[/] {chev}" if label else chev
+            first = Prompt.ask(text, console=self._console)
             return self._drain_pending_stdin(first)
         try:
-            first = input(f"{ANSI['bold']}{ANSI['cyan']}› {ANSI['reset']}")
+            prefix = f"{ANSI['dim']}{label} {ANSI['reset']}" if label else ""
+            first = input(f"{prefix}{ANSI['bold']}{ANSI['cyan']}› {ANSI['reset']}")
         except (EOFError, KeyboardInterrupt):
             return ""
         return self._drain_pending_stdin(first)

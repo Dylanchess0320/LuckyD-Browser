@@ -363,7 +363,15 @@ class CodingAgent:
             max_retries=self.max_retries,
             base_delay=self.base_delay,
             token_resolver=self._make_token_resolver(),
+            provider=self._provider_config.provider,
         )
+        # 10.5: seed the live answering pair so status surfaces never guess.
+        try:
+            from core.free_rotation import set_active_pair
+
+            set_active_pair(self._provider_config.provider, self.model)
+        except Exception:
+            pass
         self.message_builder = MessageBuilder()
         self.hooks = get_hooks()
 
@@ -746,7 +754,15 @@ class CodingAgent:
             max_retries=self.max_retries,
             base_delay=self.base_delay,
             token_resolver=self._make_token_resolver(),
+            provider=config.provider,
         )
+        # 10.5: a switch re-points the live answering pair immediately.
+        try:
+            from core.free_rotation import set_active_pair
+
+            set_active_pair(config.provider, config.model)
+        except Exception:
+            pass
 
     def _emit_event(self, event_type: AgentEventType, payload: dict | None = None) -> None:
         """Emit an agent event through the callbacks system."""

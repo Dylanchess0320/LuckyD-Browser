@@ -36,10 +36,14 @@ __all__ = [
     "FREE_MODEL_PRIORITY",
     "ROTATE_TRIGGER_CODES",
     "FreeModelRotator",
+    "active_pair_label",
     "available_free_models",
     "best_free_provider",
     "free_provider_usable",
+    "get_active_pair",
+    "reset_active_pair",
     "rotation_trigger_code",
+    "set_active_pair",
     "should_rotate_free_model",
 ]
 
@@ -55,6 +59,68 @@ FREE_MODEL_PRIORITY: tuple[tuple[str, str], ...] = (
 #: HTTP codes that trigger a rotation to the next free model. 401 is
 #: excluded on purpose (a dead key fails everywhere — surface the error).
 ROTATE_TRIGGER_CODES = frozenset({402, 403, 408, 429, 500, 502, 503, 504})
+
+#: The pair currently answering (10.5 live state). Written by the LLM client
+#: on every successful call and by the rotator on every rotate(); read by the
+#: REPL prompt, the HQ status surfaces, and the health snapshot — never guess.
+_ACTIVE_PAIR: tuple[str, str] | None = None
+
+
+def set_active_pair(provider: str, model: str) -> None:
+    """Record the pair that is currently answering (never raises)."""
+    global _ACTIVE_PAIR
+    try:
+        provider = (provider or "").strip().lower()
+        model = (model or "").strip()
+        _ACTIVE_PAIR = (provider, model) if provider and model else None
+    except Exception:
+        pass
+
+
+def get_active_pair() -> tuple[str, str] | None:
+    """The pair most recently observed answering, or None when unknown."""
+    return _ACTIVE_PAIR
+
+
+def reset_active_pair() -> None:
+    """Clear the live active pair (tests call this in fixtures)."""
+    global _ACTIVE_PAIR
+    _ACTIVE_PAIR = None
+
+
+def active_pair_label() -> str:
+    """``"provider/model"`` for the active pair, or "" when unknown."""
+    pair = get_active_pair()
+    return f"{pair[0]}/{pair[1]}" if pair else ""
+
+
+def _last_working_first(
+    pairs: list[tuple[str, str]],
+) -> list[tuple[str, str]]:
+    """Move the last-known-working pair to the front (10.5).
+
+    Only reorders pairs already in the list — membership never changes, and
+    with no record (or a record for an unusable/absent pair) the priority
+    order passes through untouched. A provider-level match wins when the
+    recorded model id drifted (e.g. the catalog renamed it).
+    """
+    if len(pairs) < 2:
+        return pairs
+    try:
+        from core.last_working import read_last_working
+
+        state = read_last_working()
+    except Exception:
+        return pairs
+    if state is None:
+        return pairs
+    key = (state.provider, state.model)
+    if key in pairs:
+        return [key, *[p for p in pairs if p != key]]
+    for pair in pairs:
+        if pair[0] == state.provider:
+            return [pair, *[p for p in pairs if p != pair]]
+    return pairs
 
 
 def rotation_trigger_code(error: object) -> int | None:
@@ -151,8 +217,12 @@ def best_free_provider() -> str | None:
 
     Used by ``core.providers.detect_provider`` so a usable $0 option always
     beats a paid key by default. Returns None when nothing free is usable.
+
+    10.5: the last-known-working provider (``core.last_working``) is
+    preferred when it is usable right now — a pair that provably answered
+    beats an untried one. The priority order itself is unchanged.
     """
-    for provider, _model in FREE_MODEL_PRIORITY:
+    for provider, _model in _last_working_first(list(FREE_MODEL_PRIORITY)):
         if free_provider_usable(provider):
             return provider
     return None
@@ -168,6 +238,8 @@ def available_free_models(
     (``llama3.2:3b``) is always appended last as the terminal fallback —
     ``list_providers()`` treats local Ollama as always configured, and the
     agent's escape legs probe it before attempting.
+
+    10.5: the last-known-working pair moves to the front when present.
     """
     failed_set = set(failed or ())
     usable: list[tuple[str, str]] = []
@@ -179,7 +251,9 @@ def available_free_models(
     ollama_pair = ("ollama", "llama3.2:3b")
     if ollama_pair not in failed_set:
         usable.append(ollama_pair)
-    return usable
+    # 10.5: prefer the last-known-working pair (membership unchanged;
+    # with no record this is a no-op and Ollama stays the terminal fallback).
+    return _last_working_first(usable)
 
 
 class FreeModelRotator:
@@ -229,4 +303,7 @@ class FreeModelRotator:
             self._failed.add(self._current)
         remaining = self.candidates()
         self._current = remaining[0] if remaining else None
+        # 10.5: the rotator's pick is the live answering pair.
+        if self._current is not None:
+            set_active_pair(self._current[0], self._current[1])
         return self._current

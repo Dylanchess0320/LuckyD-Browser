@@ -54,10 +54,14 @@ class LLMClient:
         retry_time_cap: float = 120.0,
         context_manager: ContextManager | None = None,
         token_resolver: Callable[[], str | None] | None = None,
+        provider: str = "",
     ):
         self.api_key = api_key
         self.base_url = base_url
         self.model = model
+        # Provider id serving this client (10.5: recorded on every success
+        # as the last-known-working pair + live active pair; "" = unknown).
+        self.provider = provider or ""
         self.temperature = temperature
         self.max_tokens = max_tokens
         self.timeout_sec = timeout_sec
@@ -75,6 +79,27 @@ class LLMClient:
         # session (e.g. ClinePass -> Cline CLI WorkOS token) so that a token
         # refreshed since startup actually gets used instead of the stale one.
         self.token_resolver = token_resolver
+
+    def _record_success(self) -> None:
+        """Record this pair as last-known-working + the live active pair.
+
+        10.5: called on every successful LLM response so rotation, the
+        health snapshot, and the status surfaces all reflect the pair that
+        provably answered. Never raises; a no-op when the provider id is
+        unknown (probes and legacy constructions).
+        """
+        try:
+            provider = (self.provider or "").strip()
+            model = (self.model or "").strip()
+            if not provider or not model:
+                return
+            from core.free_rotation import set_active_pair
+            from core.last_working import record_last_working
+
+            set_active_pair(provider, model)
+            record_last_working(provider, model)
+        except Exception:
+            pass
 
     def _auth_token(self) -> str:
         """Resolve the bearer token to use for this request."""
@@ -371,6 +396,7 @@ class LLMClient:
                     msg["_usage"] = usage
                 if finish:
                     msg["_finish_reason"] = finish
+                self._record_success()
                 return msg
             except httpx.HTTPStatusError as e:
                 code = e.response.status_code
@@ -626,6 +652,7 @@ class LLMClient:
             msg["_usage"] = usage
         if finish_reason:
             msg["_finish_reason"] = finish_reason
+        self._record_success()
         return msg
 
     @staticmethod
@@ -797,6 +824,7 @@ class LLMClient:
             fr = choice.get("finish_reason")
             if fr:
                 msg["_finish_reason"] = fr
+            self._record_success()
             return msg
         except Exception as e:
             print(f"\n  [ERR] Non-streaming fallback also failed: {e}")
