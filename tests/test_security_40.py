@@ -386,17 +386,17 @@ class TestVersionUnification:
         ):
             assert not rel.read_bytes().startswith(b"\xef\xbb\xbf"), f"BOM in {rel.name}"
 
-        assert browser.__version__ == "10.6.0"
+        assert browser.__version__ == "10.6.1"
 
         with open(_REPO_ROOT / "pyproject.toml", "rb") as f:
-            assert tomllib.load(f)["project"]["version"] == "10.6.0"
+            assert tomllib.load(f)["project"]["version"] == "10.6.1"
 
         ai_bridge = (_BROWSER_DIR / "browser_core" / "ai_bridge.py").read_text(encoding="utf-8")
         assert "LuckyDBrowser/10.6" in ai_bridge
         assert "LuckyDBrowser/1.0" not in ai_bridge
 
         version_info = (_BROWSER_DIR / "version_info.txt").read_text(encoding="utf-8")
-        assert "10.6.0.0" in version_info
+        assert "10.6.1.0" in version_info
         # Match the full version quad for the stale-version guard (regression:
         # 6.0.0 shipped with stale 3.9.0.0 filevers/prodvers while the strings
         # said 6.0.0.0).
@@ -407,12 +407,12 @@ class TestVersionUnification:
         assert "prodvers=(10, 6, 0, 0)" in version_info
 
         iss = (_BROWSER_DIR / "installer" / "LuckyDBrowser.iss").read_text(encoding="utf-8")
-        assert '#define AppVersion   "10.6.0"' in iss
+        assert '#define AppVersion   "10.6.1"' in iss
         # The output filename + setup version resources are separate
         # hardcodes (regression: 10.2.1 first shipped a Setup-10.2.0.exe).
-        assert "OutputBaseFilename=LuckyDBrowserSetup-10.6.0" in iss
-        assert "VersionInfoVersion=10.6.0.0" in iss
-        assert "VersionInfoProductVersion=10.6.0.0" in iss
+        assert "OutputBaseFilename=LuckyDBrowserSetup-10.6.1" in iss
+        assert "VersionInfoVersion=10.6.1.0" in iss
+        assert "VersionInfoProductVersion=10.6.1.0" in iss
         assert "10.2.0" not in iss
         assert "LuckyDBrowserSetup-10.2.3" not in iss
 

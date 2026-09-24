@@ -1,10 +1,10 @@
 """LuckyD Browser - a full-featured Chromium-based web browser for Windows."""
 
-__version__ = "10.6.0"
+__version__ = "10.6.1"
 
 # Shown once after an update (first launch with a new version).
 WHATS_NEW = (
-    "LuckyD v10.6.0 - Latest AI tools: xAI Grok 4.7 + Moonshot Kimi K3 "
-    "providers, fresh flagship model defaults, and the Aider agent joins the "
-    "mesh "
+    "LuckyD v10.6.1 - Google bot-detection fix: searches that hit Google's "
+    "'unusual traffic' page now auto-fallback to the next working engine "
+    "instead of stranding you on a CAPTCHA "
 )

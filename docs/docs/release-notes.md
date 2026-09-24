@@ -1,5 +1,17 @@
 # LuckyD Browser — Release Notes
 
+## [10.6.1] — Google bot-detection auto-fallback — 2026-09-24
+
+**[`LuckyDBrowserSetup-10.6.1.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.6.1/LuckyDBrowserSetup-10.6.1.exe)** — Windows 10/11 x64 · per-user install · no admin needed.
+**[`LuckyDBrowser-Portable-10.6.1.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.6.1/LuckyDBrowser-Portable-10.6.1.zip)** — unzip and run, for locked-down PCs.
+
+When Google serves its "unusual traffic" sorry page on a search, the tab now
+re-runs the same query on your configured non-Google engine — or
+DuckDuckGo → Bing → Brave → Startpage — with a toast naming the engine.
+No more dead-end CAPTCHA pages; the blocked query is recovered automatically.
+
+Nothing else changed since 10.6.0.
+
 ## [10.6.0] — Latest AI tools — 2026-09-24
 
 **[`LuckyDBrowserSetup-10.6.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.6.0/LuckyDBrowserSetup-10.6.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed.

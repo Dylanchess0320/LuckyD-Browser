@@ -48,14 +48,14 @@
 
 ## Install the browser
 
-1. Download [**LuckyDBrowserSetup-10.6.0.exe**](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.6.0/LuckyDBrowserSetup-10.6.0.exe)
+1. Download [**LuckyDBrowserSetup-10.6.1.exe**](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.6.1/LuckyDBrowserSetup-10.6.1.exe)
 2. Run it — installs to `%LOCALAPPDATA%\Programs\LuckyDBrowser`
 3. Optional: run `ollama_setup.ps1` from the install folder for free offline AI (Ollama + `llama3.2:3b`, ~2 GB one-time download)
 
 Silent install for scripts and fleets:
 
 ```powershell
-LuckyDBrowserSetup-10.6.0.exe /VERYSILENT /NORESTART
+LuckyDBrowserSetup-10.6.1.exe /VERYSILENT /NORESTART
 ```
 
 ## First launch in 60 seconds
@@ -87,11 +87,11 @@ browser\run_browser.bat
 
 # Shareable installer (needs Inno Setup 6)
 powershell -NoProfile -ExecutionPolicy Bypass -File browser\installer\build_installer.ps1
-# → browser\installer\output\LuckyDBrowserSetup-10.6.0.exe
+# → browser\installer\output\LuckyDBrowserSetup-10.6.1.exe
 ```
 
 ## Upgrading
 
-Install the new `LuckyDBrowserSetup-10.6.0.exe` right over your existing install — profile, settings, and workspaces carry over. The browser also checks for updates itself and can install them in-app with one click.
+Install the new `LuckyDBrowserSetup-10.6.1.exe` right over your existing install — profile, settings, and workspaces carry over. The browser also checks for updates itself and can install them in-app with one click.
 
 Next: [Features →](features.md)

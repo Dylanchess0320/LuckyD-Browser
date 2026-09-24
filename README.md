@@ -62,7 +62,7 @@ LuckyD also works with cloud providers if you prefer: Gemini, Groq, DeepSeek, Op
 
 ## What's new
 
-**v10.6.0** — Latest AI tools: xAI Grok 4.7 + Moonshot Kimi K3 providers, fresh flagship model defaults, and the Aider agent joins the mesh
+**v10.6.1** — Google bot-detection auto-fallback: searches that hit Google's "unusual traffic" page now re-run on the next working engine automatically. Nothing else changed since 10.6.0.
 
 Older changes: [full changelog](CHANGELOG.md) · [all releases](https://github.com/Dylanchess0320/LuckyD-Browser/releases)
 

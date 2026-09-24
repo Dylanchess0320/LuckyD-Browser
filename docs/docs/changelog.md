@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [10.6.1] - 2026-09-24
+
+Google bot-detection auto-fallback: when Google serves its "unusual traffic"
+sorry page on a search, the tab now re-runs the same query on the configured
+non-Google engine, or DuckDuckGo → Bing → Brave → Startpage, with a toast
+naming the engine. The blocked query is recovered from the sorry page's
+`continue` parameter. Nothing else changed since 10.6.0.
+
 ## [10.6.0] - 2026-09-24
 
 Latest AI tools: xAI Grok 4.7 + Moonshot Kimi K3 providers, fresh flagship model defaults, and the Aider agent joins the mesh.
