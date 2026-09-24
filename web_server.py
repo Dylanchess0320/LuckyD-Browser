@@ -1049,6 +1049,20 @@ def main() -> None:
     except Exception as exc:
         print(f"  [warn] tool registration failed: {exc}")
 
+    # Beast: warm the provider-health imports so the first /api/providers
+    # request doesn't pay ~0.5s of lazy-import stat storms. list_providers()
+    # keeps its in-function lazy imports (fast `import core.providers` for
+    # the CLI); the long-lived server just pays them once here. The Ollama
+    # probe also warms httpx's HTTP backend (httpcore/h11 import lazily on
+    # the first real request, not on `import httpx`).
+    try:
+        from core import cline_credit, free_rotation, last_working  # noqa: F401
+        from core.providers import list_providers  # noqa: F401
+
+        free_rotation._ollama_reachable()  # result ignored; warms httpx stack
+    except Exception as exc:
+        print(f"  [warn] provider warmup failed: {exc}")
+
     # Start the scheduled-agents daemon (LuckyD 6.0 — "works while you rest").
     try:
         from core.schedule_daemon import get_service

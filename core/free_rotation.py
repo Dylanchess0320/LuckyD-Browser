@@ -30,8 +30,6 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-import httpx
-
 __all__ = [
     "FREE_MODEL_PRIORITY",
     "ROTATE_TRIGGER_CODES",
@@ -161,6 +159,9 @@ def should_rotate_free_model(error: object) -> bool:
         return code in ROTATE_TRIGGER_CODES
     # No code to inspect — timeouts and transport errors are worth a rotate.
     # (httpx.TimeoutException subclasses httpx.TransportError.)
+    # Lazy: httpx costs ~0.7s to import; only needed when a call failed.
+    import httpx
+
     return isinstance(error, httpx.TransportError)
 
 
@@ -168,6 +169,8 @@ def _ollama_reachable() -> bool:
     """True when a local Ollama server answers (the same probe
     ``core.providers.detect_provider`` performs — no new network surface)."""
     import os
+
+    import httpx  # lazy: only needed when actually probing Ollama
 
     try:
         host = (os.environ.get("OLLAMA_HOST", "") or "http://127.0.0.1:11434").rstrip("/")

@@ -50,7 +50,6 @@ _RICH_AVAILABLE = False
 try:
     from rich.console import Console
     from rich.live import Live
-    from rich.markdown import Markdown
     from rich.spinner import Spinner  # noqa: F401  (used to register custom spinners)
     from rich.table import Table
     from rich.text import Text
@@ -81,6 +80,22 @@ except ImportError:
     pass
 
 # ── ANSI color codes (fallback) ───────────────────────────────────────
+
+
+# rich.markdown pulls in markdown_it (~1s import on slow filesystems). It is
+# only needed to render LLM responses, so import it lazily on first use.
+_Markdown: type | None = None
+
+
+def _get_markdown() -> type:
+    """Return rich.markdown.Markdown, importing it on first call."""
+    global _Markdown
+    if _Markdown is None:
+        from rich.markdown import Markdown
+
+        _Markdown = Markdown
+    return _Markdown
+
 
 ANSI = {
     "reset": "\033[0m",
@@ -450,7 +465,7 @@ class TerminalUI:
         if self._streaming:
             return
         if full_text and self.rich:
-            self._console.print(Markdown(full_text), style=BRAND["answer"])
+            self._console.print(_get_markdown()(full_text), style=BRAND["answer"])
         elif full_text:
             self._ansi_markdown(full_text)
 
@@ -460,7 +475,7 @@ class TerminalUI:
         if not text:
             return
         if self.rich:
-            self._console.print(Markdown(text), style=BRAND["answer"])
+            self._console.print(_get_markdown()(text), style=BRAND["answer"])
         else:
             self._ansi_markdown(text)
 

@@ -17,6 +17,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 # Ensure the coding-agent dir is on the path
 AGENT_DIR = Path(__file__).parent
@@ -30,18 +31,84 @@ if sys.platform == "win32":
 # Load .env FIRST -- it sets CODING_AGENT_PROVIDER / *_API_KEY that
 # core/providers.py reads from os.environ. Importing config before any
 # other module that pulls in providers guarantees the .env provider/key win.
+import importlib as _importlib
+
 import config as _config  # noqa: F401  (runs load_env() on import)
-from agent import CodingAgent
 from config import PROJECT_DIR, get_config
-from core.approval_hook import ApprovalHook
-from core.audit_hook import AuditHook
-from core.hooks import get_hooks, register_plugin
-from core.mcp_client import MCPManager
-from core.run_lock import run_exclusive
-from core.session_store import get_session_store
-from model_resolver import invalidate_cache, resolve_model
-from tools.registry import registry
-from ui import ui
+
+# ── Lazy heavy imports (beast pass) ─────────────────────────────────────
+# `agent` (httpx), `ui` (rich), `tools.registry`, etc. cost ~1.8s to import.
+# Fast paths (--help, --version) must not pay that. Heavy modules are
+# imported on first need and bound as module globals by _ensure_ui() /
+# _ensure_all_heavy(). (PEP 562 module __getattr__ was tried first, but
+# CPython's LOAD_GLOBAL never consults it for names used inside the
+# module's own functions, so explicit ensure-calls are required.)
+_HEAVY_SPECS = {
+    "CodingAgent": ("agent", "CodingAgent"),
+    "ApprovalHook": ("core.approval_hook", "ApprovalHook"),
+    "AuditHook": ("core.audit_hook", "AuditHook"),
+    "get_hooks": ("core.hooks", "get_hooks"),
+    "register_plugin": ("core.hooks", "register_plugin"),
+    "MCPManager": ("core.mcp_client", "MCPManager"),
+    "run_exclusive": ("core.run_lock", "run_exclusive"),
+    "get_session_store": ("core.session_store", "get_session_store"),
+    "invalidate_cache": ("model_resolver", "invalidate_cache"),
+    "resolve_model": ("model_resolver", "resolve_model"),
+    "registry": ("tools.registry", "registry"),
+    "ui": ("ui", "ui"),
+}
+
+
+def _ensure_heavy(*names: str) -> None:
+    """Import heavy modules on first need; bind them as main globals.
+
+    Membership in globals() is the cache check (not a separate set) so a
+    name deleted by mock.patch's __exit__ is re-imported on next access.
+    """
+    for name in names:
+        if name not in globals():
+            module_name, attr_name = _HEAVY_SPECS[name]
+            globals()[name] = getattr(_importlib.import_module(module_name), attr_name)
+
+
+def _ensure_ui() -> None:
+    """Ensure the rich UI is imported (providers/model commands need it)."""
+    _ensure_heavy("ui")
+
+
+def _ensure_all_heavy() -> None:
+    """Ensure every heavy module is imported (agent/REPL path)."""
+    _ensure_heavy(*_HEAVY_SPECS)
+
+
+def __getattr__(name: str):
+    """PEP 562: external attribute access (``main.ui``, ``from main import
+    X``, ``mock.patch("main.X")``). Internal function bodies can't use
+    this (CPython's LOAD_GLOBAL skips it) — they call _ensure_*() instead.
+    """
+    if name in _HEAVY_SPECS:
+        _ensure_heavy(name)
+        try:
+            return globals()[name]
+        except KeyError:
+            raise AttributeError(f"module {__name__!r} has no attribute {name!r}") from None
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+if TYPE_CHECKING:
+    # Static-analysis mirror of _HEAVY_SPECS above. Never executed at
+    # runtime (annotations are strings via __future__), so the fast paths
+    # stay fast while ruff/mypy still resolve every name.
+    from agent import CodingAgent
+    from core.approval_hook import ApprovalHook
+    from core.audit_hook import AuditHook
+    from core.hooks import get_hooks, register_plugin
+    from core.mcp_client import MCPManager
+    from core.run_lock import run_exclusive
+    from core.session_store import get_session_store
+    from model_resolver import invalidate_cache, resolve_model
+    from tools.registry import registry
+    from ui import ui
 
 _PROVIDER_DISPLAY_NAMES = {
     "deepseek": "DeepSeek",
@@ -347,6 +414,7 @@ def _match_cline_model(desired: str) -> tuple[str, str] | None:
     Returns (provider, full_model_id) on a confident match. On ambiguity or
     no match, prints the reason and returns None — never guesses a provider.
     """
+    _ensure_ui()
     desired = desired.strip().lower()
     entries = _cline_model_entries()
 
@@ -492,6 +560,7 @@ def _fuzzy_match_free(query: str, limit: int = 8) -> list[tuple[str, str, float]
 
 
 def _handle_no_free_candidates(query: str) -> None:
+    _ensure_ui()
     ui.warn(f"No free model matches '{query}'")
     # Suggest closest 3
     all_free = _free_entries()
@@ -521,6 +590,7 @@ def _get_high_confidence_free_match(
 
 
 def _show_ambiguous_free_matches(query: str, candidates: list[tuple[str, str, float]]) -> None:
+    _ensure_ui()
     # Ambiguous — show top 5 in a compact table
     top = candidates[:5]
     ui.warn(f"Multiple matches for '{query}':")
@@ -576,6 +646,7 @@ def _resolve_free_query(query: str) -> tuple[str, str] | None:
 
 def _prompt_and_save_api_key(env_var: str, provider_name: str) -> str:
     """Interactively prompt the user for an API key and persist it to .env."""
+    _ensure_ui()
     ui.warn(f"No API key found for {provider_name}.")
     print(f"  Paste your {provider_name} API key below (or press Enter to cancel):")
     print(f"    {env_var}= ", end="")
@@ -619,6 +690,7 @@ def _resolve_provider(provider_hint: str | None, model_name: str) -> dict:
     If a required API key is missing and we are in an interactive terminal,
     the user will be prompted to enter one.
     """
+    _ensure_ui()
     cfg = get_config()
 
     # Map provider names to their alias + env vars
@@ -721,6 +793,7 @@ def _apply_model_to_agent(agent, new_cfg: dict, provider: str, model: str) -> No
 
 def _update_ui_for_model(agent, model: str) -> None:
     """Update the UI session info with the new model."""
+    _ensure_ui()
     ui.set_session_info(
         project_name=(
             agent._project_info.name
@@ -734,6 +807,7 @@ def _update_ui_for_model(agent, model: str) -> None:
 
 def _switch_model(agent, provider: str | None = None, model_name: str = ""):
     """Switch agent to a new provider and/or model at runtime."""
+    _ensure_ui()
     new_cfg = _resolve_provider(provider, model_name)
     if not new_cfg:
         return
@@ -763,6 +837,7 @@ def _persist_model_selection(provider: str, model: str) -> None:
     that checkout's ``.env`` keeps Agent 1 and Agent 2 independent while the
     newly selected model is already active in the current request loop.
     """
+    _ensure_ui()
     from config import ENV_FILE
 
     provider = str(provider or "").strip().lower()
@@ -820,6 +895,7 @@ def _console_approval(request) -> type(None):
     For non-interactive use, approvals follow the trust policy (the legacy
     --auto-approve / CODING_AGENT_AUTO_APPROVE=1 blanket bypass is inert since 6.1).
     """
+    _ensure_all_heavy()
     from core.types import ToolPermissionLevel
 
     preview = request.tool_args.get("command", request.tool_name)[:120]
@@ -852,6 +928,7 @@ def _console_approval(request) -> type(None):
 
 async def handle_model_command(agent: CodingAgent, cmd: str) -> bool:
     """Handle the /model slash command."""
+    _ensure_all_heavy()
     # ── Professional free-model browser + fuzzy picker (Cline-style) ──
     # "/model"              → browse free catalog with numbers + interactive prompt
     # "/model free" / list  → same (explicit)
@@ -1054,6 +1131,7 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
     Handle a slash command. Returns True if the REPL should exit,
     False otherwise.
     """
+    _ensure_all_heavy()
     cmd = cmd[1:].strip().lower()  # strip leading '/'
 
     if cmd in ("q", "quit", "exit"):
@@ -1257,6 +1335,7 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
 
 async def _connect_mcp(agent: CodingAgent, verbose: bool = True) -> None:
     """Connect MCP servers and register their tools (fast no-op if unconfigured)."""
+    _ensure_all_heavy()
     try:
         mcp_manager = getattr(agent, "_mcp_manager", None)
         if mcp_manager:
@@ -1274,6 +1353,7 @@ async def _connect_mcp(agent: CodingAgent, verbose: bool = True) -> None:
 
 async def run_one_shot(agent: CodingAgent, message: str):
     """Single query mode with streaming."""
+    _ensure_all_heavy()
     await _connect_mcp(agent)
     agent.stream_callback = ui.stream_token
     agent.think_callback = ui.stream_think_token
@@ -1298,6 +1378,7 @@ async def run_one_shot(agent: CodingAgent, message: str):
 
 async def run_one_shot_json(agent: CodingAgent, message: str):
     """Single query mode -- clean JSON-line output for editor extensions."""
+    _ensure_all_heavy()
     await _connect_mcp(agent, verbose=False)
     agent.stream_callback = lambda token: sys.stdout.write(
         json.dumps({"type": "token", "text": token}) + chr(10)
@@ -1327,6 +1408,7 @@ async def run_one_shot_json(agent: CodingAgent, message: str):
 
 async def run_repl(agent: CodingAgent):
     """Interactive REPL with streaming and session info."""
+    _ensure_all_heavy()
 
     # Connect MCP servers lazily in this event loop
     await _connect_mcp(agent)
@@ -1550,6 +1632,7 @@ def _cli_model(args):
     - "<fuzzy>"           fuzzy — e.g. ``nemotron``, ``kimi``, ``qwen``, ``spark``
     - "<provider> <name>" direct — e.g. ``cline-usage kimi``
     """
+    _ensure_ui()
 
     current, cur_prov = _current_model_and_provider()
 
@@ -1659,6 +1742,7 @@ def _cli_providers(args):
 
     No API key needed. Availability is derived from env vars only (no network).
     """
+    _ensure_ui()
     from core.providers import list_providers
 
     if args and args[0] in ("-h", "--help", "help"):
@@ -2061,8 +2145,69 @@ def _dispatch_early_subcommands(args: list[str]) -> bool:
     return False
 
 
+def _print_version() -> None:
+    """Print the LuckyD Code version line (fast path: no config needed)."""
+    agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v10.4.0")
+    agent_name = os.environ.get("LUCKYD_AGENT_NAME", "")
+    label = f"LuckyD Code {agent_version}" + (f" ({agent_name})" if agent_name else "")
+    print(label)
+
+
+def _print_help() -> None:
+    """Print the CLI help text (fast path: no config needed)."""
+    print(
+        """
+LuckyD Code — AI Coding Agent
+
+Usage:
+  lucky-code                       Interactive REPL (Agent 1 · v10.4.0)
+  lucky-code --agent 2             Interactive REPL (Agent 2 · v10.4.0)
+  lucky-code providers           List AI providers — status, cost tier, current
+  lucky-code model <name>        Switch model (fuzzy Cline-style picker)
+  lucky-code plugin list --available   List/install plugins
+  lucky-code custom-provider list      List user-defined providers
+  lucky-code --acp               ACP stdio server (for editor extensions)
+  lucky-code "your query"          One-shot mode
+  lucky-code -c                    Continue last session
+  lucky-code --resume <id>         Resume specific session
+
+Options:
+  --agent 1|2        Select agent slot (1 = v10.4 Nuitka, 2 = v10.4)
+  --model NAME       Model: auto (default), flash, pro, or specific name
+  --provider NAME    Set provider (see: lucky-code providers): ollama, clinepass,
+                     cline-usage, openrouter, groq, deepseek,
+                     zai, google, gemini, openai, anthropic, minimax
+  --permission-mode MODE  Tool permission mode: default, acceptEdits,
+                     bypassPermissions, auto (default), off
+  --thinking         Use the thinking/reasoning model
+  --verify           Reflection-verify final answers (extra LLM calls)
+  --temp FLOAT       Temperature (default: 0.0)
+  -y, --yes, --yolo  Deprecated since 6.1: warns and approves nothing.
+                     For non-interactive runs use --permission-mode bypassPermissions
+                     (every skip is still audited)
+  --max-turns N      Override max agent turns (default: 30)
+  -c, --continue     Resume most recent session
+  --resume <id>      Resume a specific session by ID or prefix
+  --acp              ACP stdio server (JSON-RPC for editors)
+  --json             Structured JSON-line output (for extensions)
+  -v, --version      Show version
+  --help             Show this help
+
+REPL slash commands (9.8): /goal <text> | /goal budget=50K | /goal pause|resume|clear,
+  /steer <guidance> (guide the current response), /btw <text> (queue follow-up),
+  /model, /providers, /contributor, /compact, /review, /init.
+
+Environment:
+  <PROVIDER>_API_KEY   Set in .env for your provider
+  CODING_AGENT_PROVIDER Explicit provider override
+  CODING_AGENT_AUTO_APPROVE=1   Deprecated (inert since 6.1): approvals follow the trust policy
+"""
+    )
+
+
 def _parse_agent_args(args: list[str], cfg: dict) -> tuple[dict, str, float, str, str, str, bool]:
     """Parses the CLI arguments and returns (cfg, model, temperature, one_shot, resume_session_id, permission_mode, json_mode)."""
+    _ensure_all_heavy()
     model = cfg["model"]
     temperature = cfg["temperature"]
     one_shot = ""
@@ -2138,60 +2283,10 @@ def _parse_agent_args(args: list[str], cfg: dict) -> tuple[dict, str, float, str
                 os.environ["LUCKYD_AGENT_VERSION"] = "v10.4.0"
             i += 2
         elif args[i] in ("-v", "--version"):
-            agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v10.4.0")
-            agent_name = os.environ.get("LUCKYD_AGENT_NAME", "")
-            label = f"LuckyD Code {agent_version}" + (f" ({agent_name})" if agent_name else "")
-            print(label)
+            _print_version()
             sys.exit(0)
         elif args[i] == "--help":
-            print(
-                """
-LuckyD Code — AI Coding Agent
-
-Usage:
-  lucky-code                       Interactive REPL (Agent 1 · v10.4.0)
-  lucky-code --agent 2             Interactive REPL (Agent 2 · v10.4.0)
-  lucky-code providers           List AI providers — status, cost tier, current
-  lucky-code model <name>        Switch model (fuzzy Cline-style picker)
-  lucky-code plugin list --available   List/install plugins
-  lucky-code custom-provider list      List user-defined providers
-  lucky-code --acp               ACP stdio server (for editor extensions)
-  lucky-code "your query"          One-shot mode
-  lucky-code -c                    Continue last session
-  lucky-code --resume <id>         Resume specific session
-
-Options:
-  --agent 1|2        Select agent slot (1 = v10.4 Nuitka, 2 = v10.4)
-  --model NAME       Model: auto (default), flash, pro, or specific name
-  --provider NAME    Set provider (see: lucky-code providers): ollama, clinepass,
-                     cline-usage, openrouter, groq, deepseek,
-                     zai, google, gemini, openai, anthropic, minimax
-  --permission-mode MODE  Tool permission mode: default, acceptEdits,
-                     bypassPermissions, auto (default), off
-  --thinking         Use the thinking/reasoning model
-  --verify           Reflection-verify final answers (extra LLM calls)
-  --temp FLOAT       Temperature (default: 0.0)
-  -y, --yes, --yolo  Deprecated since 6.1: warns and approves nothing.
-                     For non-interactive runs use --permission-mode bypassPermissions
-                     (every skip is still audited)
-  --max-turns N      Override max agent turns (default: 30)
-  -c, --continue     Resume most recent session
-  --resume <id>      Resume a specific session by ID or prefix
-  --acp              ACP stdio server (JSON-RPC for editors)
-  --json             Structured JSON-line output (for extensions)
-  -v, --version      Show version
-  --help             Show this help
-
-REPL slash commands (9.8): /goal <text> | /goal budget=50K | /goal pause|resume|clear,
-  /steer <guidance> (guide the current response), /btw <text> (queue follow-up),
-  /model, /providers, /contributor, /compact, /review, /init.
-
-Environment:
-  <PROVIDER>_API_KEY   Set in .env for your provider
-  CODING_AGENT_PROVIDER Explicit provider override
-  CODING_AGENT_AUTO_APPROVE=1   Deprecated (inert since 6.1): approvals follow the trust policy
-"""
-            )
+            _print_help()
             sys.exit(0)
         elif args[i] == "--json":
             json_mode = True
@@ -2205,6 +2300,7 @@ Environment:
 
 def _validate_api_key(cfg: dict, one_shot: str) -> tuple[dict, str]:
     """Validates the API key, prompts if needed, and returns updated cfg and model."""
+    _ensure_ui()
 
     from core.providers import PROVIDER_DEFAULTS, PROVIDER_NAMES
 
@@ -2246,6 +2342,7 @@ def _run_agent(
     one_shot: str,
 ) -> None:
     """Creates the agent, wires hooks, restores session, and runs the main loop."""
+    _ensure_all_heavy()
     # Create agent
     agent = CodingAgent(
         api_key=cfg["api_key"],
@@ -2308,6 +2405,21 @@ def main():
     # Early dispatch commands that don't need a full agent
     if _dispatch_early_subcommands(args):
         return
+
+    # Fast paths: --help/--version need no config, no API key, no heavy
+    # imports. get_config() runs provider detection (imports httpx, ~1.2s
+    # on this machine) — skip it entirely here. First flag in arg order
+    # wins, mirroring _parse_agent_args.
+    for _flag in args:
+        if _flag in ("-v", "--version"):
+            _print_version()
+            return
+        if _flag == "--help":
+            _print_help()
+            return
+
+    # Agent path: everything below may use the heavy modules.
+    _ensure_all_heavy()
 
     # Parse arguments for the agent
     cfg = get_config()
