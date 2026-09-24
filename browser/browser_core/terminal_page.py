@@ -4,12 +4,25 @@ from __future__ import annotations
 
 import contextlib
 import json
+import os
 from pathlib import Path
 
 try:
     from browser_core.page_shell import page_head
 except ImportError:  # imported as browser.browser_core.terminal_page
     from browser.browser_core.page_shell import page_head
+
+try:  # same dual-import situation as page_head above
+    import browser
+
+    _APP_VERSION = browser.__version__
+except ImportError:  # pragma: no cover - last-resort fallback
+    _APP_VERSION = "10.6.1"
+
+# Displayed on the Agent 1/2 buttons and tab labels. Prefers the agent CLI's
+# own version when set (lucky-code --agent N exports LUCKYD_AGENT_VERSION),
+# otherwise tracks the browser release so the header never goes stale.
+_AGENT_VERSION = os.environ.get("LUCKYD_AGENT_VERSION", f"v{_APP_VERSION}")
 
 # Vendored xterm assets: browser/browser_core/terminal_page.py → ../assets/terminal
 STATIC_DIR = Path(__file__).resolve().parent.parent / "assets" / "terminal"
@@ -19,8 +32,8 @@ _WS_PORT = 9881  # must match browser_app's "terminal_port" default
 
 # Keep in sync with terminal_server.SHELLS (allowlist lives there).
 _SHELL_LABELS = {
-    "agent": "Agent 1 (LuckyD Code v10.4)",
-    "agent2": "Agent 2 (LuckyD Code v10.4)",
+    "agent": f"Agent 1 (LuckyD Code {_AGENT_VERSION})",
+    "agent2": f"Agent 2 (LuckyD Code {_AGENT_VERSION})",
     "powershell": "PowerShell",
     "cmd": "CMD",
     "mesh-agy": "Antigravity",
@@ -143,6 +156,7 @@ def terminal_html(settings=None, shell: str = "agent") -> str:
     return (
         _HTML.replace("__WS_URL__", f"ws://{_WS_HOST}:{port}")
         .replace("__SHELL__", shell)
+        .replace("__AGENT_VERSION__", _AGENT_VERSION)
         .replace("__MESH_CSS__", _mesh_dock_css())
         .replace("__MESH_DOCK__", _mesh_dock_html())
         .replace("__MESH_META__", json.dumps({k: v[0] for k, v in _MESH_AGENTS.items()}))
@@ -205,8 +219,8 @@ _TERM_CSS = r"""  html,body{margin:0;height:100%;background:var(--ld-window);ove
 
 _TERM_BODY = """<body>
 <div id="bar"><span id="dot" class="dot"></span><b id="title">&#9000; Terminal</b>
-  <button class="sh" data-sh="agent" title="LuckyD Code v10.4 Nuitka Agent CLI (Agent 1)">Agent 1 (v10.4)</button>
-  <button class="sh" data-sh="agent2" title="LuckyD Code v10.4 Standalone Agent CLI (Agent 2)">Agent 2 (v10.4)</button>
+  <button class="sh" data-sh="agent" title="LuckyD Code __AGENT_VERSION__ Nuitka Agent CLI (Agent 1)">Agent 1 (__AGENT_VERSION__)</button>
+  <button class="sh" data-sh="agent2" title="LuckyD Code __AGENT_VERSION__ Standalone Agent CLI (Agent 2)">Agent 2 (__AGENT_VERSION__)</button>
   <button class="sh" data-sh="powershell" title="Plain PowerShell console">PowerShell</button>
   <button class="sh" data-sh="cmd" title="Plain cmd.exe console">CMD</button>
   <span id="status">connecting&hellip;</span>
@@ -225,7 +239,7 @@ __MESH_DOCK__
 <script>
 const WS_URL = "__WS_URL__";
 let SHELL = "__SHELL__";
-const S_CORE = {agent:'Agent 1 (v10.4)', agent2:'Agent 2 (v10.4)', powershell:'PowerShell', cmd:'CMD', cline:'Cline'};
+const S_CORE = {agent:'Agent 1 (__AGENT_VERSION__)', agent2:'Agent 2 (__AGENT_VERSION__)', powershell:'PowerShell', cmd:'CMD', cline:'Cline'};
 const MESH_META = __MESH_META__;
 const SHELL_LABELS = Object.assign({}, S_CORE, MESH_META);
 const dot = document.getElementById('dot');

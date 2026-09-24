@@ -2164,7 +2164,7 @@ Usage:
   lucky-code --resume <id>         Resume specific session
 
 Options:
-  --agent 1|2        Select agent slot (1 = v10.4 Nuitka, 2 = v10.4)
+  --agent 1|2        Select agent slot (1 = v10.6.1 Nuitka, 2 = v10.6.1)
   --model NAME       Model: auto (default), flash, pro, or specific name
   --provider NAME    Set provider (see: lucky-code providers): ollama, clinepass,
                      cline-usage, openrouter, groq, deepseek,

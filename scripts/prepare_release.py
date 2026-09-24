@@ -12,6 +12,8 @@ This rewrites, in one pass:
   - browser/browser_core/ai_bridge.py     (User-Agent LuckyDBrowser/M.m)
   - main.py, ui.py, acp_server.py,
     browser/browser_core/terminal_server.py (vX.Y.Z display strings)
+  - apps/luckyd-ui/src/views/Agents.tsx (HQ agent-tab labels)
+    (browser/browser_core/terminal_page.py derives it from __version__ live)
   - tests/test_security_40.py             (version assertions + stale guards)
   - tests/test_cov_ai_bridge.py,
     tests/test_cov_terminal_server.py   (version assertions)
@@ -128,6 +130,9 @@ def main() -> None:
     )
     for f in ("main.py", "ui.py", "acp_server.py", "browser/browser_core/terminal_server.py"):
         plan_sub(f, f"v{old}", f"v{new}")
+    # HQ dashboard agent-tab labels ("Agent 1 (v10.6.1)"). terminal_page.py
+    # needs no entry: it derives the version from browser.__version__ at runtime.
+    plan_sub("apps/luckyd-ui/src/views/Agents.tsx", f"(v{old})", f"(v{new})")
 
     t = "tests/test_security_40.py"
     plan_sub(t, f'browser.__version__ == "{old}"', f'browser.__version__ == "{new}"')
