@@ -15,6 +15,8 @@ import inspect
 import logging
 from typing import Any
 
+from .context_manager import compaction_thresholds
+
 log = logging.getLogger(__name__)
 
 #: Compact once the agent has run this many turns in one run() call.
@@ -40,39 +42,60 @@ beyond what happened in the transcript."""
 
 def should_compact(
     agent: Any,
-    max_turns: int = COMPACT_TURN_THRESHOLD,
-    max_messages: int = COMPACT_MESSAGE_THRESHOLD,
+    max_turns: int | None = None,
+    max_messages: int | None = None,
 ) -> bool:
-    """Heuristic: compact when the turn count or the message count is too high."""
+    """Heuristic: compact when the turn count or the message count is too high.
+
+    Omitted thresholds scale with the agent's model window (unknown
+    models keep the historical 30-turn / 60-message defaults); explicit
+    values always win.
+    """
     try:
-        if int(getattr(agent, "turn_count", 0) or 0) >= max_turns:
+        turns_default, msgs_default, _ = compaction_thresholds(getattr(agent, "model", ""))
+        turn_limit = turns_default if max_turns is None else max_turns
+        msg_limit = msgs_default if max_messages is None else max_messages
+        if int(getattr(agent, "turn_count", 0) or 0) >= turn_limit:
             return True
         messages = getattr(agent, "messages", None) or []
-        return len(messages) >= max_messages
+        return len(messages) >= msg_limit
     except Exception:
         return False
 
 
-async def compact(agent: Any, keep_recent_turns: int = 6, summarizer=None) -> bool:
+async def compact(agent: Any, keep_recent_turns: int | None = None, summarizer=None) -> bool:
     """Summarize stale history and splice the summary back into agent.messages.
 
     Keeps the first system message and the last ``keep_recent_turns``
-    messages verbatim; everything in between is summarized via ``summarizer``
-    (a sync or async callable taking the middle messages) or, when omitted,
-    via the agent's own LLM client (non-streaming chat). On any failure the
-    message list is left untouched and False is returned.
+    messages verbatim (default scales with the agent's model window);
+    everything in between is summarized via ``summarizer`` (a sync or
+    async callable taking the middle messages) or, when omitted, via the
+    agent's own LLM client (non-streaming chat). The split never strands
+    a bare tool message: a tool_calls/tool pair stays together, since
+    providers reject orphaned tool messages. On any failure the message
+    list is left untouched and False is returned.
     """
     try:
         messages = list(getattr(agent, "messages", None) or [])
     except Exception:
         return False
+    if keep_recent_turns is None:
+        _, _, keep_recent_turns = compaction_thresholds(getattr(agent, "model", ""))
     if len(messages) <= keep_recent_turns + 1:
         return False  # nothing worth summarizing
 
     system_msg = messages[0]
     if keep_recent_turns > 0:
-        recent = messages[len(messages) - keep_recent_turns :]
-        middle = messages[1 : len(messages) - keep_recent_turns]
+        split = len(messages) - keep_recent_turns
+        # Never split a tool_calls/tool pair at the boundary.
+        while split > 1 and messages[split].get("role") == "tool":
+            split -= 1
+        if split > 1:
+            prev = messages[split - 1]
+            if prev.get("role") == "assistant" and prev.get("tool_calls"):
+                split -= 1
+        recent = messages[split:]
+        middle = messages[1:split]
     else:
         recent = []
         middle = messages[1:]
@@ -111,6 +134,10 @@ async def _summarize_via_llm(agent: Any, middle: list[dict]) -> str:
             content = content[:300]
         elif role == "assistant":
             content = content[:800]
+            calls = [tc.get("function", {}).get("name", "") for tc in m.get("tool_calls", [])]
+            calls = [c for c in calls if c]
+            if calls:
+                lines.append(f"[tools called: {', '.join(calls)}]")
         content = content.strip()
         if content:
             lines.append(f"[{role}] {content}")

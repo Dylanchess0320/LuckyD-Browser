@@ -38,6 +38,44 @@ def estimate_messages_tokens(messages: list[dict]) -> int:
     return total
 
 
+# ── Model context windows (conservative; unknown models get the default) ──
+
+#: Family-substring match, checked in order. Deliberately biased LOW on
+#: uncertainty: underestimating only compacts earlier (safe), while
+#: overestimating risks context overflow.
+MODEL_CONTEXT_WINDOWS: dict[str, int] = {
+    "gemini": 1_000_000,
+    "sonnet-4": 200_000,
+    "opus-4": 200_000,
+    "gpt-4o": 128_000,
+    "llama3": 128_000,
+    "llama-3": 128_000,
+    "deepseek": 64_000,
+}
+
+#: Fallback window for unlisted models (also the pre-10.2.2 behavior).
+DEFAULT_CONTEXT_WINDOW = 32_000
+
+
+def context_window_for(model: str | None) -> int:
+    """Best-known context window in tokens for a model id."""
+    name = (model or "").lower().strip()
+    for family, window in MODEL_CONTEXT_WINDOWS.items():
+        if family in name:
+            return window
+    return DEFAULT_CONTEXT_WINDOW
+
+
+def compaction_thresholds(model: str | None) -> tuple[int, int, int]:
+    """(turns, messages, keep_recent) scaled to the model's window."""
+    window = context_window_for(model)
+    if window >= 500_000:
+        return (60, 150, 12)
+    if window >= 100_000:
+        return (45, 100, 10)
+    return (30, 60, 6)
+
+
 def truncate_messages(
     messages: list[dict],
     max_messages: int = 40,

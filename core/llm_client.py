@@ -711,13 +711,34 @@ class LLMClient:
                 )
             else:
                 why = detail or "The API key was rejected by the provider."
-                hint = (
-                    "Check the key in your repo .env, or switch to ClinePass "
-                    "(CODING_AGENT_PROVIDER=clinepass) to use your logged-in Cline account."
-                )
+                if "cline.bot" in (self.base_url or ""):
+                    # Already on the Cline gateway — "switch to ClinePass"
+                    # would be a no-op. An ENTITLEMENT 403 means no active
+                    # plan; anything else means the session/key is bad.
+                    hint = (
+                        "Check your Cline plan/subscription, or switch to a free path: "
+                        "/model cline-usage deepseek/deepseek-chat, or "
+                        "/model ollama llama3.2:3b."
+                    )
+                else:
+                    hint = (
+                        "Check the key in your repo .env, or switch to ClinePass "
+                        "(CODING_AGENT_PROVIDER=clinepass) to use your logged-in Cline account."
+                    )
             return {
                 "role": "assistant",
                 "content": f"[API Error: {code} — authentication failed] {why} {hint}",
+            }
+        if code == 402:
+            why = f"{detail} " if detail else ""
+            return {
+                "role": "assistant",
+                "content": (
+                    f"[API Error: 402 — payment required] {why}"
+                    "Balance exhausted. Top up credits, switch to a free-tier model "
+                    "(/model cline-usage deepseek/deepseek-chat), or use local Ollama "
+                    "(/model ollama llama3.2:3b)."
+                ),
             }
         if code == 429:
             why = f"{detail} " if detail else ""

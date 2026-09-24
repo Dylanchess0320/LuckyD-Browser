@@ -41,8 +41,13 @@ class ToolRegistry:
             for t in self._tools.values()
         ]
 
-    def openai_tools(self) -> list[dict]:
-        return [t.to_openai_schema() for t in self._tools.values()]
+    def openai_tools(self, names: list[str] | None = None) -> list[dict]:
+        """Function schemas for all tools, or just ``names`` when given."""
+        if names is None:
+            return [t.to_openai_schema() for t in self._tools.values()]
+        return [
+            self._tools[name].to_openai_schema() for name in sorted(names) if name in self._tools
+        ]
 
     def prompt_description(self) -> str:
         lines = []

@@ -36,6 +36,7 @@ from .llm_client import LLMClient
 from .message_builder import MessageBuilder
 from .rules_loader import load_project_rules
 from .session_store import get_session_store
+from .trajectory import TrajectoryRecorder
 from .types import (
     AgentCallbacks,
     AgentEvent,
@@ -75,6 +76,98 @@ READONLY_NAME_PREFIXES = (
 
 #: Tool-name substrings marking file-editing tools for 'acceptEdits' mode.
 EDIT_TOOL_KEYWORDS = ("edit", "write", "apply")
+
+#: Tools advertised on every turn whatever the task: file/shell core,
+#: planning, questions, task tracking, and delegation. Everything else is
+#: task-scoped (see TASK_TOOL_KEYWORDS) to keep ~14K of schemas per turn
+#: from drowning the model. Names are lowercase registry ids.
+ALWAYS_ADVERTISED_TOOLS = frozenset(
+    {
+        "read",
+        "write",
+        "edit",
+        "glob",
+        "grep",
+        "bash",
+        "diff",
+        "enterplanmode",
+        "exitplanmode",
+        "askuserquestion",
+        "todoread",
+        "todowrite",
+        "taskcreate",
+        "tasklist",
+        "taskget",
+        "taskupdate",
+        "taskstop",
+        "task_output",
+        "task_stop",
+        "subagent",
+        "delegate_task",
+        "harness",
+        "brief",
+        "findrelevantfiles",
+    }
+)
+
+#: Task-text keyword -> tool-name prefixes advertised when the keyword
+#: appears in the current user message or active goal. Substring match,
+#: biased toward recall: a stray extra family costs tokens, a missing
+#: one costs capability. Tools matching no family are always kept, so
+#: dynamic (MCP-registered) tools can never be pruned away.
+TASK_TOOL_KEYWORDS: dict[str, tuple[str, ...]] = {
+    "git": ("git",),
+    "commit": ("git",),
+    "branch": ("git",),
+    "merge": ("git",),
+    "pull request": ("git",),
+    "web": ("web", "http"),
+    "http": ("http", "web"),
+    "url": ("web", "http", "browser"),
+    "browse": ("browser", "web"),
+    "research": ("websearch", "webfetch", "deepresearch"),
+    "browser": ("browser", "webmcp"),
+    "click": ("browser",),
+    "tab": ("browser",),
+    "webmcp": ("webmcp",),
+    "desktop": ("desktop",),
+    "mouse": ("desktop",),
+    "keyboard": ("desktop",),
+    "window": ("desktop",),
+    "clipboard": ("desktop",),
+    "screenshot": ("desktop", "browser"),
+    "schedule": ("schedule",),
+    "cron": ("schedule",),
+    "remind": ("schedule",),
+    "periodic": ("schedule",),
+    "skill": ("skill",),
+    "marketplace": ("skill",),
+    "plugin": ("skill",),
+    "lsp": ("lsp",),
+    "definition": ("lsp",),
+    "references": ("lsp",),
+    "rename": ("lsp",),
+    "symbol": ("lsp",),
+    "memory": ("memory",),
+    "remember": ("memory",),
+    "recall": ("memory",),
+    "forget": ("memory",),
+    "csv": ("csv",),
+    "sqlite": ("sqlite",),
+    "database": ("sqlite", "csv"),
+    "powershell": ("powershell",),
+    "process": ("process",),
+    "notify": ("notify",),
+    "watch": ("watch",),
+    "sleep": ("sleep",),
+    "what time": ("datetime",),
+    "what date": ("datetime",),
+    "current time": ("datetime",),
+    "handoff": ("agenthandoff",),
+    "team": ("teamcreate", "listagents"),
+    "message": ("sendmessage", "receivemessage"),
+    "graph": ("graphify",),
+}
 
 
 # ── Classified retry for the provider HTTP layer (LuckyD 9.7) ───────────
@@ -200,6 +293,13 @@ class CodingAgent:
             )
         self.permission_mode = permission_mode
 
+        # Opt-in reflection gate on final answers (CODING_AGENT_VERIFY=1).
+        self.verify_completions = os.environ.get("CODING_AGENT_VERIFY", "").lower() in (
+            "1",
+            "true",
+            "yes",
+        )
+
         # Retry state
         self.max_retries = 3
         self.base_delay = 1.0
@@ -218,6 +318,14 @@ class CodingAgent:
         self.goals = GoalStore()
         self._pending_steer: list[str] = []
         self._pending_queue: list[str] = []
+        # Signature of the last goal revision injected into the prompt, so a
+        # long conversation doesn't re-announce an unchanged goal every run.
+        self._goal_prompt_signature: str | None = None
+        # Recently executed tools (most recent last, cap 12) — always kept
+        # advertised so mid-task tools never vanish between turns.
+        self._recent_tools: list[str] = []
+        # Current run() user message, for task-scoped tool selection.
+        self._current_task_text: str = ""
 
         # Cost tracking (for /cost, goodbye)
         self._cost_tracker = CostTracker()
@@ -311,9 +419,10 @@ class CodingAgent:
             return False
 
     # HTTP codes worth rotating away from: dead/retired model (400/404),
-    # rate-limited (429), gateway down (5xx). Auth failures (401/403) are
-    # excluded — another model on the same dead key fails identically.
-    _ROTATE_CODES = frozenset({400, 404, 429, 500, 502, 503, 504})
+    # exhausted balance/quota (402), rate-limited (429), gateway down (5xx).
+    # Auth failures (401/403) are excluded — another model on the same dead
+    # key fails identically.
+    _ROTATE_CODES = frozenset({400, 402, 404, 429, 500, 502, 503, 504})
 
     # Same-gateway rotation pool for api.cline.bot (9.8: these replaced the
     # retired OpenCode Zen "-free" pool). Ordered free-first.
@@ -323,6 +432,16 @@ class CodingAgent:
         "qwen/qwen3-8b",
         "deepseek/deepseek-v4-flash",
         "z-ai/glm-5.3-flash",
+    )
+
+    # ClinePass subscription pool for the cross-provider escape leg. These
+    # bill against the flat subscription quota, so they survive a $0 (even
+    # negative) Cline Credits balance that 402s every usage-billed id.
+    # Curated mirror of main.py _CLINEPASS_CATALOG — keep in sync.
+    _CLINEPASS_ROTATION_POOL = (
+        "cline-pass/kimi-k3",
+        "cline-pass/deepseek-v4-flash",
+        "cline-pass/glm-5.3",
     )
 
     @staticmethod
@@ -384,6 +503,62 @@ class CodingAgent:
             return msg
         return None
 
+    @staticmethod
+    def _cline_gateway_usable() -> bool:
+        """True when api.cline.bot auth exists (CLI session token or key)."""
+        try:
+            from core.providers import cline_session_token
+
+            if cline_session_token():
+                return True
+        except Exception:
+            pass
+        return bool((os.environ.get("CLINEPASS_API_KEY", "") or "").strip())
+
+    @staticmethod
+    def _ollama_reachable() -> bool:
+        """True when a local Ollama server answers (no model check)."""
+        try:
+            import httpx
+
+            host = (os.environ.get("OLLAMA_HOST", "") or "http://127.0.0.1:11434").rstrip("/")
+            if host.endswith("/v1"):
+                host = host[: -len("/v1")]
+            r = httpx.get(f"{host}/api/tags", timeout=1.5)
+            return r.status_code == 200
+        except Exception:
+            return False
+
+    async def _try_provider_escape(self, target: str, candidates_fn, messages, tools):
+        """Switch to the target provider and try its candidates.
+
+        Returns the first successful assistant message (winner stays pinned),
+        or None when nothing worked — in which case the original provider
+        config and model string are restored.
+        """
+        original_model = self.model
+        original_config = self._provider_config
+        try:
+            from core.providers import build_llm_config
+
+            self.switch_provider(build_llm_config(target))
+            for alt in candidates_fn():
+                print(f"\n  [AUTO-ROTATE] Escaping to {target} '{alt}'...")
+                good = await self._try_candidate_model(alt, messages, tools)
+                if good is not None:
+                    print(f"  [AUTO-ROTATE] Succeeded on {target} '{alt}' — pinned")
+                    return good
+        except Exception:
+            pass
+        with contextlib.suppress(Exception):
+            self.switch_provider(original_config)
+        # switch_provider resets the model from the config object, which
+        # may predate a direct ag.model assignment — restore the string.
+        self.model = original_model
+        with contextlib.suppress(Exception):
+            self.llm_client.model = original_model
+        return None
+
     async def _auto_rotate_model(self, failed_msg: dict, messages, tools):
         """Rotate to a working model after an [API Error].
 
@@ -414,40 +589,43 @@ class CodingAgent:
         with contextlib.suppress(Exception):
             self.llm_client.model = original_model
 
-        # 2) Cross-provider escape hatch: the whole provider may be down or
-        # its key dead — fail over to the Cline free tier when it is usable
-        # (logged-in CLI session or CLINEPASS_API_KEY).
-        try:
-            from core.providers import cline_session_token
-
-            if str(getattr(self._provider_config, "provider", "")).lower() == "cline-usage":
-                return None  # already on the escape target — nothing left
-            usable = bool(cline_session_token()) or bool(
-                (os.environ.get("CLINEPASS_API_KEY", "") or "").strip()
+        # 2) Cross-provider escape hatches, cheapest first: the whole
+        # provider may be down, its key dead, or its balance exhausted
+        # (402) — fail over to another usable provider instead of dying.
+        # Each failed leg restores the original provider + model, so legs
+        # chain safely.
+        current = str(getattr(self._provider_config, "provider", "")).lower()
+        cline_usable = self._cline_gateway_usable()
+        if current != "cline-usage" and cline_usable:
+            good = await self._try_provider_escape(
+                "cline-usage",
+                lambda: [m for m in self._same_provider_candidates() if m != self.model],
+                messages,
+                tools,
             )
-            if not usable:
-                return None
-            original_config = self._provider_config
-            from core.providers import build_llm_config
-
-            escape = build_llm_config("cline-usage")
-            self.switch_provider(escape)
-            for alt in [m for m in self._same_provider_candidates() if m != self.model]:
-                print(f"\n  [AUTO-ROTATE] Escaping to Cline free tier '{alt}'...")
-                good = await self._try_candidate_model(alt, messages, tools)
-                if good is not None:
-                    print(f"  [AUTO-ROTATE] Succeeded on Cline '{alt}' — pinned")
-                    return good
-            self.switch_provider(original_config)
-            # switch_provider resets the model from the config object, which
-            # may predate a direct ag.model assignment — restore the string.
-            self.model = original_model
-            with contextlib.suppress(Exception):
-                self.llm_client.model = original_model
-        except Exception:
-            with contextlib.suppress(Exception):
-                self.model = original_model
-                self.llm_client.model = original_model
+            if good is not None:
+                return good
+        if current != "clinepass" and cline_usable:
+            good = await self._try_provider_escape(
+                "clinepass",
+                lambda: [m for m in self._CLINEPASS_ROTATION_POOL if m != self.model],
+                messages,
+                tools,
+            )
+            if good is not None:
+                return good
+        if current != "ollama" and self._ollama_reachable():
+            good = await self._try_provider_escape(
+                "ollama",
+                # Post-switch self.model is build_llm_config's pick: an
+                # installed model when the server reports one, else the
+                # default — exactly one attempt, no pool to burn.
+                lambda: [self.model],
+                messages,
+                tools,
+            )
+            if good is not None:
+                return good
         return None
 
     @property
@@ -567,6 +745,25 @@ class CodingAgent:
         self.messages.append({"role": "user", "content": guidance})
         return True
 
+    def _maybe_inject_goal(self) -> None:
+        """Announce the active goal to the model once per goal revision.
+
+        Skips silently when no goal is set or it is paused; a cleared goal
+        resets the signature so the next goal is announced fresh.
+        """
+        goal = self.goals.goal
+        if goal is None or goal.paused or not (goal.text or "").strip():
+            self._goal_prompt_signature = None
+            return
+        sig = f"{goal.text}\x00{goal.budget}"
+        if sig == self._goal_prompt_signature:
+            return
+        self._goal_prompt_signature = sig
+        line = f"[goal] Active objective: {goal.text.strip()}"
+        if goal.budget is not None:
+            line += f" (token budget: {goal.budget}, spent: {goal.spent})"
+        self.messages.append({"role": "user", "content": line})
+
     def _build_system(self) -> str:
         """Build the system prompt with tools, project info, memories, and rules."""
         tools_desc = registry.prompt_description()
@@ -578,6 +775,59 @@ class CodingAgent:
             memory_context=self._memory_context,
             project_rules=rules,
         )
+
+    @staticmethod
+    def _in_plan_mode() -> bool:
+        """True while the agent sits in the EnterPlanMode read-only phase."""
+        try:
+            from tools.plan_tools import is_plan_mode
+
+            return bool(is_plan_mode())
+        except Exception:
+            return False
+
+    def _record_tool_use(self, tool) -> None:
+        """Remember an executed tool so pruning keeps it advertised."""
+        name = str(getattr(tool, "name", "") or "").lower()
+        if not name:
+            return
+        if name in self._recent_tools:
+            self._recent_tools.remove(name)
+        self._recent_tools.append(name)
+        del self._recent_tools[:-12]
+
+    def _select_tool_names(self, all_names: list[str] | None = None) -> list[str] | None:
+        """Task-scoped tool subset for this turn's schemas.
+
+        Returns None (no pruning) when CODING_AGENT_NO_PRUNE=1. Otherwise
+        keeps the always-advertised core, keyword-matched families from
+        the current task text + active goal, recently used tools, and any
+        tool matching no known family (dynamic MCP tools stay safe).
+        """
+        if os.environ.get("CODING_AGENT_NO_PRUNE", "").lower() in ("1", "true", "yes"):
+            return None
+        names = list(all_names) if all_names is not None else registry.list_tools()
+        goal_text = ""
+        try:
+            goal = self.goals.goal
+            if goal is not None and not goal.paused:
+                goal_text = goal.text or ""
+        except Exception:
+            pass
+        text = f"{self._current_task_text}\n{goal_text}".lower()
+        keep = set(ALWAYS_ADVERTISED_TOOLS) | set(self._recent_tools)
+        family_prefixes: set[str] = set()
+        for keyword, prefixes in TASK_TOOL_KEYWORDS.items():
+            family_prefixes.update(prefixes)
+            if keyword in text:
+                keep.update(n for n in names if n.startswith(prefixes))
+        # Unknown/unmapped tools are kept, never pruned.
+        keep.update(
+            n
+            for n in names
+            if n not in ALWAYS_ADVERTISED_TOOLS and not n.startswith(tuple(family_prefixes))
+        )
+        return sorted(n for n in keep if n in names)
 
     def _permission_mode_decision(self, tool, tool_name: str) -> tuple[str, str]:
         """Permission-mode gate for _execute_tool; evaluated BEFORE the approval hook.
@@ -594,6 +844,21 @@ class CodingAgent:
 
         if level == "BLOCKED":
             return "block", "tool is BLOCKED"
+
+        # Plan mode wins over every permission mode: exploration is
+        # read-only by enforcement, not just by prompt. The plan tools
+        # themselves stay callable so the agent can always exit.
+        if self._in_plan_mode():
+            canonical = str(getattr(tool, "name", "") or "").lower()
+            if canonical in ("enterplanmode", "exitplanmode"):
+                return "allow", "plan-mode tool stays available in plan mode"
+            if level == "ALWAYS_ALLOW" or lname.startswith(READONLY_NAME_PREFIXES):
+                return "allow", "read-only tool allowed in plan mode"
+            return (
+                "block",
+                "plan mode is read-only: explore with read tools, "
+                "then ExitPlanMode with the plan to write",
+            )
 
         if mode == "bypassPermissions":
             return "allow", "bypassPermissions allows everything except BLOCKED tools"
@@ -672,6 +937,8 @@ class CodingAgent:
                     return result  # Hook intercepted/blocked the tool
             except Exception as e:
                 print(f"\n  [HOOK ERR] before_tool hook failed: {e}")
+
+        self._record_tool_use(tool)
 
         # Execute the tool with a real timeout (per-tool override | global default)
         default_tool_timeout = float(os.environ.get("CODING_AGENT_TOOL_TIMEOUT", "180"))
@@ -953,6 +1220,32 @@ class CodingAgent:
         # Ends with a colon / connector (a lead-in to something that never came)
         return bool(tail.endswith((":", "—", "-", ",", ";")))
 
+    async def _verify_final_answer(self, request: str, content: str) -> str:
+        """Reflection-gated completion: adopt the improved answer when better.
+
+        Single score/improve/rescore pass through ReflectionEngine. Any
+        failure (disabled, empty/error content, caller error) keeps the
+        original answer — verification never breaks a run.
+        """
+        if not self.verify_completions or not (content or "").strip():
+            return content
+        if content.startswith("[API Error:"):
+            return content
+        try:
+            from .reflection import reflect_on_output
+
+            async def _caller(prompt: str) -> str:
+                msg = await self.llm_client.chat_nonstreaming([{"role": "user", "content": prompt}])
+                return str((msg or {}).get("content", "") or "")
+
+            result = await reflect_on_output(request, content, llm_caller=_caller, max_iterations=1)
+            if result.improved:
+                print(f"\n  [VERIFY] score {result.overall_score:.2f} — adopted improved answer")
+                return result.improved_output
+            return content
+        except Exception:
+            return content
+
     async def run(self, user_message: str, max_turns: int | None = None) -> str:
         """Run the full agent loop with hooks, events, checkpointing, and memory extraction.
 
@@ -961,6 +1254,7 @@ class CodingAgent:
         """
         max_turns = max_turns or self.max_turns
         self.turn_count = 0
+        self._current_task_text = user_message or ""
 
         # Fresh conversation: build system prompt and inject memories
         if not self.messages:
@@ -982,6 +1276,8 @@ class CodingAgent:
                 pass
 
         self.messages.append({"role": "user", "content": user_message})
+        self._maybe_inject_goal()
+        TrajectoryRecorder.attach_if_enabled(self)
         self._emit_event(AgentEventType.SESSION_START, {"message": user_message[:100]})
 
         final_text = ""
@@ -996,7 +1292,12 @@ class CodingAgent:
             # message mid-run guiding the current response").
             self._drain_steer_into_messages()
 
-            # Safety: cap messages to prevent context overflow
+            # Context compaction first: summarize stale history (per-model
+            # thresholds) while the full transcript still exists. Never raises.
+            await maybe_compact(self)
+
+            # Safety fallback: cap messages when compaction declined or
+            # failed, so context can never grow without bound.
             if len(self.messages) > 40:
                 from .context_manager import truncate_messages
 
@@ -1027,10 +1328,6 @@ class CodingAgent:
                 except Exception:
                     pass
 
-            # Context compaction (9.7): summarize stale history when the
-            # conversation grows long. Never raises.
-            await maybe_compact(self)
-
             # Session autosave (9.7): checkpoint the session every 5 turns.
             if self.turn_count % 5 == 0:
                 with contextlib.suppress(Exception):
@@ -1051,7 +1348,7 @@ class CodingAgent:
             self._emit_event(
                 AgentEventType.MODEL_REQUEST, {"message_count": len(modified_messages)}
             )
-            tools = registry.openai_tools()
+            tools = registry.openai_tools(self._select_tool_names())
             try:
                 assistant_msg = await self.llm_client.chat_stream(
                     messages=modified_messages,
@@ -1074,11 +1371,12 @@ class CodingAgent:
                 continue
 
             # HQ auto-rotation: when the current model is dead (404/400),
-            # rate-limited (429) or the gateway is down (5xx), transparently
-            # rotate to a working model instead of surfacing [API Error] text.
-            # Auth failures (401/403) are NOT rotated — another model on the
-            # same dead key would fail identically; the error text already
-            # tells the user how to re-login / fix the key.
+            # its balance is exhausted (402), it is rate-limited (429) or
+            # the gateway is down (5xx), transparently rotate to a working
+            # model instead of surfacing [API Error] text. Auth failures
+            # (401/403) are NOT rotated — another model on the same dead
+            # key would fail identically; the error text already tells the
+            # user how to re-login / fix the key.
             if isinstance(assistant_msg, dict) and assistant_msg.get("content", "").startswith(
                 "[API Error:"
             ):
@@ -1095,10 +1393,14 @@ class CodingAgent:
                 except Exception:
                     pass
 
-            # Track token usage for cost display
+            # Track token usage for cost display (and the goal budget, if any)
             usage = assistant_msg.get("_usage", {}) if isinstance(assistant_msg, dict) else {}
             if usage:
                 self._cost_tracker.add_usage(usage, self.model)
+                with contextlib.suppress(Exception):
+                    spent_in = usage.get("prompt_tokens", usage.get("input_tokens", 0)) or 0
+                    spent_out = usage.get("completion_tokens", usage.get("output_tokens", 0)) or 0
+                    self.goals.add_spent(spent_in + spent_out)
             assistant_msg = (
                 assistant_msg.to_dict() if hasattr(assistant_msg, "to_dict") else assistant_msg
             )
@@ -1131,10 +1433,11 @@ class CodingAgent:
                     self.messages.append({"role": "user", "content": continuation})
                     continue
 
-                # Genuine final answer
+                # Genuine final answer (optionally reflection-verified)
                 self._no_tool_call_turns = 0
                 self._consecutive_failed_tool_turns = 0
-                final_text = content
+                final_text = await self._verify_final_answer(user_message, content)
+                assistant_msg["content"] = final_text
                 self._emit_event(AgentEventType.TURN_END, {"final": True})
                 break
 

@@ -1247,8 +1247,26 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
 # ── Main application ──────────────────────────────────────────────────
 
 
+async def _connect_mcp(agent: CodingAgent, verbose: bool = True) -> None:
+    """Connect MCP servers and register their tools (fast no-op if unconfigured)."""
+    try:
+        mcp_manager = getattr(agent, "_mcp_manager", None)
+        if mcp_manager:
+            n_srv = await mcp_manager.connect_all()
+            if n_srv:
+                from tools.mcp_tools import register_mcp_tools
+
+                n_tools = await register_mcp_tools(mcp_manager)
+                if verbose:
+                    print(f"  [MCP] {n_srv} server(s), {n_tools} tool(s) registered")
+    except Exception as e:
+        if verbose:
+            print(f"  [MCP] Connection: {e}")
+
+
 async def run_one_shot(agent: CodingAgent, message: str):
     """Single query mode with streaming."""
+    await _connect_mcp(agent)
     agent.stream_callback = ui.stream_token
     agent.think_callback = ui.stream_think_token
     ui.start_streaming()
@@ -1272,6 +1290,7 @@ async def run_one_shot(agent: CodingAgent, message: str):
 
 async def run_one_shot_json(agent: CodingAgent, message: str):
     """Single query mode -- clean JSON-line output for editor extensions."""
+    await _connect_mcp(agent, verbose=False)
     agent.stream_callback = lambda token: sys.stdout.write(
         json.dumps({"type": "token", "text": token}) + chr(10)
     )
@@ -1302,17 +1321,7 @@ async def run_repl(agent: CodingAgent):
     """Interactive REPL with streaming and session info."""
 
     # Connect MCP servers lazily in this event loop
-    try:
-        mcp_manager = getattr(agent, "_mcp_manager", None)
-        if mcp_manager:
-            n_srv = await mcp_manager.connect_all()
-            if n_srv:
-                from tools.mcp_tools import register_mcp_tools
-
-                n_tools = await register_mcp_tools(mcp_manager)
-                print(f"  [MCP] {n_srv} server(s), {n_tools} tool(s) registered")
-    except Exception as e:
-        print(f"  [MCP] Connection: {e}")
+    await _connect_mcp(agent)
 
     # Show enhanced banner with project info
     project_name = (
@@ -1993,6 +2002,9 @@ def _parse_agent_args(args: list[str], cfg: dict) -> tuple[dict, str, float, str
             cfg = get_config()
             model = cfg["model"]
             i += 1
+        elif args[i] == "--verify":
+            os.environ["CODING_AGENT_VERIFY"] = "true"
+            i += 1
         elif args[i] == "--temp" and i + 1 < len(args):
             temperature = float(args[i + 1])
             i += 2
@@ -2070,8 +2082,11 @@ Options:
   --permission-mode MODE  Tool permission mode: default, acceptEdits,
                      bypassPermissions, auto (default), off
   --thinking         Use the thinking/reasoning model
+  --verify           Reflection-verify final answers (extra LLM calls)
   --temp FLOAT       Temperature (default: 0.0)
-  -y, --yes, --yolo  Auto-approve all tool calls (non-interactive / yolo mode)
+  -y, --yes, --yolo  Deprecated since 6.1: warns and approves nothing.
+                     For non-interactive runs use --permission-mode bypassPermissions
+                     (every skip is still audited)
   --max-turns N      Override max agent turns (default: 30)
   -c, --continue     Resume most recent session
   --resume <id>      Resume a specific session by ID or prefix

@@ -33,9 +33,25 @@ VALID_PROVIDERS = {
     "opencode",
     "clinepass",
     "cline-usage",
-    "cline",
     "minimax",
 }
+
+#: Short-hands accepted anywhere a provider id is read (CODING_AGENT_PROVIDER,
+#: --provider, /model, browser settings mirror). Canonicalized at the
+#: boundary so sessions never carry the alias id (10.2.2: "cline" was briefly
+#: a full provider entry, which duplicated the Cline (usage) row in
+#: `lucky-code providers` and bypassed the Cline rotation pool).
+PROVIDER_ALIASES = {
+    "cline": "cline-usage",
+    "cline-pass": "clinepass",
+}
+
+
+def normalize_provider_id(provider: str | None) -> str:
+    """Map a provider alias to its canonical id (unknown ids pass through)."""
+    pid = (provider or "").lower().strip()
+    return PROVIDER_ALIASES.get(pid, pid)
+
 
 PROVIDER_NAMES = {
     "deepseek": "DeepSeek",
@@ -50,7 +66,6 @@ PROVIDER_NAMES = {
     "opencode": "OpenCode Zen",
     "clinepass": "ClinePass",
     "cline-usage": "Cline (usage)",
-    "cline": "Cline (usage)",
     "minimax": "MiniMax",
 }
 
@@ -149,13 +164,6 @@ PROVIDER_DEFAULTS: dict[str, ProviderDefaults] = {
         "default_base": "https://api.cline.bot/api/v1",
         "default_model": "deepseek/deepseek-chat",
     },
-    "cline": {
-        "env_key": "CLINEPASS_API_KEY",
-        "env_base": "CLINEPASS_BASE_URL",
-        "env_model": "CLINE_USAGE_MODEL",
-        "default_base": "https://api.cline.bot/api/v1",
-        "default_model": "deepseek/deepseek-chat",
-    },
     # MiniMax (MiniMax-M3, Anthropic-compatible Messages API).
     # mesh: python main.py --provider minimax --agent 1
     "minimax": {
@@ -242,7 +250,7 @@ def detect_provider() -> str | None:
     (OpenCode Zen's keyless tier died in 2026-09; Zen is back in the mesh
     since 2026-09-21 but keyed-only, so it can't be the free default).
     """
-    explicit = os.environ.get("CODING_AGENT_PROVIDER", "").lower().strip()
+    explicit = normalize_provider_id(os.environ.get("CODING_AGENT_PROVIDER", ""))
     if explicit in VALID_PROVIDERS:
         return explicit
 
@@ -318,7 +326,7 @@ def resolve_provider_config(provider: str | None = None) -> dict[str, object]:
     browser/data/settings.json). An explicit CODING_AGENT_PROVIDER still wins.
     """
     mirror_model: str | None = None
-    explicit = os.environ.get("CODING_AGENT_PROVIDER", "").lower().strip()
+    explicit = normalize_provider_id(os.environ.get("CODING_AGENT_PROVIDER", ""))
 
     if not provider:
         if explicit in VALID_PROVIDERS:
@@ -326,7 +334,7 @@ def resolve_provider_config(provider: str | None = None) -> dict[str, object]:
         else:
             # Mirror the browser AI assistant's chosen provider (and model).
             bs = _assistant_browser_settings()
-            ap = str(bs.get("ai_provider", "") or "").lower().strip()
+            ap = normalize_provider_id(str(bs.get("ai_provider", "") or ""))
             if ap in VALID_PROVIDERS:
                 provider = ap
                 overrides = bs.get("ai_model_overrides", {})
@@ -337,7 +345,7 @@ def resolve_provider_config(provider: str | None = None) -> dict[str, object]:
             else:
                 provider = detect_provider() or "deepseek"
 
-    provider = provider.lower()
+    provider = normalize_provider_id(provider)
     fallback = PROVIDER_DEFAULTS["deepseek"]
     entry = PROVIDER_DEFAULTS.get(provider, fallback)
     env_key = entry.get("env_key")
@@ -532,9 +540,7 @@ def provider_key_from_label(label: str) -> str:
 # 401s) — so it is NOT in the free tier anymore. Cline (usage-billed free
 # models + the logged-in CLI session) remains the default free agent brain —
 # see resolve_provider_config().
-FREE_TIER_PROVIDERS = frozenset(
-    {"openrouter", "ollama", "groq", "clinepass", "cline-usage", "cline"}
-)
+FREE_TIER_PROVIDERS = frozenset({"openrouter", "ollama", "groq", "clinepass", "cline-usage"})
 
 # Stable display order for the provider list (local first, then free, then paid).
 PROVIDER_ORDER = (
@@ -542,7 +548,6 @@ PROVIDER_ORDER = (
     "opencode",
     "clinepass",
     "cline-usage",
-    "cline",
     "openrouter",
     "groq",
     "deepseek",
@@ -565,7 +570,7 @@ def list_providers() -> list[dict[str, object]]:
 
     No network calls — availability is derived from env vars only.
     """
-    explicit = os.environ.get("CODING_AGENT_PROVIDER", "").lower().strip()
+    explicit = normalize_provider_id(os.environ.get("CODING_AGENT_PROVIDER", ""))
     current = explicit if explicit in VALID_PROVIDERS else detect_provider() or "deepseek"
     cline_ok = bool(cline_session_token())
 
@@ -578,7 +583,7 @@ def list_providers() -> list[dict[str, object]]:
         base_url = os.environ.get(defaults["env_base"], defaults["default_base"])
         model = os.environ.get(defaults["env_model"], defaults["default_model"])
         local = pid == "ollama"
-        if pid in ("clinepass", "cline-usage", "cline"):
+        if pid in ("clinepass", "cline-usage"):
             # Auth may come from the logged-in Cline CLI session instead of a key.
             key_present = bool((os.environ.get(env_key or "", "") or "").strip())
             if not key_present:
