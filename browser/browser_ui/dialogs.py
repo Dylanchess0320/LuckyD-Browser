@@ -292,6 +292,15 @@ class SettingsDialog(QDialog):
         self.hw_video.setChecked(bool(settings.get("hw_video_decode", False)))
         gform.addRow(self.hw_video)
 
+        self.cdp_debug = QCheckBox("CDP remote debugging (agent vision; restart to apply)", self)
+        self.cdp_debug.setToolTip(
+            "ON = localhost:9222 DevTools endpoint for the agent driver and\n"
+            "GPU-safe screenshots (loopback only, same as the control server).\n"
+            "OFF = no debug port; agent vision and deep control degrade."
+        )
+        self.cdp_debug.setChecked(bool(settings.get("cdp_debugging", True)))
+        gform.addRow(self.cdp_debug)
+
         tabs.addTab(general, "General")
 
         # ── Privacy ───────────────────────────────────────────────
@@ -411,6 +420,7 @@ class SettingsDialog(QDialog):
         self._settings.set("https_only", self.https_only.isChecked())
         self._settings.set("memory_saver", self.memory_saver.isChecked())
         self._settings.set("hw_video_decode", self.hw_video.isChecked())
+        self._settings.set("cdp_debugging", self.cdp_debug.isChecked())
         self._settings.set("harness_autostart", self.autostart.isChecked())
         self._settings.set("dashboard_newtab", self.dash.isChecked())
         self._settings.set("assistant_visible_startup", self.assistant_startup.isChecked())

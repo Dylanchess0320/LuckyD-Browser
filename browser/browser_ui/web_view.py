@@ -60,8 +60,11 @@ class WebPage(QWebEnginePage):
 
     def javaScriptConfirm(self, security_origin, msg):  # noqa: N802
         if _agent.ACTIVE_SESSIONS:
-            self._record_dialog("confirm (auto-accepted)", msg)
-            return True
+            # Fail closed: an auto-accepted confirm would let a hostile page
+            # click through destructive choices on the agent's behalf. The
+            # text is still recorded so the agent can react deliberately.
+            self._record_dialog("confirm (auto-declined)", msg)
+            return False
         return super().javaScriptConfirm(security_origin, msg)
 
     def javaScriptPrompt(self, security_origin, msg, default_value):  # noqa: N802

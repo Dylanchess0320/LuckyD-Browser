@@ -15,6 +15,7 @@ import re
 import sys
 import threading
 import time
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -283,7 +284,9 @@ class SwarmManager:
                 )
 
         with self._lock:
-            run_id = f"run-{time.strftime('%Y%m%d-%H%M%S')}"
+            # Unique suffix: back-to-back runs in the same second must not
+            # share an id, or stale worker events route into the new run.
+            run_id = f"run-{time.strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:8]}"
             self._cancel_requested = False
             self._done.clear()  # a new run is starting
             self._active_run = {

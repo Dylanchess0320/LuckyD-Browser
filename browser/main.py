@@ -20,9 +20,29 @@ for path in (BASE.parent, BASE):
         sys.path.remove(entry)
     sys.path.insert(0, entry)
 
-# Expose Chrome DevTools Protocol on localhost only — enables future
-# Playwright/browser-use control of the live tabs (see browser/README.md).
-os.environ.setdefault("QTWEBENGINE_REMOTE_DEBUGGING", "127.0.0.1:9222")
+
+# Expose Chrome DevTools Protocol on localhost only — the agent's CDP
+# driver + GPU-safe screenshots need it at engine startup (see
+# browser/README.md). Disable via Settings, or LUCKYD_CDP_DEBUG=0.
+def _apply_cdp_debugging() -> None:
+    """Set QTWEBENGINE_REMOTE_DEBUGGING unless the user disabled CDP."""
+    try:
+        from browser_core.settings import SettingsStore, cdp_debugging_endpoint
+
+        endpoint = cdp_debugging_endpoint(SettingsStore(), os.environ)
+        if endpoint:
+            os.environ.setdefault("QTWEBENGINE_REMOTE_DEBUGGING", endpoint)
+        else:
+            os.environ.pop("QTWEBENGINE_REMOTE_DEBUGGING", None)
+            print(
+                "[luckyd] CDP remote debugging is OFF (agent vision/deep control degraded)",
+                flush=True,
+            )
+    except Exception:
+        pass  # a flag problem must never block startup
+
+
+_apply_cdp_debugging()
 
 
 def _apply_video_decode_flags() -> None:

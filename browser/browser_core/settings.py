@@ -97,6 +97,11 @@ DEFAULTS = {
     # GPU decode for smoother high-res playback. Takes effect on restart
     # (applied as a Chromium flag before QtWebEngine starts).
     "hw_video_decode": False,
+    # CDP remote debugging on loopback only. Default on: the agent's CDP
+    # driver + GPU-safe screenshots need the port at engine startup (it
+    # cannot be enabled at runtime). Same trust domain as the localhost
+    # control server. Takes effect on restart.
+    "cdp_debugging": True,
     # 7.0 one-window model (Phase 2): these shipped in the UI/settings file
     # before they were registered here, so fresh SettingsStore defaults and
     # headless tests saw KeyErrors/missing toggles. Canonical values:
@@ -225,3 +230,32 @@ def webengine_chromium_flags(hw_video_decode: bool = False) -> str:
         "--disable-accelerated-video-decode --disable-gpu-compositing --disable-gpu-rasterization"
         " --force-color-profile=srgb"
     )
+
+
+#: Loopback-only CDP endpoint (Qt WebEngine accepts no other host:port).
+CDP_DEBUG_ENDPOINT = "127.0.0.1:9222"
+
+
+def cdp_debugging_endpoint(settings=None, env=None) -> str | None:
+    """Effective CDP endpoint, or None when remote debugging is disabled.
+
+    ``LUCKYD_CDP_DEBUG=0/1`` overrides the ``cdp_debugging`` setting.
+    Pure function so main.py can apply it before QtWebEngine starts
+    (and tests can pin it).
+    """
+    env = {} if env is None else env
+    flag = str(env.get("LUCKYD_CDP_DEBUG", "") or "").lower().strip()
+    if flag in ("0", "false", "no", "off"):
+        return None
+    if flag in ("1", "true", "yes", "on"):
+        return CDP_DEBUG_ENDPOINT
+    if settings is not None:
+        get = getattr(settings, "get", None)
+        try:
+            if callable(get):
+                return CDP_DEBUG_ENDPOINT if get("cdp_debugging", True) else None
+            if isinstance(settings, dict):
+                return CDP_DEBUG_ENDPOINT if settings.get("cdp_debugging", True) else None
+        except Exception:
+            pass
+    return CDP_DEBUG_ENDPOINT

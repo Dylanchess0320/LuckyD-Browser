@@ -683,12 +683,33 @@ _ASK_SYSTEM = (
     "on the page. Be concise."
 )
 
+
+def _on_gui_thread() -> bool:
+    """True when the caller already runs on Qt's GUI thread.
+
+    Headless-safe: any import failure (or no QApplication yet) is False.
+    Lives outside the _HAVE_QT gate so callers can probe cheaply.
+    """
+    try:
+        from PySide6.QtCore import QThread
+        from PySide6.QtWidgets import QApplication
+
+        app = QApplication.instance()
+        if app is None:
+            return False
+        return QThread.currentThread() == app.thread()
+    except Exception:
+        return False
+
+
 if _HAVE_QT:
 
     class GuiInvoker(QObject):
         """Runs callables on the GUI thread; HTTP workers block for the result.
 
-        NEVER call ``run()`` from the GUI thread itself — that deadlocks.
+        GUI-thread callers run inline: nested QEventLoops inside the
+        closures still pump, so this is correct where blocking on our own
+        signal would deadlock (a 20s UI freeze per call).
         """
 
         invoke = Signal(object)
@@ -707,6 +728,8 @@ if _HAVE_QT:
                 done.set()
 
         def run(self, fn, timeout: float = 20.0):
+            if _on_gui_thread():
+                return fn()
             box: dict = {}
             done = threading.Event()
             self.invoke.emit((fn, box, done))
@@ -798,7 +821,11 @@ class QtBrowserBackend:
             }
 
         info = self._invoker.run(_do)
-        info.update(name=API_NAME, version=API_VERSION, cdp="127.0.0.1:9222")
+        info.update(
+            name=API_NAME,
+            version=API_VERSION,
+            cdp=os.environ.get("QTWEBENGINE_REMOTE_DEBUGGING", "") or "disabled",
+        )
         with contextlib.suppress(Exception):
             info["ads_blocked"] = int(self._app.adblock.blocked_count)
         try:  # harness reachability — network stays off the GUI thread

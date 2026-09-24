@@ -27,6 +27,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import shutil
 import subprocess
 import sys
 import threading
@@ -71,6 +72,29 @@ def _find_exe() -> Path | None:
         if path.exists():
             return path
     return None
+
+
+def _python_executable() -> str:
+    """Interpreter for .py launchers. A frozen exe is NOT Python.
+
+    In a source checkout this is sys.executable. In a frozen browser it
+    is LUCKYD_PYTHON, else whatever `python`/`python3`/`py` resolves on
+    PATH. Raises FileNotFoundError instead of spawning the browser exe
+    with a .py argument (which can only fail confusingly).
+    """
+    if not getattr(sys, "frozen", False):
+        return sys.executable
+    override = os.environ.get("LUCKYD_PYTHON", "").strip()
+    if override:
+        return override
+    found = shutil.which("python") or shutil.which("python3") or shutil.which("py")
+    if found:
+        return found
+    raise FileNotFoundError(
+        "frozen browser cannot run a .py harness launcher — no Python "
+        "interpreter found. Set LUCKYD_PYTHON to one, or install "
+        "luckyd-code.exe next to the browser."
+    )
 
 
 def _hq_token() -> str:
@@ -155,8 +179,9 @@ class HarnessBridge:
                 return True
             flags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
             # A .py launcher must be run through the Python interpreter; a
-            # frozen .exe runs directly.
-            cmd = [sys.executable, str(exe)] if exe.suffix.lower() == ".py" else [str(exe)]
+            # frozen .exe runs directly. Under a frozen browser,
+            # sys.executable is the browser itself — never use it here.
+            cmd = [_python_executable(), str(exe)] if exe.suffix.lower() == ".py" else [str(exe)]
             self._harness_proc = subprocess.Popen(
                 [*cmd, "--web", "--port", str(self.port), "--host", self.host],
                 stdout=subprocess.DEVNULL,
