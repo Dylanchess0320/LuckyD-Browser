@@ -31,13 +31,6 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-# ── skill parsing (shared with tools/skill_tools) ─────────────────────────
-
-try:
-    from tools.skill_tools import _parse_skill as _parse_skill_file
-except Exception:  # pragma: no cover — import cycle guard
-    _parse_skill_file = None
-
 
 def user_skills_dir() -> Path:
     from core.trust import _data_dir

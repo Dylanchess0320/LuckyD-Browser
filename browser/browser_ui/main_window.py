@@ -255,9 +255,8 @@ class MainWindow(QMainWindow):
         self.omnibox.navigate.connect(self.load_in_current_tab)
         bar.addWidget(self.omnibox)
 
-        # Update badge: retained for API compat with _show_pending_update(). It
-        # now always points at the GitHub releases page — the in-app update
-        # checker that drove it was removed as unreliable.
+        # Update badge: it always points at the GitHub releases page — the
+        # in-app update checker that drove it was removed as unreliable.
         self._update_act = QAction("⬆", self)
         self._update_act.setToolTip("Get the latest LuckyD — opens the releases page on GitHub")
         self._update_act.setVisible(True)
@@ -1933,32 +1932,6 @@ class MainWindow(QMainWindow):
     def check_for_updates(self, silent: bool = False) -> None:
         """Open the GitHub releases page in a tab (the auto-updater is retired)."""
         del silent  # the badge + menu item share this entry point
-        self._open_releases_page()
-
-    def _on_update_checker_finished(self) -> None:
-        """Legacy shim: the UpdateChecker thread no longer runs."""
-
-    def _on_no_update(self, silent: bool) -> None:
-        del silent  # no-op shim
-
-    def _on_update_failed(self, message: str, silent: bool) -> None:
-        del message, silent  # no-op shim
-
-    def _show_update_badge(self, info: dict) -> None:
-        del info  # no-op shim: the badge always links to the releases page
-
-    def _show_pending_update(self) -> None:
-        self._open_releases_page()
-
-    def _on_update_available(self, info: dict, silent: bool) -> None:
-        del info, silent  # no-op shim: availability lives on GitHub, not in-app
-
-    def _start_update_download(self, info: dict) -> None:
-        del info  # retired: the auto-download flow was replaced by the releases page
-        self._open_releases_page()
-
-    def _apply_update(self, installer_path: str, version: str) -> None:
-        del installer_path, version  # retired: same as above
         self._open_releases_page()
 
     # NOTE: the old in-app updater chain that used to follow here (checker

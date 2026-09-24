@@ -939,12 +939,6 @@ async def handle_model_command(agent: CodingAgent, cmd: str) -> bool:
     raw = cmd[len("model") :].strip()
     low = raw.lower()
 
-    def _current_provider_name() -> str:
-        try:
-            return getattr(getattr(agent, "_provider_config", None), "provider", "") or ""
-        except Exception:
-            return ""
-
     def _flat_for_catalog(free_only: bool) -> dict[int, tuple[str, str]]:
         """Build the same number→(provider,model) map that ui.show_models() uses."""
         from core.providers import provider_key_from_label
@@ -969,7 +963,6 @@ async def handle_model_command(agent: CodingAgent, cmd: str) -> bool:
         flat = ui.show_models(
             sections,
             current_model=getattr(agent, "model", "") or "",
-            current_provider=_current_provider_name(),
         )
         # Built-in terminal picker — no separate bat file needed
         if sys.stdin.isatty():
@@ -1038,7 +1031,6 @@ async def handle_model_command(agent: CodingAgent, cmd: str) -> bool:
         flat = ui.show_models(
             sections,
             current_model=getattr(agent, "model", "") or "",
-            current_provider=_current_provider_name(),
         )
         if sys.stdin.isatty():
             try:
@@ -1064,7 +1056,6 @@ async def handle_model_command(agent: CodingAgent, cmd: str) -> bool:
         ui.show_models(
             model_catalog(free_only=False),
             current_model=getattr(agent, "model", "") or "",
-            current_provider=_current_provider_name(),
         )
         ui.info("Tip: /model <name> fuzzy-switches free models · /model free for free-only picker")
         return False
@@ -1082,7 +1073,6 @@ async def handle_model_command(agent: CodingAgent, cmd: str) -> bool:
             ui.show_models(
                 model_catalog(free_only=True),
                 current_model=getattr(agent, "model", "") or "",
-                current_provider=_current_provider_name(),
             )
         return False
 
@@ -1652,15 +1642,11 @@ def _cli_model(args):
 
     low0 = " ".join(args).strip().lower()
     if low0 in ("list", "free", "--free", "free --check", "list free", "free list"):
-        ui.show_models(
-            model_catalog(free_only=True), current_model=current, current_provider=cur_prov
-        )
+        ui.show_models(model_catalog(free_only=True), current_model=current)
         print("Switch: lucky-code model <name>  e.g. lucky-code model nemotron")
         return
     if low0 in ("all", "paid", "free all", "all free", "full"):
-        ui.show_models(
-            model_catalog(free_only=False), current_model=current, current_provider=cur_prov
-        )
+        ui.show_models(model_catalog(free_only=False), current_model=current)
         return
 
     # ── Resolve the desired model ────────────────────────────────────

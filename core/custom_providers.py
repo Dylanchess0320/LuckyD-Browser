@@ -238,5 +238,3 @@ def test_provider(
         return {"ok": True, "status": status, "models": models, "error": ""}
     except Exception as exc:
         return {"ok": False, "status": None, "models": [], "error": f"{type(exc).__name__}: {exc}"}
-
-    return None

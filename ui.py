@@ -810,7 +810,6 @@ class TerminalUI:
         sections: list[dict],
         *,
         current_model: str = "",
-        current_provider: str = "",
         numbered: bool = True,
     ) -> dict[int, tuple[str, str]]:
         """Professional model catalog — Panel + Table (Rich) or boxed ANSI fallback.
@@ -1329,7 +1328,6 @@ class WebUI:
         sections: list[dict],
         *,
         current_model: str = "",
-        current_provider: str = "",
         numbered: bool = True,
     ) -> None:
         """Send the tiered model catalog to the browser's models panel."""
