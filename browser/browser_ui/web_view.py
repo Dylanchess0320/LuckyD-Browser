@@ -5,10 +5,11 @@ from __future__ import annotations
 import contextlib
 import json
 from string import Template
-from urllib.parse import quote
+from urllib.parse import parse_qs, quote, quote_plus, unquote, urlparse
 
 from browser_core import agent as _agent
 from browser_core.https_only import upgrade_url
+from browser_core.settings import SEARCH_ENGINES
 from PySide6.QtCore import Qt, QTimer, QUrl
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtWebEngineCore import QWebEnginePage, QWebEngineSettings
@@ -111,6 +112,69 @@ def _is_google_sorry_url(url_str: str) -> bool:
     """
     lowered = (url_str or "").lower()
     return "google.com/sorry" in lowered or "sorry/index" in lowered
+
+
+# Engines to re-run a blocked Google search on, in preference order.
+# Google itself is never a fallback target (it is the engine that blocked us).
+_SORRY_FALLBACK_ENGINES = ("DuckDuckGo", "Bing", "Brave", "Startpage")
+
+
+def _sorry_continue_url(sorry_url: str) -> str | None:
+    """Extract the blocked page URL from a Google sorry page's `continue` param.
+
+    Google's sorry page looks like:
+        https://www.google.com/sorry/index?continue=https://www.google.com/search%3Fq%3Dcats&hl=en
+    Returns the decoded `continue` URL, or None when absent/unparseable.
+    Module-level so it is unit-testable without a Qt runtime.
+    """
+    try:
+        qs = parse_qs(urlparse(sorry_url or "").query)
+        cont = qs.get("continue", [None])[0]
+        if not cont:
+            return None
+        return unquote(cont)
+    except Exception:
+        return None
+
+
+def _google_search_query(search_url: str) -> str | None:
+    """Extract the `q` query from a google.com/search URL, or None.
+
+    Module-level so it is unit-testable without a Qt runtime.
+    """
+    try:
+        parsed = urlparse(search_url or "")
+        if "google.com/search" not in (parsed.netloc + parsed.path).lower():
+            return None
+        q = parse_qs(parsed.query).get("q", [""])[0]
+        return q.strip() or None
+    except Exception:
+        return None
+
+
+def _sorry_fallback(sorry_url: str, preferred_engine: str = "DuckDuckGo") -> tuple[str, str] | None:
+    """Pick a fallback search for a blocked Google search.
+
+    Returns (engine_name, search_url) re-running the blocked query on the
+    first usable non-Google engine — the user's preferred engine when it is
+    not Google, else the fixed preference order. Returns None when the
+    sorry page carries no recoverable Google search query.
+
+    Module-level so it is unit-testable without a Qt runtime.
+    """
+    original = _sorry_continue_url(sorry_url)
+    query = _google_search_query(original) if original else None
+    if not query:
+        return None
+    ordered = [preferred_engine] if preferred_engine in SEARCH_ENGINES else []
+    ordered += [e for e in _SORRY_FALLBACK_ENGINES if e != preferred_engine]
+    for engine in ordered:
+        if engine == "Google":
+            continue
+        template = SEARCH_ENGINES.get(engine)
+        if template:
+            return engine, template.format(query=quote_plus(query))
+    return None
 
 
 def _connecting_html(p: dict, attempt: int) -> str:
@@ -280,7 +344,7 @@ class WebView(QWebEngineView):
             if self._connecting_for != url:
                 self._load_attempts.pop(url.toString(), None)
             self._connecting_for = None
-            self._maybe_warn_google_sorry(url)
+            self._handle_google_sorry(url)
             return
         if url.scheme() not in ("http", "https"):
             return
@@ -316,13 +380,15 @@ class WebView(QWebEngineView):
         except RuntimeError:
             pass  # view torn down between scheduling and firing — nothing to do
 
-    def _maybe_warn_google_sorry(self, url) -> None:
-        """Toast once per session when Google serves its "unusual traffic" bot page.
+    def _handle_google_sorry(self, url) -> None:
+        """Recover from Google's "unusual traffic" bot page instead of stranding the user.
 
         Some of Google's risk scoring is IP/reputation-based and no browser
-        code can fully defeat it — so when the challenge page does appear,
-        point the user at the escape hatch (switch the default search
-        provider) instead of leaving them stuck on an unsolvable page.
+        code can fully defeat it — so when the challenge page appears on a
+        Google search, re-run the same query on a fallback engine (the user's
+        configured engine when it isn't Google, else DuckDuckGo → Bing →
+        Brave → Startpage). Non-Google engines never produce sorry pages, so
+        the fallback cannot loop back onto itself.
         """
         try:
             url_str = url.toString()
@@ -330,10 +396,27 @@ class WebView(QWebEngineView):
             return
         if not _is_google_sorry_url(url_str):
             return
+        toast = getattr(self._mw, "toast", None)
+        try:
+            preferred = str(self._mw.settings.get("search_engine", "DuckDuckGo"))
+        except Exception:
+            preferred = "DuckDuckGo"
+        fallback = _sorry_fallback(url_str, preferred)
+        if fallback is not None:
+            engine, fallback_url = fallback
+            if callable(toast):
+                toast(
+                    f"Google flagged this search as automated traffic — re-ran it on {engine}.",
+                    "warning",
+                )
+            with contextlib.suppress(Exception):
+                self.load(QUrl(fallback_url))
+            return
+        # No recoverable query (sorry page reached some other way) — keep the
+        # old advisory, once per session.
         if getattr(self._mw, "_google_sorry_warned", False):
             return
         self._mw._google_sorry_warned = True
-        toast = getattr(self._mw, "toast", None)
         if callable(toast):
             toast(
                 "Google flagged this as automated traffic. You can switch the "

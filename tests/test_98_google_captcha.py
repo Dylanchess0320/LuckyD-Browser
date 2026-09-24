@@ -35,6 +35,37 @@ class _QtInterceptorStub:
 
 sys.modules["PySide6.QtWebEngineCore"].QWebEngineUrlRequestInterceptor = _QtInterceptorStub
 
+
+class _QtPageStub:
+    """Real QWebEnginePage stand-in (mirrors test_crash_ui._WebPageBaseStub)."""
+
+    def __init__(self, *args, **kwargs):
+        self.renderProcessTerminated = MagicMock()
+        self.featurePermissionRequested = MagicMock()
+
+
+class _QtViewStub:
+    """Real QWebEngineView stand-in."""
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+
+def _webview_module():
+    """Import browser_ui.web_view with real Qt base stubs.
+
+    The stubs are installed idempotently before the (possibly first) import
+    so WebView/WebPage are genuine classes instead of mock-subclass garbage
+    (cf. AGENTS.md). When the full suite runs, test_crash_ui already imported
+    the module with its own stubs — then this is a no-op returning it.
+    """
+    sys.modules["PySide6.QtWebEngineCore"].QWebEnginePage = _QtPageStub
+    sys.modules["PySide6.QtWebEngineWidgets"].QWebEngineView = _QtViewStub
+    import browser_ui.web_view as wv
+
+    return wv
+
+
 from browser_core.adblock import AdBlockInterceptor, _is_captcha_safe_url
 from browser_core.settings import DEFAULTS, SEARCH_ENGINES, SettingsStore
 
@@ -220,7 +251,7 @@ def test_desktop_ua_falls_back_to_constant_when_engine_query_fails() -> None:
 
 
 def test_is_google_sorry_url() -> None:
-    from browser_ui.web_view import _is_google_sorry_url as is_sorry
+    is_sorry = _webview_module()._is_google_sorry_url
 
     assert is_sorry("https://www.google.com/sorry/index?continue=...")
     assert is_sorry("https://sorry.google.com/sorry/index")
@@ -234,3 +265,160 @@ def test_omnibox_uses_settings_search_url_for() -> None:
     text = (_BROWSER_DIR / "browser_ui" / "omnibox.py").read_text(encoding="utf-8")
     assert "self._settings.search_url_for(text)" in text
     assert "google.com/search" not in text
+
+
+# ── Google sorry-page auto-fallback ──────────────────────────────────────
+_SORRY = (
+    "https://www.google.com/sorry/index"
+    "?continue=https://www.google.com/search%3Fq%3Drobot%2Bvacuum%26hl%3Den"
+    "&hl=en&q=EgQK..."
+)
+
+
+def test_sorry_continue_url_extracts_blocked_search() -> None:
+    wv = _webview_module()
+    assert wv._sorry_continue_url(_SORRY) == "https://www.google.com/search?q=robot+vacuum&hl=en"
+
+
+def test_sorry_continue_url_none_when_missing() -> None:
+    wv = _webview_module()
+    assert wv._sorry_continue_url("https://www.google.com/sorry/index?hl=en") is None
+    assert wv._sorry_continue_url("") is None
+    assert wv._sorry_continue_url("not a url") is None
+
+
+def test_google_search_query_extracts_q() -> None:
+    wv = _webview_module()
+    assert (
+        wv._google_search_query("https://www.google.com/search?q=robot+vacuum&hl=en")
+        == "robot vacuum"
+    )
+    assert (
+        wv._google_search_query("https://www.google.com/search?q=%22exact+phrase%22")
+        == '"exact phrase"'
+    )
+
+
+def test_google_search_query_none_for_non_search() -> None:
+    wv = _webview_module()
+    assert wv._google_search_query("https://www.google.com/") is None
+    assert wv._google_search_query("https://www.bing.com/search?q=x") is None
+    assert wv._google_search_query("https://www.google.com/search?hl=en") is None
+    assert wv._google_search_query("") is None
+
+
+def test_sorry_fallback_prefers_user_engine_when_not_google() -> None:
+    wv = _webview_module()
+    engine, url = wv._sorry_fallback(_SORRY, preferred_engine="Brave")
+    assert engine == "Brave"
+    assert url == "https://search.brave.com/search?q=robot+vacuum"
+
+
+def test_sorry_fallback_skips_google_preferred_engine() -> None:
+    wv = _webview_module()
+    engine, url = wv._sorry_fallback(_SORRY, preferred_engine="Google")
+    assert engine == "DuckDuckGo"
+    assert url == "https://duckduckgo.com/?q=robot+vacuum"
+
+
+def test_sorry_fallback_none_when_no_query() -> None:
+    wv = _webview_module()
+    assert wv._sorry_fallback("https://www.google.com/sorry/index?hl=en") is None
+    assert wv._sorry_fallback("https://www.google.com/sorry/index") is None
+
+
+def test_sorry_fallback_never_targets_google() -> None:
+    wv = _webview_module()
+    for preferred in ("Google", "DuckDuckGo", "Bing", "Brave", "Startpage", "Nope"):
+        fb = wv._sorry_fallback(_SORRY, preferred_engine=preferred)
+        assert fb is not None
+        assert fb[0] != "Google"
+        assert "google.com" not in fb[1]
+
+
+class _FakeQUrl:
+    def __init__(self, s: str):
+        self._s = s
+
+    def toString(self):  # noqa: N802 - mirrors QUrl API
+        return self._s
+
+
+class _FakeMw:
+    def __init__(self, engine: str = "Google"):
+        self._engine = engine
+        self.toasts: list[tuple[str, str]] = []
+
+    def toast(self, msg: str, kind: str):
+        self.toasts.append((msg, kind))
+
+    @property
+    def settings(self):
+        mw = self
+
+        class _S:
+            def get(self, key: str, default=None):
+                return mw._engine if key == "search_engine" else default
+
+        return _S()
+
+
+class _FakeView:
+    def __init__(self, engine: str = "Google"):
+        self._mw = _FakeMw(engine)
+        self.loaded: list = []
+
+    def load(self, qurl):
+        self.loaded.append(qurl)
+
+
+def _loaded_url(wv, view) -> str:
+    """The URL string the fake view was asked to load.
+
+    The handler wraps it in Qt's QUrl (a MagicMock headless) — read the
+    constructor arg instead of toString().
+    """
+    assert len(view.loaded) == 1
+    qurl_mock = wv.QUrl
+    assert qurl_mock.call_args is not None
+    return qurl_mock.call_args[0][0]
+
+
+def test_handle_google_sorry_falls_back_and_toasts() -> None:
+    wv = _webview_module()
+    if hasattr(wv.QUrl, "reset_mock"):
+        wv.QUrl.reset_mock()
+    view = _FakeView(engine="Google")
+    wv.WebView._handle_google_sorry(view, _FakeQUrl(_SORRY))  # type: ignore[arg-type]
+    assert _loaded_url(wv, view) == "https://duckduckgo.com/?q=robot+vacuum"
+    assert len(view._mw.toasts) == 1
+    msg, kind = view._mw.toasts[0]
+    assert "DuckDuckGo" in msg and kind == "warning"
+
+
+def test_handle_google_sorry_respects_preferred_engine() -> None:
+    wv = _webview_module()
+    if hasattr(wv.QUrl, "reset_mock"):
+        wv.QUrl.reset_mock()
+    view = _FakeView(engine="Brave")
+    wv.WebView._handle_google_sorry(view, _FakeQUrl(_SORRY))  # type: ignore[arg-type]
+    assert _loaded_url(wv, view) == "https://search.brave.com/search?q=robot+vacuum"
+
+
+def test_handle_google_sorry_no_query_keeps_advisory_once() -> None:
+    wv = _webview_module()
+    view = _FakeView(engine="Google")
+    url = _FakeQUrl("https://www.google.com/sorry/index?hl=en")
+    wv.WebView._handle_google_sorry(view, url)  # type: ignore[arg-type]
+    wv.WebView._handle_google_sorry(view, url)  # type: ignore[arg-type]
+    assert view.loaded == []
+    assert len(view._mw.toasts) == 1  # advisory only once per session
+    assert "Settings" in view._mw.toasts[0][0]
+
+
+def test_handle_google_sorry_ignores_non_sorry_urls() -> None:
+    wv = _webview_module()
+    view = _FakeView(engine="Google")
+    wv.WebView._handle_google_sorry(view, _FakeQUrl("https://www.google.com/search?q=cats"))  # type: ignore[arg-type]
+    assert view.loaded == []
+    assert view._mw.toasts == []
