@@ -185,3 +185,5 @@ external/
 
 browser/installer/compile_log.txt
 coverage.json
+benchmark_results/
+desktop_*.png

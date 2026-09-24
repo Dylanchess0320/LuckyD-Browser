@@ -139,6 +139,17 @@ GET  /help                   machine-readable route list
 The element indices in `/snapshot` and `/act` are the same ones the AI
 sidebar agent uses, so anything that can read a snapshot can drive the page.
 
+## CDP remote debugging
+
+Qt WebEngine exposes Chrome DevTools Protocol on loopback
+(`127.0.0.1:9222`) at startup. The agent's CDP driver, GPU-safe
+screenshots, and the Network Monitor all need it, and it cannot be
+enabled at runtime — so it defaults ON. It never binds a network
+interface (same trust domain as the Control API above). To disable it,
+uncheck **Settings → CDP remote debugging** (restart to apply) or set
+`LUCKYD_CDP_DEBUG=0`; `/status` then reports `"cdp": "disabled"` and
+agent vision/deep control degrade to the JS driver.
+
 ## Harness mode (luckyd-code.exe backend)
 
 The AI sidebar's **🔌 Harness mode** checkbox routes agent tasks to the
