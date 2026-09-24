@@ -592,7 +592,7 @@ def test_call_openai_streaming_success(
     assert url == "https://api.openai.com/v1/chat/completions"
     assert headers["Authorization"] == "Bearer k"
     assert headers["User-Agent"] == "LuckyDBrowser/10.5"
-    assert body["model"] == "gpt-4o"
+    assert body["model"] == "gpt-6-sol"
     assert body["stream"] is True
 
 
@@ -615,7 +615,7 @@ def test_call_gemini_url_and_delta(hermetic, fake_http) -> None:
     (_method, url, body, headers) = fake_http.last.stream_calls[0]
     assert (
         url == "https://generativelanguage.googleapis.com/v1beta"
-        "/models/gemini-2.5-flash:streamGenerateContent?key=gk&alt=sse"
+        "/models/gemini-3.8-flash:streamGenerateContent?key=gk&alt=sse"
     )
     assert body["contents"][0]["parts"] == [{"text": "hi"}]
     assert "Authorization" not in headers
@@ -783,7 +783,7 @@ def test_fetch_models_non_openai_kind_skips_live_block(
     hermetic["env"] = {"GOOGLE_API_KEY": "gk"}
     monkeypatch.setattr(ai_bridge.httpx, "get", _must_not_run)
     bridge = _bridge(hermetic)
-    assert bridge.fetch_models("google") == ["gemini-2.5-flash"]
+    assert bridge.fetch_models("google") == ["gemini-3.8-flash"]
 
 
 def test_routed_provider_route_task_error_returns_none(

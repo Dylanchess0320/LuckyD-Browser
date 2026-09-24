@@ -10,17 +10,27 @@ from pathlib import Path
 
 
 def test_jules_shells_allowlisted() -> None:
-    """mesh-jules (and the bare `jules` alias) must be allowlisted shells."""
+    """mesh-jules (and the bare `jules` alias) must be allowlisted shells.
+
+    2026-09-24: mesh-aider / aider ride the same mesh rails.
+    """
     from browser.browser_core.terminal_server import MESH_SHELLS, SHELLS
 
     assert "mesh-jules" in SHELLS
     assert "jules" in SHELLS
     assert MESH_SHELLS["mesh-jules"] == "jules"
     assert MESH_SHELLS["jules"] == "jules"
+    assert "mesh-aider" in SHELLS
+    assert "aider" in SHELLS
+    assert MESH_SHELLS["mesh-aider"] == "aider"
+    assert MESH_SHELLS["aider"] == "aider"
 
 
 def test_jules_mesh_dock_entry() -> None:
-    """The dock chip metadata must exist with the 4-tuple shape."""
+    """The dock chip metadata must exist with the 4-tuple shape.
+
+    2026-09-24: Aider's dock chip gets the same guarantee.
+    """
     from browser.browser_core.terminal_page import _MESH_AGENTS, _SHELL_LABELS
 
     entry = _MESH_AGENTS["mesh-jules"]
@@ -31,13 +41,26 @@ def test_jules_mesh_dock_entry() -> None:
     assert _SHELL_LABELS.get("mesh-jules") == "Jules"
     assert _SHELL_LABELS.get("jules") == "Jules"
 
+    aider = _MESH_AGENTS["mesh-aider"]
+    assert isinstance(aider, tuple) and len(aider) == 4
+    alabel, aemoji, aaccent, ablurb = aider
+    assert alabel == "Aider"
+    assert aemoji and aaccent.startswith("#") and ablurb
+    assert _SHELL_LABELS.get("mesh-aider") == "Aider"
+    assert _SHELL_LABELS.get("aider") == "Aider"
+
 
 def test_jules_mesh_emoji_unused() -> None:
-    """Jules' dock emoji must not collide with another agent's."""
+    """Jules' dock emoji must not collide with another agent's.
+
+    2026-09-24: same guarantee for Aider's emoji.
+    """
     from browser.browser_core.terminal_page import _MESH_AGENTS
 
     emojis = [meta[1] for shell, meta in _MESH_AGENTS.items() if shell != "mesh-jules"]
     assert _MESH_AGENTS["mesh-jules"][1] not in emojis
+    aider_emojis = [meta[1] for shell, meta in _MESH_AGENTS.items() if shell != "mesh-aider"]
+    assert _MESH_AGENTS["mesh-aider"][1] not in aider_emojis
 
 
 def test_jules_shell_command_resolves(monkeypatch, tmp_path: Path) -> None:
@@ -76,11 +99,14 @@ def test_jules_availability_reported(monkeypatch) -> None:
 
 
 def test_jules_coexists_with_other_agents() -> None:
-    """Adding Jules must not disturb OpenCode, MiniMax Code, or Cline."""
+    """Adding Jules must not disturb OpenCode, MiniMax Code, or Cline.
+
+    2026-09-24: Aider (mesh-aider) joins the same way — it coexists too.
+    """
     from browser.browser_core.terminal_page import _MESH_AGENTS
     from browser.browser_core.terminal_server import MESH_SHELLS, SHELLS
 
-    for shell in ("mesh-opencode", "mesh-mcode", "mesh-mmx", "mesh-cline"):
+    for shell in ("mesh-opencode", "mesh-mcode", "mesh-mmx", "mesh-cline", "mesh-aider"):
         assert shell in SHELLS
         assert shell in MESH_SHELLS
         assert shell in _MESH_AGENTS

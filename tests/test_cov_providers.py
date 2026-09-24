@@ -237,7 +237,7 @@ class TestResolveProviderConfig:
         cfg = resolve_provider_config("mystery")
         assert cfg["provider"] == "mystery"
         assert cfg["base_url"] == "https://api.deepseek.com/v1"
-        assert cfg["model"] == "deepseek-chat"
+        assert cfg["model"] == "deepseek-v4"
 
     def test_mirror_browser_model_override(self, clean_env, monkeypatch):
         monkeypatch.setattr(
@@ -262,7 +262,7 @@ class TestResolveProviderConfig:
         clean_env.setenv("OPENAI_API_KEY", "sk-x")
         cfg = resolve_provider_config()
         assert cfg["provider"] == "openai"
-        assert cfg["model"] == "gpt-4o"  # default, no mirror model applied
+        assert cfg["model"] == "gpt-6-sol"  # default, no mirror model applied
 
     def test_mirror_env_model_beats_browser_pick(self, clean_env, monkeypatch):
         monkeypatch.setattr(
@@ -298,7 +298,7 @@ class TestResolveProviderConfig:
         clean_env.setenv("OPENAI_API_KEY", "sk-x")
         cfg = resolve_provider_config()
         assert cfg["provider"] == "openai"
-        assert cfg["model"] == "gpt-4o"  # no override for this provider
+        assert cfg["model"] == "gpt-6-sol"  # no override for this provider
 
     def test_clinepass_import_fallback_inserts_path(self, clean_env, monkeypatch):
         # bc NOT pre-added: the fallback must insert it into sys.path.
@@ -385,7 +385,7 @@ class TestResolveProviderConfig:
     def test_deepseek_auto_resolver_import_error(self, clean_env, monkeypatch):
         monkeypatch.setitem(sys.modules, "model_resolver", None)
         cfg = resolve_provider_config("deepseek")
-        assert cfg["model"] == "deepseek-chat"
+        assert cfg["model"] == "deepseek-v4"
 
     def test_deepseek_explicit_model_skips_resolver(self, clean_env, monkeypatch):
         fake = _FakeModelResolver()

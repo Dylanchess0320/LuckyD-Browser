@@ -36,6 +36,10 @@ VALID_PROVIDERS = {
     "clinepass",
     "cline-usage",
     "minimax",
+    # 2026-09-24: xAI Grok 4.7 (flagship coding/agent model) + Moonshot Kimi K3
+    # (1M-context open-weight MoE) join the keyed provider roster.
+    "xai",
+    "moonshot",
 }
 
 #: Short-hands accepted anywhere a provider id is read (CODING_AGENT_PROVIDER,
@@ -69,6 +73,8 @@ PROVIDER_NAMES = {
     "clinepass": "ClinePass",
     "cline-usage": "Cline (usage)",
     "minimax": "MiniMax",
+    "xai": "xAI (Grok)",
+    "moonshot": "Moonshot (Kimi)",
 }
 
 PROVIDER_DEFAULTS: dict[str, ProviderDefaults] = {
@@ -77,28 +83,36 @@ PROVIDER_DEFAULTS: dict[str, ProviderDefaults] = {
         "env_base": "OPENAI_BASE_URL",
         "env_model": "OPENAI_MODEL",
         "default_base": "https://api.openai.com/v1",
-        "default_model": "gpt-4o",
+        # 2026-09-24: GPT-6 Sol — balanced GPT-6 tier ($2/$10 per 1M), replaces
+        # the stale gpt-4o default. Astra ($10/$50) via OPENAI_MODEL=gpt-6-astra.
+        "default_model": "gpt-6-sol",
     },
     "anthropic": {
         "env_key": "ANTHROPIC_API_KEY",
         "env_base": "ANTHROPIC_BASE_URL",
         "env_model": "ANTHROPIC_MODEL",
         "default_base": "https://api.anthropic.com/v1",
-        "default_model": "claude-sonnet-4-20250514",
+        # 2026-09-24: Claude Opus 5.5 — Fable-5.1-class at $4/$20 per 1M,
+        # replaces the retired claude-sonnet-4-20250514 default.
+        "default_model": "claude-opus-5-5",
     },
     "google": {
         "env_key": "GOOGLE_API_KEY",
         "env_base": "GOOGLE_BASE_URL",
         "env_model": "GOOGLE_MODEL",
         "default_base": "https://generativelanguage.googleapis.com/v1beta",
-        "default_model": "gemini-2.5-flash",
+        # 2026-09-24: Gemini 3.8 Flash (Sep 2) — newest stable Flash, 1M
+        # context, replaces gemini-2.5-flash.
+        "default_model": "gemini-3.8-flash",
     },
     "gemini": {
         "env_key": "GOOGLE_API_KEY",
         "env_base": "GOOGLE_BASE_URL",
         "env_model": "GOOGLE_MODEL",
         "default_base": "https://generativelanguage.googleapis.com/v1beta",
-        "default_model": "gemini-2.5-flash",
+        # 2026-09-24: Gemini 3.8 Flash (Sep 2) — newest stable Flash, 1M
+        # context, replaces gemini-2.5-flash.
+        "default_model": "gemini-3.8-flash",
     },
     "ollama": {
         "env_key": None,
@@ -112,14 +126,18 @@ PROVIDER_DEFAULTS: dict[str, ProviderDefaults] = {
         "env_base": "CODING_AGENT_BASE_URL",
         "env_model": "CODING_AGENT_MODEL",
         "default_base": "https://api.deepseek.com/v1",
-        "default_model": "deepseek-chat",
+        # 2026-09-24: DeepSeek V4 — cheapest frontier-class ($0.14/$0.28 per
+        # 1M), replaces the retired deepseek-chat default.
+        "default_model": "deepseek-v4",
     },
     "zai": {
         "env_key": "ZAI_API_KEY",
         "env_base": "ZAI_BASE_URL",
         "env_model": "ZAI_MODEL",
         "default_base": "https://api.z.ai/api/paas/v4",
-        "default_model": "glm-4.5",
+        # 2026-09-24: GLM-5.3 Flash (MIT-licensed, agent-heavy), replaces
+        # the retired glm-4.5 default.
+        "default_model": "glm-5.3-flash",
     },
     "groq": {
         "env_key": "GROQ_API_KEY",
@@ -174,6 +192,26 @@ PROVIDER_DEFAULTS: dict[str, ProviderDefaults] = {
         "env_model": "MINIMAX_MODEL",
         "default_base": "https://api.minimax.io/anthropic",
         "default_model": "MiniMax-M3",
+    },
+    # xAI (Grok 4.7, OpenAI-compatible chat API). 2026-09-24: flagship coding /
+    # long-running agent model, 500K context, $2/$6 per 1M. Key: XAI_API_KEY
+    # from console.x.ai. Base: https://api.x.ai/v1.
+    "xai": {
+        "env_key": "XAI_API_KEY",
+        "env_base": "XAI_BASE_URL",
+        "env_model": "XAI_MODEL",
+        "default_base": "https://api.x.ai/v1",
+        "default_model": "grok-4.7",
+    },
+    # Moonshot AI (Kimi K3, OpenAI-compatible chat API). 2026-09-24: huge
+    # open-weight multimodal MoE, 1M context, $3/$15 per 1M. Key:
+    # MOONSHOT_API_KEY from platform.kimi.ai. Base: https://api.moonshot.ai/v1.
+    "moonshot": {
+        "env_key": "MOONSHOT_API_KEY",
+        "env_base": "MOONSHOT_BASE_URL",
+        "env_model": "MOONSHOT_MODEL",
+        "default_base": "https://api.moonshot.ai/v1",
+        "default_model": "kimi-k3",
     },
 }
 
@@ -573,6 +611,9 @@ PROVIDER_ORDER = (
     "openai",
     "anthropic",
     "minimax",
+    # 2026-09-24: xAI Grok 4.7 + Moonshot Kimi K3 (keyed, paid tiers).
+    "xai",
+    "moonshot",
 )
 
 

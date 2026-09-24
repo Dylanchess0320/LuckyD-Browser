@@ -113,12 +113,12 @@ _PROVIDER_SPECS = [
     (
         "google",
         "GOOGLE_API_KEY",
-        "gemini-2.5-flash",
+        "gemini-3.8-flash",
         "https://generativelanguage.googleapis.com/v1beta",
         "gemini",
     ),
     ("groq", "GROQ_API_KEY", "llama-3.3-70b-versatile", "https://api.groq.com/openai/v1", "openai"),
-    ("zai", "ZAI_API_KEY", "glm-4.5-flash", "https://api.z.ai/api/paas/v4", "openai"),
+    ("zai", "ZAI_API_KEY", "glm-5.3-flash", "https://api.z.ai/api/paas/v4", "openai"),
     (
         "openrouter",
         "OPENROUTER_API_KEY",
@@ -127,14 +127,20 @@ _PROVIDER_SPECS = [
         "openai",
     ),
     ("deepseek", "DEEPSEEK_API_KEY", "deepseek-v4-flash", "https://api.deepseek.com", "openai"),
-    ("openai", "OPENAI_API_KEY", "gpt-4o", "https://api.openai.com/v1", "openai"),
+    ("openai", "OPENAI_API_KEY", "gpt-6-sol", "https://api.openai.com/v1", "openai"),
     (
         "anthropic",
         "ANTHROPIC_API_KEY",
-        "claude-sonnet-4-20250514",
+        "claude-opus-5-5",
         "https://api.anthropic.com/v1",
         "anthropic",
     ),
+    # 2026-09-24: xAI Grok 4.7 — flagship coding / long-running agent model
+    # (500K context). OpenAI-compatible: https://api.x.ai/v1, XAI_API_KEY.
+    ("xai", "XAI_API_KEY", "grok-4.7", "https://api.x.ai/v1", "openai"),
+    # 2026-09-24: Moonshot Kimi K3 — open-weight multimodal MoE, 1M context.
+    # OpenAI-compatible: https://api.moonshot.ai/v1, MOONSHOT_API_KEY.
+    ("moonshot", "MOONSHOT_API_KEY", "kimi-k3", "https://api.moonshot.ai/v1", "openai"),
 ]
 
 # Keyless local servers — probed at startup, registered before keyed clouds.
@@ -170,11 +176,17 @@ _VISION_HINTS = (
     "gpt-4-turbo",
     "gpt-4-vision",
     "gpt-5",
+    # 2026-09-24: GPT-6 family takes text+image input.
+    "gpt-6",
     "gemini",
     "claude-3",
     "claude-sonnet-4",
     "claude-opus-4",
     "claude-haiku-4",
+    # 2026-09-24: Claude 5.x family (Fable 5.1 / Opus 5.5) takes image input.
+    "claude-opus-5",
+    "claude-fable-5",
+    "claude-sonnet-5",
     "llava",
     "bakllava",
     "moondream",
@@ -190,6 +202,9 @@ _VISION_HINTS = (
     "glm-4v",
     "glm-4.5v",
     "kimi-vl",
+    # 2026-09-24: Kimi K3 has native vision; Grok 4.x takes text+image input.
+    "kimi-k3",
+    "grok-4",
     "internvl",
     "phi-3-vision",
     "phi-3.5-vision",

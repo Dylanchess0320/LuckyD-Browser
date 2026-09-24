@@ -768,7 +768,7 @@ def _resolve_provider(provider_hint: str | None, model_name: str) -> dict:
     return {
         "api_key": api_key,
         "base_url": cfg.get("base_url", "https://api.deepseek.com/v1"),
-        "model": model_name or cfg.get("model", "deepseek-chat"),
+        "model": model_name or cfg.get("model", "deepseek-v4"),
         "provider": "deepseek",
         "thinking": cfg.get("thinking", False),
     }
@@ -854,6 +854,8 @@ def _persist_model_selection(provider: str, model: str) -> None:
         "clinepass": "CLINEPASS_MODEL",
         "cline-usage": "CLINE_USAGE_MODEL",
         "minimax": "MINIMAX_MODEL",
+        "xai": "XAI_MODEL",
+        "moonshot": "MOONSHOT_MODEL",
     }.get(provider)
     if not env_key or not model:
         return
@@ -1093,6 +1095,8 @@ async def handle_model_command(agent: CodingAgent, cmd: str) -> bool:
         "ollama",
         "zai",
         "minimax",
+        "xai",
+        "moonshot",
     ):
         if low.startswith(p + " "):
             provider = _PROVIDER_ALIASES.get(p, p)
@@ -1590,6 +1594,8 @@ def _resolve_model_query(raw_query: str) -> tuple[str, str] | None:
         "openai",
         "anthropic",
         "minimax",
+        "xai",
+        "moonshot",
     ):
         if raw_query.lower().startswith(p + " "):
             provider = _PROVIDER_ALIASES.get(p, p)
@@ -2162,7 +2168,8 @@ Options:
   --model NAME       Model: auto (default), flash, pro, or specific name
   --provider NAME    Set provider (see: lucky-code providers): ollama, clinepass,
                      cline-usage, openrouter, groq, deepseek,
-                     zai, google, gemini, openai, anthropic, minimax
+                     zai, google, gemini, openai, anthropic, minimax,
+                     xai, moonshot
   --permission-mode MODE  Tool permission mode: default, acceptEdits,
                      bypassPermissions, auto (default), off
   --thinking         Use the thinking/reasoning model

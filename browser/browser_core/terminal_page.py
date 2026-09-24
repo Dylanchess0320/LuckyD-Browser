@@ -36,6 +36,8 @@ _SHELL_LABELS = {
     "cline": "Cline",
     "mesh-jules": "Jules",
     "jules": "Jules",
+    "mesh-aider": "Aider",
+    "aider": "Aider",
 }
 
 
@@ -62,6 +64,8 @@ _MESH_AGENTS = {
     "mesh-grok": ("Grok", "𝕏", "#f1f5f9", "xAI · builder"),
     "mesh-muse": ("Muse Code", "Ⓜ️", "#0082fb", "Meta · native via WSL Ubuntu"),
     "mesh-jules": ("Jules", "☁️", "#34a853", "Google · async coder"),
+    # 2026-09-24: Aider — open-source git-native pair programmer.
+    "mesh-aider": ("Aider", "⌨️", "#a3e635", "Aider · git-native pair programmer"),
 }
 
 

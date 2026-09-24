@@ -341,6 +341,10 @@ SHELLS = (
     "mesh-grok",
     "mesh-muse",
     "mesh-jules",
+    # 2026-09-24: Aider (mesh-aider/aider) — open-source git-native pair
+    # programmer (auto-commits every edit, repo map, 4.1M+ installs).
+    "mesh-aider",
+    "aider",
     "agy",
     "antigravity",
     "grok",
@@ -374,6 +378,8 @@ MESH_SHELLS = {
     "grok": "grok",
     "mesh-jules": "jules",
     "jules": "jules",
+    "mesh-aider": "aider",
+    "aider": "aider",
 }
 
 # Extra default args per mesh shell (appended after the resolved executable).

@@ -16,7 +16,7 @@ class TestProviders:
         assert cfg["provider"] == "zai"
         assert cfg["api_key"] == "sk-test-zai"
         assert "z.ai" in cfg["base_url"]
-        assert cfg["model"] == "glm-4.5"
+        assert cfg["model"] == "glm-5.3-flash"
 
     def test_openrouter_provider_resolution(self):
         from core.providers import resolve_provider_config

@@ -162,7 +162,7 @@ def test_set_model_override(hermetic) -> None:
     assert b.model_for("openai") == "gpt-4o-mini"
     b.set_model_override("missing", "x")  # unknown provider ignored
     assert b.model_for("openai") == "gpt-4o-mini"
-    assert before == "gpt-4o"
+    assert before == "gpt-6-sol"
 
 
 # ── local status diagnoses ───────────────────────────────────────────

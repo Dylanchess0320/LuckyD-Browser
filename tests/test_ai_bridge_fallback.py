@@ -52,17 +52,35 @@ def test_fallback_default_is_cline_usage_when_keyed(
 
 
 def test_opencode_registers_when_keyed(no_local_no_keys, monkeypatch: pytest.MonkeyPatch) -> None:
-    """OPENCODE_API_KEY registers the keyed Zen gateway (restored 2026-09-21)."""
+    """OPENCODE_API_KEY registers the keyed Zen gateway (restored 2026-09-21).
+
+    2026-09-24: XAI_API_KEY / MOONSHOT_API_KEY register xAI (Grok 4.7) and
+    Moonshot (Kimi K3) the same keyed way.
+    """
     monkeypatch.setattr(ai_bridge, "_load_env", lambda: {"OPENCODE_API_KEY": "zk-test"})
     bridge = AIBridge()
     assert "opencode" in bridge.providers()
     assert bridge.default_provider() == "opencode"
+
+    monkeypatch.setattr(
+        ai_bridge,
+        "_load_env",
+        lambda: {"XAI_API_KEY": "xai-test", "MOONSHOT_API_KEY": "ms-test"},
+    )
+    bridge = AIBridge()
+    assert "xai" in bridge.providers()
+    assert "moonshot" in bridge.providers()
+    assert bridge.model_for("xai") == "grok-4.7"
+    assert bridge.model_for("moonshot") == "kimi-k3"
 
 
 def test_no_key_no_provider_registered(no_local_no_keys) -> None:
     """Without keys or Cline auth, no cloud provider is usable."""
     bridge = AIBridge()
     assert "opencode" not in bridge.providers()
+    # 2026-09-24: the new providers stay dark without their keys too.
+    assert "xai" not in bridge.providers()
+    assert "moonshot" not in bridge.providers()
     assert bridge.default_provider() is None
 
 
