@@ -5,7 +5,7 @@
 <p class="tagline">The AI browser that runs <em>your</em> models — local, unlimited, offline — plus a full coding agent and real terminals in one window.</p>
 
 <div class="cta-row" markdown>
-[⬇ Download v10.2.3](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.2.3/LuckyDBrowserSetup-10.2.3.exe){ .luckyd-btn }
+[⬇ Download v10.4.0](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.4.0/LuckyDBrowserSetup-10.4.0.exe){ .luckyd-btn }
 [Getting started](getting-started.md){ .luckyd-btn-ghost }
 [What's new](release-notes.md){ .luckyd-btn-ghost }
 </div>
@@ -76,12 +76,12 @@
 
 ## Install in 10 seconds
 
-1. Get [**LuckyDBrowserSetup-10.2.3.exe**](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.2.3/LuckyDBrowserSetup-10.2.3.exe)
+1. Get [**LuckyDBrowserSetup-10.4.0.exe**](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.4.0/LuckyDBrowserSetup-10.4.0.exe)
 2. Run it — per-user, **no admin**, installs to `%LOCALAPPDATA%\Programs\LuckyDBrowser`
 3. Optional: run `ollama_setup.ps1` from the install folder → Ollama + `llama3.2:3b` (~2 GB, one time)
 4. `Ctrl+Shift+A` → chat offline. Or bring your own keys (Gemini, Groq, DeepSeek, OpenAI, Anthropic, Z.ai, OpenRouter, Cline, OpenCode)
 
-Windows 10/11 x64 only. Silent install: `LuckyDBrowserSetup-10.2.3.exe /VERYSILENT /NORESTART`
+Windows 10/11 x64 only. Silent install: `LuckyDBrowserSetup-10.4.0.exe /VERYSILENT /NORESTART`
 
 ## Why LuckyD
 
@@ -97,6 +97,10 @@ Most "AI browsers" rent you a chatbot behind an account. LuckyD is a **real Chro
 | Open source MIT · no admin to install | ✅ | ❌ | ❌ | ❌ |
 
 > The others rent you their AI. **LuckyD runs yours.**
+
+## New in 10.4.0 — Provider-credit honesty
+
+A Cline HTTP 402 (insufficient credits) records a 24-hour marker in `~/.luckyd/cline_credit_state.json`: provider auto-selection skips Cline while valid, the provider list shows an exhausted indicator, and `lucky-code providers --clear-credit-state` clears it after topping up. Agent 1 and Agent 2 both run LuckyD Code v10.4.0.
 
 ## New in 10.2.0 — Performance + hardening edition
 
@@ -202,6 +206,6 @@ A hardened foundation: every local service now authenticates with HttpOnly sessi
 
 <p align="center">
   <b>MIT © LuckyD</b> · Chromium · Ollama · Qt · xterm.js · pywinpty · PyInstaller · Inno Setup<br>
-  <a href="https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.2.3/LuckyDBrowserSetup-10.2.3.exe">Download v10.2.3</a>
+  <a href="https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.4.0/LuckyDBrowserSetup-10.4.0.exe">Download v10.4.0</a>
   · <a href="https://www.youtube.com/@LuckyDYoutube">YouTube</a>
 </p>

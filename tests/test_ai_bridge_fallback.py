@@ -88,8 +88,14 @@ def test_cline_registers_when_keyed(no_local_no_keys, monkeypatch: pytest.Monkey
     assert model in ai_bridge._CLINE_GATEWAY_CATALOG
 
 
-def test_local_server_still_beats_cline(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A reachable Ollama keeps priority #1 over the Cline gateway."""
+def test_cline_free_tier_beats_local_server(monkeypatch: pytest.MonkeyPatch) -> None:
+    """10.4 free-model priority: Cline (free tier) beats local Ollama.
+
+    Supersedes the old local-first order — the mandated default priority is
+    Cline free tier -> Gemini free tier -> Ollama local -> other free
+    providers. (Ollama remains the terminal fallback when nothing with
+    better priority is usable.)
+    """
     monkeypatch.setattr(ai_bridge, "_load_env", lambda: {"CLINEPASS_API_KEY": "k"})
     monkeypatch.setattr(
         AIBridge,
@@ -97,4 +103,4 @@ def test_local_server_still_beats_cline(monkeypatch: pytest.MonkeyPatch) -> None
         staticmethod(lambda env: {"ollama": ("llama3", "http://localhost:11434/v1", "", "openai")}),
     )
     bridge = AIBridge()
-    assert bridge.default_provider() == "ollama"
+    assert bridge.default_provider() == "cline-usage"

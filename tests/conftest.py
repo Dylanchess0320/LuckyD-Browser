@@ -31,7 +31,7 @@ import pytest
 
 # ── Disable API calls in tests ─────────────────────────────────────────
 @pytest.fixture(autouse=True)
-def _mock_env(monkeypatch: pytest.MonkeyPatch) -> None:
+def _mock_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Prevent accidental API calls during testing.
 
     Set CODING_AGENT_TEST_API=1 to allow real API calls for integration tests.
@@ -48,6 +48,10 @@ def _mock_env(monkeypatch: pytest.MonkeyPatch) -> None:
         # for the suite so agent.run() tests don't write data/trajectories/.
         # (test_trajectory.py opts back in per-test.)
         monkeypatch.setenv("CODING_AGENT_TRAJECTORY", "0")
+        # 10.4: a developer's real Cline 402 marker must never flip suite
+        # results — point the credit-state file at a per-test path that
+        # starts nonexistent. (tests/test_cline_credit.py overrides this.)
+        monkeypatch.setenv("LUCKYD_CLINE_CREDIT_STATE", str(tmp_path / "cline_credit_state.json"))
 
 
 # ── Temporary directory fixtures ───────────────────────────────────────

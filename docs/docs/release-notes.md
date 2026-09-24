@@ -1,5 +1,15 @@
 # LuckyD Browser — Release Notes
 
+## [10.4.0] — Provider-credit honesty — 2026-09-24
+
+**[`LuckyDBrowserSetup-10.4.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.4.0/LuckyDBrowserSetup-10.4.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed.
+**[`LuckyDBrowser-Portable-10.4.0.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.4.0/LuckyDBrowser-Portable-10.4.0.zip)** — unzip and run, for locked-down PCs.
+
+- **Cline credit honesty** — a Cline HTTP 402 (insufficient credits) records `~/.luckyd/cline_credit_state.json` (24-hour TTL). While valid, provider auto-selection skips Cline and the provider list shows an exhausted indicator; `lucky-code providers --clear-credit-state` clears the marker after topping up. No balance API — the 402 is the only trigger.
+- **Version unification** — everything reports 10.4.0.
+
+On top of everything from 10.2.3 below.
+
 ## [10.2.3] — Smarter-agent edition + 402 failover — 2026-09-23
 
 **[`LuckyDBrowserSetup-10.2.3.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.2.3/LuckyDBrowserSetup-10.2.3.exe)** — Windows 10/11 x64 · per-user install · no admin needed.

@@ -15,6 +15,7 @@ import contextlib
 import json
 import os
 import re
+import time
 from pathlib import Path
 
 import httpx
@@ -27,6 +28,59 @@ try:
     from core.router import route_task as _route_task
 except Exception:  # pragma: no cover - import guard
     _route_task = None
+
+# Cline credit-exhaustion marker (core/cline_credit.py) — optional like the
+# router above: the frozen browser may not have `core` importable, so fall
+# back to reading the state file directly. Both paths agree on location,
+# format, TTL (24 h), and the LUCKYD_CLINE_CREDIT_STATE seam; both fail open.
+try:
+    from core.cline_credit import is_cline_credit_exhausted as _core_cline_exhausted
+    from core.cline_credit import record_cline_credit_exhausted as _core_cline_record
+except Exception:  # pragma: no cover - import guard
+    _core_cline_exhausted = None
+    _core_cline_record = None
+
+
+def _cline_state_path() -> Path:
+    """Marker file location, shared by the core and fallback paths."""
+    override = (os.environ.get("LUCKYD_CLINE_CREDIT_STATE", "") or "").strip()
+    if override:
+        return Path(override)
+    return Path.home() / ".luckyd" / "cline_credit_state.json"
+
+
+def _cline_credit_exhausted() -> bool:
+    """True while a Cline 402 marker is inside its 24 h TTL. Never raises."""
+    if _core_cline_exhausted is not None:
+        try:
+            return bool(_core_cline_exhausted())
+        except Exception:
+            return False
+    try:
+        data = json.loads(_cline_state_path().read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            return False
+        return (time.time() - float(data["exhausted_at"])) < 24 * 60 * 60
+    except Exception:
+        return False
+
+
+def _record_cline_credit_exhausted(reason: str) -> None:
+    """Persist a Cline 402 marker. Never raises."""
+    if _core_cline_record is not None:
+        with contextlib.suppress(Exception):
+            _core_cline_record(reason)
+        return
+    try:
+        path = _cline_state_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps({"exhausted_at": time.time(), "reason": (reason or "")[:300]}),
+            encoding="utf-8",
+        )
+    except Exception:
+        pass
+
 
 ENV_PATH = Path(__file__).resolve().parent.parent.parent / ".env"
 _HAS_STREAM_END = re.compile(r"\[DONE\]")
@@ -476,23 +530,36 @@ class AIBridge:
     def default_provider(self) -> str | None:
         """Return the highest-priority available provider.
 
-        Preference order (matches this module's docstring):
-          1. Local keyless servers (Ollama, LM Studio) — free, unlimited,
-             offline, no key or login needed
-          2. cline-usage — Cline free tier, when auth actually exists
+        Preference order — the 10.4 free-model priority (best free first):
+          1. cline-usage — Cline free tier, when auth actually exists
              (API key or a logged-in Cline CLI session) — the free default
              (OpenCode Zen is back in the mesh but keyed, not free)
-          3. Cloud keyed providers, in _PROVIDER_SPECS order
+          2. google — Gemini free tier (GOOGLE_API_KEY)
+          3. Local keyless servers (Ollama, LM Studio) — free, unlimited,
+             offline, no key or login needed
+          4. Other free providers (OpenRouter free catalog, Groq free tier)
+          5. Remaining cloud keyed providers, in registration order
+
+        10.4: while a Cline 402 marker is valid (an exhausted Cline Credits
+        balance 402s every usage-billed call), both Cline gateways are
+        skipped here just like providers without auth.
         """
+        cline_ok = self._cline_usable() and not _cline_credit_exhausted()
+        if "cline-usage" in self._configs and cline_ok:
+            return "cline-usage"
+        # Gemini free tier (registered under the "google" id in this bridge).
+        if "google" in self._configs:
+            return "google"
         for name, *_ in _LOCAL_SPECS:
             if name in self._configs:
                 return name
-        if "cline-usage" in self._configs and self._cline_usable():
-            return "cline-usage"
+        for name in ("openrouter", "groq"):
+            if name in self._configs:
+                return name
         # clinepass/cline-usage register with empty tokens for the
         # fetch_models() catalog fallback — never default to that dead end.
         for name in self._configs:
-            if name in ("clinepass", "cline-usage") and not self._cline_usable():
+            if name in ("clinepass", "cline-usage") and not cline_ok:
                 continue
             return name
         return None
@@ -507,6 +574,13 @@ class AIBridge:
             return True
         info = self._configs.get("cline-usage") or self._configs.get("clinepass")
         return bool(info and info[2])
+
+    def cline_credit_exhausted(self) -> bool:
+        """True while a Cline 402 marker steers auto-selection away (10.4).
+
+        The sidebar uses this for the credit-exhausted provider indicator.
+        """
+        return _cline_credit_exhausted()
 
     def model_for(self, provider: str) -> str:
         info = self._configs.get(provider)
@@ -596,7 +670,7 @@ class AIBridge:
                     "research can't use it directly"
                 )
         key = (cfg["api_key"] or "").strip()
-        headers = {"User-Agent": "LuckyDBrowser/10.2", "Content-Type": "application/json"}
+        headers = {"User-Agent": "LuckyDBrowser/10.4", "Content-Type": "application/json"}
         if key:
             headers["Authorization"] = f"Bearer {key}"
         configured = cfg["model"]
@@ -626,6 +700,12 @@ class AIBridge:
                     last_err = RuntimeError(
                         f"{pname} {m} HTTP {resp.status_code}: {resp.text[:200]}"
                     )
+                    if resp.status_code == 402 and self.is_cline_gateway(pname):
+                        # 10.4: exhausted Cline Credits — record the signal
+                        # (the 402 is the only trigger; no balance API).
+                        _record_cline_credit_exhausted(
+                            f"HTTP 402 from {base_url} ({m}): {(resp.text or '')[:200]}"
+                        )
                     if resp.status_code in (400, 401, 404, 429, 500, 502, 503, 504):
                         continue  # rotate to the next model
                     break
@@ -994,7 +1074,7 @@ class AIBridge:
             )
         )
         body["model"] = model
-        headers = {"User-Agent": "LuckyDBrowser/10.2"}
+        headers = {"User-Agent": "LuckyDBrowser/10.4"}
 
         if kind == "gemini":
             url = f"{base_url}/models/{model}:streamGenerateContent?key={api_key}&alt=sse"
@@ -1022,6 +1102,9 @@ class AIBridge:
         ):
             if resp.status_code >= 400:
                 detail = (await resp.aread()).decode(errors="replace")[:300]
+                if resp.status_code == 402 and self.is_cline_gateway(name):
+                    # 10.4: exhausted Cline Credits — record the signal.
+                    _record_cline_credit_exhausted(f"HTTP 402 from {base_url} ({model}): {detail}")
                 raise RuntimeError(f"{name} HTTP {resp.status_code}: {detail}")
             buf = ""
             async for chunk in resp.aiter_bytes():

@@ -560,6 +560,51 @@ class CodingAgent:
             self.llm_client.model = original_model
         return None
 
+    def _free_candidate_usable(self, provider: str) -> bool:
+        """Usability guard for one free-rotation candidate.
+
+        No network beyond the Ollama liveness probe: Cline needs its gateway
+        auth (and no valid 402 credit-exhaustion marker), keyed free tiers
+        need their env key present.
+        """
+        if provider == "cline-usage":
+            from core.cline_credit import is_cline_credit_exhausted
+
+            return self._cline_gateway_usable() and not is_cline_credit_exhausted()
+        if provider == "ollama":
+            return self._ollama_reachable()
+        try:
+            from core.providers import PROVIDER_DEFAULTS
+
+            env_key = (PROVIDER_DEFAULTS.get(provider) or {}).get("env_key")
+        except Exception:
+            env_key = None
+        return bool(env_key and (os.environ.get(env_key, "") or "").strip())
+
+    async def _rotate_free_models(self, messages, tools):
+        """Walk the free-model priority after a rotation-trigger failure.
+
+        10.4: the current provider just failed in a way that won't heal by
+        retrying it (HTTP 403: its auth/entitlement is dead), so each usable
+        free (provider, model) pair from ``core.free_rotation`` is tried in
+        priority order. The first success is pinned; total failure restores
+        the original provider and model and returns None.
+        """
+        from core.free_rotation import FreeModelRotator
+
+        current = str(getattr(self._provider_config, "provider", "")).lower()
+        rotator = FreeModelRotator()
+        # The current provider's auth/quota just failed — retrying it with a
+        # different model would fail identically, so skip the whole provider.
+        rotator.mark_provider_failed(current)
+        for provider, model in rotator.candidates():
+            if not self._free_candidate_usable(provider):
+                continue
+            good = await self._try_provider_escape(provider, lambda m=model: [m], messages, tools)
+            if good is not None:
+                return good
+        return None
+
     async def _auto_rotate_model(self, failed_msg: dict, messages, tools):
         """Rotate to a working model after an [API Error].
 
@@ -570,8 +615,13 @@ class CodingAgent:
         """
         content = str(failed_msg.get("content", ""))
         code = self._api_error_code(content)
-        if code in (401, 403):
+        if code == 401:
             return None
+        if code == 403:
+            # 10.4: this provider's auth/entitlement is dead — another model
+            # on the same key fails identically, so skip same-key rotation
+            # and walk the free-model priority instead.
+            return await self._rotate_free_models(messages, tools)
         if code is not None and code not in self._ROTATE_CODES:
             return None
 
@@ -1507,10 +1557,11 @@ class CodingAgent:
             # HQ auto-rotation: when the current model is dead (404/400),
             # its balance is exhausted (402), it is rate-limited (429) or
             # the gateway is down (5xx), transparently rotate to a working
-            # model instead of surfacing [API Error] text. Auth failures
-            # (401/403) are NOT rotated — another model on the same dead
-            # key would fail identically; the error text already tells the
-            # user how to re-login / fix the key.
+            # model instead of surfacing [API Error] text. A 401 is NOT
+            # rotated — a dead key fails on every provider, so the error
+            # text (how to re-login / fix the key) is surfaced as-is. A 403
+            # walks the free-model priority instead (10.4): this provider's
+            # auth/entitlement is dead, but a free model elsewhere may work.
             if isinstance(assistant_msg, dict) and assistant_msg.get("content", "").startswith(
                 "[API Error:"
             ):

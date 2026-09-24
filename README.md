@@ -75,15 +75,20 @@ See [`kit/SKILL_AUTHORING.md`](kit/SKILL_AUTHORING.md) to publish your own skill
 
 ## Latest release
 
-**v10.2.3** — Smarter-agent edition: the agent loop got live goals, enforced plan mode, verifier-gated answers, and retrieval that works without ONNX, plus 402 balance-exhausted failover that escapes to ClinePass or local Ollama instead of stopping:
+**v10.4.0** — Provider-credit honesty: an exhausted Cline balance stops being offered as a ready default:
 
 | | |
 |---|---|
-| **⬇ Windows installer** | [`LuckyDBrowserSetup-10.2.3.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.2.3/LuckyDBrowserSetup-10.2.3.exe) — built on a real Windows runner with Inno Setup 6. Per-user, no admin, silent-install flags. |
+| **⬇ Windows installer** | [`LuckyDBrowserSetup-10.4.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.4.0/LuckyDBrowserSetup-10.4.0.exe) — built on a real Windows runner with Inno Setup 6. Per-user, no admin, silent-install flags. |
+| **💳 Credit honesty** | A Cline HTTP 402 records `~/.luckyd/cline_credit_state.json` (timestamp + reason, 24-hour TTL). While valid, auto-selection skips Cline, the provider list shows an exhausted indicator, and `lucky-code providers --clear-credit-state` clears it after topping up. No balance API — the 402 is the only trigger. Explicit picks (`CODING_AGENT_PROVIDER`, `--provider`, sidebar choice) still win. |
 | **🧠 Smarter agent** | Active goal injected into the prompt with real token-budget accrual, `EnterPlanMode` actually blocks writes, MCP servers connect in one-shot/JSON mode too, opt-in `--verify` polishes final answers. |
 | **⚡ Leaner context** | Token-aware compaction per model window, task-scoped tool pruning, and `FindRelevantFiles` retrieval for unfamiliar code. |
 | **💳 402 failover** | An exhausted Cline Credits balance rotates to ClinePass subscription models, then local Ollama — no more dead-end `[API Error: 402]`. |
+| **🔄 Free-model auto-rotation** | Every surface (lucky-code CLI, browser AI, assistant/backend) defaults to free models and auto-rotates on failure: Cline free tier → Gemini free tier → Ollama `llama3.2:3b` → OpenRouter/Groq free tiers. Triggers: HTTP 402/403/429, 408/5xx, timeouts, connection errors. No config needed; `CODING_AGENT_PROVIDER`, `--provider`, and the sidebar's saved provider always win. Paid/keyed providers stay available. |
 | **🌐 Browser fixes** | Trust/debug/harness/GUI/updater/catalog hardening across the browser shell. |
+
+**v10.2.3** — Smarter-agent edition + 402 failover: [release page](https://github.com/Dylanchess0320/LuckyD-Browser/releases/tag/v10.2.3).
+
 
 **v10.2.1** — Dashboard cleanup + HQ auto-rotation: AI preset chips removed, Ask Lucky reliability fixes, HQ rotates to a working model when the configured one is retired or down: [release page](https://github.com/Dylanchess0320/LuckyD-Browser/releases/tag/v10.2.1).
 
@@ -291,14 +296,14 @@ Also in this lineage: Deep Research swarm (`Ctrl+Shift+R`), Agent Mesh, self-hea
 
 ## Install in 10 seconds
 
-1. Get **[LuckyDBrowserSetup-10.2.3.exe](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.2.3/LuckyDBrowserSetup-10.2.3.exe)**
+1. Get **[LuckyDBrowserSetup-10.4.0.exe](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.4.0/LuckyDBrowserSetup-10.4.0.exe)**
 2. Run it — per-user, **no admin**, installs to `%LOCALAPPDATA%\Programs\LuckyDBrowser`
 3. Leave **“Set up free unlimited local AI”** checked → Ollama + `llama3.2:3b` (~2 GB, one time)
 4. `Ctrl+Shift+A` → chat offline. Or bring your own keys (Gemini, Groq, DeepSeek, OpenAI, Anthropic, Z.ai, OpenRouter, Cline, MiniMax)
 
 No local model yet? With a logged-in Cline CLI session (`cline auth`), chat uses Cline's free models — no local server needed.
 
-Silent: `LuckyDBrowserSetup-10.2.3.exe /VERYSILENT /NORESTART`
+Silent: `LuckyDBrowserSetup-10.4.0.exe /VERYSILENT /NORESTART`
 
 Windows 10/11 x64 only.
 
@@ -339,7 +344,7 @@ browser\run_browser.bat
 
 # Shareable installer (needs Inno Setup 6)
 powershell -NoProfile -ExecutionPolicy Bypass -File browser\installer\build_installer.ps1
-# → browser\installer\output\LuckyDBrowserSetup-10.2.3.exe
+# → browser\installer\output\LuckyDBrowserSetup-10.4.0.exe
 ```
 
 ---

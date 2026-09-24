@@ -9,6 +9,8 @@ import os
 from dataclasses import dataclass
 from typing import TypedDict
 
+from core.cline_credit import is_cline_credit_exhausted
+
 
 class ProviderDefaults(TypedDict, total=False):
     env_key: str | None
@@ -242,23 +244,42 @@ def reset_cline_session_cache() -> None:
 
 def detect_provider() -> str | None:
     """Auto-detect which provider to use based on environment variables.
-    Returns provider name or None if DeepSeek (fallback) should be used.
+    Returns provider name or None if no provider is usable.
+
+    10.4 free-first: after an explicit CODING_AGENT_PROVIDER (which always
+    wins), the free-model priority is walked first
+    (``core.free_rotation.best_free_provider``: Cline free tier -> Gemini
+    free tier -> local Ollama -> other free providers) — a usable $0 option
+    always beats a paid key by default. Keyed/paid providers follow in the
+    historical priority order.
 
     9.8: a logged-in Cline CLI session is detected FIRST and returns
     ``cline-usage`` — Cline's usage-billed gateway carries free agent models and
     its auth comes from the on-disk session, so it is the free default
     (OpenCode Zen's keyless tier died in 2026-09; Zen is back in the mesh
     since 2026-09-21 but keyed-only, so it can't be the free default).
+
+    10.4: while a Cline 402 marker is valid (see core/cline_credit.py),
+    auto-detection skips both Cline gateways and falls through to the next
+    usable provider. An explicit CODING_AGENT_PROVIDER always wins — forcing
+    Cline by hand (e.g. right after topping up) is the documented override.
     """
     explicit = normalize_provider_id(os.environ.get("CODING_AGENT_PROVIDER", ""))
     if explicit in VALID_PROVIDERS:
         return explicit
 
-    # Free-first: reuse the logged-in Cline CLI session when there is one.
-    if cline_session_token():
-        return "cline-usage"
+    # 10.4 free-first: walk the free-model priority before any paid/keyed
+    # provider. (Covers the old session-first Cline check and the Ollama
+    # liveness probe; no new network surface.)
+    from core.free_rotation import best_free_provider
 
-    # Check env vars in priority order
+    free = best_free_provider()
+    if free:
+        return free
+
+    cline_blocked = is_cline_credit_exhausted()
+
+    # Check env vars in priority order (keyed/paid providers)
     checks = [
         ("clinepass", "CLINEPASS_API_KEY"),
         ("cline-usage", "CLINE_USAGE_MODEL"),
@@ -272,22 +293,14 @@ def detect_provider() -> str | None:
         ("ollama", "OLLAMA_MODEL"),
     ]
     for provider, env_var in checks:
+        if provider in ("clinepass", "cline-usage") and cline_blocked:
+            continue
         if os.environ.get(env_var):
             return provider
 
     # Check DeepSeek
     if os.environ.get("DEEPSEEK_API_KEY") or os.environ.get("CODING_AGENT_API_KEY"):
         return "deepseek"
-
-    # Auto-detect local Ollama if running
-    try:
-        import httpx
-
-        r = httpx.get("http://127.0.0.1:11434/api/tags", timeout=0.5)
-        if r.status_code == 200:
-            return "ollama"
-    except Exception:
-        pass
 
     return None
 
@@ -343,7 +356,7 @@ def resolve_provider_config(provider: str | None = None) -> dict[str, object]:
                     if m:
                         mirror_model = m
             else:
-                provider = detect_provider() or "deepseek"
+                provider = detect_provider() or "ollama"  # 10.4: terminal free fallback
 
     provider = normalize_provider_id(provider)
     fallback = PROVIDER_DEFAULTS["deepseek"]
@@ -532,15 +545,18 @@ def provider_key_from_label(label: str) -> str:
 
 
 # Providers with a usable $0 tier: local servers, the OpenRouter free catalog,
-# Groq's free tier, and the Cline gateways (flat subscription or usage-billed
-# free models). Everything else bills per token.
+# Groq's free tier, the Gemini free tier (GOOGLE_API_KEY), and the Cline
+# gateways (flat subscription or usage-billed free models). Everything else
+# bills per token.
 #
 # NOTE (2026-09-21): OpenCode Zen is restored to the mesh at Dylan's request,
 # but keyed only — its $0 keyless tier died in 2026-09 (every keyless call
 # 401s) — so it is NOT in the free tier anymore. Cline (usage-billed free
 # models + the logged-in CLI session) remains the default free agent brain —
 # see resolve_provider_config().
-FREE_TIER_PROVIDERS = frozenset({"openrouter", "ollama", "groq", "clinepass", "cline-usage"})
+FREE_TIER_PROVIDERS = frozenset(
+    {"openrouter", "ollama", "groq", "clinepass", "cline-usage", "gemini"}
+)
 
 # Stable display order for the provider list (local first, then free, then paid).
 PROVIDER_ORDER = (
@@ -566,13 +582,18 @@ def list_providers() -> list[dict[str, object]]:
     Each entry has: ``id``, ``name``, ``base_url``, ``model`` (effective default
     or env override), ``env_key`` (or None for keyless local), ``key_present``,
     ``local``, ``free_tier``, ``configured`` (usable right now: local, or key /
-    session auth present), and ``current`` (the active provider).
+    session auth present), ``current`` (the active provider), and
+    ``credit_exhausted`` (10.4: True for the Cline rows while a 402 marker is
+    valid — those rows report ``configured`` False and are never auto-current).
 
     No network calls — availability is derived from env vars only.
     """
     explicit = normalize_provider_id(os.environ.get("CODING_AGENT_PROVIDER", ""))
     current = explicit if explicit in VALID_PROVIDERS else detect_provider() or "deepseek"
     cline_ok = bool(cline_session_token())
+    # 10.4: a valid 402 marker steers auto-selection away from Cline (an
+    # explicit CODING_AGENT_PROVIDER still wins — see detect_provider()).
+    cline_blocked = is_cline_credit_exhausted()
 
     providers: list[dict[str, object]] = []
     for pid in PROVIDER_ORDER:
@@ -588,7 +609,7 @@ def list_providers() -> list[dict[str, object]]:
             key_present = bool((os.environ.get(env_key or "", "") or "").strip())
             if not key_present:
                 key_present = cline_ok
-            configured = key_present
+            configured = key_present and not cline_blocked
         elif local:
             configured = True
             key_present = False
@@ -607,6 +628,7 @@ def list_providers() -> list[dict[str, object]]:
                 "free_tier": pid in FREE_TIER_PROVIDERS,
                 "configured": configured,
                 "current": pid == current,
+                "credit_exhausted": cline_blocked and pid in ("clinepass", "cline-usage"),
             }
         )
     return providers

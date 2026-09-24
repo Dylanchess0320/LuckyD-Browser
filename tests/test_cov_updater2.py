@@ -281,7 +281,7 @@ def test_checker_429_uses_atom_fallback(signals) -> None:
             raise err
 
         def fetch_latest_atom(self):
-            return ReleaseInfo(version="10.3.0", url="https://x")
+            return ReleaseInfo(version="10.99.0", url="https://x")
 
     UpdateChecker(_Src()).run()
     UpdateChecker.update_available.emit.assert_called_once()

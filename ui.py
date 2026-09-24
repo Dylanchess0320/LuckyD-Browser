@@ -247,7 +247,7 @@ class TerminalUI:
         """Clean startup banner."""
         header = self._session_header()
         tip = "Type a task, or /help for commands"
-        agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v10.2.1").strip()
+        agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v10.4.0").strip()
         agent_name = os.environ.get("LUCKYD_AGENT_NAME", "").strip()
         ver_label = f"{agent_version}" + (f" ({agent_name})" if agent_name else "")
 
@@ -904,8 +904,11 @@ class TerminalUI:
                     "free" if free else "paid",
                     style=BRAND["success"] if free else BRAND["muted"],
                 )
+                exhausted = bool(p.get("credit_exhausted"))
                 if is_cur:
                     status_txt = Text("◀ active", style=BRAND["success"])
+                elif exhausted:
+                    status_txt = Text("exhausted", style=BRAND["error"])
                 elif is_ready:
                     status_txt = Text("✓ ready", style=BRAND["success"])
                 else:
@@ -921,6 +924,13 @@ class TerminalUI:
                 padding=(0, 1),
             )
             self._console.print(panel)
+            drained = [
+                str(p.get("name", p.get("id", ""))) for p in entries if p.get("credit_exhausted")
+            ]
+            if drained:
+                self._console.print(
+                    f"  {self._dim('Credits exhausted (HTTP 402) for ' + ', '.join(drained) + ' — top up, then:')} {self._primary('lucky-code providers --clear-credit-state')}"
+                )
             self._console.print(
                 f"  {self._dim('Switch:')} {self._primary('/model <provider> <name>')} {self._dim('e.g.')} {self._primary('/model cline-usage kimi')}"
             )
@@ -943,8 +953,11 @@ class TerminalUI:
             is_cur = bool(p.get("current"))
             is_ready = bool(p.get("configured"))
             free = bool(p.get("free_tier") or p.get("local"))
+            exhausted = bool(p.get("credit_exhausted"))
             if is_cur:
                 status, sc = "◀ active", ANSI["green"]
+            elif exhausted:
+                status, sc = "exhausted", ANSI["red"]
             elif is_ready:
                 status, sc = "✓ ready", ANSI["green"]
             else:
@@ -959,6 +972,10 @@ class TerminalUI:
             )
             if not is_ready and p.get("env_key"):
                 print(f"  {ANSI['dim']}  └ set {p['env_key']} in .env to enable{ANSI['reset']}")
+            if exhausted:
+                print(
+                    f"  {ANSI['dim']}  └ credits exhausted (HTTP 402) — top up, then{ANSI['reset']} {ANSI['cyan']}lucky-code providers --clear-credit-state{ANSI['reset']}"
+                )
         print(
             f"\n  {ANSI['dim']}Switch: {ANSI['reset']}{ANSI['cyan']}/model <provider> <name>{ANSI['reset']}\n"
         )
@@ -969,7 +986,8 @@ class TerminalUI:
         ``providers`` is a JSON-shaped list built by
         ``core.providers.list_providers``::
             [{"id", "name", "base_url", "model", "env_key", "key_present",
-              "local", "free_tier", "configured", "current"}, ...]
+              "local", "free_tier", "configured", "current",
+              "credit_exhausted"}, ...]
         """
         entries = list(providers or [])
 

@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [10.4.0] - 2026-09-24
+
+Provider-credit honesty + version unification. Shipped
+as `LuckyDBrowserSetup-10.4.0.exe` + `LuckyDBrowser-Portable-10.4.0.zip`.
+
+### Added
+- **Cline credit-exhaustion honesty** — when the Cline gateway returns
+  HTTP 402 (insufficient credits), LuckyD records a marker in
+  `~/.luckyd/cline_credit_state.json` (timestamp + reason, 24-hour TTL).
+  While valid, `list_providers()`/`detect_provider()` and the browser's
+  `default_provider()` skip Cline, the provider list shows an exhausted
+  indicator, and `lucky-code providers --clear-credit-state` clears the
+  marker by hand. No Cline balance API — the 402 is the only trigger.
+  (`core/cline_credit.py`, `core/providers.py`, `core/llm_client.py`,
+  `browser/browser_core/ai_bridge.py`, `browser/browser_ui/ai_sidebar.py`,
+  `ui.py`, `main.py`, `tests/test_cline_credit.py`.)
+- **Version unification** — browser, backend, installer, docs, and
+  version-pinned tests all report 10.4.0.
+
 ## [10.2.3] - 2026-09-23
 
 Smarter-agent edition + 402 balance-exhausted failover. Shipped

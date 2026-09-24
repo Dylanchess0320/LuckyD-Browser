@@ -290,6 +290,8 @@ class AiSidebar(QDockWidget):
         for name in ordered:
             display = self._provider_label(name)
             label = f"{display} — {self.bridge.model_for(name)}"
+            if name in ("clinepass", "cline-usage") and self._cline_credit_exhausted():
+                label += "  (credits exhausted)"
             self.provider_box.addItem(label, name)
         self.context_box = QCheckBox("Page context", body)
         self.context_box.setChecked(True)
@@ -734,6 +736,13 @@ class AiSidebar(QDockWidget):
             "anthropic": "Anthropic",
         }
         return labels.get(provider, provider)
+
+    def _cline_credit_exhausted(self) -> bool:
+        """True while a Cline 402 marker steers auto-selection away (10.4)."""
+        try:
+            return bool(self.bridge.cline_credit_exhausted())
+        except Exception:
+            return False
 
     @staticmethod
     def _model_label(provider: str, model: str) -> str:

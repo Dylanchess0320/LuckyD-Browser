@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [10.4.0] - 2026-09-24
+
+Provider-credit honesty + version unification. Shipped
+as `LuckyDBrowserSetup-10.4.0.exe` + `LuckyDBrowser-Portable-10.4.0.zip`.
+
+### Added
+- **Cline credit honesty** — a Cline HTTP 402 records
+  `~/.luckyd/cline_credit_state.json` (24-hour TTL); auto-selection skips
+  Cline while valid, the provider list shows an exhausted indicator, and
+  `lucky-code providers --clear-credit-state` clears it.
+- **Version unification to 10.4.0** — pyproject, browser `__version__`, Inno
+  Setup script, version_info, AI bridge User-Agent, docs, and version-pinned
+  tests.
+
 ## [10.2.3] - 2026-09-23
 
 Smarter-agent edition + 402 balance-exhausted failover. Shipped

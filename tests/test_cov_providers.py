@@ -285,7 +285,9 @@ class TestResolveProviderConfig:
         monkeypatch.setattr(httpx, "get", _fake_httpx_get(exc=ConnectionError("refused")))
         monkeypatch.setitem(sys.modules, "model_resolver", None)
         cfg = resolve_provider_config()
-        assert cfg["provider"] == "deepseek"
+        # 10.4: the default path's terminal fallback is Ollama (free local),
+        # not DeepSeek.
+        assert cfg["provider"] == "ollama"
 
     def test_mirror_overrides_missing_provider_key(self, clean_env, monkeypatch):
         monkeypatch.setattr(

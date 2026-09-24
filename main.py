@@ -1192,7 +1192,7 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
             ui.warn("MCP not configured or no servers connected")
 
     elif cmd == "version":
-        agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v10.2.1")
+        agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v10.4.0")
         agent_name = os.environ.get("LUCKYD_AGENT_NAME", "Agent 1")
         ui.info(f"LuckyD Code {agent_version} ({agent_name})")
 
@@ -1597,10 +1597,24 @@ Shows every provider (local, free-tier, paid) with its default model,
 cost tier, and whether it is usable right now (key present / local /
 logged-in session). The active provider is marked ◀.
 
+A Cline row marked "exhausted" means the Cline gateway recently returned
+HTTP 402 (credits exhausted): auto-selection skips Cline for 24 hours.
+Top up, then clear the marker with:
+
+  lucky-code providers --clear-credit-state
+
 Switch providers with:  lucky-code model <provider> <name>
                         (or /model <provider> <name> inside the REPL)
 """
         )
+        return
+    if args and "--clear-credit-state" in args:
+        from core.cline_credit import clear_cline_credit_state
+
+        if clear_cline_credit_state():
+            print("Cleared the Cline credit-exhausted marker.")
+        else:
+            print("No Cline credit-exhausted marker to clear.")
         return
     ui.show_providers(list_providers())
 
@@ -2044,14 +2058,14 @@ def _parse_agent_args(args: list[str], cfg: dict) -> tuple[dict, str, float, str
             if slot == "2":
                 os.environ["LUCKYD_AGENT_SLOT"] = "2"
                 os.environ["LUCKYD_AGENT_NAME"] = "Agent 2"
-                os.environ["LUCKYD_AGENT_VERSION"] = "v10.2.1"
+                os.environ["LUCKYD_AGENT_VERSION"] = "v10.4.0"
             else:
                 os.environ["LUCKYD_AGENT_SLOT"] = "1"
                 os.environ["LUCKYD_AGENT_NAME"] = "Agent 1"
-                os.environ["LUCKYD_AGENT_VERSION"] = "v10.2.1"
+                os.environ["LUCKYD_AGENT_VERSION"] = "v10.4.0"
             i += 2
         elif args[i] in ("-v", "--version"):
-            agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v10.2.1")
+            agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v10.4.0")
             agent_name = os.environ.get("LUCKYD_AGENT_NAME", "")
             label = f"LuckyD Code {agent_version}" + (f" ({agent_name})" if agent_name else "")
             print(label)
@@ -2062,8 +2076,8 @@ def _parse_agent_args(args: list[str], cfg: dict) -> tuple[dict, str, float, str
 LuckyD Code — AI Coding Agent
 
 Usage:
-  lucky-code                       Interactive REPL (Agent 1 · v10.2.1)
-  lucky-code --agent 2             Interactive REPL (Agent 2 · v10.2.1)
+  lucky-code                       Interactive REPL (Agent 1 · v10.4.0)
+  lucky-code --agent 2             Interactive REPL (Agent 2 · v10.4.0)
   lucky-code providers           List AI providers — status, cost tier, current
   lucky-code model <name>        Switch model (fuzzy Cline-style picker)
   lucky-code plugin list --available   List/install plugins
@@ -2074,7 +2088,7 @@ Usage:
   lucky-code --resume <id>         Resume specific session
 
 Options:
-  --agent 1|2        Select agent slot (1 = v10.2 Nuitka, 2 = v10.2)
+  --agent 1|2        Select agent slot (1 = v10.4 Nuitka, 2 = v10.4)
   --model NAME       Model: auto (default), flash, pro, or specific name
   --provider NAME    Set provider (see: lucky-code providers): ollama, clinepass,
                      cline-usage, openrouter, groq, deepseek,

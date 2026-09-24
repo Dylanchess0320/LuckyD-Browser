@@ -13,6 +13,7 @@ from collections.abc import Callable
 
 import httpx
 
+from .cline_credit import record_cline_credit_exhausted
 from .context_manager import ContextManager
 
 # Models whose thinking mode makes function-call thought signatures mandatory
@@ -731,6 +732,14 @@ class LLMClient:
             }
         if code == 402:
             why = f"{detail} " if detail else ""
+            if "cline.bot" in (self.base_url or ""):
+                # 10.4: an exhausted Cline Credits balance 402s every
+                # usage-billed call — record the signal so auto-selection
+                # steers away from Cline for 24 hours. (No balance API
+                # exists; the 402 is the only trigger.)
+                record_cline_credit_exhausted(
+                    f"HTTP 402 from {self.base_url} ({self.model}): {detail or 'payment required'}"
+                )
             return {
                 "role": "assistant",
                 "content": (
