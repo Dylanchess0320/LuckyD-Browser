@@ -1,5 +1,20 @@
 # LuckyD Browser — Release Notes
 
+## [10.5.0] — Provider/model switching polish — 2026-09-24
+
+**[`LuckyDBrowserSetup-10.5.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.5.0/LuckyDBrowserSetup-10.5.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed.
+**[`LuckyDBrowser-Portable-10.5.0.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.5.0/LuckyDBrowser-Portable-10.5.0.zip)** — unzip and run, for locked-down PCs.
+
+- **Provider/model switching polish** — HQ Models view shows per-provider health
+  badges (Ready / Needs key / Exhausted) with rotation order, a one-click
+  "Switch to best working" button, and the live answering provider/model in the
+  sidebar. LuckyD remembers the last working provider and prefers it automatically.
+- **BEAST speed pass** — CLI `--help` cold start 2.6s → 0.14s, `providers`/`model`
+  commands ~2.3s → ~1.3s, HQ first dashboard load ~500ms → 65ms. Lazy heavy
+  imports, cached sys.path/model catalog, eager free-rotation init at HQ startup.
+
+On top of everything from 10.4.0 below.
+
 ## [10.4.0] — Provider-credit honesty — 2026-09-24
 
 **[`LuckyDBrowserSetup-10.4.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.4.0/LuckyDBrowserSetup-10.4.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed.

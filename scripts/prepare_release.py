@@ -199,7 +199,9 @@ def main() -> None:
     # Install guides: exe names + download URLs must track the release.
     for doc in ("docs/docs/getting-started.md", "README-LuckyD-Browser.md"):
         plan_sub(doc, f"LuckyDBrowserSetup-{old}.exe", f"LuckyDBrowserSetup-{new}.exe")
-        plan_sub(doc, f"/releases/download/v{old}/", f"/releases/download/v{new}/")
+        # URL pattern is not present in every guide (some link /releases/latest).
+        if f"/releases/download/v{old}/" in (ROOT / doc).read_text(encoding="utf-8"):
+            plan_sub(doc, f"/releases/download/v{old}/", f"/releases/download/v{new}/")
 
     # README "What's new" section — skip if the new version is already documented.
     readme = ROOT / "README.md"

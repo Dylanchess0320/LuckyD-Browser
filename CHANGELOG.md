@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [10.5.0] - 2026-09-24
+
+Provider/model switching polish: HQ Models view now shows per-provider health badges (Ready / Needs key / Exhausted) with rotation order, a one-click 'Switch to best working' button, and the live answering provider/model in the sidebar. LuckyD remembers the last working provider and prefers it automatically.
+
+### Added
+- **Provider/model switching polish** — HQ Models view shows per-provider health
+  badges (Ready / Needs key / Exhausted) with rotation order, a one-click
+  "Switch to best working" button, and the live answering provider/model in the
+  sidebar. LuckyD remembers the last working provider and prefers it automatically.
+- **BEAST speed pass** — CLI `--help` cold start 2.6s → 0.14s, `providers`/`model`
+  commands ~2.3s → ~1.3s, HQ first dashboard load ~500ms → 65ms. Lazy heavy
+  imports, cached sys.path/model catalog, eager free-rotation init at HQ startup.
+
+
 ## [10.4.0] - 2026-09-24
 
 Provider-credit honesty + version unification. Shipped
