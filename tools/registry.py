@@ -32,6 +32,27 @@ class ToolRegistry:
             return self._tools[self._aliases[key]]
         return None
 
+    def canonical_name(self, name: str) -> str:
+        """Resolve any tool spelling to the canonical registered tool name.
+
+        The model may type an alias (``Shell`` for ``Bash``) or a different
+        case (``bash``). The executor resolves these through :meth:`get`,
+        so every policy check (permissions, scopes, risk, audit) must
+        resolve the same way — otherwise an alternate spelling silently
+        bypasses approval. Unknown names are returned unchanged so callers
+        keep applying default policy to them.
+        """
+        key = (name or "").lower()
+        tool = self._tools.get(key)
+        if tool is not None:
+            return tool.name
+        canon_key = self._aliases.get(key)
+        if canon_key is not None:
+            tool = self._tools.get(canon_key)
+            if tool is not None:
+                return tool.name
+        return name
+
     def list_tools(self) -> list[str]:
         return sorted(self._tools.keys())
 
@@ -68,3 +89,12 @@ registry = ToolRegistry()
 
 def register_tool(tool: ToolBase):
     registry.register(tool)
+
+
+def canonical_name(name: str) -> str:
+    """Resolve any tool spelling to the canonical registered tool name.
+
+    Module-level convenience wrapper around the global registry; see
+    :meth:`ToolRegistry.canonical_name`.
+    """
+    return registry.canonical_name(name)

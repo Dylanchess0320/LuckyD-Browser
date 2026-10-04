@@ -20,7 +20,7 @@ from __future__ import annotations
 from typing import Any
 
 from core.approval_hook import ApprovalHook
-from core.trust import scope_of
+from core.trust import canonical_tool_name, scope_of
 from core.types import HookContext, ToolPermissionLevel
 
 
@@ -54,6 +54,8 @@ class UnattendedApprovalHook(ApprovalHook):
     def before_tool(self, tool_name: str, tool_args: dict, ctx: HookContext) -> dict | None:
         from core.scheduler import HARD_DENY_SCOPES
 
+        # Alias-bypass fix: judge the canonical tool the executor will run.
+        tool_name = canonical_tool_name(tool_name)
         level = self.get_permission(tool_name)
         scope = scope_of(tool_name)
         clean = {k: v for k, v in tool_args.items() if not k.startswith("_")}

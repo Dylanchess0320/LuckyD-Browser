@@ -232,8 +232,25 @@ _SCOPE_PREFIXES: tuple[tuple[str, str], ...] = (
 )
 
 
+def canonical_tool_name(tool_name: str) -> str:
+    """Resolve any tool spelling to the canonical registered tool name.
+
+    The executor resolves aliases/case variants through the tool registry,
+    so policy checks must resolve identically — otherwise an alternate
+    spelling (``Shell`` for ``Bash``, or just ``bash``) silently bypasses
+    approval, scope, and risk checks. Falls back to the input unchanged if
+    the registry is unavailable or the name is unknown.
+    """
+    try:
+        from tools.registry import canonical_name
+        return canonical_name(tool_name)
+    except Exception:
+        return tool_name
+
+
 def scope_of(tool_name: str) -> str:
     """Return the permission scope id for a tool name."""
+    tool_name = canonical_tool_name(tool_name)
     if tool_name in _TOOL_SCOPE_OVERRIDES:
         return _TOOL_SCOPE_OVERRIDES[tool_name]
     for prefix, scope in _SCOPE_PREFIXES:
@@ -244,6 +261,7 @@ def scope_of(tool_name: str) -> str:
 
 def risk_of(tool_name: str) -> str:
     """low / medium / high — derived from the approval permission level."""
+    tool_name = canonical_tool_name(tool_name)
     try:
         from core.approval_hook import _TOOL_PERMISSIONS
         from core.types import ToolPermissionLevel
@@ -522,6 +540,7 @@ def host_of_url(url: str) -> str | None:
 
 def describe_decision(tool: str, args: dict[str, Any]) -> str:
     """One-line human summary of what a tool call would do (for approval UI)."""
+    tool = canonical_tool_name(tool)
     scope = scope_of(tool)
     if tool == "BrowserNavigate":
         return f"Navigate to {args.get('url', '?')}"

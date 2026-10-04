@@ -24,6 +24,7 @@ from typing import Any
 
 from core.hooks import AgentPlugin, HookContext
 from core.trust import (
+    canonical_tool_name,
     describe_decision,
     get_audit_log,
     get_policy,
@@ -298,10 +299,12 @@ class ApprovalHook(AgentPlugin):
             )
 
     def set_permission(self, tool_name: str, level: ToolPermissionLevel):
-        _TOOL_PERMISSIONS[tool_name] = level
+        _TOOL_PERMISSIONS[canonical_tool_name(tool_name)] = level
 
     def get_permission(self, tool_name: str) -> ToolPermissionLevel:
-        return _TOOL_PERMISSIONS.get(tool_name, ToolPermissionLevel.NORMAL)
+        return _TOOL_PERMISSIONS.get(
+            canonical_tool_name(tool_name), ToolPermissionLevel.NORMAL
+        )
 
     def evaluate_policy(self, tool_name: str, tool_args: dict, ctx: HookContext) -> tuple[str, str]:
         """Evaluate the trust policy for a tool call without asking anyone.
@@ -319,6 +322,10 @@ class ApprovalHook(AgentPlugin):
         silent skips. This is also what non-interactive callers (e.g. the HQ
         web server's schedule routes) use to gate mutating actions.
         """
+        # Resolve aliases/case variants to the canonical tool name FIRST:
+        # the executor resolves the same way, so policy must judge the same
+        # tool the executor will run. (Alias-bypass fix.)
+        tool_name = canonical_tool_name(tool_name)
         level = self.get_permission(tool_name)
         clean_args = {k: v for k, v in tool_args.items() if not k.startswith("_")}
         scope = scope_of(tool_name)
@@ -398,6 +405,7 @@ class ApprovalHook(AgentPlugin):
         return "needs_approval", f"Tool '{tool_name}' requires approval."
 
     def before_tool(self, tool_name: str, tool_args: dict, ctx: HookContext) -> dict | None:
+        tool_name = canonical_tool_name(tool_name)
         decision, reason = self.evaluate_policy(tool_name, tool_args, ctx)
         if decision == "approved":
             return None
