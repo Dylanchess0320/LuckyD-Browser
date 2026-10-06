@@ -727,7 +727,7 @@ if __name__ == "__main__":
         "def f(a=[]):\n"
         "    try:\n"
         "        print(sys.version)\n"
-        "    except:\n"
+        "    except Exception:\n"
         "        pass\n"
         "    return 1\n"
         "    print('never')\n"
