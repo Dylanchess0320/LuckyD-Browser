@@ -345,7 +345,7 @@ class CodeExecutionSandbox:
             elif returns_node.id == "tuple":
                 return "assert result == ()  # TODO: real assertion"
             elif returns_node.id == "bytes":
-                return "assert result == b''  # TODO: real assertion"
+                return "assert isinstance(result, bytes)"
         elif isinstance(returns_node, ast.Constant):
             if returns_node.value is None:
                 return "assert result is None  # TODO: real assertion"
