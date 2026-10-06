@@ -337,7 +337,7 @@ class CodeExecutionSandbox:
             elif returns_node.id == "str":
                 return 'assert result == ""  # TODO: real assertion'
             elif returns_node.id == "list":
-                return "assert result == []  # TODO: real assertion"
+                return "assert isinstance(result, list)  # TODO: real assertion"
             elif returns_node.id == "dict":
                 return "assert result == {}  # TODO: real assertion"
             elif returns_node.id == "set":
@@ -351,7 +351,7 @@ class CodeExecutionSandbox:
                 return "assert result is None  # TODO: real assertion"
         elif isinstance(returns_node, ast.Subscript) and isinstance(returns_node.value, ast.Name):
             if returns_node.value.id == "list":
-                return "assert result == []  # TODO: real assertion"
+                return "assert isinstance(result, list)  # TODO: real assertion"
             elif returns_node.value.id == "dict":
                 return "assert result == {}  # TODO: real assertion"
             elif returns_node.value.id == "set":
