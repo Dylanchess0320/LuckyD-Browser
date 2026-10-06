@@ -62,3 +62,57 @@ async def test_handle_request_invalid_params_type():
     assert res.get("type") == "error"
     assert "traceback" in res
     assert res.get("id") == "789"
+
+
+@pytest.mark.asyncio
+async def test_run_agent_stream_success(monkeypatch):
+    import bridge
+
+    monkeypatch.setattr(bridge, "get_config", lambda: {"api_key": "test", "base_url": None})
+    monkeypatch.setattr(bridge, "resolve_model", lambda **kwargs: "mock-model")
+
+    class MockAgent:
+        def __init__(self, model):
+            self.model = model
+
+        async def stream(self, prompt):
+            yield "chunk1"
+            yield "chunk2"
+
+    monkeypatch.setattr(bridge, "CodingAgent", MockAgent)
+
+    chunks = []
+    async for chunk in bridge.run_agent_stream("test prompt"):
+        chunks.append(json.loads(chunk))
+
+    assert len(chunks) == 2
+    assert chunks[0] == {"type": "chunk", "content": "chunk1"}
+    assert chunks[1] == {"type": "chunk", "content": "chunk2"}
+
+
+@pytest.mark.asyncio
+async def test_run_agent_stream_error(monkeypatch):
+    import bridge
+
+    monkeypatch.setattr(bridge, "get_config", lambda: {"api_key": "test", "base_url": None})
+    monkeypatch.setattr(bridge, "resolve_model", lambda **kwargs: "mock-model")
+
+    class MockAgent:
+        def __init__(self, model):
+            self.model = model
+
+        async def stream(self, prompt):
+            yield "chunk1"
+            raise ValueError("Test error")
+
+    monkeypatch.setattr(bridge, "CodingAgent", MockAgent)
+
+    chunks = []
+    async for chunk in bridge.run_agent_stream("test prompt"):
+        chunks.append(json.loads(chunk))
+
+    assert len(chunks) == 2
+    assert chunks[0] == {"type": "chunk", "content": "chunk1"}
+    assert chunks[1]["type"] == "error"
+    assert chunks[1]["content"] == "Test error"
+    assert "traceback" in chunks[1]
