@@ -716,11 +716,8 @@ class AdvancedDebugging:
         with tempfile.NamedTemporaryFile(delete=False) as stats_file:
             stats_path = stats_file.name
 
-        # Basic safe environment
-        safe_env = {
-            "PATH": os.environ.get("PATH", ""),
-            "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
-        }
+        # Copy environment to ensure Python starts correctly on all platforms (like Windows)
+        env = os.environ.copy()
 
         with contextlib.suppress(Exception):
             subprocess.run(
@@ -728,7 +725,7 @@ class AdvancedDebugging:
                 timeout=timeout,
                 check=False,
                 capture_output=True,
-                env=safe_env,
+                env=env,
             )
 
         elapsed = time.perf_counter() - start
