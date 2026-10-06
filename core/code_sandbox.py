@@ -351,7 +351,9 @@ class CodeExecutionSandbox:
                 return "assert result is None  # TODO: real assertion"
         elif isinstance(returns_node, ast.Subscript) and isinstance(returns_node.value, ast.Name):
             if returns_node.value.id == "list":
-                return "assert result == []  # TODO: real assertion"
+                if isinstance(returns_node.slice, ast.Name):
+                    return f"assert isinstance(result, list) and all(isinstance(x, {returns_node.slice.id}) for x in result)"
+                return "assert isinstance(result, list)"
             elif returns_node.value.id == "dict":
                 return "assert result == {}  # TODO: real assertion"
             elif returns_node.value.id == "set":
