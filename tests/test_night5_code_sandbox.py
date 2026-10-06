@@ -422,7 +422,10 @@ def test_unannotated():
     assert "assert result == []  # TODO: real assertion" in skeleton
 
     assert "def test_test_dict():" in skeleton
-    assert "assert result == {}  # TODO: real assertion" in skeleton
+    assert (
+        "assert isinstance(result, dict) and all(isinstance(k, str) and isinstance(v, int) for k, v in result.items())  # TODO: real assertion"
+        in skeleton
+    )
 
     assert "def test_test_set():" in skeleton
     assert "assert result == set()  # TODO: real assertion" in skeleton
@@ -438,3 +441,47 @@ def test_unannotated():
 
     assert "def test_test_unannotated():" in skeleton
     assert "assert result is not None  # TODO: real assertion" in skeleton
+
+
+def test_infer_assertion_generic_dict(sandbox):
+    code = """
+def test_dict_both() -> dict[str, int]:
+    return {"a": 1}
+
+def test_dict_key_only() -> dict[str, Any]:
+    return {"a": [1]}
+
+def test_dict_val_only() -> dict[Any, list]:
+    return {1: []}
+
+def test_dict_any_any() -> dict[Any, Any]:
+    return {"a": 1}
+
+def test_dict_bare() -> dict:
+    return {"a": 1}
+"""
+    skeleton = sandbox.generate_tests(code)
+
+    assert "def test_test_dict_both():" in skeleton
+    assert (
+        "assert isinstance(result, dict) and all(isinstance(k, str) and isinstance(v, int) for k, v in result.items())  # TODO: real assertion"
+        in skeleton
+    )
+
+    assert "def test_test_dict_key_only():" in skeleton
+    assert (
+        "assert isinstance(result, dict) and all(isinstance(k, str) for k in result.keys())  # TODO: real assertion"
+        in skeleton
+    )
+
+    assert "def test_test_dict_val_only():" in skeleton
+    assert (
+        "assert isinstance(result, dict) and all(isinstance(v, list) for v in result.values())  # TODO: real assertion"
+        in skeleton
+    )
+
+    assert "def test_test_dict_any_any():" in skeleton
+    assert "assert isinstance(result, dict)  # TODO: real assertion" in skeleton
+
+    assert "def test_test_dict_bare():" in skeleton
+    assert "assert result == {}  # TODO: real assertion" in skeleton
