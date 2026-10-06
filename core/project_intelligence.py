@@ -482,7 +482,7 @@ class ProjectIntelligence:
                 data = json.loads(pkg_json.read_text(encoding="utf-8", errors="replace"))
                 for section in ("dependencies", "devDependencies"):
                     declared_py.extend(data.get(section, {}).keys())
-            except Exception:
+            except (OSError, json.JSONDecodeError):
                 pass
 
         info.declared = sorted(set(declared_py), key=str.lower)
@@ -523,7 +523,7 @@ class ProjectIntelligence:
             rel = str(py_file.relative_to(root))
             try:
                 source = py_file.read_text(encoding="utf-8", errors="replace")
-            except Exception:
+            except OSError:
                 continue
             hits.extend(self._ast_patterns(source, rel))
             hits.extend(self._regex_patterns(source, rel))
@@ -570,7 +570,7 @@ class ProjectIntelligence:
         hits: list[FrameworkHit] = []
         try:
             data = json.loads(path.read_text(encoding="utf-8", errors="replace"))
-        except Exception:
+        except (OSError, json.JSONDecodeError):
             return hits
         deps = {**data.get("dependencies", {}), **data.get("devDependencies", {})}
         for dep, framework in _JS_FRAMEWORK_HINTS.items():
@@ -641,7 +641,7 @@ class ProjectIntelligence:
         hits: list[FrameworkHit] = []
         try:
             data = json.loads(path.read_text(encoding="utf-8", errors="replace"))
-        except Exception:
+        except (OSError, json.JSONDecodeError):
             return hits
         deps = {**data.get("require", {}), **data.get("require-dev", {})}
         for dep, framework in _PHP_FRAMEWORK_HINTS.items():
@@ -657,7 +657,7 @@ class ProjectIntelligence:
         for py_file in self._iter_files(root, {".py"}):
             try:
                 text = py_file.read_text(encoding="utf-8", errors="replace")
-            except Exception:
+            except OSError:
                 continue
             for m in _IMPORT_FROM_RE.finditer(text):
                 imported.add(m.group(1).lower())
@@ -777,7 +777,7 @@ class ProjectIntelligence:
                 try:
                     with open(fpath, encoding="utf-8", errors="replace") as fh:
                         loc = sum(1 for _ in fh)
-                except Exception:
+                except OSError:
                     loc = 0
                 stats.total_loc += loc
                 if lang:
