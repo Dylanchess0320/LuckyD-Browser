@@ -114,23 +114,41 @@ def test_redact_sensitive():
     assert logging_setup.redact_sensitive("") == ""
 
     # Normal string
-    assert logging_setup.redact_sensitive("This is a normal log message.") == "This is a normal log message."
+    assert (
+        logging_setup.redact_sensitive("This is a normal log message.")
+        == "This is a normal log message."
+    )
 
     # API keys
-    assert logging_setup.redact_sensitive('{"api_key": "some_secret_key"}') == '{"api_key": "***REDACTED***"}'
+    assert (
+        logging_setup.redact_sensitive('{"api_key": "some_secret_key"}')
+        == '{"api_key": "***REDACTED***"}'
+    )
     assert logging_setup.redact_sensitive('api_key="my_key_123"') == 'api_key="***REDACTED***"'
 
     # sk- pattern
-    assert logging_setup.redact_sensitive("Using key sk-1234567890abcdefghij1234567890") == "Using key sk-***REDACTED***"
+    assert (
+        logging_setup.redact_sensitive("Using key sk-1234567890abcdefghij1234567890")
+        == "Using key sk-***REDACTED***"
+    )
 
     # Bearer tokens
-    assert logging_setup.redact_sensitive("Header: Bearer eyJhbGciOiJIUzI1NiIsInR") == "Header: Bearer ***REDACTED***"
+    assert (
+        logging_setup.redact_sensitive("Header: Bearer eyJhbGciOiJIUzI1NiIsInR")
+        == "Header: Bearer ***REDACTED***"
+    )
 
     # Authorization
-    assert logging_setup.redact_sensitive("Authorization: Basic YWxhZGRpbjpvcGVuc2VzYW1l") == "Authorization: Basic ***REDACTED***"
+    assert (
+        logging_setup.redact_sensitive("Authorization: Basic YWxhZGRpbjpvcGVuc2VzYW1l")
+        == "Authorization: Basic ***REDACTED***"
+    )
 
     # Password
-    assert logging_setup.redact_sensitive('password: "super_secret_password"') == 'password: "***REDACTED***"'
+    assert (
+        logging_setup.redact_sensitive('password: "super_secret_password"')
+        == 'password: "***REDACTED***"'
+    )
 
     # Token
     assert logging_setup.redact_sensitive('token="abc123def456"') == 'token="***REDACTED***"'
