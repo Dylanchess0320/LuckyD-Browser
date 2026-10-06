@@ -353,7 +353,21 @@ class CodeExecutionSandbox:
             if returns_node.value.id == "list":
                 return "assert result == []  # TODO: real assertion"
             elif returns_node.value.id == "dict":
-                return "assert result == {}  # TODO: real assertion"
+                if isinstance(returns_node.slice, ast.Tuple) and len(returns_node.slice.elts) == 2:
+                    k_node = returns_node.slice.elts[0]
+                    v_node = returns_node.slice.elts[1]
+
+                    k_type = k_node.id if isinstance(k_node, ast.Name) else None
+                    v_type = v_node.id if isinstance(v_node, ast.Name) else None
+
+                    if k_type and v_type and "Any" not in (k_type, v_type):
+                        return f"assert isinstance(result, dict) and all(isinstance(k, {k_type}) and isinstance(v, {v_type}) for k, v in result.items())  # TODO: real assertion"
+                    elif k_type and k_type != "Any":
+                        return f"assert isinstance(result, dict) and all(isinstance(k, {k_type}) for k in result.keys())  # TODO: real assertion"
+                    elif v_type and v_type != "Any":
+                        return f"assert isinstance(result, dict) and all(isinstance(v, {v_type}) for v in result.values())  # TODO: real assertion"
+
+                return "assert isinstance(result, dict)  # TODO: real assertion"
             elif returns_node.value.id == "set":
                 return "assert result == set()  # TODO: real assertion"
             elif returns_node.value.id == "tuple":
