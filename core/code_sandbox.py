@@ -333,7 +333,7 @@ class CodeExecutionSandbox:
             if returns_node.id == "bool":
                 return "assert result is True  # TODO: real assertion"
             elif returns_node.id in ("int", "float"):
-                return "assert result == 0  # TODO: real assertion"
+                return f"assert isinstance(result, {returns_node.id})  # TODO: real assertion"
             elif returns_node.id == "str":
                 return 'assert result == ""  # TODO: real assertion'
             elif returns_node.id == "list":
