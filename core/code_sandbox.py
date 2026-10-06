@@ -329,35 +329,50 @@ class CodeExecutionSandbox:
         if not returns_node:
             return "assert result is not None  # TODO: real assertion"
 
-        if isinstance(returns_node, ast.Name):
-            if returns_node.id == "bool":
-                return "assert result is True  # TODO: real assertion"
-            elif returns_node.id in ("int", "float"):
-                return "assert result == 0  # TODO: real assertion"
-            elif returns_node.id == "str":
-                return 'assert result == ""  # TODO: real assertion'
-            elif returns_node.id == "list":
-                return "assert result == []  # TODO: real assertion"
-            elif returns_node.id == "dict":
-                return "assert result == {}  # TODO: real assertion"
-            elif returns_node.id == "set":
-                return "assert result == set()  # TODO: real assertion"
-            elif returns_node.id == "tuple":
-                return "assert result == ()  # TODO: real assertion"
-            elif returns_node.id == "bytes":
-                return "assert result == b''  # TODO: real assertion"
-        elif isinstance(returns_node, ast.Constant):
-            if returns_node.value is None:
-                return "assert result is None  # TODO: real assertion"
-        elif isinstance(returns_node, ast.Subscript) and isinstance(returns_node.value, ast.Name):
-            if returns_node.value.id == "list":
-                return "assert result == []  # TODO: real assertion"
-            elif returns_node.value.id == "dict":
-                return "assert result == {}  # TODO: real assertion"
-            elif returns_node.value.id == "set":
-                return "assert result == set()  # TODO: real assertion"
-            elif returns_node.value.id == "tuple":
-                return "assert result == ()  # TODO: real assertion"
+        def _infer_value(node: ast.expr) -> str | None:
+            if isinstance(node, ast.Name):
+                if node.id == "bool":
+                    return "True"
+                elif node.id in ("int", "float"):
+                    return "0"
+                elif node.id == "str":
+                    return '""'
+                elif node.id == "list":
+                    return "[]"
+                elif node.id == "dict":
+                    return "{}"
+                elif node.id == "set":
+                    return "set()"
+                elif node.id == "tuple":
+                    return "()"
+                elif node.id == "bytes":
+                    return "b''"
+            elif isinstance(node, ast.Constant):
+                if node.value is None:
+                    return "None"
+            elif isinstance(node, ast.Subscript) and isinstance(node.value, ast.Name):
+                if node.value.id == "list":
+                    return "[]"
+                elif node.value.id == "dict":
+                    return "{}"
+                elif node.value.id == "set":
+                    return "set()"
+                elif node.value.id == "tuple":
+                    if isinstance(node.slice, ast.Tuple):
+                        elements = [_infer_value(e) or "None" for e in node.slice.elts]
+                        if len(elements) == 1:
+                            return f"({elements[0]},)"
+                        return f"({', '.join(elements)})"
+                    else:
+                        val = _infer_value(node.slice) or "None"
+                        return f"({val},)"
+            return None
+
+        val = _infer_value(returns_node)
+        if val is not None:
+            if val in ("None", "True", "False"):
+                return f"assert result is {val}  # TODO: real assertion"
+            return f"assert result == {val}  # TODO: real assertion"
 
         return "assert result is not None  # TODO: real assertion"
 
