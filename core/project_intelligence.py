@@ -10,12 +10,15 @@ from __future__ import annotations
 
 import ast
 import json
+import logging
 import os
 import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 # ── Constants ──────────────────────────────────────────────────────────
 
@@ -482,8 +485,8 @@ class ProjectIntelligence:
                 data = json.loads(pkg_json.read_text(encoding="utf-8", errors="replace"))
                 for section in ("dependencies", "devDependencies"):
                     declared_py.extend(data.get(section, {}).keys())
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Failed to parse package.json: %s", e)
 
         info.declared = sorted(set(declared_py), key=str.lower)
 
