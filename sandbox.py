@@ -145,7 +145,14 @@ def execute(command: str, cwd: str | None = None, timeout: int | None = None) ->
     try:
         # Use the native shell: PowerShell on Windows, bash on Linux/macOS
         if platform.system() == "Windows":
-            shell_cmd = ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", command]
+            shell_cmd = [
+                "powershell.exe",
+                "-NoProfile",
+                "-NonInteractive",
+                "-NoLogo",
+                "-Command",
+                command,
+            ]
         else:
             shell_cmd = ["bash", "-c", command]
 
@@ -156,6 +163,7 @@ def execute(command: str, cwd: str | None = None, timeout: int | None = None) ->
             text=True,
             timeout=timeout,
             shell=False,
+            stdin=subprocess.DEVNULL,
         )
         elapsed = int((time.time() - start) * 1000)
 
