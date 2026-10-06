@@ -355,6 +355,17 @@ class CodeExecutionSandbox:
             elif returns_node.value.id == "dict":
                 return "assert result == {}  # TODO: real assertion"
             elif returns_node.value.id == "set":
+                inner_assertion = self._infer_assertion(returns_node.slice)
+                if " == " in inner_assertion:
+                    val = inner_assertion.split(" == ")[1].split("  #")[0].strip()
+                    if val in ("[]", "{}"):
+                        return "assert result == set()  # TODO: real assertion"
+                    if val != "set()":
+                        return f"assert result == {{{val}}}  # TODO: real assertion"
+                elif " is " in inner_assertion:
+                    val = inner_assertion.split(" is ")[1].split("  #")[0].strip()
+                    if val not in ("not None",):
+                        return f"assert result == {{{val}}}  # TODO: real assertion"
                 return "assert result == set()  # TODO: real assertion"
             elif returns_node.value.id == "tuple":
                 return "assert result == ()  # TODO: real assertion"
