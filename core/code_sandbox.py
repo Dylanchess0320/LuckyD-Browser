@@ -324,9 +324,57 @@ class CodeExecutionSandbox:
         issues.sort(key=lambda i: i.line)
         return issues
 
-    def _infer_assertion(self, returns_node: ast.expr | None) -> str:
+    def _infer_assertion(self, returns_node: ast.expr | None, body: list[ast.stmt]) -> str:
         """Infer a more realistic assertion based on the AST returns node."""
         if not returns_node:
+            return_types = set()
+            has_return = False
+            for stmt in body:
+                for node in ast.walk(stmt):
+                    if isinstance(node, ast.Return):
+                        has_return = True
+                        if node.value is None:
+                            return_types.add("NoneType")
+                        elif isinstance(node.value, ast.Constant):
+                            if node.value.value is None:
+                                return_types.add("NoneType")
+                            else:
+                                return_types.add(type(node.value.value).__name__)
+                        elif isinstance(node.value, (ast.List, ast.ListComp)):
+                            return_types.add("list")
+                        elif isinstance(node.value, (ast.Dict, ast.DictComp)):
+                            return_types.add("dict")
+                        elif isinstance(node.value, (ast.Set, ast.SetComp)):
+                            return_types.add("set")
+                        elif isinstance(node.value, ast.Tuple):
+                            return_types.add("tuple")
+                        elif isinstance(node.value, ast.JoinedStr):
+                            return_types.add("str")
+
+            if not has_return:
+                return "assert result is None  # TODO: real assertion"
+
+            if len(return_types) == 1:
+                ret_type = return_types.pop()
+                if ret_type == "bool":
+                    return "assert result is True  # TODO: real assertion"
+                elif ret_type in ("int", "float"):
+                    return "assert result == 0  # TODO: real assertion"
+                elif ret_type == "str":
+                    return 'assert result == ""  # TODO: real assertion'
+                elif ret_type == "list":
+                    return "assert result == []  # TODO: real assertion"
+                elif ret_type == "dict":
+                    return "assert result == {}  # TODO: real assertion"
+                elif ret_type == "set":
+                    return "assert result == set()  # TODO: real assertion"
+                elif ret_type == "tuple":
+                    return "assert result == ()  # TODO: real assertion"
+                elif ret_type == "bytes":
+                    return "assert result == b''  # TODO: real assertion"
+                elif ret_type == "NoneType":
+                    return "assert result is None  # TODO: real assertion"
+
             return "assert result is not None  # TODO: real assertion"
 
         if isinstance(returns_node, ast.Name):
@@ -393,7 +441,7 @@ class CodeExecutionSandbox:
                 "    # Act",
                 f"    result = {fn.name}({call_args})" if args else f"    result = {fn.name}()",
                 "    # Assert",
-                f"    {self._infer_assertion(fn.returns)}",
+                f"    {self._infer_assertion(fn.returns, fn.body)}",
                 "",
             ]
         if not funcs:
