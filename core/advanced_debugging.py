@@ -9,11 +9,15 @@ All stdlib. No external dependencies.
 from __future__ import annotations
 
 import ast
-import cProfile
+import contextlib
 import io
 import json
+import os
 import pstats
 import re
+import subprocess
+import sys
+import tempfile
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -701,26 +705,46 @@ class AdvancedDebugging:
         """
         Profile the given code and return hotspots.
 
-        Uses cProfile + pstats. The code is executed in a restricted namespace.
+        Uses cProfile + pstats. The code is executed in a subprocess.
         """
-        namespace: dict[str, Any] = {"__name__": "__main__"}
-        profiler = cProfile.Profile()
-
         start = time.perf_counter()
-        try:
-            profiler.enable()
-            exec(compile(code, "<string>", "exec"), namespace)  # nosec B102
-        except Exception:
-            pass  # we still want the profile even if the code raised
-        finally:
-            profiler.disable()
+
+        with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as code_file:
+            code_file.write(code)
+            code_path = code_file.name
+
+        with tempfile.NamedTemporaryFile(delete=False) as stats_file:
+            stats_path = stats_file.name
+
+        # Copy environment to ensure Python starts correctly on all platforms (like Windows)
+        env = os.environ.copy()
+
+        with contextlib.suppress(Exception):
+            subprocess.run(
+                [sys.executable, "-m", "cProfile", "-o", stats_path, code_path],
+                timeout=timeout,
+                check=False,
+                capture_output=True,
+                env=env,
+            )
+
         elapsed = time.perf_counter() - start
 
-        # Parse cProfile output
         stream = io.StringIO()
-        stats = pstats.Stats(profiler, stream=stream)
-        stats.sort_stats("cumulative").print_stats(20)
+        try:
+            stats = pstats.Stats(stats_path, stream=stream)
+            stats.sort_stats("cumulative").print_stats(20)
+        except Exception:
+            pass  # In case the file is empty or missing
+
         raw_profile = stream.getvalue()
+
+        # Clean up temporary files
+        try:
+            os.remove(code_path)
+            os.remove(stats_path)
+        except OSError:
+            pass
 
         hotspots = self._parse_profile_output(raw_profile, elapsed)
         return PerformanceReport(
