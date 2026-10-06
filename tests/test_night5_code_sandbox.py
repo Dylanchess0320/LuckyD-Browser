@@ -419,7 +419,7 @@ def test_unannotated():
     assert 'assert result == ""  # TODO: real assertion' in skeleton
 
     assert "def test_test_list():" in skeleton
-    assert "assert result == []  # TODO: real assertion" in skeleton
+    assert "assert isinstance(result, list) and all(isinstance(x, int) for x in result)" in skeleton
 
     assert "def test_test_dict():" in skeleton
     assert "assert result == {}  # TODO: real assertion" in skeleton
