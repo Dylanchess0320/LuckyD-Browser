@@ -343,7 +343,7 @@ class CodeExecutionSandbox:
             elif returns_node.id == "set":
                 return "assert result == set()  # TODO: real assertion"
             elif returns_node.id == "tuple":
-                return "assert result == ()  # TODO: real assertion"
+                return "assert isinstance(result, tuple)  # TODO: real assertion"
             elif returns_node.id == "bytes":
                 return "assert result == b''  # TODO: real assertion"
         elif isinstance(returns_node, ast.Constant):
@@ -357,7 +357,20 @@ class CodeExecutionSandbox:
             elif returns_node.value.id == "set":
                 return "assert result == set()  # TODO: real assertion"
             elif returns_node.value.id == "tuple":
-                return "assert result == ()  # TODO: real assertion"
+                if isinstance(returns_node.slice, ast.Tuple):
+                    if not returns_node.slice.elts:
+                        return "assert result == ()  # TODO: real assertion"
+                    if (
+                        len(returns_node.slice.elts) == 2
+                        and isinstance(returns_node.slice.elts[1], ast.Constant)
+                        and returns_node.slice.elts[1].value == Ellipsis
+                    ):
+                        return "assert isinstance(result, tuple)  # TODO: real assertion"
+                    length = len(returns_node.slice.elts)
+                    return f"assert isinstance(result, tuple) and len(result) == {length}  # TODO: real assertion"
+                elif isinstance(returns_node.slice, (ast.Name, ast.Subscript)):
+                    return "assert isinstance(result, tuple) and len(result) == 1  # TODO: real assertion"
+                return "assert isinstance(result, tuple)  # TODO: real assertion"
 
         return "assert result is not None  # TODO: real assertion"
 
