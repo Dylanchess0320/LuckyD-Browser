@@ -410,7 +410,7 @@ def test_unannotated():
     skeleton = sandbox.generate_tests(code)
 
     assert "def test_test_bool():" in skeleton
-    assert "assert result is True  # TODO: real assertion" in skeleton
+    assert "assert isinstance(result, bool)" in skeleton
 
     assert "def test_test_int():" in skeleton
     assert "assert result == 0  # TODO: real assertion" in skeleton

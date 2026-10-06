@@ -331,7 +331,7 @@ class CodeExecutionSandbox:
 
         if isinstance(returns_node, ast.Name):
             if returns_node.id == "bool":
-                return "assert result is True  # TODO: real assertion"
+                return "assert isinstance(result, bool)"
             elif returns_node.id in ("int", "float"):
                 return "assert result == 0  # TODO: real assertion"
             elif returns_node.id == "str":
