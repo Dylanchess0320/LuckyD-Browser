@@ -191,13 +191,13 @@ class _Client:
         self.pages = pages
         self.urls = []
 
-    def __enter__(self):
+    async def __aenter__(self):
         return self
 
-    def __exit__(self, *a):
+    async def __aexit__(self, *a):
         return False
 
-    def get(self, url):
+    async def get(self, url):
         self.urls.append(url)
         for page, resp in self.pages.items():
             if url.endswith(f"/{page}.md"):
@@ -212,7 +212,7 @@ def test_sync_indexes_all_pages_and_caches(tmp_path, monkeypatch) -> None:
     made = []
     client = _Client({p: _Resp(md) for p in fmhy._PAGES.values()})
     made.append(client)
-    monkeypatch.setattr(fmhy.httpx, "Client", lambda **kw: made[0])
+    monkeypatch.setattr(fmhy.httpx, "AsyncClient", lambda **kw: made[0])
     p = tmp_path / "fmhy.json"
     idx = FmhyIndex(p)
     n = idx.sync()
@@ -235,7 +235,7 @@ def test_sync_skips_failing_pages(tmp_path, monkeypatch) -> None:
     first = next(iter(pages.values()))
     client_pages = {p: _Resp(md) for p in pages.values()}
     client_pages[first] = ConnectionError("offline")
-    monkeypatch.setattr(fmhy.httpx, "Client", lambda **kw: _Client(client_pages))
+    monkeypatch.setattr(fmhy.httpx, "AsyncClient", lambda **kw: _Client(client_pages))
     idx = FmhyIndex(tmp_path / "fmhy.json")
     assert idx.sync() == len(pages) - 1
 
@@ -243,7 +243,7 @@ def test_sync_skips_failing_pages(tmp_path, monkeypatch) -> None:
 def test_sync_no_entries_keeps_old_state(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(
         fmhy.httpx,
-        "Client",
+        "AsyncClient",
         lambda **kw: _Client({p: _Resp("", status=404) for p in fmhy._PAGES.values()}),
     )
     idx = FmhyIndex(tmp_path / "fmhy.json")

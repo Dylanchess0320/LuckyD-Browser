@@ -7,6 +7,7 @@ No API key required. Cache auto-refreshes weekly.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 import time
@@ -94,14 +95,37 @@ class FmhyIndex:
     def sync(self) -> int:
         """Fetch + parse all wiki pages. Returns total entries indexed."""
         entries: list[dict] = []
-        with httpx.Client(timeout=20.0, follow_redirects=True) as client:
-            for category, page in _PAGES.items():
-                try:
-                    resp = client.get(_WIKI_RAW.format(page=page))
-                    if resp.status_code == 200:
-                        entries.extend(parse_markdown(resp.text, category))
-                except Exception:
-                    continue  # offline / page renamed — skip gracefully
+
+        async def _fetch_all() -> None:
+            async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
+
+                async def _fetch_page(category: str, page: str) -> None:
+                    try:
+                        resp = await client.get(_WIKI_RAW.format(page=page))
+                        if resp.status_code == 200:
+                            # We collect parsed items synchronously here.
+                            # It's quick, but could be offloaded if it blocked.
+                            parsed = parse_markdown(resp.text, category)
+                            entries.extend(parsed)
+                    except Exception:
+                        pass
+
+                tasks = [_fetch_page(category, page) for category, page in _PAGES.items()]
+                await asyncio.gather(*tasks)
+
+        # Run the asyncio event loop synchronously to fetch pages concurrently
+        try:
+            _ = asyncio.get_running_loop()
+            is_running = True
+        except RuntimeError:
+            is_running = False
+
+        if is_running:
+            import nest_asyncio
+
+            nest_asyncio.apply()
+
+        asyncio.run(_fetch_all())
         if entries:
             self._entries = entries
             self._fetched_at = time.time()
