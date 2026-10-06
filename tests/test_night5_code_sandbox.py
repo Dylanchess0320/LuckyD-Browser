@@ -416,7 +416,7 @@ def test_unannotated():
     assert "assert result == 0  # TODO: real assertion" in skeleton
 
     assert "def test_test_str():" in skeleton
-    assert 'assert result == ""  # TODO: real assertion' in skeleton
+    assert "assert isinstance(result, str)" in skeleton
 
     assert "def test_test_list():" in skeleton
     assert "assert result == []  # TODO: real assertion" in skeleton

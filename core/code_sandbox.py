@@ -335,7 +335,7 @@ class CodeExecutionSandbox:
             elif returns_node.id in ("int", "float"):
                 return "assert result == 0  # TODO: real assertion"
             elif returns_node.id == "str":
-                return 'assert result == ""  # TODO: real assertion'
+                return "assert isinstance(result, str)"
             elif returns_node.id == "list":
                 return "assert result == []  # TODO: real assertion"
             elif returns_node.id == "dict":
