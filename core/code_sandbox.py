@@ -348,7 +348,7 @@ class CodeExecutionSandbox:
                 return "assert result == b''  # TODO: real assertion"
         elif isinstance(returns_node, ast.Constant):
             if returns_node.value is None:
-                return "assert result is None  # TODO: real assertion"
+                return "assert result is None"
         elif isinstance(returns_node, ast.Subscript) and isinstance(returns_node.value, ast.Name):
             if returns_node.value.id == "list":
                 return "assert result == []  # TODO: real assertion"

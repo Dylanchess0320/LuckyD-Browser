@@ -431,7 +431,7 @@ def test_unannotated():
     assert "assert result == ()  # TODO: real assertion" in skeleton
 
     assert "def test_test_none():" in skeleton
-    assert "assert result is None  # TODO: real assertion" in skeleton
+    assert "assert result is None" in skeleton
 
     assert "def test_test_bytes():" in skeleton
     assert "assert result == b''  # TODO: real assertion" in skeleton
