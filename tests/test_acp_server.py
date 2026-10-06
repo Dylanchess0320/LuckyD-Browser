@@ -102,22 +102,27 @@ def test_handle_unknown_method():
 
 def test_serve_forever_eof():
     import io
+
     # Test exiting on EOF
     server = AcpServer(stdin=io.StringIO(""), stdout=io.StringIO())
     assert server.serve_forever() == 0
 
+
 def test_serve_forever_shutdown():
     import io
     import json
+
     # Test exiting on shutdown method
     req = json.dumps({"method": "shutdown", "id": 1})
     server = AcpServer(stdin=io.StringIO(f"{req}\n"), stdout=io.StringIO())
     server._initialized = True
     assert server.serve_forever() == 0
 
+
 def test_serve_forever_empty_lines_and_malformed_json():
     import io
     import json
+
     # Test skipping empty lines and handling malformed JSON
     # followed by a valid shutdown to exit
     req = "\n  \ninvalid json\n" + json.dumps({"method": "shutdown", "id": 1}) + "\n"
@@ -130,29 +135,33 @@ def test_serve_forever_empty_lines_and_malformed_json():
     # Expect a -32700 error for the malformed JSON
     assert '"code": -32700' in output
 
+
 def test_serve_forever_crashed_handle():
     import io
     import json
     from unittest.mock import MagicMock
+
     req = json.dumps({"method": "ping", "id": 1}) + "\n"
     stdout = io.StringIO()
     server = AcpServer(stdin=io.StringIO(req), stdout=stdout)
     server._initialized = True
-    server.handle = MagicMock(side_effect=Exception("Test crash")) # type: ignore
+    server.handle = MagicMock(side_effect=Exception("Test crash"))  # type: ignore
 
     assert server.serve_forever() == 0
     output = stdout.getvalue()
     assert '"code": -32603' in output
-    assert 'internal error' in output
+    assert "internal error" in output
+
 
 def test_serve_forever_write_failed():
     import io
     import json
     from unittest.mock import MagicMock
+
     req = json.dumps({"method": "ping", "id": 1}) + "\n"
     stdout = io.StringIO()
     server = AcpServer(stdin=io.StringIO(req), stdout=stdout)
     server._initialized = True
-    server._emit = MagicMock(side_effect=Exception("Test write failure")) # type: ignore
+    server._emit = MagicMock(side_effect=Exception("Test write failure"))  # type: ignore
 
     assert server.serve_forever() == 1
