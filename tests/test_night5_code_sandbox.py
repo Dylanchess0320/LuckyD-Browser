@@ -406,6 +406,15 @@ def test_bytes() -> bytes:
 
 def test_unannotated():
     return 1
+
+def test_custom() -> MyClass:
+    return MyClass()
+
+def test_generic() -> MyGeneric[int]:
+    return MyGeneric()
+
+def test_attr() -> models.User:
+    return models.User()
 """
     skeleton = sandbox.generate_tests(code)
 
@@ -438,3 +447,12 @@ def test_unannotated():
 
     assert "def test_test_unannotated():" in skeleton
     assert "assert result is not None  # TODO: real assertion" in skeleton
+
+    assert "def test_test_custom():" in skeleton
+    assert "assert isinstance(result, MyClass)  # TODO: real assertion" in skeleton
+
+    assert "def test_test_generic():" in skeleton
+    assert "assert isinstance(result, MyGeneric)  # TODO: real assertion" in skeleton
+
+    assert "def test_test_attr():" in skeleton
+    assert "assert isinstance(result, models.User)  # TODO: real assertion" in skeleton
