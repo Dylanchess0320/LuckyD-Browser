@@ -107,3 +107,38 @@ async def test_agent_logger_timed_async():
         assert args[0] == logging.INFO
         assert "[TIMER] async_func completed in 2.000s" in args[1]
         assert kwargs["extra"]["extra"]["async_arg"] == "async_value"
+
+
+def test_redact_sensitive():
+    # Empty string
+    assert logging_setup.redact_sensitive("") == ""
+
+    # Normal string
+    assert logging_setup.redact_sensitive("This is a normal log message.") == "This is a normal log message."
+
+    # API keys
+    assert logging_setup.redact_sensitive('{"api_key": "some_secret_key"}') == '{"api_key": "***REDACTED***"}'
+    assert logging_setup.redact_sensitive('api_key="my_key_123"') == 'api_key="***REDACTED***"'
+
+    # sk- pattern
+    assert logging_setup.redact_sensitive("Using key sk-1234567890abcdefghij1234567890") == "Using key sk-***REDACTED***"
+
+    # Bearer tokens
+    assert logging_setup.redact_sensitive("Header: Bearer eyJhbGciOiJIUzI1NiIsInR") == "Header: Bearer ***REDACTED***"
+
+    # Authorization
+    assert logging_setup.redact_sensitive("Authorization: Basic YWxhZGRpbjpvcGVuc2VzYW1l") == "Authorization: Basic ***REDACTED***"
+
+    # Password
+    assert logging_setup.redact_sensitive('password: "super_secret_password"') == 'password: "***REDACTED***"'
+
+    # Token
+    assert logging_setup.redact_sensitive('token="abc123def456"') == 'token="***REDACTED***"'
+
+    # Multiple sensitive items in one string
+    multi_secret = 'api_key: "key1", password="pw2"'
+    expected_multi = 'api_key: "***REDACTED***", password="***REDACTED***"'
+    assert logging_setup.redact_sensitive(multi_secret) == expected_multi
+
+    # Case insensitivity check
+    assert logging_setup.redact_sensitive('API_KEY: "secret"') == 'API_KEY: "***REDACTED***"'

@@ -76,9 +76,9 @@ SENSITIVE_PATTERNS = [
     (r'(api_key["\']?\s*[:=]\s*["\'])([^"\']+)(["\'])', r"\1***REDACTED***\3"),
     (r"(sk-[a-zA-Z0-9]{20,})", "sk-***REDACTED***"),
     (r"(Bearer\s+)[a-zA-Z0-9._-]+", r"\1***REDACTED***"),
-    (r"(Authorization:\s*)[a-zA-Z0-9._-]+", r"\1***REDACTED***"),
-    (r'(password["\']?\s*[:=]\s*["\'])([^"\']+)(["\'])', r"\1***REDACTED***"),
-    (r'(token["\']?\s*[:=]\s*["\'])([^"\']+)(["\'])', r"\1***REDACTED***"),
+    (r"(Authorization:\s*(?:Basic\s+|Bearer\s+)?)[a-zA-Z0-9._-]+", r"\1***REDACTED***"),
+    (r'(password["\']?\s*[:=]\s*["\'])([^"\']+)(["\'])', r"\1***REDACTED***\3"),
+    (r'(token["\']?\s*[:=]\s*["\'])([^"\']+)(["\'])', r"\1***REDACTED***\3"),
 ]
 
 # ── JSON Formatter (production) ──────────────────────────────────────────
