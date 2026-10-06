@@ -20,7 +20,6 @@ Stdlib only — no pip dependencies.
 from __future__ import annotations
 
 import ast
-import cProfile
 import io
 import json
 import os
@@ -401,58 +400,86 @@ class CodeExecutionSandbox:
         return "\n".join(lines).rstrip() + "\n"
 
     def profile(self, code: str, timeout: float = 30.0, top_n: int = 15) -> ProfileResult:
-        """Profile *code* in-process with cProfile.
-
-        Refuses to run in untrusted mode because exec() runs in the parent
-        process with no subprocess isolation — AST-based forbidden-node
-        checks are bypassable (e.g. getattr(os, 'system')).  Use execute()
-        for untrusted profiling with wall-clock timeout and full process
-        isolation.
-        """
-        if not self.trusted:
-            return ProfileResult(
-                success=False,
-                error="profile() is not available in untrusted mode — "
-                "use execute() for sandboxed profiling",
-            )
+        """Profile *code* in a subprocess with cProfile."""
         ok, err = self.validate_syntax(code)
         if not ok:
             return ProfileResult(success=False, error=err)
 
-        namespace: dict[str, Any] = {"__name__": "__sandbox_profile__"}
-        profiler = cProfile.Profile()
-        stream = io.StringIO()
-        try:
-            profiler.enable()
-            exec(compile(code, "<sandbox-profile>", "exec"), namespace)  # nosec B102
-            profiler.disable()
-        except Exception as exc:  # profiled code raised — still report stats
-            profiler.disable()
-            stats = pstats.Stats(profiler, stream=stream).sort_stats("cumulative")
-            stats.print_stats(top_n)
-            return ProfileResult(
-                success=False,
-                stats_text=stream.getvalue(),
-                error=f"{type(exc).__name__}: {exc}",
-            )
+        if not self.trusted:
+            violation = self._find_forbidden(code)
+            if violation:
+                return ProfileResult(
+                    success=False,
+                    error=f"Forbidden construct blocked: {violation}",
+                )
 
-        stats = pstats.Stats(profiler, stream=stream).sort_stats("cumulative")
-        stats.print_stats(top_n)
-        top = [
-            {
-                "function": f"{fn[0]}:{fn[1]}({fn[2]})",
-                "ncalls": cc,
-                "tottime": round(tt, 6),
-                "cumtime": round(ct, 6),
+        tmpdir = tempfile.mkdtemp(prefix="luckyd_sandbox_")
+        try:
+            script_path = Path(tmpdir) / "_sandbox_profile.py"
+            prof_path = Path(tmpdir) / "_sandbox.prof"
+
+            script_path.write_text(code, encoding="utf-8")
+
+            cmd = [self.python, "-I", "-m", "cProfile", "-o", str(prof_path), str(script_path)]
+            kwargs: dict[str, Any] = {
+                "cwd": tmpdir,
+                "env": self._build_env(None),
+                "text": True,
+                "encoding": "utf-8",
+                "errors": "replace",
+                "stdout": subprocess.PIPE,
+                "stderr": subprocess.PIPE,
             }
-            for (fn, (cc, _nc, tt, ct, _callers)) in list(stats.stats.items())[:top_n]
-        ]
-        return ProfileResult(
-            success=True,
-            stats_text=stream.getvalue(),
-            cumulative_time=round(stats.total_tt, 6),
-            top_functions=top,
-        )
+
+            if sys.platform != "win32" and self.memory_limit_mb:
+                kwargs["preexec_fn"] = _make_memory_limiter(self.memory_limit_mb)
+
+            try:
+                proc = subprocess.run(cmd, timeout=timeout, **kwargs)
+            except subprocess.TimeoutExpired:
+                return ProfileResult(success=False, error="timeout")
+            except OSError as exc:
+                return ProfileResult(success=False, error=str(exc))
+
+            if not prof_path.exists():
+                error_msg = (
+                    proc.stderr.strip() if proc.stderr else "Profiling failed to produce output"
+                )
+                return ProfileResult(success=False, error=error_msg)
+
+            stream = io.StringIO()
+            try:
+                stats = pstats.Stats(str(prof_path), stream=stream).sort_stats("cumulative")
+            except Exception as exc:
+                return ProfileResult(success=False, error=f"Invalid profile data: {exc}")
+
+            stats.print_stats(top_n)
+            top = [
+                {
+                    "function": f"{fn[0]}:{fn[1]}({fn[2]})",
+                    "ncalls": cc,
+                    "tottime": round(tt, 6),
+                    "cumtime": round(ct, 6),
+                }
+                for (fn, (cc, _nc, tt, ct, _callers)) in list(stats.stats.items())[:top_n]
+            ]
+
+            success = proc.returncode == 0
+            error = None
+            if not success:
+                err_text = proc.stderr.strip() if proc.stderr else ""
+                lines = [line.strip() for line in err_text.splitlines() if line.strip()]
+                error = lines[-1] if lines else "Runtime error"
+
+            return ProfileResult(
+                success=success,
+                stats_text=stream.getvalue(),
+                cumulative_time=round(stats.total_tt, 6),
+                top_functions=top,
+                error=error,
+            )
+        finally:
+            _remove_tree(tmpdir)
 
     # ── Internal helpers ───────────────────────────────────────────────
 

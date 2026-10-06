@@ -306,10 +306,16 @@ def test_generate_tests_syntax_error(sandbox):
 # ── profile ──────────────────────────────────────────────────────────────
 
 
-def test_profile_refused_untrusted(sandbox):
+def test_profile_untrusted_allowed(sandbox):
     result = sandbox.profile("x = 1\n")
+    assert result.success is True
+    assert result.stats_text
+
+
+def test_profile_untrusted_blocked(sandbox):
+    result = sandbox.profile("import os\nos.system('echo pwned')")
     assert result.success is False
-    assert "untrusted" in result.error
+    assert "Forbidden" in result.error
 
 
 def test_profile_trusted_runs_own_snippet(trusted_sandbox):
