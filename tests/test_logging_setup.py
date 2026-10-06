@@ -151,7 +151,9 @@ def test_redact_sensitive():
     )
 
     # Token
-    assert logging_setup.redact_sensitive('token="some_dummy_token_val"') == 'token="***REDACTED***"'
+    assert (
+        logging_setup.redact_sensitive('token="some_dummy_token_val"') == 'token="***REDACTED***"'
+    )
 
     # Multiple sensitive items in one string
     multi_secret = 'api_key: "key1", password="pw2"'
