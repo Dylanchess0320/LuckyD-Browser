@@ -339,7 +339,7 @@ class CodeExecutionSandbox:
             elif returns_node.id == "list":
                 return "assert result == []  # TODO: real assertion"
             elif returns_node.id == "dict":
-                return "assert result == {}  # TODO: real assertion"
+                return "assert isinstance(result, dict)"
             elif returns_node.id == "set":
                 return "assert result == set()  # TODO: real assertion"
             elif returns_node.id == "tuple":
@@ -353,7 +353,7 @@ class CodeExecutionSandbox:
             if returns_node.value.id == "list":
                 return "assert result == []  # TODO: real assertion"
             elif returns_node.value.id == "dict":
-                return "assert result == {}  # TODO: real assertion"
+                return "assert isinstance(result, dict)"
             elif returns_node.value.id == "set":
                 return "assert result == set()  # TODO: real assertion"
             elif returns_node.value.id == "tuple":
