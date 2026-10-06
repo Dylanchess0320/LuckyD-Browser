@@ -803,13 +803,15 @@ if __name__ == "__main__":
     # 7. compression: add enough stale low-importance memories to trigger merge
     with mem._lock, mem._conn:
         stale = _iso(_utcnow() - timedelta(days=90))
+        mids = []
         for i in range(4):
             mid = mem.add_memory(
                 f"Old scratch note {i} about temporary debugging.",
                 category="scratch",
                 importance=0.1,
             )
-            mem._conn.execute("UPDATE memories SET last_accessed = ? WHERE id = ?", (stale, mid))
+            mids.append((stale, mid))
+        mem._conn.executemany("UPDATE memories SET last_accessed = ? WHERE id = ?", mids)
     before = mem.stats()["total"]
     merged = mem.compress_old_memories(older_than_days=30, max_importance=0.3, keep_minimum=0)
     after = mem.stats()["total"]
