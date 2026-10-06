@@ -395,6 +395,12 @@ def test_dict() -> dict[str, int]:
 def test_set() -> set[str]:
     return {"a"}
 
+def test_set_list() -> set[list]:
+    return set()
+
+def test_set_dict() -> set[dict[str, int]]:
+    return set()
+
 def test_tuple() -> tuple[int, int]:
     return (1, 2)
 
@@ -425,6 +431,12 @@ def test_unannotated():
     assert "assert result == {}  # TODO: real assertion" in skeleton
 
     assert "def test_test_set():" in skeleton
+    assert 'assert result == {""}  # TODO: real assertion' in skeleton
+
+    assert "def test_test_set_list():" in skeleton
+    assert "assert result == set()  # TODO: real assertion" in skeleton
+
+    assert "def test_test_set_dict():" in skeleton
     assert "assert result == set()  # TODO: real assertion" in skeleton
 
     assert "def test_test_tuple():" in skeleton
