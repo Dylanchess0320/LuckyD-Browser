@@ -930,7 +930,7 @@ def bad(a=[]):
         pass
     try:
         x = eval("1+1")
-    except:
+    except Exception:
         pass
     f = open("x.txt")
 """
