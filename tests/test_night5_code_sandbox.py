@@ -428,7 +428,9 @@ def test_unannotated():
     assert "assert result == set()  # TODO: real assertion" in skeleton
 
     assert "def test_test_tuple():" in skeleton
-    assert "assert result == ()  # TODO: real assertion" in skeleton
+    assert (
+        "assert isinstance(result, tuple) and len(result) == 2  # TODO: real assertion" in skeleton
+    )
 
     assert "def test_test_none():" in skeleton
     assert "assert result is None  # TODO: real assertion" in skeleton
