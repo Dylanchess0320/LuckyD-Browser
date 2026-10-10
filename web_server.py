@@ -32,7 +32,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from config import PROJECT_DIR, get_config, load_env
+from config import DATA_DIR, PROJECT_DIR, get_config, load_env
 from core.approval_hook import ApprovalHook
 from core.audit_hook import AuditHook
 from core.hooks import get_hooks, register_plugin
@@ -176,6 +176,72 @@ def _sched_run_background(schedule_id: str) -> None:
 _TASKS: dict[str, dict] = {}
 _TASKS_LOCK = threading.Lock()
 
+#: On-disk copy of the task registry. On startup, any task still marked
+#: running/queued is failed explicitly so the UI never polls a dead task
+#: into the 30-minute timeout.
+_TASKS_FILE = Path(DATA_DIR) / "hq_tasks.json"
+_TASKS_PERSIST_CHARS = 200_000  # cap per persisted result/error string
+
+
+def _save_tasks() -> None:
+    """Persist the task registry to disk. Never raises."""
+    try:
+        _TASKS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with _TASKS_LOCK:
+            snapshot = {
+                tid: {
+                    k: (v[:_TASKS_PERSIST_CHARS] if isinstance(v, str) else v)
+                    for k, v in task.items()
+                }
+                for tid, task in _TASKS.items()
+            }
+        tmp = _TASKS_FILE.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(snapshot, indent=1), encoding="utf-8")
+        tmp.replace(_TASKS_FILE)
+    except Exception:
+        pass
+
+
+def _load_tasks() -> None:
+    """Load the persisted registry; fail stale running/queued tasks.
+
+    A task marked running/queued at load time belonged to a previous
+    process that died without finishing it — mark it failed with a clear
+    reason instead of leaving the UI polling forever.
+    """
+    try:
+        raw = _TASKS_FILE.read_text(encoding="utf-8")
+    except OSError:
+        return
+    try:
+        snapshot = json.loads(raw)
+    except (json.JSONDecodeError, ValueError):
+        return
+    if not isinstance(snapshot, dict):
+        return
+    with _TASKS_LOCK:
+        for tid, task in snapshot.items():
+            if not isinstance(task, dict):
+                continue
+            if task.get("status") in ("running", "queued"):
+                task["status"] = "failed"
+                task["error"] = (
+                    "Server restarted while this task was running; "
+                    "marked failed on startup instead of timing out."
+                )
+            _TASKS[str(tid)] = task
+    _save_tasks()
+
+
+#: Max HTTP request body accepted by HQHandler._body(). Larger bodies are
+#: rejected with 413 before reading (same bug class as the 10.6.3 terminal
+#: paste fix: oversized input must never silently corrupt).
+_MAX_BODY_BYTES = 10 * 1024 * 1024
+
+
+class _BodyTooLargeError(Exception):
+    """Raised by HQHandler._body() when Content-Length exceeds _MAX_BODY_BYTES."""
+
 
 async def _agent_run(task: str) -> str:
     """Serialise agent runs — the shared agent cannot run two turns at once."""
@@ -193,15 +259,18 @@ def _bg_worker(task_id: str, task: str) -> None:
     """Run an agent task in the background, recording status for polling."""
     with _TASKS_LOCK:
         _TASKS[task_id]["status"] = "running"
+    _save_tasks()
     try:
         result = _run_async(_agent_run(task), timeout=1800.0)
         with _TASKS_LOCK:
             _TASKS[task_id]["status"] = "done"
             _TASKS[task_id]["result"] = result
+        _save_tasks()
     except Exception as exc:  # never let the worker thread die silently
         with _TASKS_LOCK:
             _TASKS[task_id]["status"] = "error"
             _TASKS[task_id]["error"] = f"{type(exc).__name__}: {exc}"
+        _save_tasks()
 
 
 # ── HTTP handler ─────────────────────────────────────────────────────────────
@@ -342,6 +411,10 @@ class HQHandler(BaseHTTPRequestHandler):
             size = 0
         if size <= 0:
             return {}
+        if size > _MAX_BODY_BYTES:
+            raise _BodyTooLargeError(
+                f"request body too large ({size:,} bytes > {_MAX_BODY_BYTES:,} byte limit)"
+            )
         try:
             data = json.loads(self.rfile.read(size) or b"{}")
             return data if isinstance(data, dict) else {}
@@ -527,7 +600,12 @@ class HQHandler(BaseHTTPRequestHandler):
             return self._send_json({"error": "forbidden origin"}, code=403)
         if not self._authorized():
             return self._send_json({"error": "unauthorized"}, code=401)
-        body = self._body()
+        try:
+            body = self._body()
+        except _BodyTooLargeError as e:
+            # The unread body would desync a keep-alive connection, so close it.
+            self.close_connection = True
+            return self._send_json({"error": str(e)}, code=413)
         try:
             if path in ("/api/chat", "/chat", "/api/orchestrate"):
                 task = body.get("task") or body.get("message") or body.get("prompt") or ""
@@ -551,6 +629,7 @@ class HQHandler(BaseHTTPRequestHandler):
                         "status": "queued",
                         "created": time.time(),
                     }
+                _save_tasks()
                 threading.Thread(target=_bg_worker, args=(task_id, task), daemon=True).start()
                 return self._send_json({"task_id": task_id, "id": task_id})
             if path == "/api/brain/search":
@@ -1066,6 +1145,10 @@ def main() -> None:
         print("  scheduler daemon: running (see /schedules)")
     except Exception as exc:
         print(f"  [warn] scheduler failed to start: {exc}")
+
+    # Recover the durable task registry: tasks left running/queued by a
+    # previous process are marked failed so the UI stops polling them.
+    _load_tasks()
 
     server = ThreadingHTTPServer((args.host, args.port), HQHandler)
     server.daemon_threads = True

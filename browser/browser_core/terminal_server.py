@@ -620,11 +620,11 @@ def _spawn_pty(
     if shell == "agent":
         env["LUCKYD_AGENT_SLOT"] = "1"
         env["LUCKYD_AGENT_NAME"] = "Agent 1"
-        env["LUCKYD_AGENT_VERSION"] = "v10.6.3"
+        env["LUCKYD_AGENT_VERSION"] = "v10.7.0"
     elif shell == "agent2":
         env["LUCKYD_AGENT_SLOT"] = "2"
         env["LUCKYD_AGENT_NAME"] = "Agent 2"
-        env["LUCKYD_AGENT_VERSION"] = "v10.6.3"
+        env["LUCKYD_AGENT_VERSION"] = "v10.7.0"
     # pywinpty's PTY.spawn() expects the environment as a NUL-joined block
     # string ("name=value\0name=value\0…"), NOT a dict — passing a dict
     # raises cffi's "argument env: 'dict' object is not an instance of str",
@@ -706,7 +706,12 @@ class TerminalServer:
         stop = threading.Event()
 
         def pump_out() -> None:
-            """PTY → WebSocket."""
+            """PTY → WebSocket.
+
+            Chunked at 8KB: a single huge ws.send() can garble or drop data
+            the same way a single huge pty.write() did on the input side
+            (10.6.3 paste fix) — the shell reassembles the chunks.
+            """
             try:
                 while not stop.is_set():
                     if not pty.isalive():
@@ -714,7 +719,9 @@ class TerminalServer:
                     data = pty.read(blocking=False)
                     if data:
                         try:
-                            ws.send(data)
+                            # Slicing works for both str and bytes payloads.
+                            for i in range(0, len(data), 8192):
+                                ws.send(data[i : i + 8192])
                         except Exception:
                             break
                     else:

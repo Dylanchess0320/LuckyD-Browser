@@ -6,6 +6,7 @@ The sub-agent inherits the same model, tools, and memory but runs independently.
 from __future__ import annotations
 
 from .base import ToolBase, ToolOutput
+from .delegate import quarantine_result
 from .registry import register_tool
 
 
@@ -35,8 +36,11 @@ class SubAgentTool(ToolBase):
 
         try:
             result = await agent.run(task, max_turns=min(max_turns, 10))
+            # Quarantine pattern (Terminal mesh): a multi-thousand-char
+            # subagent dump never enters the parent context raw — the full
+            # result goes to disk and only a pointer note comes back.
             return ToolOutput(
-                text=result,
+                text=quarantine_result(result, task[:60]),
                 title="SubAgent Result",
                 metadata={"task": task[:100], "turns_used": agent.turn_count},
             )

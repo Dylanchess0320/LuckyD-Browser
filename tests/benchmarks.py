@@ -33,6 +33,10 @@ class BenchmarkTask:
     prompt: str
     expected_output: str | None = None  # If set, check for exact/substring match
     expected_files: list[str] = field(default_factory=list)  # Files that should be created/modified
+    expected_file_contents: dict[str, str] = field(
+        default_factory=dict
+    )  # path -> required substring in the file's final content
+    expected_error: str | None = None  # If set, success = the run raised and the message matches
     timeout_sec: int = 60
     tags: list[str] = field(default_factory=list)  # e.g., ["code_gen", "refactor", "debug"]
     difficulty: str = "medium"  # easy, medium, hard
@@ -393,12 +397,23 @@ class BenchmarkRunner:
 
         except Exception as e:
             latency = (time.monotonic() - start) * 1000
+            err = f"{type(e).__name__}: {e}"
+            # expected_error tasks succeed when the agent rejects as specified
+            # (e.g. a clear oversize-input error) instead of failing silently.
+            if task.expected_error and task.expected_error.lower() in err.lower():
+                return TaskResult(
+                    task_id=task.id,
+                    success=True,
+                    output="",
+                    latency_ms=latency,
+                    error=None,
+                )
             return TaskResult(
                 task_id=task.id,
                 success=False,
                 output="",
                 latency_ms=latency,
-                error=f"{type(e).__name__}: {e}",
+                error=err,
             )
 
     async def _call_agent(self, prompt: str) -> str:
@@ -418,7 +433,19 @@ class BenchmarkRunner:
             return False
 
         # Check expected files
-        return all(Path(file_path).exists() for file_path in task.expected_files)
+        if not all(Path(file_path).exists() for file_path in task.expected_files):
+            return False
+
+        # Check expected file contents (substring match per file)
+        for file_path, needle in task.expected_file_contents.items():
+            try:
+                content = Path(file_path).read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                return False
+            if needle not in content:
+                return False
+
+        return True
 
     def save_report(self, report: BenchmarkReport, filename: str | None = None):
         """Save a benchmark report to JSON."""

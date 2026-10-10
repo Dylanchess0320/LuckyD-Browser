@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [10.7.0] - 2026-10-10
+
+One unified agent loop: LuckyD Terminal's /mesh routing and LuckyD Code agents merged into the browser's `CodingAgent` (ported: lazy-load pstats, quarantine+pointer-note for subagent results, checkpoints-before-write verified present). Reliability hardening: oversized user input rejected with a clear error (1M chars) and HTTP bodies over 10MB get a 413 (same bug class as the 10.6.3 paste corruption); PTY→WS output chunked at 8KB; every mid-run model/provider rotation now recorded as a `MODEL_ROTATED` event, with `CODING_AGENT_PIN_PROVIDER=1` opt-in pin mode; background task registry persisted to disk with stale-task recovery on restart; classified retry policy wired into the LLM HTTP layer; context truncation now compacts/summarizes instead of silently dropping middle history. New task-completion eval suite (`tests/coding_eval.py`, 14 scenarios incl. reliability + context-overflow): 12/14 before → 14/14 after. Full suite: 3327 passed, 0 failed.
+
 ## [10.6.3] - 2026-10-10
 
 Antigravity agent paste fix: large pastes no longer corrupt in the terminal (chunked pty.write at 8KB, frontend chunks at 16KB with bracketed-paste wrap). 33 code-health PRs merged (exception handlers, test assertions, sandbox hardening including CodeExecutionSandbox RCE fix). Provider-health UI polish (live status badges, one-click best-working switch). LuckyD AI section in README.

@@ -70,7 +70,7 @@ class LLMClient:
         # Total wall-clock budget for all retries of one call (9.7, minimax
         # port: classified retry). Once exceeded, no further retry is started.
         self.retry_time_cap = retry_time_cap
-        self.retryable_codes = {429, 500, 502, 503, 504}
+        self.retryable_codes = {429, *range(500, 600)}
         # Fail fast on these — retrying never helps (bad request / bad key).
         self.fatal_codes = {400, 401, 403}
         self.context_manager = context_manager or ContextManager()
@@ -879,10 +879,9 @@ class LLMClient:
                     resp.raise_for_status()
                     return resp
             except (
-                httpx.RemoteProtocolError,
+                httpx.TimeoutException,  # Read/Connect/Write/PoolTimeout
                 httpx.ConnectError,
-                httpx.ReadTimeout,
-                httpx.ConnectTimeout,
+                httpx.RemoteProtocolError,
             ) as e:
                 last_exc = e
                 if self._retry_allowed(attempt, started_at):

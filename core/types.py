@@ -42,6 +42,7 @@ class AgentEventType(Enum):
     WARNING = "warning"
     DEBUG = "debug"
     CONTEXT_TRUNCATED = "context_truncated"
+    MODEL_ROTATED = "model_rotated"
     MEMORY_REFRESH = "memory_refresh"
     CHECKPOINT_CREATED = "checkpoint_created"
     TOOL_RESULT_TRUNCATED = "tool_result_truncated"

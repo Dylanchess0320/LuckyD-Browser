@@ -23,6 +23,7 @@ from __future__ import annotations
 import asyncio
 import threading
 import uuid
+from pathlib import Path
 from typing import Any
 
 from .base import ToolBase, ToolOutput
@@ -30,6 +31,43 @@ from .registry import register_tool
 
 MAX_RESULT_CHARS = 4000
 MAX_WAIT_SEC = 30
+
+#: Above this size, delegated results are quarantined to disk and only a
+#: short pointer note enters the model context — the Terminal's mesh
+#: pattern: never dump megabytes of delegated output into context.
+QUARANTINE_CHARS = MAX_RESULT_CHARS
+_QUARANTINE_DIR_NAME = "delegate-results"
+
+
+def quarantine_result(text: str, label: str) -> str:
+    """Quarantine a large delegated result to disk; return the pointer note.
+
+    Returns the original text unchanged when it fits in context; otherwise
+    writes the full text under DATA_DIR/delegate-results/ and returns a
+    short note with the file path plus a head excerpt, so the model can
+    Read the file if it needs the details.
+    """
+    if len(text) <= QUARANTINE_CHARS:
+        return text
+    try:
+        from datetime import datetime, timezone
+
+        from config import DATA_DIR
+
+        qdir = Path(DATA_DIR) / _QUARANTINE_DIR_NAME
+        qdir.mkdir(parents=True, exist_ok=True)
+        safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in label)[:40] or "result"
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        path = qdir / f"{safe}-{stamp}.md"
+        path.write_text(text, encoding="utf-8")
+        return (
+            f"[delegated result quarantined: {len(text):,} chars — too large for context]\n"
+            f"Full result saved to: {path}\n"
+            "Use the Read tool on that path if you need the details.\n\n"
+            f"--- excerpt (first 1000 chars) ---\n{text[:1000]}"
+        )
+    except Exception:
+        return text[:QUARANTINE_CHARS] + "\n... [truncated]"
 
 
 _tasks: dict[str, dict[str, Any]] = {}
@@ -186,7 +224,9 @@ class TaskOutputTool(ToolBase):
             result = entry["result"]
             error = entry["error"]
 
-        text_result = str(result)[:MAX_RESULT_CHARS] if result is not None else None
+        text_result = (
+            quarantine_result(str(result), f"task-{task_id}") if result is not None else None
+        )
         lines = [f"task_id: {task_id}", f"status: {status}"]
         if text_result is not None:
             lines.append(f"result:\n{text_result}")

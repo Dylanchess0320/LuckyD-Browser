@@ -52,6 +52,14 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 
+#: Max user-message size accepted by CodingAgent.run(). Larger inputs are
+#: rejected with a clear error instead of flowing into the loop (same bug
+#: class as the 10.6.3 terminal paste fix: oversized input must never
+#: silently corrupt). 200KB-class inputs flow through intact; multi-MB
+#: dumps get a clear rejection. Override with CODING_AGENT_MAX_INPUT_CHARS.
+MAX_USER_MESSAGE_CHARS = int(os.environ.get("CODING_AGENT_MAX_INPUT_CHARS", "1000000"))
+
+
 #: Valid ``permission_mode`` values for CodingAgent (LuckyD 9.7).
 PERMISSION_MODES = ("default", "acceptEdits", "bypassPermissions", "auto", "off")
 
@@ -175,12 +183,12 @@ TASK_TOOL_KEYWORDS: dict[str, tuple[str, ...]] = {
 # Policy: retryable = HTTP 429 / 5xx / timeouts / connection errors;
 # fatal (fail fast) = 400 / 401 / 403 and other client errors.
 #
-# NOTE: these helpers live here because this change is scoped to
-# core/agent_loop.py. Wiring _with_retry around LLMClient._http_post (the
-# method that POSTs to {base_url}/chat/completions) needs an edit to
-# core/llm_client.py — which already retries inline via retryable_codes,
-# max_retries, and Retry-After support — so that wiring is left as a
-# follow-up.
+# Follow-up DONE (10.7): LLMClient._http_post (the method that POSTs to
+# {base_url}/chat/completions) now enforces this classified policy itself —
+# retryable_codes covers 429 + the full 5xx range and the transient
+# exception tuple covers every httpx timeout/connection failure, with the
+# Retry-After-aware backoff it already had. _with_retry below stays as the
+# standalone, tested wrapper for other provider-call callables.
 
 
 def _is_retryable(exc: Exception) -> bool:
@@ -495,8 +503,14 @@ class CodingAgent:
             pass
         return []
 
-    async def _try_candidate_model(self, model: str, messages, tools):
-        """One rotation attempt on a same-provider model; None when still bad."""
+    async def _try_candidate_model(self, model: str, messages, tools, quiet: bool = False):
+        """One rotation attempt on a same-provider model; None when still bad.
+
+        On success the winner stays pinned and — unless ``quiet`` — a
+        MODEL_ROTATED event records the swap on the session/event stream.
+        """
+        from_model = self.model
+        from_provider = str(getattr(self._provider_config, "provider", "") or "")
         self.model = model
         self.llm_client.model = model
         try:
@@ -509,6 +523,18 @@ class CodingAgent:
         except Exception:
             return None
         if msg and not str(msg.get("content", "")).startswith("[API Error:"):
+            if not quiet:
+                to_provider = str(getattr(self._provider_config, "provider", "") or "")
+                self._emit_event(
+                    AgentEventType.MODEL_ROTATED,
+                    {
+                        "from_provider": from_provider,
+                        "from_model": from_model,
+                        "to_provider": to_provider,
+                        "to_model": model,
+                        "reason": "auto-rotate",
+                    },
+                )
             return msg
         return None
 
@@ -547,20 +573,31 @@ class CodingAgent:
         """
         original_model = self.model
         original_config = self._provider_config
+        original_provider = str(getattr(self._provider_config, "provider", "") or "")
         try:
             from core.providers import build_llm_config
 
-            self.switch_provider(build_llm_config(target))
+            self.switch_provider(build_llm_config(target), record=False)
             for alt in candidates_fn():
                 print(f"\n  [AUTO-ROTATE] Escaping to {target} '{alt}'...")
-                good = await self._try_candidate_model(alt, messages, tools)
+                good = await self._try_candidate_model(alt, messages, tools, quiet=True)
                 if good is not None:
                     print(f"  [AUTO-ROTATE] Succeeded on {target} '{alt}' — pinned")
+                    self._emit_event(
+                        AgentEventType.MODEL_ROTATED,
+                        {
+                            "from_provider": original_provider,
+                            "from_model": original_model,
+                            "to_provider": target,
+                            "to_model": alt,
+                            "reason": "provider-escape",
+                        },
+                    )
                     return good
         except Exception:
             pass
         with contextlib.suppress(Exception):
-            self.switch_provider(original_config)
+            self.switch_provider(original_config, record=False)
         # switch_provider resets the model from the config object, which
         # may predate a direct ag.model assignment — restore the string.
         self.model = original_model
@@ -620,7 +657,13 @@ class CodingAgent:
         pinned as the active model), or None when nothing worked — in which
         case the original model/provider is restored and the caller keeps
         the original error message.
+
+        Deterministic mode: with CODING_AGENT_PIN_PROVIDER=1 (or true/yes),
+        mid-run rotation is disabled entirely — a dead provider surfaces its
+        error instead of silently switching billing/behavior mid-run.
         """
+        if os.environ.get("CODING_AGENT_PIN_PROVIDER", "").lower() in ("1", "true", "yes"):
+            return None
         content = str(failed_msg.get("content", ""))
         code = self._api_error_code(content)
         if code == 401:
@@ -730,15 +773,18 @@ class CodingAgent:
 
         return _resolve
 
-    def switch_provider(self, config: LLMConfig) -> None:
+    def switch_provider(self, config: LLMConfig, record: bool = True) -> None:
         """Switch the active LLM provider/model at runtime.
 
         Public API for model switching so callers (main.py, bridges) don't
         need to reach into private internals. Rebinds the provider router
         (display + cost tracking) AND the inference client (self.llm_client)
         so /model actually routes requests to the new provider — not just
-        the display name.
+        the display name. Unless ``record`` is False, the swap is logged to
+        the session/event stream as a MODEL_ROTATED event.
         """
+        from_provider = str(getattr(self._provider_config, "provider", "") or "")
+        from_model = self.model
         self._provider_config = config
         self._router.switch(config)
         self.model = config.model
@@ -763,6 +809,17 @@ class CodingAgent:
             set_active_pair(config.provider, config.model)
         except Exception:
             pass
+        if record:
+            self._emit_event(
+                AgentEventType.MODEL_ROTATED,
+                {
+                    "from_provider": from_provider,
+                    "from_model": from_model,
+                    "to_provider": str(config.provider or ""),
+                    "to_model": config.model,
+                    "reason": "explicit",
+                },
+            )
 
     def _emit_event(self, event_type: AgentEventType, payload: dict | None = None) -> None:
         """Emit an agent event through the callbacks system."""
@@ -1446,12 +1503,72 @@ class CodingAgent:
         )
         return result_msg
 
+    @staticmethod
+    def _structural_summary(messages: list[dict]) -> str:
+        """Deterministic summary of dropped history for the truncation fallback.
+
+        Used only when LLM compaction declined or failed: counts turns, tool
+        calls, files touched, and recent errors, so the middle is preserved
+        structurally instead of deleted silently.
+        """
+        turns = 0
+        tool_counts: dict[str, int] = {}
+        files: set[str] = set()
+        errors: list[str] = []
+        for m in messages:
+            role = m.get("role", "")
+            if role == "user":
+                turns += 1
+            for tc in m.get("tool_calls") or []:
+                func = tc.get("function", {}) or {}
+                name = str(func.get("name", "?"))
+                tool_counts[name] = tool_counts.get(name, 0) + 1
+                try:
+                    args = json.loads(func.get("arguments", "") or "{}")
+                except Exception:
+                    args = {}
+                if isinstance(args, dict):
+                    for key in ("file_path", "path", "file"):
+                        p = args.get(key)
+                        if isinstance(p, str) and p:
+                            files.add(p)
+                            break
+            content = m.get("content", "")
+            if (
+                role == "tool"
+                and isinstance(content, str)
+                and content.startswith("Error")
+                and len(errors) < 3
+            ):
+                errors.append(content[:200])
+        calls = ", ".join(f"{k}x{v}" for k, v in sorted(tool_counts.items()))
+        lines = [
+            "Structural summary (compaction unavailable): "
+            f"{turns} user turns, {sum(tool_counts.values())} tool calls"
+            + (f" ({calls})" if calls else "")
+        ]
+        if files:
+            lines.append("Files touched: " + ", ".join(sorted(files)))
+        if errors:
+            lines.append("Recent errors:")
+            lines.extend(f"- {e}" for e in errors)
+        return "\n".join(lines)
+
     async def run(self, user_message: str, max_turns: int | None = None) -> str:
         """Run the full agent loop with hooks, events, checkpointing, and memory extraction.
 
         Conversation history persists across calls so multi-turn conversations work.
         Use reset() (or /clear) to start a fresh conversation.
         """
+        # Reliability: reject oversized input with a clear error instead of
+        # letting it silently corrupt the loop (same bug class as the 10.6.3
+        # terminal paste fix).
+        if len(user_message or "") > MAX_USER_MESSAGE_CHARS:
+            return (
+                f"[ERR] Input too large ({len(user_message):,} chars > "
+                f"{MAX_USER_MESSAGE_CHARS:,} char limit). Split it into smaller "
+                "pieces, or point me at the files instead of pasting them."
+            )
         max_turns = max_turns or self.max_turns
         self.turn_count = 0
         self._current_task_text = user_message or ""
@@ -1496,14 +1613,28 @@ class CodingAgent:
             # thresholds) while the full transcript still exists. Never raises.
             await maybe_compact(self)
 
-            # Safety fallback: cap messages when compaction declined or
-            # failed, so context can never grow without bound.
+            # Safety fallback: cap messages so context can never grow without
+            # bound. Compaction is attempted FIRST (LLM summarizer pass);
+            # only when that declines or fails does a deterministic
+            # structural summary preserve the dropped middle — raw deletion
+            # is the last resort, never the first.
             if len(self.messages) > 40:
+                from .compaction import SUMMARY_PREFIX, compact
                 from .context_manager import truncate_messages
 
-                self.messages = truncate_messages(self.messages, max_messages=40, keep_recent=20)
+                compacted = await compact(self)
+                if not compacted and len(self.messages) > 40:
+                    dropped = self.messages[1 : len(self.messages) - 20]
+                    structural = self._structural_summary(dropped)
+                    self.messages = truncate_messages(
+                        self.messages, max_messages=40, keep_recent=20
+                    )
+                    self.messages.insert(
+                        1, {"role": "system", "content": SUMMARY_PREFIX + structural}
+                    )
                 self._emit_event(
-                    AgentEventType.CONTEXT_TRUNCATED, {"message_count": len(self.messages)}
+                    AgentEventType.CONTEXT_TRUNCATED,
+                    {"message_count": len(self.messages), "compacted": compacted},
                 )
 
             # Per-turn memory refresh
