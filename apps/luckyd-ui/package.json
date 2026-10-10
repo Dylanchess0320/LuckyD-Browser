@@ -33,7 +33,7 @@
     "vite": "^6.4.2"
   },
   "optionalDependencies": {
-    "electron": "^35.7.5",
+    "electron": "^41.10.6",
     "electron-builder": "^26.15.0"
   },
   "build": {
