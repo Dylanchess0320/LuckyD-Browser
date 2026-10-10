@@ -222,6 +222,26 @@ class SmartContextEngine:
     _import_graph: dict[str, set[str]] = field(default_factory=dict, init=False)
     _graph_built_at: float = field(default=0.0, init=False)
 
+    #: Hard cap on cached scores. prune_cache() only removes *expired*
+    #: entries and nothing in production ever called it — every unique
+    #: (path, task_query) pair accumulated forever. The cap is enforced
+    #: on insert (oldest-first eviction) so the dict can't grow without
+    #: bound on long sessions.
+    _MAX_CACHE_ENTRIES: int = field(default=5000, init=False, repr=False)
+
+    def _bounded_cache_set(self, key: tuple[str, str], entry: _CacheEntry) -> None:
+        """Insert into _cache, evicting oldest entries past the cap. Never raises."""
+        try:
+            self._cache[key] = entry
+            if len(self._cache) > self._MAX_CACHE_ENTRIES:
+                self.prune_cache()
+            if len(self._cache) > self._MAX_CACHE_ENTRIES:
+                oldest = sorted(self._cache.items(), key=lambda kv: kv[1].created_at)
+                for k, _ in oldest[: len(self._cache) - self._MAX_CACHE_ENTRIES]:
+                    del self._cache[k]
+        except Exception:
+            pass
+
     # ── Public API ────────────────────────────────────────────────────
 
     def score_file(self, path: str, task_query: str) -> float:
@@ -237,7 +257,9 @@ class SmartContextEngine:
             return entry.score.total
 
         score = self._compute_score(norm, task_query, fp)
-        self._cache[key] = _CacheEntry(score=score, created_at=time.time(), fingerprint=fp)
+        self._bounded_cache_set(
+            key, _CacheEntry(score=score, created_at=time.time(), fingerprint=fp)
+        )
         return score.total
 
     def rank_files(self, paths: Iterable[str], task_query: str) -> list[FileScore]:
@@ -256,7 +278,9 @@ class SmartContextEngine:
                 scores.append(entry.score)
                 continue
             score = self._compute_score(norm, task_query, fp)
-            self._cache[key] = _CacheEntry(score=score, created_at=time.time(), fingerprint=fp)
+            self._bounded_cache_set(
+                key, _CacheEntry(score=score, created_at=time.time(), fingerprint=fp)
+            )
             scores.append(score)
         scores.sort(key=lambda s: s.total, reverse=True)
         return scores

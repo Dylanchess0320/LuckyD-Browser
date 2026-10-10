@@ -21,6 +21,8 @@ Statuses: ``queued`` / ``running`` / ``succeeded`` / ``failed`` / ``canceled``.
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import os
 import threading
 import uuid
 from pathlib import Path
@@ -32,11 +34,43 @@ from .registry import register_tool
 MAX_RESULT_CHARS = 4000
 MAX_WAIT_SEC = 30
 
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(os.environ.get(name, str(default)))
+    except (TypeError, ValueError):
+        return default
+
+
+#: Cap on concurrently running/queued delegated subagents. Each delegate
+#: spawns a full CodingAgent that burns tokens for many turns — without a
+#: cap the model can fork-bomb the provider bill (and the thread pool) by
+#: spawning delegates in a loop. 8 matches the deep-research max_parallel
+#: ceiling. Override with DELEGATE_MAX_CONCURRENT.
+MAX_CONCURRENT_DELEGATES = _env_int("DELEGATE_MAX_CONCURRENT", 8)
+
 #: Above this size, delegated results are quarantined to disk and only a
 #: short pointer note enters the model context — the Terminal's mesh
 #: pattern: never dump megabytes of delegated output into context.
 QUARANTINE_CHARS = MAX_RESULT_CHARS
 _QUARANTINE_DIR_NAME = "delegate-results"
+#: Cap on quarantined result files; oldest are pruned so the dir can't grow
+#: without bound on long sessions.
+MAX_KEPT_QUARANTINE_FILES = 100
+
+
+def _prune_quarantine_dir(qdir: Path) -> None:
+    """Delete oldest quarantined files beyond MAX_KEPT_QUARANTINE_FILES. Never raises."""
+    try:
+        files = sorted(
+            (p for p in qdir.iterdir() if p.is_file()),
+            key=lambda p: p.stat().st_mtime,
+        )
+        for stale in files[: max(0, len(files) - MAX_KEPT_QUARANTINE_FILES)]:
+            with contextlib.suppress(OSError):
+                stale.unlink()
+    except OSError:
+        pass
 
 
 def quarantine_result(text: str, label: str) -> str:
@@ -57,9 +91,13 @@ def quarantine_result(text: str, label: str) -> str:
         qdir = Path(DATA_DIR) / _QUARANTINE_DIR_NAME
         qdir.mkdir(parents=True, exist_ok=True)
         safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in label)[:40] or "result"
-        stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        # Microseconds in the stamp: task_output is often polled twice in
+        # the same second for one large result — second-granularity stamps
+        # collided and overwrote the first file.
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
         path = qdir / f"{safe}-{stamp}.md"
         path.write_text(text, encoding="utf-8")
+        _prune_quarantine_dir(qdir)
         return (
             f"[delegated result quarantined: {len(text):,} chars — too large for context]\n"
             f"Full result saved to: {path}\n"
@@ -74,8 +112,36 @@ _tasks: dict[str, dict[str, Any]] = {}
 _tasks_lock = threading.Lock()
 
 
+#: How many finished delegated tasks to keep for task_output polling.
+#: Older terminal entries are evicted (their threads are already done).
+MAX_KEPT_TASKS = 50
+
+
 def _new_task_id() -> str:
     return f"task_{uuid.uuid4().hex[:8]}"
+
+
+def _active_delegate_count_locked() -> int:
+    """Number of delegated tasks currently queued or running.
+
+    Must be called with _tasks_lock held.
+    """
+    return sum(1 for e in _tasks.values() if e.get("status") in ("queued", "running"))
+
+
+def _prune_terminal_tasks() -> None:
+    """Evict oldest terminal entries so the registry can't grow forever.
+
+    Long sessions accumulate one entry (thread handle + full result text)
+    per delegate call. Only terminal states (succeeded/failed/canceled) are
+    evicted — running/queued tasks are never dropped. Keeps the newest
+    ``MAX_KEPT_TASKS`` terminal entries so task_output stays useful.
+    Must be called with _tasks_lock held.
+    """
+    terminal = [tid for tid, e in _tasks.items() if e.get("status") not in ("queued", "running")]
+    overflow = len(terminal) - MAX_KEPT_TASKS
+    for tid in terminal[: max(0, overflow)]:
+        del _tasks[tid]
 
 
 def _run_subagent(task_id: str, task: str) -> None:
@@ -100,6 +166,7 @@ def _run_subagent(task_id: str, task: str) -> None:
             if entry is not None:
                 entry["status"] = "failed"
                 entry["error"] = f"{type(e).__name__}: {e}"
+            _prune_terminal_tasks()
         return
 
     with _tasks_lock:
@@ -109,6 +176,7 @@ def _run_subagent(task_id: str, task: str) -> None:
         entry["result"] = result
         if entry["status"] != "canceled":
             entry["status"] = "succeeded"
+        _prune_terminal_tasks()
 
 
 class DelegateTaskTool(ToolBase):
@@ -155,7 +223,18 @@ class DelegateTaskTool(ToolBase):
                     text=f"task_id '{task_id}' is already in use.",
                     error=True,
                 )
+            if _active_delegate_count_locked() >= MAX_CONCURRENT_DELEGATES:
+                return ToolOutput(
+                    text=(
+                        f"Too many delegated tasks already running "
+                        f"({MAX_CONCURRENT_DELEGATES} concurrent limit). "
+                        "Wait for some to finish with task_output, or stop "
+                        "one with task_stop, then try again."
+                    ),
+                    error=True,
+                )
             _tasks[task_id] = entry
+            _prune_terminal_tasks()
 
         thread = threading.Thread(
             target=_run_subagent,
@@ -215,7 +294,8 @@ class TaskOutputTool(ToolBase):
                 error=True,
             )
 
-        thread = entry["thread"]
+        with _tasks_lock:
+            thread = entry["thread"]
         if thread is not None and thread.is_alive() and wait_sec > 0:
             thread.join(timeout=wait_sec)
 

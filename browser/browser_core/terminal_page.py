@@ -17,7 +17,7 @@ try:  # same dual-import situation as page_head above
 
     _APP_VERSION = browser.__version__
 except ImportError:  # pragma: no cover - last-resort fallback
-    _APP_VERSION = "10.7.0"
+    _APP_VERSION = "10.7.1"
 
 # Displayed on the Agent 1/2 buttons and tab labels. Prefers the agent CLI's
 # own version when set (lucky-code --agent N exports LUCKYD_AGENT_VERSION),

@@ -1272,7 +1272,7 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
             ui.warn("MCP not configured or no servers connected")
 
     elif cmd == "version":
-        agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v10.7.0")
+        agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v10.7.1")
         agent_name = os.environ.get("LUCKYD_AGENT_NAME", "Agent 1")
         ui.info(f"LuckyD Code {agent_version} ({agent_name})")
 
@@ -2208,7 +2208,7 @@ def _dispatch_early_subcommands(args: list[str]) -> bool:
 
 def _print_version() -> None:
     """Print the LuckyD Code version line (fast path: no config needed)."""
-    agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v10.7.0")
+    agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v10.7.1")
     agent_name = os.environ.get("LUCKYD_AGENT_NAME", "")
     label = f"LuckyD Code {agent_version}" + (f" ({agent_name})" if agent_name else "")
     print(label)
@@ -2221,8 +2221,8 @@ def _print_help() -> None:
 LuckyD Code — AI Coding Agent
 
 Usage:
-  lucky-code                       Interactive REPL (Agent 1 · v10.7.0)
-  lucky-code --agent 2             Interactive REPL (Agent 2 · v10.7.0)
+  lucky-code                       Interactive REPL (Agent 1 · v10.7.1)
+  lucky-code --agent 2             Interactive REPL (Agent 2 · v10.7.1)
   lucky-code providers           List AI providers — status, cost tier, current
   lucky-code model <name>        Switch model (fuzzy Cline-style picker)
   lucky-code plugin list --available   List/install plugins
@@ -2233,7 +2233,7 @@ Usage:
   lucky-code --resume <id>         Resume specific session
 
 Options:
-  --agent 1|2        Select agent slot (1 = v10.7.0 Nuitka, 2 = v10.7.0)
+  --agent 1|2        Select agent slot (1 = v10.7.1 Nuitka, 2 = v10.7.1)
   --model NAME       Model: auto (default), flash, pro, or specific name
   --provider NAME    Set provider (see: lucky-code providers): ollama, clinepass,
                      cline-usage, openrouter, groq, deepseek,
@@ -2338,11 +2338,11 @@ def _parse_agent_args(args: list[str], cfg: dict) -> tuple[dict, str, float, str
             if slot == "2":
                 os.environ["LUCKYD_AGENT_SLOT"] = "2"
                 os.environ["LUCKYD_AGENT_NAME"] = "Agent 2"
-                os.environ["LUCKYD_AGENT_VERSION"] = "v10.7.0"
+                os.environ["LUCKYD_AGENT_VERSION"] = "v10.7.1"
             else:
                 os.environ["LUCKYD_AGENT_SLOT"] = "1"
                 os.environ["LUCKYD_AGENT_NAME"] = "Agent 1"
-                os.environ["LUCKYD_AGENT_VERSION"] = "v10.7.0"
+                os.environ["LUCKYD_AGENT_VERSION"] = "v10.7.1"
             i += 2
         elif args[i] in ("-v", "--version"):
             _print_version()

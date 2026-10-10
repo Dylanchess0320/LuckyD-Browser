@@ -33,6 +33,7 @@ import tools.file_tools
 import tools.git_tools
 import tools.graphify_tool
 import tools.harness_tool
+import tools.jules_delegate
 import tools.lsp_tools
 import tools.mcp_tools
 import tools.memory_tools

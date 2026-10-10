@@ -1391,3 +1391,41 @@ async def test_chat_nonstreaming_basic_success(client):
     assert msg["_usage"] == {"prompt_tokens": 3}
     headers = FakeAsyncClient.instances[-1].captured["headers"]
     assert headers["Authorization"] == "Bearer test-key"
+
+
+# ── _http_post: retry-budget exhaustion must raise, never return None ──
+
+
+async def test_http_post_raises_when_retry_budget_exhausted(client):
+    """Regression: _http_post used to fall through and return None (crashing
+    callers with AttributeError on resp.json()) when the retry time budget
+    was blown on a retryable HTTP status. It must surface the real HTTP
+    error instead — and fire no extra requests after the budget is gone."""
+    client.retry_time_cap = 0  # budget blown from the first attempt
+    FakeAsyncClient.instances.clear()
+    FakeAsyncClient.script = [("post", FakePostResp({}, status=500))]
+    with (
+        patch("core.llm_client.httpx.AsyncClient", FakeAsyncClient),
+        pytest.raises(httpx.HTTPStatusError) as ei,
+    ):
+        await client._http_post("https://api.example.com/chat/completions", {}, {})
+    assert ei.value.response.status_code == 500
+    assert len(FakeAsyncClient.instances) == 1  # no extra requests past the budget
+
+
+async def test_http_post_still_retries_then_raises(client):
+    """Sanity: retryable statuses still retry while the budget lasts, then
+    raise the last HTTP error (not None) once attempts are exhausted."""
+    FakeAsyncClient.instances.clear()
+    FakeAsyncClient.script = [
+        ("post", FakePostResp({}, status=503)),
+        ("post", FakePostResp({}, status=503)),
+        ("post", FakePostResp({}, status=503)),
+    ]
+    with (
+        patch("core.llm_client.httpx.AsyncClient", FakeAsyncClient),
+        pytest.raises(httpx.HTTPStatusError) as ei,
+    ):
+        await client._http_post("https://api.example.com/chat/completions", {}, {})
+    assert ei.value.response.status_code == 503
+    assert len(FakeAsyncClient.instances) == 3  # initial + 2 retries

@@ -181,6 +181,26 @@ _TASKS_LOCK = threading.Lock()
 #: into the 30-minute timeout.
 _TASKS_FILE = Path(DATA_DIR) / "hq_tasks.json"
 _TASKS_PERSIST_CHARS = 200_000  # cap per persisted result/error string
+#: Cap on HQ background tasks kept in memory and on disk. Each entry can
+#: carry a ~200KB result, so an unbounded registry is a slow disk/memory
+#: leak on a long-lived server. Oldest terminal tasks are evicted first;
+#: running/queued tasks are never dropped.
+_MAX_KEPT_HQ_TASKS = 200
+
+
+def _prune_hq_tasks() -> None:
+    """Evict oldest terminal HQ tasks beyond _MAX_KEPT_HQ_TASKS. Never raises."""
+    try:
+        with _TASKS_LOCK:
+            terminal = [
+                tid
+                for tid, t in _TASKS.items()
+                if isinstance(t, dict) and t.get("status") not in ("running", "queued")
+            ]
+            for tid in terminal[: max(0, len(terminal) - _MAX_KEPT_HQ_TASKS)]:
+                del _TASKS[tid]
+    except Exception:
+        pass
 
 
 def _save_tasks() -> None:
@@ -265,11 +285,13 @@ def _bg_worker(task_id: str, task: str) -> None:
         with _TASKS_LOCK:
             _TASKS[task_id]["status"] = "done"
             _TASKS[task_id]["result"] = result
+        _prune_hq_tasks()
         _save_tasks()
     except Exception as exc:  # never let the worker thread die silently
         with _TASKS_LOCK:
             _TASKS[task_id]["status"] = "error"
             _TASKS[task_id]["error"] = f"{type(exc).__name__}: {exc}"
+        _prune_hq_tasks()
         _save_tasks()
 
 
@@ -629,6 +651,7 @@ class HQHandler(BaseHTTPRequestHandler):
                         "status": "queued",
                         "created": time.time(),
                     }
+                _prune_hq_tasks()
                 _save_tasks()
                 threading.Thread(target=_bg_worker, args=(task_id, task), daemon=True).start()
                 return self._send_json({"task_id": task_id, "id": task_id})

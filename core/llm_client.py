@@ -893,13 +893,18 @@ class LLMClient:
                 else:
                     raise
             except httpx.HTTPStatusError as e:
-                if (
-                    e.response.status_code not in self.retryable_codes
-                    or attempt >= self.max_retries
-                ):
-                    print(
-                        f"\n  [ERR] API Error ({e.response.status_code}): {e.response.text[:500]}"
-                    )
-                    raise
+                # We only land here when the inline branch above decided NOT
+                # to retry (non-retryable code, attempts exhausted, or the
+                # retry time budget is blown). The old conditional could fall
+                # through silently when the budget was exceeded on a
+                # retryable code — burning another request per remaining
+                # attempt and finally returning None, which crashed callers
+                # with a confusing AttributeError instead of the real HTTP
+                # error. Always surface the real error.
+                print(f"\n  [ERR] API Error ({e.response.status_code}): {e.response.text[:500]}")
+                raise
         if last_exc:
             raise last_exc
+        # Unreachable: every path above returns, continues, or raises — but
+        # never resolve to an implicit None (callers do resp.json()).
+        raise RuntimeError("_http_post exited without a response or an error")

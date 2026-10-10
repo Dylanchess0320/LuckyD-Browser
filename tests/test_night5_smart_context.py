@@ -251,3 +251,17 @@ def test_prune_cache_removes_expired(engine, proj):
     removed = engine.prune_cache()
     assert removed >= 1
     assert engine._cache == {}
+
+
+def test_cache_bounded_on_insert(engine, proj):
+    """The score cache must not grow without bound: inserts past the cap
+    evict oldest entries (prune_cache was never called by production)."""
+    engine._MAX_CACHE_ENTRIES = 5
+    target = str(proj / "mypkg" / "auth.py")
+    for i in range(10):
+        engine.score_file(target, f"distinct-query-{i}")
+    assert len(engine._cache) <= 5
+    # newest queries survive, oldest were evicted
+    keys = {k[1] for k in engine._cache}
+    assert "distinct-query-9" in keys
+    assert "distinct-query-0" not in keys

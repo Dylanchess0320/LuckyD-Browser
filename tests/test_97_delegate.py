@@ -173,3 +173,100 @@ async def test_permission_levels():
 def test_asyncio_mode_is_auto():
     # sanity: real CodingAgent.run is a coroutine function, handled by the worker
     assert asyncio.iscoroutinefunction(core.agent_loop.CodingAgent.run)
+
+
+# ── concurrency cap ──────────────────────────────────────────────────
+
+
+async def test_concurrency_cap_rejects_overflow(monkeypatch, fake_agent):
+    """delegate_task must refuse new spawns past MAX_CONCURRENT_DELEGATES —
+    each delegate burns tokens for many turns, so unbounded spawning is a
+    fork-bomb on the provider bill."""
+    monkeypatch.setattr(delegate_mod, "MAX_CONCURRENT_DELEGATES", 2)
+    # Occupy both slots with slow agents that never finish on their own.
+    monkeypatch.setattr(core.agent_loop, "CodingAgent", SlowAgent)
+    out1 = await DelegateTaskTool().execute(task="one")
+    out2 = await DelegateTaskTool().execute(task="two")
+    assert not out1.error and not out2.error
+
+    third = await DelegateTaskTool().execute(task="three")
+    assert third.error
+    assert "Too many delegated tasks" in third.text
+    SlowAgent.release.set()
+
+
+async def test_concurrency_slot_frees_after_completion(monkeypatch, fake_agent):
+    """A finished task frees its concurrency slot for the next spawn."""
+    monkeypatch.setattr(delegate_mod, "MAX_CONCURRENT_DELEGATES", 1)
+    out1 = await DelegateTaskTool().execute(task="one")
+    done = await _wait_for(out1.metadata["task_id"], {"succeeded", "failed"})
+    assert done.metadata["status"] == "succeeded"
+
+    out2 = await DelegateTaskTool().execute(task="two")
+    assert not out2.error
+    await _wait_for(out2.metadata["task_id"], {"succeeded", "failed"})
+
+
+# ── registry pruning ─────────────────────────────────────────────────
+
+
+async def test_terminal_tasks_pruned_beyond_cap(monkeypatch, fake_agent):
+    """Oldest terminal entries are evicted past MAX_KEPT_TASKS so the
+    registry (thread handles + full result texts) can't grow forever."""
+    monkeypatch.setattr(delegate_mod, "MAX_KEPT_TASKS", 3)
+    ids = []
+    for i in range(5):
+        out = await DelegateTaskTool().execute(task=f"t{i}")
+        ids.append(out.metadata["task_id"])
+        await _wait_for(out.metadata["task_id"], {"succeeded", "failed"})
+    with delegate_mod._tasks_lock:
+        kept = list(delegate_mod._tasks.keys())
+    assert len(kept) == 3
+    assert kept == ids[-3:]
+    # evicted ids read back as unknown
+    gone = await TaskOutputTool().execute(task_id=ids[0])
+    assert gone.error and "Unknown task_id" in gone.text
+
+
+async def test_running_tasks_never_pruned(monkeypatch):
+    """Pruning must never drop a queued/running task, however small the cap."""
+    monkeypatch.setattr(delegate_mod, "MAX_KEPT_TASKS", 1)
+    monkeypatch.setattr(delegate_mod, "MAX_CONCURRENT_DELEGATES", 8)
+    monkeypatch.setattr(core.agent_loop, "CodingAgent", SlowAgent)
+    out = await DelegateTaskTool().execute(task="slow")
+    assert not out.error
+    with delegate_mod._tasks_lock:
+        assert out.metadata["task_id"] in delegate_mod._tasks
+    SlowAgent.release.set()
+    await _wait_for(out.metadata["task_id"], {"succeeded", "failed"})
+
+
+# ── quarantine hardening ─────────────────────────────────────────────
+
+
+def test_quarantine_stamp_has_microseconds(tmp_path, monkeypatch):
+    """Same-second double polls must not collide on the quarantine filename."""
+    import tools.delegate as d
+
+    monkeypatch.setattr(d, "QUARANTINE_CHARS", 5)
+    monkeypatch.setattr("config.DATA_DIR", str(tmp_path))
+    n1 = d.quarantine_result("123456789", "task-x")
+    n2 = d.quarantine_result("123456789", "task-x")
+    p1 = next(line for line in n1.splitlines() if line.startswith("Full result saved to:"))
+    p2 = next(line for line in n2.splitlines() if line.startswith("Full result saved to:"))
+    assert p1 != p2
+    files = list((tmp_path / "delegate-results").iterdir())
+    assert len(files) == 2
+
+
+def test_quarantine_dir_pruned(tmp_path, monkeypatch):
+    """The quarantine dir is capped at MAX_KEPT_QUARANTINE_FILES."""
+    import tools.delegate as d
+
+    monkeypatch.setattr(d, "QUARANTINE_CHARS", 5)
+    monkeypatch.setattr(d, "MAX_KEPT_QUARANTINE_FILES", 3)
+    monkeypatch.setattr("config.DATA_DIR", str(tmp_path))
+    for i in range(5):
+        d.quarantine_result(f"12345{i}", f"task-{i}")
+    files = list((tmp_path / "delegate-results").iterdir())
+    assert len(files) == 3
