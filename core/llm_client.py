@@ -54,7 +54,7 @@ class LLMClient:
         retry_time_cap: float = 120.0,
         context_manager: ContextManager | None = None,
         token_resolver: Callable[[], str | None] | None = None,
-        provider: str = "",
+        provider: str | None = None,
     ):
         self.api_key = api_key
         self.base_url = base_url
@@ -79,6 +79,32 @@ class LLMClient:
         # session (e.g. ClinePass -> Cline CLI WorkOS token) so that a token
         # refreshed since startup actually gets used instead of the stale one.
         self.token_resolver = token_resolver
+        # Provider id for the last-working memory (core/last_working.py).
+        # Derived from the base URL when not given explicitly.
+        if provider:
+            self._provider_id = provider.lower().strip()
+        else:
+            try:
+                from .providers import provider_id_for_base_url
+
+                self._provider_id = provider_id_for_base_url(base_url) or ""
+            except Exception:
+                self._provider_id = ""
+
+    def _note_success(self) -> None:
+        """Record this provider+model as last-known-working. Never raises.
+
+        Called after any API call that actually served a response, so the
+        HQ Models view, ``lucky-code providers``, and the free rotation can
+        prefer the pair with evidence it worked.
+        """
+        try:
+            from .last_working import record_last_working_model
+
+            if self._provider_id:
+                record_last_working_model(self._provider_id, self.model)
+        except Exception:
+            pass
 
     def _record_success(self) -> None:
         """Record this pair as last-known-working + the live active pair.
@@ -595,7 +621,9 @@ class LLMClient:
             if resp.status_code >= 400:
                 await resp.aread()
             resp.raise_for_status()
-            return await self._read_stream(resp, stream_callback, think_callback)
+            msg = await self._read_stream(resp, stream_callback, think_callback)
+            self._note_success()
+            return msg
 
     async def _read_stream(self, resp, stream_callback, think_callback) -> dict | None:
         """Read and parse a streaming response, capturing usage."""

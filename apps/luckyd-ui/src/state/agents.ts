@@ -32,22 +32,35 @@ export interface ProviderHealth {
   model: string;
   configured: boolean;
   key_present: boolean;
+  requires_key: boolean;
+  env_key?: string | null;
   local: boolean;
   free_tier: boolean;
   current: boolean;
   credit_exhausted: boolean;
+  /** Position in the free rotation (0-based), null when not in the chain. */
   rotation_order: number | null;
+  /** True for the rotation member the switcher would try next. */
   next_in_rotation: boolean;
+  /** Seconds until the Cline 402 exhaustion marker expires (0 = n/a). */
   credit_ttl_remaining_sec: number;
+  status: 'ready' | 'needs_key' | 'exhausted';
   last_working: boolean;
   last_working_ago: string | null;
   last_working_model: string | null;
 }
-export interface BestFree {
-  provider: string;
-  model: string;
-  available: boolean;
-  last_working_ago?: string | null;
+
+/** GET /api/providers — live "what would work right now" snapshot. */
+export interface HealthSnapshot {
+  providers: ProviderHealth[];
+  /** Best usable free provider id (core.free_rotation.best_free_provider). */
+  best_free: string | null;
+  /** Default model for best_free. */
+  best_free_model: string | null;
+  /** Currently answering provider/model (core.free_rotation.get_active_pair). */
+  active: { provider: string; model: string } | null;
+  /** Last pair that demonstrably answered (core.last_working), if fresh. */
+  last_working: { provider: string; model: string; timestamp: number } | null;
 }
 
 export const BRIDGE_URL = 'http://127.0.0.1:9885';
@@ -80,15 +93,24 @@ export function terminalUrl(shell: string): string {
   return `${BRIDGE_URL}/terminal?shell=${encodeURIComponent(shell)}`;
 }
 
+/**
+ * The bridge writes browser/data/settings.json, which uses the browser's
+ * provider namespace ("google"); core/free_rotation speaks "gemini".
+ * The bridge normalizes on write, so compare UI state through this helper.
+ */
+export function toBrowserProviderId(id: string): string {
+  return id === 'gemini' ? 'google' : id;
+}
+
 interface AgentsState {
   ping: MeshPing | null;
   catalog: Catalog | null;
   current: CurrentModel | null;
+  health: HealthSnapshot | null;
   switching: boolean;
-  health: ProviderHealth[] | null;
-  bestFree: BestFree | null;
   refresh: () => Promise<void>;
   setModel: (provider: string, model: string) => Promise<void>;
+  /** One click: switch to the best provider that works right now. */
   switchToBest: () => Promise<boolean>;
 }
 
@@ -106,30 +128,24 @@ export const useAgents = create<AgentsState>((set, get) => ({
   ping: null,
   catalog: null,
   current: null,
-  switching: false,
   health: null,
-  bestFree: null,
+  switching: false,
   refresh: async () => {
     try {
-      const [ping, catalog, current, providers, bestFree] = await Promise.all([
+      const [ping, catalog, current, health] = await Promise.all([
         fetchJson<MeshPing>(`${BRIDGE_URL}/api/ping`),
         fetchJson<Catalog>(`${BRIDGE_URL}/api/catalog`),
         fetchJson<CurrentModel>(`${BRIDGE_URL}/api/model`),
         // 10.5 health snapshot + one-click fix target (null on old bridges).
-        fetchJson<{ providers: ProviderHealth[] }>(`${BRIDGE_URL}/api/providers`),
-        fetchJson<BestFree>(`${BRIDGE_URL}/api/best-free`),
+        fetchJson<HealthSnapshot>(`${BRIDGE_URL}/api/providers`),
       ]);
-      if (!ping && !catalog && !current && !providers && !bestFree) {
+      if (!ping && !catalog && !current && !health) {
         set({ ping: null });
         return;
       }
-      set({
-        ping,
-        catalog,
-        current,
-        health: providers?.providers ?? null,
-        bestFree: bestFree && bestFree.available ? bestFree : null,
-      });
+      set({ ping, catalog, current });
+      // Older bridges may not serve /api/providers yet — keep going.
+      if (health && Array.isArray(health.providers)) set({ health });
     } catch {
       set({ ping: null });
     }
@@ -143,8 +159,16 @@ export const useAgents = create<AgentsState>((set, get) => ({
         body: JSON.stringify({ provider, model }),
       });
       if (r.ok) {
-        const next: CurrentModel = await r.json();
+        const next = (await r.json()) as CurrentModel & {
+          health?: HealthSnapshot | null;
+        };
         set({ current: next });
+        // The bridge re-reads settings.json and returns a fresh health
+        // snapshot with every switch — the UI updates instantly, no
+        // restart of the bridge or the terminal agent required.
+        if (next.health && Array.isArray(next.health.providers)) {
+          set({ health: next.health });
+        }
       }
     } finally {
       set({ switching: false });
@@ -154,9 +178,9 @@ export const useAgents = create<AgentsState>((set, get) => ({
   // the pick is never stale. Returns true when a switch was performed.
   switchToBest: async () => {
     await get().refresh();
-    const best = get().bestFree;
-    if (!best?.provider || !best.model) return false;
-    await get().setModel(best.provider, best.model);
+    const h = get().health;
+    if (!h?.best_free || !h?.best_free_model) return false;
+    await get().setModel(h.best_free, h.best_free_model);
     await get().refresh();
     return true;
   },
@@ -164,4 +188,16 @@ export const useAgents = create<AgentsState>((set, get) => ({
 
 export function useAgentsRefresh() {
   return useCallback(() => useAgents.getState().refresh(), []);
+}
+
+/** "worked 2h ago" style label for the last-known-working pair. */
+export function lastWorkingAge(ts: number): string {
+  const s = Math.max(0, Math.floor(Date.now() / 1000 - ts));
+  if (s < 60) return 'just now';
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  return `${d}d ago`;
 }

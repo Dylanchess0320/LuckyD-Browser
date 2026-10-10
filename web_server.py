@@ -377,19 +377,14 @@ class HQHandler(BaseHTTPRequestHandler):
                     {"models": [cfg.get("model", "")], "provider": cfg.get("provider", "")}
                 )
             if path == "/api/providers":
-                from core.providers import list_providers
+                # Health snapshot: per-provider status (ready/needs_key/
+                # exhausted), rotation order, next-in-rotation, Cline 402 TTL,
+                # the free rotation's current best pick, and the
+                # last-known-working pair. Single source of truth for "what
+                # would work right now" (additive over the old shape).
+                from core.providers import health_snapshot
 
-                payload: dict = {"providers": list_providers()}
-                # 10.5: one source of truth for "what would work right now".
-                try:
-                    from core.free_rotation import best_free_provider, get_active_pair
-
-                    payload["best_free"] = best_free_provider()
-                    _live = get_active_pair()
-                    payload["active"] = {"provider": _live[0], "model": _live[1]} if _live else None
-                except Exception:
-                    pass
-                return self._send_json(payload)
+                return self._send_json(health_snapshot())
             if path == "/api/files":
                 files = sorted(
                     str(p.relative_to(PROJECT_DIR))

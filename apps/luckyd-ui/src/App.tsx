@@ -10,6 +10,8 @@ import SessionRail from './components/SessionRail';
 import { useGlobalKeys } from './hooks/keys';
 import { useLuckyBase } from './state/chat';
 import { useTrust } from './state/trust';
+import { useAgents } from './state/agents';
+import { useLivePair, PairDot } from './components/ActiveModel';
 
 type Tab = 'chat' | 'agents' | 'models' | 'trust' | 'schedules' | 'memory' | 'settings';
 
@@ -28,15 +30,32 @@ export default function App() {
   const { connected, checkHealth, lastError, provider, model } = useLuckyBase();
   const pending = useTrust((s) => s.pending);
   const refreshTrust = useTrust((s) => s.refreshTrust);
+  const { provider: liveProvider, model: liveModel, status: liveStatus } = useLivePair();
   useGlobalKeys(setTab);
 
   useEffect(() => {
     void checkHealth();
     void refreshTrust().catch(() => undefined);
-    const t = setInterval(() => void checkHealth(), 10000);
+    // Live active pair: the bridge re-reads settings.json on every fetch and
+    // pushes a fresh health snapshot after each switch — no restart needed.
+    const agentsRefresh = () => useAgents.getState().refresh().catch(() => undefined);
+    void agentsRefresh();
+    const t = setInterval(() => {
+      void checkHealth();
+      void agentsRefresh();
+    }, 10000);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const pairColor =
+    liveStatus === 'ready'
+      ? 'text-ld-ok'
+      : liveStatus === 'exhausted'
+        ? 'text-ld-danger'
+        : liveStatus === 'needs_key'
+          ? 'text-ld-warn'
+          : 'text-ld-muted';
 
   return (
     <div className="flex h-screen bg-ld-window text-ld-text">
@@ -62,22 +81,35 @@ export default function App() {
             )}
           </button>
         ))}
-        <div className="mt-auto flex w-full flex-col items-center gap-1.5 px-1">
-          {/* 10.5 always-visible active-model indicator (live answering pair). */}
-          {provider && (
-            <span
-              title={`${provider}/${model || 'auto'} — currently answering`}
-              className="w-full truncate text-center font-mono text-[9px] leading-tight text-ld-muted"
-            >
-              {provider}
-              <br />
-              <span className="text-ld-faint">{(model || 'auto').slice(0, 14)}</span>
+        {/* Sidebar status bar: always-visible active provider/model (live) */}
+        <div className="mt-auto flex w-full flex-col items-center gap-1 px-1">
+          <button
+            onClick={() => setTab('models')}
+            title={
+              liveProvider
+                ? `${liveProvider}/${liveModel} — open Models`
+                : 'Open Models'
+            }
+            className="flex w-full flex-col items-center gap-1 rounded-lg py-1 hover:bg-ld-card"
+          >
+            <span className="flex items-center gap-1">
+              <span
+                title={connected ? 'backend connected' : 'backend offline'}
+                className={`block h-2.5 w-2.5 rounded-full ${connected ? 'bg-ld-ok' : 'bg-ld-danger'}`}
+              />
+              <PairDot status={liveStatus} />
             </span>
-          )}
-          <span
-            title={connected ? 'backend connected' : 'backend offline'}
-            className={`block h-2.5 w-2.5 rounded-full ${connected ? 'bg-ld-ok' : 'bg-ld-danger'}`}
-          />
+            <span
+              className={`w-full truncate text-center font-mono text-[9px] leading-tight ${pairColor}`}
+            >
+              {liveProvider || '…'}
+            </span>
+            {liveModel && (
+              <span className="w-full truncate text-center font-mono text-[9px] leading-tight text-ld-faint">
+                {liveModel}
+              </span>
+            )}
+          </button>
         </div>
       </nav>
 

@@ -262,7 +262,7 @@ class TerminalUI:
         """Clean startup banner."""
         header = self._session_header()
         tip = "Type a task, or /help for commands"
-        agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v10.6.1").strip()
+        agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v10.6.3").strip()
         agent_name = os.environ.get("LUCKYD_AGENT_NAME", "").strip()
         ver_label = f"{agent_version}" + (f" ({agent_name})" if agent_name else "")
 
@@ -874,6 +874,23 @@ class TerminalUI:
             from rich import box
             from rich.panel import Panel
 
+            # Last-known-working pair (core/last_working.py) — star its row.
+            lw_provider = ""
+            lw_summary = ""
+            try:
+                from core.last_working import (
+                    is_last_working_fresh,
+                    last_working_summary,
+                    read_last_working_model,
+                )
+
+                _lw = read_last_working_model()
+                if _lw is not None and is_last_working_fresh():
+                    lw_provider = _lw.provider
+                    lw_summary = last_working_summary() or ""
+            except Exception:
+                pass
+
             self._console.print()
             header_text = Text()
             header_text.append("  AI Providers", style=f"bold {BRAND['primary']}")
@@ -898,6 +915,7 @@ class TerminalUI:
                 min_width=22,
             )
             table.add_column("Cost", justify="center", no_wrap=True, width=8)
+            table.add_column("Rot", justify="center", no_wrap=True, width=4)
             table.add_column("Status", justify="center", no_wrap=True, width=12)
 
             for p in entries:
@@ -910,6 +928,8 @@ class TerminalUI:
                 )
                 if is_cur:
                     name_txt.append("  ◀", style=BRAND["success"])
+                if lw_provider and str(p.get("id", "")) == lw_provider:
+                    name_txt.append("  ★", style=BRAND["warn"])
                 model_txt = Text(
                     str(p.get("model", "")),
                     style=(f"bold {BRAND['primary']}" if is_cur else BRAND["primary"]),
@@ -917,6 +937,11 @@ class TerminalUI:
                 cost_txt = Text(
                     "free" if free else "paid",
                     style=BRAND["success"] if free else BRAND["muted"],
+                )
+                rot = p.get("rotation_order")
+                rot_txt = Text(
+                    f"#{rot}" if isinstance(rot, int) else "-",
+                    style=BRAND["muted"],
                 )
                 exhausted = bool(p.get("credit_exhausted"))
                 if is_cur:
@@ -927,7 +952,7 @@ class TerminalUI:
                     status_txt = Text("✓ ready", style=BRAND["success"])
                 else:
                     status_txt = Text("needs key", style=BRAND["warn"])
-                table.add_row(name_txt, model_txt, cost_txt, status_txt)
+                table.add_row(name_txt, model_txt, cost_txt, rot_txt, status_txt)
 
             panel = Panel(
                 table,
@@ -938,6 +963,10 @@ class TerminalUI:
                 padding=(0, 1),
             )
             self._console.print(panel)
+            if lw_summary:
+                self._console.print(
+                    f"  {self._dim('★ last known working:')} {self._primary(lw_summary)}"
+                )
             drained = [
                 str(p.get("name", p.get("id", ""))) for p in entries if p.get("credit_exhausted")
             ]
@@ -955,13 +984,25 @@ class TerminalUI:
             return False
 
     def _show_providers_ansi(self, entries: list[dict]) -> None:
+        try:
+            from core.last_working import (
+                is_last_working_fresh,
+                last_working_summary,
+                read_last_working_model,
+            )
+
+            _lw = read_last_working_model()
+            lw_provider = _lw.provider if _lw is not None and is_last_working_fresh() else ""
+            lw_summary = last_working_summary() or ""
+        except Exception:
+            lw_provider, lw_summary = "", ""
         ready = sum(1 for p in entries if p.get("configured"))
         print(
             f"\n  {ANSI['bold']}{ANSI['cyan']}AI Providers{ANSI['reset']}  {ANSI['dim']}· {ready}/{len(entries)} ready{ANSI['reset']}"
         )
-        print(f"  {ANSI['dim']}{'─' * 62}{ANSI['reset']}")
+        print(f"  {ANSI['dim']}{'─' * 68}{ANSI['reset']}")
         print(
-            f"  {ANSI['dim']} {'Provider':<22} {'Model':<26} {'Cost':<6} {'Status'}{ANSI['reset']}"
+            f"  {ANSI['dim']} {'Provider':<22} {'Model':<26} {'Cost':<6} {'Rot':<4} {'Status'}{ANSI['reset']}"
         )
         for p in entries:
             is_cur = bool(p.get("current"))
@@ -979,10 +1020,13 @@ class TerminalUI:
             cost = "free" if free else "paid"
             cc = ANSI["green"] if free else ANSI["dim"]
             cur_mark = f" {ANSI['green']}◀{ANSI['reset']}" if is_cur else ""
+            star = f" {ANSI['yellow']}★{ANSI['reset']}" if str(p.get("id")) == lw_provider else ""
+            rot = p.get("rotation_order")
+            rot_s = f"#{rot}" if isinstance(rot, int) else "-"
             name = str(p.get("name", p.get("id", "")))[:22]
             model = str(p.get("model", ""))[:26]
             print(
-                f"  {ANSI['bold'] if is_cur else ''}{name:<22}{ANSI['reset']} {ANSI['cyan']}{model:<26}{ANSI['reset']} {cc}{cost:<6}{ANSI['reset']} {sc}{status}{ANSI['reset']}{cur_mark}"
+                f"  {ANSI['bold'] if is_cur else ''}{name:<22}{ANSI['reset']} {ANSI['cyan']}{model:<26}{ANSI['reset']} {cc}{cost:<6}{ANSI['reset']} {ANSI['dim']}{rot_s:<4}{ANSI['reset']} {sc}{status}{ANSI['reset']}{cur_mark}{star}"
             )
             if not is_ready and p.get("env_key"):
                 print(f"  {ANSI['dim']}  └ set {p['env_key']} in .env to enable{ANSI['reset']}")
@@ -990,6 +1034,10 @@ class TerminalUI:
                 print(
                     f"  {ANSI['dim']}  └ credits exhausted (HTTP 402) — top up, then{ANSI['reset']} {ANSI['cyan']}lucky-code providers --clear-credit-state{ANSI['reset']}"
                 )
+        if lw_summary:
+            print(
+                f"  {ANSI['dim']}★ last known working: {ANSI['reset']}{ANSI['cyan']}{lw_summary}{ANSI['reset']}"
+            )
         print(
             f"\n  {ANSI['dim']}Switch: {ANSI['reset']}{ANSI['cyan']}/model <provider> <name>{ANSI['reset']}\n"
         )

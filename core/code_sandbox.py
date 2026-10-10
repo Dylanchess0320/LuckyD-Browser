@@ -20,7 +20,6 @@ Stdlib only — no pip dependencies.
 from __future__ import annotations
 
 import ast
-import cProfile
 import io
 import json
 import os
@@ -324,40 +323,116 @@ class CodeExecutionSandbox:
         issues.sort(key=lambda i: i.line)
         return issues
 
-    def _infer_assertion(self, returns_node: ast.expr | None) -> str:
+    def _infer_assertion(self, returns_node: ast.expr | None, body: list[ast.stmt]) -> str:
         """Infer a more realistic assertion based on the AST returns node."""
         if not returns_node:
-            return "assert result is not None  # TODO: real assertion"
+            return_types = set()
+            has_return = False
+            for stmt in body:
+                for node in ast.walk(stmt):
+                    if isinstance(node, ast.Return):
+                        has_return = True
+                        if node.value is None:
+                            return_types.add("NoneType")
+                        elif isinstance(node.value, ast.Constant):
+                            if node.value.value is None:
+                                return_types.add("NoneType")
+                            else:
+                                return_types.add(type(node.value.value).__name__)
+                        elif isinstance(node.value, (ast.List, ast.ListComp)):
+                            return_types.add("list")
+                        elif isinstance(node.value, (ast.Dict, ast.DictComp)):
+                            return_types.add("dict")
+                        elif isinstance(node.value, (ast.Set, ast.SetComp)):
+                            return_types.add("set")
+                        elif isinstance(node.value, ast.Tuple):
+                            return_types.add("tuple")
+                        elif isinstance(node.value, ast.JoinedStr):
+                            return_types.add("str")
 
+            if not has_return:
+                return "assert result is None  # TODO: real assertion"
+
+            if len(return_types) == 1:
+                ret_type = return_types.pop()
+                if ret_type == "bool":
+                    return "assert result is True  # TODO: real assertion"
+                elif ret_type in ("int", "float"):
+                    return "assert result == 0  # TODO: real assertion"
+                elif ret_type == "str":
+                    return 'assert result == ""  # TODO: real assertion'
+                elif ret_type == "list":
+                    return "assert result == []  # TODO: real assertion"
+                elif ret_type == "dict":
+                    return "assert result == {}  # TODO: real assertion"
+                elif ret_type == "set":
+                    return "assert result == set()  # TODO: real assertion"
+                elif ret_type == "tuple":
+                    return "assert result == ()  # TODO: real assertion"
+                elif ret_type == "bytes":
+                    return "assert result == b''  # TODO: real assertion"
+                elif ret_type == "NoneType":
+                    return "assert result is None  # TODO: real assertion"
+
+            return "assert result is not None  # TODO: real assertion"
         if isinstance(returns_node, ast.Name):
             if returns_node.id == "bool":
-                return "assert result is True  # TODO: real assertion"
+                return "assert isinstance(result, bool)"
             elif returns_node.id in ("int", "float"):
-                return "assert result == 0  # TODO: real assertion"
+                return f"assert isinstance(result, {returns_node.id})  # TODO: real assertion"
             elif returns_node.id == "str":
-                return 'assert result == ""  # TODO: real assertion'
+                return "assert isinstance(result, str)"
             elif returns_node.id == "list":
-                return "assert result == []  # TODO: real assertion"
+                return "assert isinstance(result, list)  # TODO: real assertion"
             elif returns_node.id == "dict":
-                return "assert result == {}  # TODO: real assertion"
+                return "assert isinstance(result, dict)"
             elif returns_node.id == "set":
-                return "assert result == set()  # TODO: real assertion"
+                return "assert isinstance(result, set)"
             elif returns_node.id == "tuple":
-                return "assert result == ()  # TODO: real assertion"
+                return "assert isinstance(result, tuple)  # TODO: real assertion"
             elif returns_node.id == "bytes":
-                return "assert result == b''  # TODO: real assertion"
+                return "assert isinstance(result, bytes)"
         elif isinstance(returns_node, ast.Constant):
             if returns_node.value is None:
-                return "assert result is None  # TODO: real assertion"
+                return "assert result is None"
         elif isinstance(returns_node, ast.Subscript) and isinstance(returns_node.value, ast.Name):
             if returns_node.value.id == "list":
-                return "assert result == []  # TODO: real assertion"
+                if isinstance(returns_node.slice, ast.Name):
+                    return f"assert isinstance(result, list) and all(isinstance(x, {returns_node.slice.id}) for x in result)"
+                return "assert isinstance(result, list)"
             elif returns_node.value.id == "dict":
-                return "assert result == {}  # TODO: real assertion"
+                if isinstance(returns_node.slice, ast.Tuple) and len(returns_node.slice.elts) == 2:
+                    k_node = returns_node.slice.elts[0]
+                    v_node = returns_node.slice.elts[1]
+
+                    k_type = k_node.id if isinstance(k_node, ast.Name) else None
+                    v_type = v_node.id if isinstance(v_node, ast.Name) else None
+
+                    if k_type and v_type and "Any" not in (k_type, v_type):
+                        return f"assert isinstance(result, dict) and all(isinstance(k, {k_type}) and isinstance(v, {v_type}) for k, v in result.items())  # TODO: real assertion"
+                    elif k_type and k_type != "Any":
+                        return f"assert isinstance(result, dict) and all(isinstance(k, {k_type}) for k in result.keys())  # TODO: real assertion"
+                    elif v_type and v_type != "Any":
+                        return f"assert isinstance(result, dict) and all(isinstance(v, {v_type}) for v in result.values())  # TODO: real assertion"
+
+                return "assert isinstance(result, dict)  # TODO: real assertion"
             elif returns_node.value.id == "set":
-                return "assert result == set()  # TODO: real assertion"
+                return "assert isinstance(result, set)"
             elif returns_node.value.id == "tuple":
-                return "assert result == ()  # TODO: real assertion"
+                if isinstance(returns_node.slice, ast.Tuple):
+                    if not returns_node.slice.elts:
+                        return "assert result == ()  # TODO: real assertion"
+                    if (
+                        len(returns_node.slice.elts) == 2
+                        and isinstance(returns_node.slice.elts[1], ast.Constant)
+                        and returns_node.slice.elts[1].value == Ellipsis
+                    ):
+                        return "assert isinstance(result, tuple)  # TODO: real assertion"
+                    length = len(returns_node.slice.elts)
+                    return f"assert isinstance(result, tuple) and len(result) == {length}  # TODO: real assertion"
+                elif isinstance(returns_node.slice, (ast.Name, ast.Subscript)):
+                    return "assert isinstance(result, tuple) and len(result) == 1  # TODO: real assertion"
+                return "assert isinstance(result, tuple)  # TODO: real assertion"
 
         return "assert result is not None  # TODO: real assertion"
 
@@ -393,7 +468,7 @@ class CodeExecutionSandbox:
                 "    # Act",
                 f"    result = {fn.name}({call_args})" if args else f"    result = {fn.name}()",
                 "    # Assert",
-                f"    {self._infer_assertion(fn.returns)}",
+                f"    {self._infer_assertion(fn.returns, fn.body)}",
                 "",
             ]
         if not funcs:
@@ -401,58 +476,86 @@ class CodeExecutionSandbox:
         return "\n".join(lines).rstrip() + "\n"
 
     def profile(self, code: str, timeout: float = 30.0, top_n: int = 15) -> ProfileResult:
-        """Profile *code* in-process with cProfile.
-
-        Refuses to run in untrusted mode because exec() runs in the parent
-        process with no subprocess isolation — AST-based forbidden-node
-        checks are bypassable (e.g. getattr(os, 'system')).  Use execute()
-        for untrusted profiling with wall-clock timeout and full process
-        isolation.
-        """
-        if not self.trusted:
-            return ProfileResult(
-                success=False,
-                error="profile() is not available in untrusted mode — "
-                "use execute() for sandboxed profiling",
-            )
+        """Profile *code* in a subprocess with cProfile."""
         ok, err = self.validate_syntax(code)
         if not ok:
             return ProfileResult(success=False, error=err)
 
-        namespace: dict[str, Any] = {"__name__": "__sandbox_profile__"}
-        profiler = cProfile.Profile()
-        stream = io.StringIO()
-        try:
-            profiler.enable()
-            exec(compile(code, "<sandbox-profile>", "exec"), namespace)  # nosec B102
-            profiler.disable()
-        except Exception as exc:  # profiled code raised — still report stats
-            profiler.disable()
-            stats = pstats.Stats(profiler, stream=stream).sort_stats("cumulative")
-            stats.print_stats(top_n)
-            return ProfileResult(
-                success=False,
-                stats_text=stream.getvalue(),
-                error=f"{type(exc).__name__}: {exc}",
-            )
+        if not self.trusted:
+            violation = self._find_forbidden(code)
+            if violation:
+                return ProfileResult(
+                    success=False,
+                    error=f"Forbidden construct blocked: {violation}",
+                )
 
-        stats = pstats.Stats(profiler, stream=stream).sort_stats("cumulative")
-        stats.print_stats(top_n)
-        top = [
-            {
-                "function": f"{fn[0]}:{fn[1]}({fn[2]})",
-                "ncalls": cc,
-                "tottime": round(tt, 6),
-                "cumtime": round(ct, 6),
+        tmpdir = tempfile.mkdtemp(prefix="luckyd_sandbox_")
+        try:
+            script_path = Path(tmpdir) / "_sandbox_profile.py"
+            prof_path = Path(tmpdir) / "_sandbox.prof"
+
+            script_path.write_text(code, encoding="utf-8")
+
+            cmd = [self.python, "-I", "-m", "cProfile", "-o", str(prof_path), str(script_path)]
+            kwargs: dict[str, Any] = {
+                "cwd": tmpdir,
+                "env": self._build_env(None),
+                "text": True,
+                "encoding": "utf-8",
+                "errors": "replace",
+                "stdout": subprocess.PIPE,
+                "stderr": subprocess.PIPE,
             }
-            for (fn, (cc, _nc, tt, ct, _callers)) in list(stats.stats.items())[:top_n]
-        ]
-        return ProfileResult(
-            success=True,
-            stats_text=stream.getvalue(),
-            cumulative_time=round(stats.total_tt, 6),
-            top_functions=top,
-        )
+
+            if sys.platform != "win32" and self.memory_limit_mb:
+                kwargs["preexec_fn"] = _make_memory_limiter(self.memory_limit_mb)
+
+            try:
+                proc = subprocess.run(cmd, timeout=timeout, **kwargs)
+            except subprocess.TimeoutExpired:
+                return ProfileResult(success=False, error="timeout")
+            except OSError as exc:
+                return ProfileResult(success=False, error=str(exc))
+
+            if not prof_path.exists():
+                error_msg = (
+                    proc.stderr.strip() if proc.stderr else "Profiling failed to produce output"
+                )
+                return ProfileResult(success=False, error=error_msg)
+
+            stream = io.StringIO()
+            try:
+                stats = pstats.Stats(str(prof_path), stream=stream).sort_stats("cumulative")
+            except Exception as exc:
+                return ProfileResult(success=False, error=f"Invalid profile data: {exc}")
+
+            stats.print_stats(top_n)
+            top = [
+                {
+                    "function": f"{fn[0]}:{fn[1]}({fn[2]})",
+                    "ncalls": cc,
+                    "tottime": round(tt, 6),
+                    "cumtime": round(ct, 6),
+                }
+                for (fn, (cc, _nc, tt, ct, _callers)) in list(stats.stats.items())[:top_n]
+            ]
+
+            success = proc.returncode == 0
+            error = None
+            if not success:
+                err_text = proc.stderr.strip() if proc.stderr else ""
+                lines = [line.strip() for line in err_text.splitlines() if line.strip()]
+                error = lines[-1] if lines else "Runtime error"
+
+            return ProfileResult(
+                success=success,
+                stats_text=stream.getvalue(),
+                cumulative_time=round(stats.total_tt, 6),
+                top_functions=top,
+                error=error,
+            )
+        finally:
+            _remove_tree(tmpdir)
 
     # ── Internal helpers ───────────────────────────────────────────────
 
@@ -727,7 +830,7 @@ if __name__ == "__main__":
         "def f(a=[]):\n"
         "    try:\n"
         "        print(sys.version)\n"
-        "    except:\n"
+        "    except Exception:\n"
         "        pass\n"
         "    return 1\n"
         "    print('never')\n"

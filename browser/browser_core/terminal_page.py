@@ -17,7 +17,7 @@ try:  # same dual-import situation as page_head above
 
     _APP_VERSION = browser.__version__
 except ImportError:  # pragma: no cover - last-resort fallback
-    _APP_VERSION = "10.6.1"
+    _APP_VERSION = "10.6.3"
 
 # Displayed on the Agent 1/2 buttons and tab labels. Prefers the agent CLI's
 # own version when set (lucky-code --agent N exports LUCKYD_AGENT_VERSION),
@@ -372,8 +372,24 @@ function copySelection(){
 }
 async function pasteClipboard(){
   const text = await clipRead();
-  if (text) { term.paste(text); flash('pasted ' + text.length + ' chars'); }
-  else { flash('clipboard unavailable'); }
+  if (!text) { flash('clipboard unavailable'); term.focus(); return; }
+  // Chunk large pastes: term.paste() emits ONE onData → ONE ws.send() →
+  // ONE pty.write(). Pastes over ~1MB kill the WS (max_size), and large
+  // single writes garble in ConPTY ("too much info corrupts"). 16KB chunks
+  // stay safe; bracketed-paste wrap is preserved (first chunk opens, last
+  // closes) so CLIs still receive it as one paste.
+  const CHUNK = 16384;
+  if (ws && ws.readyState === 1 && text.length > CHUNK) {
+    for (let i = 0; i < text.length; i += CHUNK) {
+      let chunk = text.slice(i, i + CHUNK);
+      if (i === 0) chunk = '\x1b[200~' + chunk;
+      if (i + CHUNK >= text.length) chunk += '\x1b[201~';
+      ws.send(chunk);
+    }
+  } else if (text) {
+    term.paste(text);
+  }
+  flash('pasted ' + text.length + ' chars');
   term.focus();
 }
 term.attachCustomKeyEventHandler(ev => {

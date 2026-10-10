@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useLuckyBase } from '../state/chat';
+import { useLivePair, PairDot } from '../components/ActiveModel';
 import Md from '../components/Markdown';
 
 const SUGGESTIONS = [
@@ -11,6 +12,11 @@ const SUGGESTIONS = [
 
 export default function Chat() {
   const { messages, busy, workingLabel, send, stop, clearChat, model, provider } = useLuckyBase();
+  // Live pair from the rotator state (bridge re-reads settings.json; the web
+  // backend's /api/settings is the fallback) — no restart needed.
+  const live = useLivePair();
+  const shownProvider = live.provider || provider;
+  const shownModel = live.model || model;
   const [draft, setDraft] = useState('');
   const [copied, setCopied] = useState<string | null>(null);
 
@@ -33,8 +39,12 @@ export default function Chat() {
       <div className="flex items-center justify-between border-b border-ld-border px-5 py-3">
         <div>
           <h1 className="text-lg font-semibold text-ld-text">Chat</h1>
-          <p className="text-xs text-ld-muted" title="Currently answering model (live)">
-            {provider || '…'} · {model || '…'}
+          <p className="flex items-center gap-1.5 text-xs text-ld-muted">
+            <PairDot status={live.status} />
+            <span className="font-mono">
+              {shownProvider || '…'} · {shownModel || '…'}
+            </span>
+            {live.switching && <span className="text-ld-muted">switching…</span>}
             {busy && workingLabel ? ` · ${workingLabel}` : ''}
           </p>
         </div>

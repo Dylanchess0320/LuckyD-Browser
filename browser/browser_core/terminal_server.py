@@ -620,11 +620,11 @@ def _spawn_pty(
     if shell == "agent":
         env["LUCKYD_AGENT_SLOT"] = "1"
         env["LUCKYD_AGENT_NAME"] = "Agent 1"
-        env["LUCKYD_AGENT_VERSION"] = "v10.6.1"
+        env["LUCKYD_AGENT_VERSION"] = "v10.6.3"
     elif shell == "agent2":
         env["LUCKYD_AGENT_SLOT"] = "2"
         env["LUCKYD_AGENT_NAME"] = "Agent 2"
-        env["LUCKYD_AGENT_VERSION"] = "v10.6.1"
+        env["LUCKYD_AGENT_VERSION"] = "v10.6.3"
     # pywinpty's PTY.spawn() expects the environment as a NUL-joined block
     # string ("name=value\0name=value\0…"), NOT a dict — passing a dict
     # raises cffi's "argument env: 'dict' object is not an instance of str",
@@ -751,7 +751,13 @@ class TerminalServer:
                             )
                         continue
                 try:
-                    pty.write(text)
+                    # Chunk large inputs: a single huge pty.write() garbles or
+                    # truncates in ConPTY/pywinpty ("too much info corrupts").
+                    # 8KB chunks flow through cleanly; the shell reassembles
+                    # them. (Frontend also chunks pastes at 16KB so no single
+                    # WS message approaches the 1MB frame limit.)
+                    for i in range(0, len(text), 8192):
+                        pty.write(text[i : i + 8192])
                 except Exception:
                     break
         except Exception:

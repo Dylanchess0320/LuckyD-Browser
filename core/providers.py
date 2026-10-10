@@ -628,17 +628,22 @@ def list_providers() -> list[dict[str, object]]:
     valid — those rows report ``configured`` False and are never auto-current).
 
     10.5 health snapshot (one source of truth for "what would work right
-    now"): ``rotation_order`` (0-based index into
+    now", consumed by the web ``/api/providers`` endpoint, the agents bridge,
+    the HQ Models view, and ``lucky-code providers``):
+    ``status`` (``"ready"`` | ``"needs_key"`` | ``"exhausted"`` — the badge
+    the UI renders), ``rotation_order`` (0-based index into
     ``core.free_rotation.FREE_MODEL_PRIORITY``, None when the provider is not
     in the rotation), ``next_in_rotation`` (True for the single provider
     ``best_free_provider()`` would pick), ``credit_ttl_remaining_sec`` (whole
-    seconds until the Cline 402 marker expires on the Cline rows, else 0),
-    ``last_working`` (True when this provider last answered successfully),
-    ``last_working_ago`` ("worked 2h ago", else None), and
-    ``last_working_model`` (the recorded model id, else None).
+    seconds until the Cline 402 marker expires on the Cline rows, else 0 —
+    the UI renders "retry in ~Nh"), ``last_working`` (True when this provider
+    last answered successfully), ``last_working_ago`` ("worked 2h ago", else
+    None), and ``last_working_model`` (the recorded model id, else None).
 
     No network calls — availability is derived from env vars only.
     """
+    from core.free_rotation import FREE_MODEL_PRIORITY, best_free_provider
+
     explicit = normalize_provider_id(os.environ.get("CODING_AGENT_PROVIDER", ""))
     current = explicit if explicit in VALID_PROVIDERS else detect_provider() or "deepseek"
     cline_ok = bool(cline_session_token())
@@ -699,6 +704,8 @@ def list_providers() -> list[dict[str, object]]:
             key_present = bool((os.environ.get(env_key or "", "") or "").strip())
             configured = key_present
         is_last_working = lw_provider is not None and pid == lw_provider
+        exhausted = cline_blocked and pid in ("clinepass", "cline-usage")
+        status = "exhausted" if exhausted else ("ready" if configured else "needs_key")
         providers.append(
             {
                 "id": pid,
@@ -711,8 +718,9 @@ def list_providers() -> list[dict[str, object]]:
                 "free_tier": pid in FREE_TIER_PROVIDERS,
                 "configured": configured,
                 "current": pid == current,
-                "credit_exhausted": cline_blocked and pid in ("clinepass", "cline-usage"),
+                "credit_exhausted": exhausted,
                 # 10.5 health snapshot — "what would work right now".
+                "status": status,
                 "rotation_order": rotation_order.get(pid),
                 "next_in_rotation": next_free is not None and pid == next_free,
                 "credit_ttl_remaining_sec": (
@@ -724,3 +732,72 @@ def list_providers() -> list[dict[str, object]]:
             }
         )
     return providers
+
+
+def provider_id_for_base_url(base_url: str) -> str | None:
+    """Reverse-lookup a provider id from a configured base URL.
+
+    Matches when the URL contains the provider's default base host (env
+    overrides keep the host in practice). Returns None when nothing matches.
+    """
+    url = (base_url or "").lower()
+    if not url:
+        return None
+    for pid, defaults in PROVIDER_DEFAULTS.items():
+        default_base = str(defaults.get("default_base") or "").lower()
+        if default_base and default_base in url:
+            return pid
+    return None
+
+
+def health_snapshot() -> dict[str, object]:
+    """One-call "what would work right now" snapshot.
+
+    Bundles :func:`list_providers` with the free rotation's current best
+    pick and the last-known-working pair (``core.last_working``) as a
+    structured ``{"provider", "model", "timestamp"}`` dict (or None). This
+    is what the web ``/api/providers`` endpoint and the agents bridge
+    serve. Never raises — a broken state file degrades to
+    ``last_working: None``, never to a 500.
+    """
+    from core.free_rotation import best_free_provider, get_active_pair
+    from core.last_working import is_last_working_fresh, read_last_working_model
+
+    try:
+        entries = list_providers()
+    except Exception:
+        entries = []
+    try:
+        best = best_free_provider()
+    except Exception:
+        best = None
+    best_model: str | None = None
+    if best:
+        for entry in entries:
+            if entry.get("id") == best:
+                best_model = str(entry.get("model") or "")
+                break
+    active: dict[str, object] | None = None
+    try:
+        _live = get_active_pair()
+        active = {"provider": _live[0], "model": _live[1]} if _live else None
+    except Exception:
+        active = None
+    last_working: dict[str, object] | None = None
+    try:
+        lw = read_last_working_model()
+        if lw is not None and is_last_working_fresh():
+            last_working = {
+                "provider": lw.provider,
+                "model": lw.model,
+                "timestamp": lw.worked_at,
+            }
+    except Exception:
+        last_working = None
+    return {
+        "providers": entries,
+        "best_free": best,
+        "best_free_model": best_model,
+        "active": active,
+        "last_working": last_working,
+    }

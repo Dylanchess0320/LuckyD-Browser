@@ -329,6 +329,7 @@ class MultiModelOrchestrator:
                 max_tokens=cfg.max_tokens,
                 timeout_sec=cfg.timeout_sec,
                 max_retries=0,  # orchestrator owns retry policy
+                provider=getattr(cfg, "provider", "") or "",
             )
         self._clients[name] = client
         return client

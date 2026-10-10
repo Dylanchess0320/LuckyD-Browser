@@ -23,12 +23,19 @@ import time
 from pathlib import Path
 
 __all__ = [
+    "LAST_WORKING_TTL_SEC",
     "LastWorkingState",
     "clear_last_working",
+    "clear_last_working_model",
+    "is_last_working_fresh",
     "last_working_age_label",
+    "last_working_pair",
     "last_working_path",
+    "last_working_summary",
     "read_last_working",
+    "read_last_working_model",
     "record_last_working",
+    "record_last_working_model",
 ]
 
 #: Env var overriding the state file location (test seam; see module docstring).
@@ -36,6 +43,11 @@ _LAST_WORKING_ENV = "LUCKYD_LAST_WORKING_STATE"
 
 _STATE_DIRNAME = ".luckyd"
 _STATE_FILENAME = "last_working_model.json"
+
+#: A record older than this is "stale" — still shown, but no longer preferred
+#: by rotation or reported as fresh. 24h keeps yesterday's evidence relevant
+#: without letting a week-old success steer today's picks.
+LAST_WORKING_TTL_SEC = 86400
 
 
 class LastWorkingState:
@@ -125,3 +137,45 @@ def clear_last_working() -> bool:
         return False
     except Exception:
         return False
+
+
+def is_last_working_fresh(*, now: float | None = None) -> bool:
+    """True when a record exists and is younger than ``LAST_WORKING_TTL_SEC``."""
+    state = read_last_working()
+    if state is None:
+        return False
+    current = now if now is not None else time.time()
+    return max(0.0, current - state.worked_at) <= LAST_WORKING_TTL_SEC
+
+
+def last_working_pair(*, now: float | None = None) -> tuple[str, str] | None:
+    """``(provider, model)`` of the last-known-working pair, or None.
+
+    Returns None when there is no record or the record is stale (older than
+    ``LAST_WORKING_TTL_SEC``) — rotation must not prefer ancient evidence.
+    """
+    if not is_last_working_fresh(now=now):
+        return None
+    state = read_last_working()
+    if state is None:
+        return None
+    return (state.provider, state.model)
+
+
+def last_working_summary(*, now: float | None = None) -> str | None:
+    """One-line ``"provider/model (worked X ago)"``; None when no record."""
+    state = read_last_working()
+    if state is None:
+        return None
+    label = last_working_age_label(now=now)
+    return (
+        f"{state.provider}/{state.model} ({label})" if label else f"{state.provider}/{state.model}"
+    )
+
+
+# ── _model-suffixed aliases ──────────────────────────────────────────────
+# The HQ/tests surface historically used the explicit ``*_model`` names;
+# they are the same functions, kept so both spellings work.
+record_last_working_model = record_last_working
+read_last_working_model = read_last_working
+clear_last_working_model = clear_last_working

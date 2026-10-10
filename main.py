@@ -1272,7 +1272,7 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
             ui.warn("MCP not configured or no servers connected")
 
     elif cmd == "version":
-        agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v10.6.1")
+        agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v10.6.3")
         agent_name = os.environ.get("LUCKYD_AGENT_NAME", "Agent 1")
         ui.info(f"LuckyD Code {agent_version} ({agent_name})")
 
@@ -1635,6 +1635,14 @@ def _cli_model(args):
     # ── Browse modes (no separate bat file — built into the CLI) ─────
     if not args:
         print(f"Current: {cur_prov}/{current}\n")
+        try:
+            from core.last_working import last_working_summary
+
+            _lw = last_working_summary()
+            if _lw:
+                print(f"Last known working: {_lw}\n")
+        except Exception:
+            pass
         print("Usage:")
         print("  lucky-code model list              — browse free catalog (interactive)")
         print("  lucky-code model all               — browse free + paid")
@@ -1666,6 +1674,16 @@ def _cli_model(args):
     # ── Persist to .env (generic — works for any provider) ──────────
     _persist_model_to_env(provider, picked)
 
+    # ── Hot-reload: make the new pick live in THIS process ──────────
+    # Re-read .env into os.environ and re-resolve, so the switch is
+    # effective immediately — no terminal restart. If the in-process
+    # reload can't apply cleanly, re-exec ourselves so the new .env is
+    # picked up from a clean state (still no manual restart for Dylan).
+    if not _hot_reload_provider_config() and not os.environ.get("LUCKYD_MODEL_HOTRELOAD_RETRY"):
+        ui.warn("In-process reload failed — re-executing to pick up the new .env…")
+        env = dict(os.environ, LUCKYD_MODEL_HOTRELOAD_RETRY="1")
+        os.execvpe(sys.executable, [sys.executable, sys.argv[0], *sys.argv[1:]], env)
+
     # Friendly tier label
     if provider == "clinepass":
         tier = "ClinePass subscription"
@@ -1685,6 +1703,7 @@ def _cli_model(args):
         print("Live now — new runs use it immediately, no restart needed.")
     else:
         _reexec_or_restart_hint()
+    _print_model_switch_health(provider, picked)
 
 
 def _hot_reload_model_switch(provider: str, picked: str) -> bool:
@@ -1714,6 +1733,22 @@ def _hot_reload_model_switch(provider: str, picked: str) -> bool:
         return False
 
 
+def _hot_reload_provider_config() -> bool:
+    """Re-read .env/.luckyd-agent-*.env into os.environ (in-process).
+
+    Returns True when the reload applied cleanly — the process's provider
+    config now reflects the persisted .env and no restart is needed. Never
+    raises.
+    """
+    try:
+        from config import load_env
+
+        load_env()
+        return True
+    except Exception:
+        return False
+
+
 def _reexec_or_restart_hint() -> None:
     """Self-exec restart fallback when in-process reload fails (10.5).
 
@@ -1727,6 +1762,40 @@ def _reexec_or_restart_hint() -> None:
         with contextlib.suppress(Exception):
             os.execv(sys.executable, [sys.executable, *sys.argv])
     print("Restart the terminal (or /model inside the REPL) for the change to take effect.")
+
+
+def _print_model_switch_health(provider: str, picked: str) -> None:
+    """Report the effective provider/model + live health after a switch.
+
+    Resolves the config exactly the way the next agent launch would, so
+    "it says it switched" always matches "it will actually answer".
+    """
+    try:
+        from core.providers import list_providers, resolve_provider_config
+
+        eff = resolve_provider_config()
+        eff_provider = str(eff.get("provider", provider) or provider)
+        eff_model = str(eff.get("model", picked) or picked)
+        entry = next((p for p in list_providers() if p.get("id") == eff_provider), {})
+        status = str(entry.get("status", ""))
+        if status == "ready":
+            ui.success(f"Now active: {eff_provider}/{eff_model} ✓ ready — no restart needed.")
+        elif status == "exhausted":
+            ttl = int(entry.get("credit_ttl_remaining_sec", 0) or 0)
+            when = f"~{ttl // 3600}h" if ttl >= 3600 else f"~{ttl // 60}m"
+            ui.warn(
+                f"Now active: {eff_provider}/{eff_model} ✗ credits exhausted "
+                f"(retry in {when}) — run /model to pick a working one."
+            )
+        elif status == "needs_key":
+            env_key = str(entry.get("env_key") or "")
+            hint = f" — set {env_key} in .env to enable it" if env_key else ""
+            ui.warn(f"Now active: {eff_provider}/{eff_model} ⚠ needs key{hint}.")
+        else:
+            ui.info(f"Now active: {eff_provider}/{eff_model} — no restart needed.")
+    except Exception:
+        ui.info("Switch saved — no restart needed.")
+    print("Tip: a running REPL switches instantly with /model <name> — same picker.")
 
 
 def _cli_providers(args):
@@ -2139,7 +2208,7 @@ def _dispatch_early_subcommands(args: list[str]) -> bool:
 
 def _print_version() -> None:
     """Print the LuckyD Code version line (fast path: no config needed)."""
-    agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v10.6.1")
+    agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v10.6.3")
     agent_name = os.environ.get("LUCKYD_AGENT_NAME", "")
     label = f"LuckyD Code {agent_version}" + (f" ({agent_name})" if agent_name else "")
     print(label)
@@ -2152,8 +2221,8 @@ def _print_help() -> None:
 LuckyD Code — AI Coding Agent
 
 Usage:
-  lucky-code                       Interactive REPL (Agent 1 · v10.6.1)
-  lucky-code --agent 2             Interactive REPL (Agent 2 · v10.6.1)
+  lucky-code                       Interactive REPL (Agent 1 · v10.6.3)
+  lucky-code --agent 2             Interactive REPL (Agent 2 · v10.6.3)
   lucky-code providers           List AI providers — status, cost tier, current
   lucky-code model <name>        Switch model (fuzzy Cline-style picker)
   lucky-code plugin list --available   List/install plugins
@@ -2164,7 +2233,7 @@ Usage:
   lucky-code --resume <id>         Resume specific session
 
 Options:
-  --agent 1|2        Select agent slot (1 = v10.6.1 Nuitka, 2 = v10.6.1)
+  --agent 1|2        Select agent slot (1 = v10.6.3 Nuitka, 2 = v10.6.3)
   --model NAME       Model: auto (default), flash, pro, or specific name
   --provider NAME    Set provider (see: lucky-code providers): ollama, clinepass,
                      cline-usage, openrouter, groq, deepseek,
@@ -2269,11 +2338,11 @@ def _parse_agent_args(args: list[str], cfg: dict) -> tuple[dict, str, float, str
             if slot == "2":
                 os.environ["LUCKYD_AGENT_SLOT"] = "2"
                 os.environ["LUCKYD_AGENT_NAME"] = "Agent 2"
-                os.environ["LUCKYD_AGENT_VERSION"] = "v10.6.1"
+                os.environ["LUCKYD_AGENT_VERSION"] = "v10.6.3"
             else:
                 os.environ["LUCKYD_AGENT_SLOT"] = "1"
                 os.environ["LUCKYD_AGENT_NAME"] = "Agent 1"
-                os.environ["LUCKYD_AGENT_VERSION"] = "v10.6.1"
+                os.environ["LUCKYD_AGENT_VERSION"] = "v10.6.3"
             i += 2
         elif args[i] in ("-v", "--version"):
             _print_version()

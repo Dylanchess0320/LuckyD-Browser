@@ -1,36 +1,46 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useAgents, type CatalogProvider, type ProviderHealth } from '../state/agents';
+import {
+  useAgents,
+  lastWorkingAge,
+  toBrowserProviderId,
+  type CatalogProvider,
+  type ProviderHealth,
+} from '../state/agents';
 import { useLuckyBase } from '../state/chat';
 
-function HealthBadge({ h }: { h: ProviderHealth }) {
-  if (h.credit_exhausted) {
+function formatTtl(sec: number): string {
+  if (sec <= 0) return '';
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  if (h > 0) return `~${h}h${m > 0 ? ` ${m}m` : ''}`;
+  return `~${Math.max(1, m)}m`;
+}
+
+function StatusBadge({ p }: { p: ProviderHealth }) {
+  if (p.status === 'ready')
     return (
-      <span
-        title="Credits exhausted (HTTP 402) — top up, then clear the marker"
-        className="rounded-full bg-ld-danger/15 px-2 py-0.5 text-[10px] font-semibold text-ld-danger"
-      >
-        Exhausted
+      <span className="rounded-full border border-ld-ok/40 bg-ld-ok/15 px-2 py-0.5 text-[10px] text-ld-ok">
+        ✓ Ready
       </span>
     );
-  }
-  if (h.configured) {
+  if (p.status === 'exhausted')
     return (
-      <span className="rounded-full bg-ld-ok/15 px-2 py-0.5 text-[10px] font-semibold text-ld-ok">
-        Ready
+      <span className="rounded-full border border-ld-danger/40 bg-ld-danger/15 px-2 py-0.5 text-[10px] text-ld-danger">
+        ✗ Exhausted
       </span>
     );
-  }
   return (
-    <span className="rounded-full bg-ld-warn/15 px-2 py-0.5 text-[10px] font-semibold text-ld-warn">
-      Needs key
+    <span className="rounded-full border border-ld-warn/40 bg-ld-warn/15 px-2 py-0.5 text-[10px] text-ld-warn">
+      ⚠ Needs key
+
     </span>
   );
 }
 
 export default function Models() {
-  const { catalog, current, switching, refresh, setModel, health, bestFree, switchToBest } =
+  const { catalog, current, health, switching, refresh, setModel, switchToBest } =
     useAgents();
-  const { connected, checkHealth } = useLuckyBase();
+  const { checkHealth } = useLuckyBase();
   const [filter, setFilter] = useState('');
 
   useEffect(() => {
@@ -48,34 +58,111 @@ export default function Models() {
     void checkHealth();
   };
 
-  const healthById = useMemo(() => {
-    const m = new Map<string, ProviderHealth>();
-    for (const h of health ?? []) m.set(h.id, h);
-    return m;
-  }, [health]);
-
-  // Warning banner when the *selected* model is currently unusable.
-  const currentHealth = current ? healthById.get(current.provider) : undefined;
-  const currentUnusable =
-    currentHealth != null && (!currentHealth.configured || currentHealth.credit_exhausted);
-  const unusableReason = currentHealth?.credit_exhausted
-    ? 'its credits are exhausted (HTTP 402)'
-    : 'it has no API key configured';
-
   const entries = Object.entries(catalog?.ai_providers ?? {}) as [
     string,
     CatalogProvider,
   ][];
 
+  // Live rotation chain from the bridge health snapshot (core.free_rotation):
+  // Cline → Gemini → local Ollama → other free, with live status.
+  const rotation = useMemo(
+    () =>
+      (health?.providers ?? [])
+        .filter((p) => p.rotation_order != null)
+        .sort((a, b) => (a.rotation_order ?? 99) - (b.rotation_order ?? 99)),
+    [health],
+  );
+
+  const healthById = useMemo(
+    () => new Map((health?.providers ?? []).map((p) => [p.id, p])),
+    [health],
+  );
+
+  const currentHealth = current ? healthById.get(current.provider) : undefined;
+  const currentUnusable =
+    !!currentHealth &&
+    (currentHealth.status === 'needs_key' || currentHealth.status === 'exhausted');
+
+  const lastWorking = health?.last_working ?? null;
+
   return (
     <div className="h-full overflow-y-auto px-5 py-6">
       <div className="mx-auto max-w-3xl">
-        <h2 className="text-lg font-bold">🧠 Free Models</h2>
-        <p className="mt-1 text-xs text-ld-muted">
-          Zero-cost models from the browser's registry. Selecting one rewrites{' '}
-          <code className="font-mono">browser/data/settings.json</code> — the backend mirrors
-          it per request, so the next chat run uses it. No restart needed.
-        </p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-bold">🧠 Free Models</h2>
+            <p className="mt-1 text-xs text-ld-muted">
+              Zero-cost models from the browser's registry. Selecting one rewrites{' '}
+              <code className="font-mono">browser/data/settings.json</code> — the backend
+              mirrors it per request, so the next chat run uses it. No restart needed.
+            </p>
+          </div>
+          <button
+            onClick={() => void switchToBest()}
+            disabled={switching || !health?.best_free}
+            className="shrink-0 rounded-lg bg-ld-accent px-3 py-2 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-40"
+            title={
+              health?.best_free
+                ? `Switch to ${health.best_free}/${health.best_free_model}`
+                : 'No working free provider right now'
+            }
+          >
+            {switching ? 'Switching…' : '⚡ Switch to best working'}
+          </button>
+        </div>
+
+        {/* Best-working now + last-known-working pair */}
+        {(health?.best_free || lastWorking) && (
+          <div className="mt-3 rounded-xl border border-ld-border bg-ld-panel px-4 py-3 text-xs">
+            {health?.best_free && (
+              <div className="text-ld-text">
+                <span className="text-ld-muted">Best working now:</span>{' '}
+                <span className="font-mono text-ld-ok">
+                  {health.best_free}/{health.best_free_model}
+                </span>
+              </div>
+            )}
+            {lastWorking && (
+              <div className="mt-1 text-ld-text">
+                <span className="text-ld-warn">★</span>{' '}
+                <span className="text-ld-muted">Last known working:</span>{' '}
+                <span className="font-mono">
+                  {lastWorking.provider}/{lastWorking.model}
+                </span>{' '}
+                <span className="text-ld-muted">
+                  (worked {lastWorkingAge(lastWorking.timestamp)})
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Warning when the selected model can't actually answer */}
+        {currentUnusable && currentHealth && (
+          <div className="mt-3 rounded-xl border border-ld-danger/50 bg-ld-danger/10 px-4 py-3 text-xs">
+            <div className="font-semibold text-ld-danger">
+              ⚠ Selected model is unusable:{' '}
+              <span className="font-mono">
+                {current?.provider}/{current?.model}
+              </span>{' '}
+              —{' '}
+              {currentHealth.status === 'exhausted'
+                ? `credits exhausted${
+                    currentHealth.credit_ttl_remaining_sec > 0
+                      ? ` (retry in ${formatTtl(currentHealth.credit_ttl_remaining_sec)})`
+                      : ''
+                  }`
+                : `needs a key (${currentHealth.env_key ?? 'see provider config'})`}
+            </div>
+            <button
+              onClick={() => void switchToBest()}
+              disabled={switching || !health?.best_free}
+              className="mt-2 rounded-lg bg-ld-danger px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-40"
+            >
+              {switching ? 'Switching…' : '⚡ Switch to best working'}
+            </button>
+          </div>
+        )}
 
         {current && (
           <div className="mt-4 rounded-xl border border-ld-accent/40 bg-ld-accent/5 px-4 py-3 text-xs">
@@ -83,32 +170,85 @@ export default function Models() {
             <span className="font-mono">
               {current.provider}/{current.model || 'auto'}
             </span>
+            {currentHealth && (
+              <span className="ml-2">
+                <StatusBadge p={currentHealth} />
+              </span>
+            )}
             {switching && <span className="ml-2 text-ld-muted">switching…</span>}
           </div>
         )}
 
-        {currentUnusable && current && (
-          <div className="mt-3 rounded-xl border border-ld-danger/50 bg-ld-danger/10 px-4 py-3 text-xs">
-            <div className="font-semibold text-ld-danger">
-              ⚠️ {current.provider}/{current.model || 'auto'} is currently unusable —{' '}
-              {unusableReason}.
+        {/* Free rotation — live health */}
+        {rotation.length > 0 && (
+          <div className="mt-5">
+            <h3 className="text-sm font-semibold">
+              Free rotation — live health
+              <span className="ml-2 text-[10px] font-normal text-ld-muted">
+                read from the live rotator state
+              </span>
+            </h3>
+            <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
+              {rotation.map((p) => {
+                const isActive = current?.provider === toBrowserProviderId(p.id);
+                const isLastWorking =
+                  !!lastWorking &&
+                  toBrowserProviderId(lastWorking.provider) ===
+                    toBrowserProviderId(p.id);
+                return (
+                  <div
+                    key={p.id}
+                    className={`rounded-lg border px-3 py-2.5 ${
+                      isActive ? 'border-ld-ok/60 bg-ld-ok/5' : 'border-ld-border'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="w-6 shrink-0 font-mono text-[10px] text-ld-muted">
+                        #{p.rotation_order != null ? p.rotation_order + 1 : '–'}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-xs font-semibold">
+                        {p.name}
+                        {isActive && <span className="ml-1 text-ld-ok">◀</span>}
+                        {isLastWorking && (
+                          <span className="ml-1 text-ld-warn" title="Last known working">
+                            ★
+                          </span>
+                        )}
+                        {p.next_in_rotation && !isActive && (
+                          <span className="ml-1 text-[10px] font-normal text-ld-accent">
+                            next
+                          </span>
+                        )}
+                      </span>
+                      <StatusBadge p={p} />
+                    </div>
+                    <div className="mt-1 truncate font-mono text-[10px] text-ld-muted">
+                      {p.model}
+                    </div>
+                    {p.status === 'exhausted' && p.credit_ttl_remaining_sec > 0 && (
+                      <div className="mt-1 text-[10px] text-ld-danger">
+                        Credits exhausted — retry in {formatTtl(p.credit_ttl_remaining_sec)}
+                      </div>
+                    )}
+                    <button
+                      disabled={switching || isActive || p.status !== 'ready'}
+                      onClick={() => {
+                        void pick(p.id, p.model);
+                      }}
+                      className="mt-2 rounded-lg border border-ld-border px-3 py-1 font-mono text-xs text-ld-muted transition hover:border-ld-accent hover:text-ld-text disabled:opacity-40"
+                      title={
+                        p.status !== 'ready'
+                          ? 'Not usable right now'
+                          : `Use ${p.id}/${p.model}`
+                      }
+                    >
+                      {isActive ? 'Active ✓' : 'Use'}
+                    </button>
+                  </div>
+                );
+              })}
             </div>
-            <button
-              onClick={() => void fixToBest()}
-              disabled={switching || !bestFree}
-              title={
-                bestFree
-                  ? `Switch to ${bestFree.provider}/${bestFree.model}`
-                  : 'No working free model found'
-              }
-              className="mt-2 rounded-lg bg-ld-accent px-3 py-1.5 font-semibold text-white transition disabled:opacity-50"
-            >
-              {switching
-                ? 'Switching…'
-                : bestFree
-                  ? `Switch to best working (${bestFree.provider}/${bestFree.model})`
-                  : 'No working model available'}
-            </button>
+
           </div>
         )}
 
@@ -116,7 +256,7 @@ export default function Models() {
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           placeholder="Filter models…"
-          className="mt-4 w-full rounded-xl border border-ld-border bg-ld-card px-4 py-2.5 text-sm outline-none placeholder:text-ld-faint focus:border-ld-accent"
+          className="mt-5 w-full rounded-xl border border-ld-border bg-ld-card px-4 py-2.5 text-sm outline-none placeholder:text-ld-faint focus:border-ld-accent"
         />
 
         <div className="mt-4 space-y-5">
@@ -134,7 +274,7 @@ export default function Models() {
                   <span className="rounded-full border border-ld-border px-2 py-0.5 text-[10px] font-normal text-ld-muted">
                     {models.length} free
                   </span>
-                  {h && <HealthBadge h={h} />}
+                  {h && <StatusBadge p={h} />}
                   {h?.rotation_order != null && (
                     <span
                       title={

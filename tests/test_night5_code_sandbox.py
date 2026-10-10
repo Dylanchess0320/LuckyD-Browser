@@ -306,10 +306,16 @@ def test_generate_tests_syntax_error(sandbox):
 # ── profile ──────────────────────────────────────────────────────────────
 
 
-def test_profile_refused_untrusted(sandbox):
+def test_profile_untrusted_allowed(sandbox):
     result = sandbox.profile("x = 1\n")
+    assert result.success is True
+    assert result.stats_text
+
+
+def test_profile_untrusted_blocked(sandbox):
+    result = sandbox.profile("import os\nos.system('echo pwned')")
     assert result.success is False
-    assert "untrusted" in result.error
+    assert "Forbidden" in result.error
 
 
 def test_profile_trusted_runs_own_snippet(trusted_sandbox):
@@ -395,6 +401,12 @@ def test_dict() -> dict[str, int]:
 def test_set() -> set[str]:
     return {"a"}
 
+def test_set_list() -> set[list]:
+    return set()
+
+def test_set_dict() -> set[dict[str, int]]:
+    return set()
+
 def test_tuple() -> tuple[int, int]:
     return (1, 2)
 
@@ -406,35 +418,117 @@ def test_bytes() -> bytes:
 
 def test_unannotated():
     return 1
+
+def test_custom() -> MyClass:
+    return MyClass()
+
+def test_generic() -> MyGeneric[int]:
+    return MyGeneric()
+
+def test_attr() -> models.User:
+    return models.User()
 """
     skeleton = sandbox.generate_tests(code)
 
     assert "def test_test_bool():" in skeleton
-    assert "assert result is True  # TODO: real assertion" in skeleton
+    assert "assert isinstance(result, bool)" in skeleton
+
+    assert "def test_test_int():" in skeleton
+    assert "assert isinstance(result, int)  # TODO: real assertion" in skeleton
+
+    assert "def test_test_str():" in skeleton
+    assert "assert isinstance(result, str)" in skeleton
+
+    assert "def test_test_list():" in skeleton
+    assert "assert isinstance(result, list) and all(isinstance(x, int) for x in result)" in skeleton
+
+    assert "def test_test_dict():" in skeleton
+    assert (
+        "assert isinstance(result, dict) and all(isinstance(k, str) and isinstance(v, int) for k, v in result.items())  # TODO: real assertion"
+        in skeleton
+    )
+
+    assert "def test_test_set():" in skeleton
+    assert "assert isinstance(result, set)" in skeleton
+
+    assert "def test_test_tuple():" in skeleton
+    assert (
+        "assert isinstance(result, tuple) and len(result) == 2  # TODO: real assertion" in skeleton
+    )
+
+    assert "def test_test_none():" in skeleton
+    assert "assert result is None" in skeleton
+
+    assert "def test_test_bytes():" in skeleton
+    assert "assert isinstance(result, bytes)" in skeleton
+
+    assert "def test_test_unannotated():" in skeleton
+    assert "assert result is not None  # TODO: real assertion" in skeleton
+
+
+def test_infer_assertion_generic_dict(sandbox):
+    code = """
+def test_dict_both() -> dict[str, int]:
+    return {"a": 1}
+
+def test_dict_key_only() -> dict[str, Any]:
+    return {"a": [1]}
+
+def test_dict_val_only() -> dict[Any, list]:
+    return {1: []}
+
+def test_dict_any_any() -> dict[Any, Any]:
+    return {"a": 1}
+
+def test_dict_bare() -> dict:
+    return {"a": 1}
+"""
+    skeleton = sandbox.generate_tests(code)
+
+    assert "def test_test_dict_both():" in skeleton
+    assert (
+        "assert isinstance(result, dict) and all(isinstance(k, str) and isinstance(v, int) for k, v in result.items())  # TODO: real assertion"
+        in skeleton
+    )
+
+    assert "def test_test_dict_key_only():" in skeleton
+    assert (
+        "assert isinstance(result, dict) and all(isinstance(k, str) for k in result.keys())  # TODO: real assertion"
+        in skeleton
+    )
+
+    assert "def test_test_dict_val_only():" in skeleton
+    assert (
+        "assert isinstance(result, dict) and all(isinstance(v, list) for v in result.values())  # TODO: real assertion"
+        in skeleton
+    )
+
+    assert "def test_test_dict_any_any():" in skeleton
+    assert "assert isinstance(result, dict)  # TODO: real assertion" in skeleton
+
+    assert "def test_test_dict_bare():" in skeleton
+    assert "assert isinstance(result, dict)" in skeleton
+
+
+def test_infer_assertion_from_body(sandbox):
+    """Unannotated functions: infer assertion from return statements."""
+    code = """
+def test_int():
+    return 1
+
+def test_list():
+    return [1, 2]
+
+def test_none():
+    return None
+"""
+    skeleton = sandbox.generate_tests(code)
 
     assert "def test_test_int():" in skeleton
     assert "assert result == 0  # TODO: real assertion" in skeleton
 
-    assert "def test_test_str():" in skeleton
-    assert 'assert result == ""  # TODO: real assertion' in skeleton
-
     assert "def test_test_list():" in skeleton
     assert "assert result == []  # TODO: real assertion" in skeleton
 
-    assert "def test_test_dict():" in skeleton
-    assert "assert result == {}  # TODO: real assertion" in skeleton
-
-    assert "def test_test_set():" in skeleton
-    assert "assert result == set()  # TODO: real assertion" in skeleton
-
-    assert "def test_test_tuple():" in skeleton
-    assert "assert result == ()  # TODO: real assertion" in skeleton
-
     assert "def test_test_none():" in skeleton
     assert "assert result is None  # TODO: real assertion" in skeleton
-
-    assert "def test_test_bytes():" in skeleton
-    assert "assert result == b''  # TODO: real assertion" in skeleton
-
-    assert "def test_test_unannotated():" in skeleton
-    assert "assert result is not None  # TODO: real assertion" in skeleton

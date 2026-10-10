@@ -372,8 +372,8 @@ class TestAgentsBridge:
     def test_read_providers_snapshot(self, clean_env, tmp_path):
         clean_env.setenv("GROQ_API_KEY", TEST_API_KEY)
         bridge = self._bridge(tmp_path)
-        snap = bridge.read_providers()
-        assert snap["available"] is True
+        snap = bridge.provider_health()
+        assert "error" not in snap
         by_id = {p["id"]: p for p in snap["providers"]}
         assert by_id["groq"]["next_in_rotation"] is True
         assert by_id["groq"]["rotation_order"] == 4
@@ -382,16 +382,15 @@ class TestAgentsBridge:
     def test_read_best_free(self, clean_env, tmp_path):
         clean_env.setenv("GROQ_API_KEY", TEST_API_KEY)
         bridge = self._bridge(tmp_path)
-        best = bridge.read_best_free()
-        assert best["available"] is True
-        assert best["provider"] == "groq"
-        assert best["model"] == "groq/compound-mini"
+        snap = bridge.provider_health()
+        assert snap["best_free"] == "groq"
+        assert snap["best_free_model"] == "groq/compound-mini"
 
     def test_read_best_free_none_when_nothing_usable(self, clean_env, tmp_path):
         bridge = self._bridge(tmp_path)
-        best = bridge.read_best_free()
-        assert best["available"] is False
-        assert best["provider"] == "" and best["model"] == ""
+        snap = bridge.provider_health()
+        assert snap["best_free"] is None
+        assert snap["best_free_model"] is None
 
     def test_set_model_live_reread(self, clean_env, tmp_path):
         bridge = self._bridge(tmp_path)
@@ -424,10 +423,9 @@ class TestAgentsBridge:
                 return resp.status, body
 
             status, snap = _get("/api/providers")
-            assert status == 200 and snap["available"] is True
+            assert status == 200 and "error" not in snap
             assert any(p["id"] == "groq" for p in snap["providers"])
-            status, best = _get("/api/best-free")
-            assert status == 200 and best["provider"] == "groq"
+            assert snap["best_free"] == "groq"
 
             conn = http.client.HTTPConnection("127.0.0.1", port, timeout=15)
             conn.request(

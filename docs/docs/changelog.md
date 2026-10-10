@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [10.6.3] - 2026-10-10
+
+Antigravity agent paste fix: large pastes no longer corrupt in the terminal (chunked pty.write at 8KB, frontend chunks at 16KB with bracketed-paste wrap). 33 code-health PRs merged (exception handlers, test assertions, sandbox hardening including CodeExecutionSandbox RCE fix). Provider-health UI polish (live status badges, one-click best-working switch). LuckyD AI section in README.
+
 ## [10.6.1] - 2026-09-24
 
 Google bot-detection auto-fallback: when Google serves its "unusual traffic"

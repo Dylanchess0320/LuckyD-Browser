@@ -42,7 +42,23 @@ bridge reuses them verbatim instead of reimplementing any of it:
 
                                  AI sidebar writes; luckyd-code.exe mirrors
 
-                                 it per request, no backend rebuild needed)
+                                 it per request, no backend rebuild needed).
+
+                                 The response includes a live re-read of
+
+                                 settings.json plus the provider health
+
+                                 snapshot, so the UI updates instantly.
+
+  * GET  /api/providers       -> provider health snapshot
+
+                                 (core.providers.health_snapshot: per-provider
+
+                                 status/rotation_order/next_in_rotation/Cline
+
+                                 402 TTL, the rotation's current best pick,
+
+                                 and the last-known-working pair)
 
 
 
@@ -264,6 +280,12 @@ class Bridge:
         if not provider or not model:
             raise ValueError("provider and model are both required")
 
+        # settings.json is the browser's file: it uses the browser's provider
+        # namespace ("google"), while core/free_rotation speaks "gemini".
+        # Normalize at this boundary so the Qt AI sidebar and ai_bridge both
+        # re-select what HQ picked (the bridge never validates ids itself).
+        provider = {"gemini": "google"}.get(provider, provider)
+
         data = self.reload_settings()
 
         overrides = data.get("ai_model_overrides")
@@ -287,95 +309,35 @@ class Bridge:
         # every later GET) reflects exactly what is on disk — no restart.
         return self.read_current_model()
 
-    # ── provider health snapshot (10.5) ─────────────────────────────────
+    # ── provider health snapshot (10.5/10.6) ─────────────────────────
 
-    def _ensure_core_import(self) -> bool:
-        """Make ``core.*`` importable (repo root on sys.path); False if absent.
+    def provider_health(self) -> dict:
+        """Live provider health snapshot (core.providers.health_snapshot).
 
-        The frozen bridge bundles only browser_core, so core/providers.py may
-        legitimately be missing — callers degrade to available: False.
-        """
-
-        import importlib.util
+        Falls back to a degraded-but-shaped response when core/ can't be
+        imported (e.g. the bridge running from a bare backend directory).
+        Never raises."""
 
         try:
-            if importlib.util.find_spec("core.providers") is not None:
-                return True
-            if str(self.root) not in sys.path:
-                sys.path.insert(0, str(self.root))
-            return importlib.util.find_spec("core.providers") is not None
-        except Exception:
-            return False
+            from core.providers import health_snapshot
 
-    def read_providers(self) -> dict:
-        """Health snapshot — the same ``list_providers()`` HQ uses (10.5).
-
-        One source of truth for "what would work right now": per-provider
-        rotation order, next-in-rotation, Cline 402 TTL, and last-working
-        info, plus the live answering pair.
-        """
-
-        if not self._ensure_core_import():
-            return {"providers": [], "available": False}
-
-        try:
-            from core.free_rotation import get_active_pair
-            from core.providers import list_providers
-
-            live = get_active_pair()
-
-            return {
-                "providers": list_providers(),
-                "active": ({"provider": live[0], "model": live[1]} if live else None),
-                "available": True,
-            }
+            snap = health_snapshot()
+            if isinstance(snap, dict):
+                return snap
         except Exception as exc:
             return {
                 "providers": [],
-                "available": False,
-                "error": f"{type(exc).__name__}: {exc}",
+                "best_free": None,
+                "best_free_model": None,
+                "last_working": None,
+                "error": f"health snapshot unavailable: {type(exc).__name__}",
             }
-
-    def read_best_free(self) -> dict:
-        """The ``best_free_provider()`` pick as a concrete pair (10.5).
-
-        Powers the Models view's one-click "Switch to best working" fix.
-        """
-
-        if not self._ensure_core_import():
-            return {"provider": "", "model": "", "available": False}
-
-        try:
-            from core.free_rotation import FREE_MODEL_PRIORITY, best_free_provider
-            from core.last_working import last_working_age_label
-
-            best = best_free_provider()
-            if not best:
-                return {"provider": "", "model": "", "available": False}
-
-            model = ""
-            for pid, mid in FREE_MODEL_PRIORITY:
-                if pid == best:
-                    model = mid
-                    break
-            if not model:
-                from core.providers import PROVIDER_DEFAULTS
-
-                model = str((PROVIDER_DEFAULTS.get(best) or {}).get("default_model", ""))
-
-            return {
-                "provider": best,
-                "model": model,
-                "available": True,
-                "last_working_ago": last_working_age_label(),
-            }
-        except Exception as exc:
-            return {
-                "provider": "",
-                "model": "",
-                "available": False,
-                "error": f"{type(exc).__name__}: {exc}",
-            }
+        return {
+            "providers": [],
+            "best_free": None,
+            "best_free_model": None,
+            "last_working": None,
+        }
 
 
 def make_handler(bridge: Bridge):
@@ -501,12 +463,12 @@ def make_handler(bridge: Bridge):
                 return
 
             if path == "/api/providers":
-                self._send_json(bridge.read_providers())
+                # Live provider health (rotation order, next-in-rotation,
+                # Cline 402 TTL, last-working pair) — the Models view's
+                # single source of truth.
+                self._send_json(bridge.provider_health())
 
                 return
-
-            if path == "/api/best-free":
-                self._send_json(bridge.read_best_free())
 
                 return
 
@@ -630,7 +592,11 @@ def make_handler(bridge: Bridge):
 
                 return
 
-            self._send_json({"ok": True, **result})
+            # Explicit live re-read: set_model already returned the freshly
+            # read settings, and the health snapshot is recomputed from the
+            # live rotator state — so the UI reflects the switch instantly,
+            # no restart of the bridge or the terminal agent required.
+            self._send_json({"ok": True, **result, "health": bridge.provider_health()})
 
     return Handler
 
@@ -655,6 +621,12 @@ def main() -> int:
 
     if not _import_browser_core(root):
         print(f"[bridge] no browser/ package under {root} â€” terminal pages off", flush=True)
+
+    # core/ (providers, rotation, last-working) for the /api/providers
+    # health snapshot and the /api/model response.
+    with contextlib.suppress(Exception):
+        if str(root) not in sys.path:
+            sys.path.insert(0, str(root))
 
     bridge = Bridge(root, args.http_port, args.ws_port)
 

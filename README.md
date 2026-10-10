@@ -31,6 +31,18 @@ LuckyD is a normal, fast web browser — with an AI assistant living inside it. 
 
 ---
 
+## LuckyD AI
+
+The browser's AI isn't a single chatbot — it's a routing layer that finds you something that actually works, plus an agent terminal that runs real coding CLIs.
+
+**Provider handling that tells the truth.** Settings → Models shows every provider's live status — Ready, Needs key, or Exhausted (with retry countdown) — read from the same health snapshot the backend uses. The "Switch to best working" button moves you to the provider with evidence it answered recently, in one click. No more picking a dead model and wondering why nothing happens.
+
+**16 coding agents in a tab.** Press `Ctrl+Shift+H` for the agent terminal: Antigravity, Claude, Codex, Copilot, Qwen, OpenCode, MiniMax Code, MiniMax Media, Cline, OpenClaw, Hermes, Pi, Grok, Muse Code, Jules, and more. Paste large prompts without corruption (10.6.3 fixed the ConPTY garbling on big pastes). Each agent runs in its own PTY with bracketed-paste support.
+
+**The LuckyD AI vision.** The direction is a single LuckyD AI: you ask, it routes — free providers first, local models when you want privacy, your own keys when you add them — and it remembers what worked. The 10.5/10.6 provider-health work (live status, last-known-working tracking, free-model rotation) is the foundation. Not a separate model to download; the intelligence is in the routing.
+
+---
+
 ## Install in 3 steps
 
 1. **[Download the installer](https://github.com/Dylanchess0320/LuckyD-Browser/releases/latest)** (Windows 10/11, 64-bit)
@@ -62,7 +74,9 @@ LuckyD also works with cloud providers if you prefer: Gemini, Groq, DeepSeek, Op
 
 ## What's new
 
+**v10.6.3** — Antigravity agent paste fix (large pastes no longer corrupt in the terminal); 33 code-health PRs merged (exception handlers, test assertions, sandbox hardening including an RCE fix); provider-health UI polish (live status badges, one-click best-working switch). Nothing else changed since 10.6.2.
 **v10.6.1** — Google bot-detection auto-fallback: searches that hit Google's "unusual traffic" page now re-run on the next working engine automatically. Nothing else changed since 10.6.0.
+**v10.5.0** — Model & provider handling rebuilt: the browser now shows which AI providers are actually working, warns you before you pick a dead one, and switches to the best working option in one click. Free models stay the default.
 
 Older changes: [full changelog](CHANGELOG.md) · [all releases](https://github.com/Dylanchess0320/LuckyD-Browser/releases)
 
