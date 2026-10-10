@@ -133,7 +133,9 @@ class JulesClient:
             },
         )
         try:
-            with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT_SEC) as resp:
+            # url is API_BASE (constant https origin) + fixed internal paths;
+            # never built from untrusted input.
+            with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT_SEC) as resp:  # nosec B310
                 raw = resp.read().decode("utf-8") or "{}"
                 return json.loads(raw)
         except urllib.error.HTTPError as e:

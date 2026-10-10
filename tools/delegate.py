@@ -93,8 +93,10 @@ def quarantine_result(text: str, label: str) -> str:
         safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in label)[:40] or "result"
         # Microseconds in the stamp: task_output is often polled twice in
         # the same second for one large result — second-granularity stamps
-        # collided and overwrote the first file.
-        stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
+        # collided and overwrote the first file. The uuid suffix covers
+        # coarse Windows clocks that return identical microseconds for
+        # rapid successive calls.
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f") + "-" + uuid.uuid4().hex[:8]
         path = qdir / f"{safe}-{stamp}.md"
         path.write_text(text, encoding="utf-8")
         _prune_quarantine_dir(qdir)
