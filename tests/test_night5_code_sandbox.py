@@ -463,7 +463,7 @@ def test_attr() -> models.User:
     assert "assert isinstance(result, bytes)" in skeleton
 
     assert "def test_test_unannotated():" in skeleton
-    assert "assert result is not None  # TODO: real assertion" in skeleton
+    assert "assert result == 0  # TODO: real assertion" in skeleton
 
 
 def test_infer_assertion_generic_dict(sandbox):
@@ -532,3 +532,27 @@ def test_none():
 
     assert "def test_test_none():" in skeleton
     assert "assert result is None  # TODO: real assertion" in skeleton
+
+
+def test_infer_assertion_custom_types(sandbox):
+    """Custom, generic, and attribute annotations: isinstance against the named type."""
+    code = """
+def test_custom() -> MyClass:
+    return MyClass()
+
+def test_generic() -> MyGeneric[int]:
+    return MyGeneric()
+
+def test_attr() -> models.User:
+    return models.User()
+"""
+    skeleton = sandbox.generate_tests(code)
+
+    assert "def test_test_custom():" in skeleton
+    assert "assert isinstance(result, MyClass)  # TODO: real assertion" in skeleton
+
+    assert "def test_test_generic():" in skeleton
+    assert "assert isinstance(result, MyGeneric)  # TODO: real assertion" in skeleton
+
+    assert "def test_test_attr():" in skeleton
+    assert "assert isinstance(result, models.User)  # TODO: real assertion" in skeleton

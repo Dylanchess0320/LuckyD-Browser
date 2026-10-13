@@ -13,6 +13,7 @@ import contextlib
 import io
 import json
 import os
+import pstats
 import re
 import subprocess
 import sys
@@ -731,8 +732,6 @@ class AdvancedDebugging:
 
         stream = io.StringIO()
         try:
-            import pstats  # lazy: only needed for the profiler report path
-
             stats = pstats.Stats(stats_path, stream=stream)
             stats.sort_stats("cumulative").print_stats(20)
         except Exception:

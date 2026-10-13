@@ -434,6 +434,16 @@ class CodeExecutionSandbox:
                     return "assert isinstance(result, tuple) and len(result) == 1  # TODO: real assertion"
                 return "assert isinstance(result, tuple)  # TODO: real assertion"
 
+        try:
+            base_node = returns_node
+            if isinstance(base_node, ast.Subscript):
+                base_node = base_node.value
+            if isinstance(base_node, (ast.Name, ast.Attribute)):
+                base_name = ast.unparse(base_node)
+                return f"assert isinstance(result, {base_name})  # TODO: real assertion"
+        except Exception:
+            pass
+
         return "assert result is not None  # TODO: real assertion"
 
     def generate_tests(self, code: str) -> str:
