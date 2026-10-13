@@ -56,6 +56,8 @@ def test_opencode_registers_when_keyed(no_local_no_keys, monkeypatch: pytest.Mon
 
     2026-09-24: XAI_API_KEY / MOONSHOT_API_KEY register xAI (Grok 4.7) and
     Moonshot (Kimi K3) the same keyed way.
+    2026-10-12: META_API_KEY / MISTRAL_API_KEY register Meta (Muse Wonder) and
+    Mistral (Large 4) the same keyed way.
     """
     monkeypatch.setattr(ai_bridge, "_load_env", lambda: {"OPENCODE_API_KEY": "zk-test"})
     bridge = AIBridge()
@@ -73,6 +75,17 @@ def test_opencode_registers_when_keyed(no_local_no_keys, monkeypatch: pytest.Mon
     assert bridge.model_for("xai") == "grok-4.7"
     assert bridge.model_for("moonshot") == "kimi-k3"
 
+    monkeypatch.setattr(
+        ai_bridge,
+        "_load_env",
+        lambda: {"META_API_KEY": "meta-test", "MISTRAL_API_KEY": "mistral-test"},
+    )
+    bridge = AIBridge()
+    assert "meta" in bridge.providers()
+    assert "mistral" in bridge.providers()
+    assert bridge.model_for("meta") == "muse-wonder-1.0"
+    assert bridge.model_for("mistral") == "mistral-large-4"
+
 
 def test_no_key_no_provider_registered(no_local_no_keys) -> None:
     """Without keys or Cline auth, no cloud provider is usable."""
@@ -81,6 +94,9 @@ def test_no_key_no_provider_registered(no_local_no_keys) -> None:
     # 2026-09-24: the new providers stay dark without their keys too.
     assert "xai" not in bridge.providers()
     assert "moonshot" not in bridge.providers()
+    # 2026-10-12: Meta + Mistral stay dark without their keys too.
+    assert "meta" not in bridge.providers()
+    assert "mistral" not in bridge.providers()
     assert bridge.default_provider() is None
 
 

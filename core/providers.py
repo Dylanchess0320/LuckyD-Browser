@@ -40,6 +40,10 @@ VALID_PROVIDERS = {
     # (1M-context open-weight MoE) join the keyed provider roster.
     "xai",
     "moonshot",
+    # 2026-10-12: Meta Muse Wonder (frontier agentic/coding model, launched
+    # Oct 12) + Mistral Large 4 (public preview Oct 6) join the keyed roster.
+    "meta",
+    "mistral",
 }
 
 #: Short-hands accepted anywhere a provider id is read (CODING_AGENT_PROVIDER,
@@ -75,6 +79,8 @@ PROVIDER_NAMES = {
     "minimax": "MiniMax",
     "xai": "xAI (Grok)",
     "moonshot": "Moonshot (Kimi)",
+    "meta": "Meta (Muse)",
+    "mistral": "Mistral AI",
 }
 
 PROVIDER_DEFAULTS: dict[str, ProviderDefaults] = {
@@ -212,6 +218,28 @@ PROVIDER_DEFAULTS: dict[str, ProviderDefaults] = {
         "env_model": "MOONSHOT_MODEL",
         "default_base": "https://api.moonshot.ai/v1",
         "default_model": "kimi-k3",
+    },
+    # Meta (Muse Wonder, OpenAI-compatible chat API). 2026-10-12: frontier
+    # agentic/coding model launched Oct 12, 2026, ~1M context, Active Memory /
+    # Active Focus, $4/$20 per 1M. Key: META_API_KEY (the "LLM|id|secret" Model
+    # API key). Base: https://api.meta.ai/v1.
+    "meta": {
+        "env_key": "META_API_KEY",
+        "env_base": "META_BASE_URL",
+        "env_model": "META_MODEL",
+        "default_base": "https://api.meta.ai/v1",
+        "default_model": "muse-wonder-1.0",
+    },
+    # Mistral AI (OpenAI-compatible chat API). 2026-10-12: Mistral Large 4
+    # (public preview Oct 6, weights due end of Oct) — 1.05T MoE, 1M context,
+    # $reasoning_effort-tunable. Key: MISTRAL_API_KEY from console.mistral.ai.
+    # Base: https://api.mistral.ai/v1. Free experiment tier on new accounts.
+    "mistral": {
+        "env_key": "MISTRAL_API_KEY",
+        "env_base": "MISTRAL_BASE_URL",
+        "env_model": "MISTRAL_MODEL",
+        "default_base": "https://api.mistral.ai/v1",
+        "default_model": "mistral-large-4",
     },
 }
 
@@ -537,6 +565,8 @@ def detect_api_format(provider: str) -> str:
         "cline-usage": "openai",  # same gateway, usage-billed model ids
         "cline": "openai",  # alias of cline-usage
         "minimax": "anthropic",  # Anthropic-compatible Messages API
+        "meta": "openai",  # Meta Model API is OpenAI-compatible
+        "mistral": "openai",  # Mistral La Plateforme is OpenAI-compatible
     }
     return formats.get(provider, "openai")
 
@@ -614,6 +644,10 @@ PROVIDER_ORDER = (
     # 2026-09-24: xAI Grok 4.7 + Moonshot Kimi K3 (keyed, paid tiers).
     "xai",
     "moonshot",
+    # 2026-10-12: Meta Muse Wonder + Mistral Large 4 (keyed, paid tiers;
+    # Mistral has a free experiment tier on new accounts).
+    "meta",
+    "mistral",
 )
 
 

@@ -856,6 +856,8 @@ def _persist_model_selection(provider: str, model: str) -> None:
         "minimax": "MINIMAX_MODEL",
         "xai": "XAI_MODEL",
         "moonshot": "MOONSHOT_MODEL",
+        "meta": "META_MODEL",
+        "mistral": "MISTRAL_MODEL",
     }.get(provider)
     if not env_key or not model:
         return
@@ -1097,6 +1099,8 @@ async def handle_model_command(agent: CodingAgent, cmd: str) -> bool:
         "minimax",
         "xai",
         "moonshot",
+        "meta",
+        "mistral",
     ):
         if low.startswith(p + " "):
             provider = _PROVIDER_ALIASES.get(p, p)
@@ -1596,6 +1600,8 @@ def _resolve_model_query(raw_query: str) -> tuple[str, str] | None:
         "minimax",
         "xai",
         "moonshot",
+        "meta",
+        "mistral",
     ):
         if raw_query.lower().startswith(p + " "):
             provider = _PROVIDER_ALIASES.get(p, p)
@@ -2238,7 +2244,7 @@ Options:
   --provider NAME    Set provider (see: lucky-code providers): ollama, clinepass,
                      cline-usage, openrouter, groq, deepseek,
                      zai, google, gemini, openai, anthropic, minimax,
-                     xai, moonshot
+                     xai, moonshot, meta, mistral
   --permission-mode MODE  Tool permission mode: default, acceptEdits,
                      bypassPermissions, auto (default), off
   --thinking         Use the thinking/reasoning model

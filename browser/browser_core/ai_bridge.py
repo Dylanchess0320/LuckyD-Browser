@@ -141,6 +141,13 @@ _PROVIDER_SPECS = [
     # 2026-09-24: Moonshot Kimi K3 — open-weight multimodal MoE, 1M context.
     # OpenAI-compatible: https://api.moonshot.ai/v1, MOONSHOT_API_KEY.
     ("moonshot", "MOONSHOT_API_KEY", "kimi-k3", "https://api.moonshot.ai/v1", "openai"),
+    # 2026-10-12: Meta Muse Wonder — frontier agentic/coding model (launched
+    # Oct 12, 2026), ~1M context. OpenAI-compatible: https://api.meta.ai/v1,
+    # META_API_KEY.
+    ("meta", "META_API_KEY", "muse-wonder-1.0", "https://api.meta.ai/v1", "openai"),
+    # 2026-10-12: Mistral Large 4 — public preview Oct 6, 1.05T MoE, 1M
+    # context. OpenAI-compatible: https://api.mistral.ai/v1, MISTRAL_API_KEY.
+    ("mistral", "MISTRAL_API_KEY", "mistral-large-4", "https://api.mistral.ai/v1", "openai"),
 ]
 
 # Keyless local servers — probed at startup, registered before keyed clouds.

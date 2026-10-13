@@ -78,3 +78,6 @@ class TestProviders:
 
         assert detect_api_format("openai") == "openai"
         assert detect_api_format("deepseek") == "openai"
+        # 2026-10-12: Meta Model API + Mistral La Plateforme are OpenAI-compatible.
+        assert detect_api_format("meta") == "openai"
+        assert detect_api_format("mistral") == "openai"

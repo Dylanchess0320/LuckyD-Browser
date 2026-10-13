@@ -734,6 +734,8 @@ class AiSidebar(QDockWidget):
             "deepseek": "DeepSeek",
             "openai": "OpenAI",
             "anthropic": "Anthropic",
+            "meta": "Meta (Muse)",
+            "mistral": "Mistral",
         }
         return labels.get(provider, provider)
 

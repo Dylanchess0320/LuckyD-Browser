@@ -45,8 +45,12 @@ def clean_env(monkeypatch):
         "DEEPSEEK_API_KEY",
         "XAI_API_KEY",
         "MOONSHOT_API_KEY",
+        "META_API_KEY",
+        "MISTRAL_API_KEY",
         "XAI_MODEL",
         "MOONSHOT_MODEL",
+        "META_MODEL",
+        "MISTRAL_MODEL",
         "CODING_AGENT_API_KEY",
         "CLINEPASS_API_KEY",
         "CLINE_USAGE_MODEL",
@@ -70,6 +74,17 @@ class TestListProviders:
         assert PROVIDER_DEFAULTS["xai"]["default_base"] == "https://api.x.ai/v1"
         assert PROVIDER_DEFAULTS["moonshot"]["default_model"] == "kimi-k3"
         assert PROVIDER_DEFAULTS["moonshot"]["default_base"] == "https://api.moonshot.ai/v1"
+        # 2026-10-12 latest-AI refresh: Meta (Muse Wonder, launched Oct 12) +
+        # Mistral (Large 4, public preview Oct 6) join the roster.
+        assert "meta" in ids and "mistral" in ids
+        assert PROVIDER_NAMES["meta"] == "Meta (Muse)"
+        assert PROVIDER_NAMES["mistral"] == "Mistral AI"
+        assert PROVIDER_DEFAULTS["meta"]["default_model"] == "muse-wonder-1.0"
+        assert PROVIDER_DEFAULTS["meta"]["default_base"] == "https://api.meta.ai/v1"
+        assert PROVIDER_DEFAULTS["meta"]["env_key"] == "META_API_KEY"
+        assert PROVIDER_DEFAULTS["mistral"]["default_model"] == "mistral-large-4"
+        assert PROVIDER_DEFAULTS["mistral"]["default_base"] == "https://api.mistral.ai/v1"
+        assert PROVIDER_DEFAULTS["mistral"]["env_key"] == "MISTRAL_API_KEY"
         assert PROVIDER_DEFAULTS["openai"]["default_model"] == "gpt-6-sol"
         assert PROVIDER_DEFAULTS["anthropic"]["default_model"] == "claude-opus-5-5"
         assert PROVIDER_DEFAULTS["google"]["default_model"] == "gemini-3.8-flash"
@@ -87,6 +102,12 @@ class TestListProviders:
         assert catalog["xai"]["recommended"] == "grok-4.7"
         assert catalog["moonshot"]["env_key"] == "MOONSHOT_API_KEY"
         assert catalog["moonshot"]["recommended"] == "kimi-k3"
+        assert catalog["meta"]["env_key"] == "META_API_KEY"
+        assert catalog["meta"]["recommended"] == "muse-wonder-1.0"
+        assert catalog["meta"]["base_url"] == "https://api.meta.ai/v1"
+        assert catalog["mistral"]["env_key"] == "MISTRAL_API_KEY"
+        assert catalog["mistral"]["recommended"] == "mistral-large-4"
+        assert catalog["mistral"]["base_url"] == "https://api.mistral.ai/v1"
         assert catalog["anthropic"]["recommended"] == "claude-opus-5-5"
         assert catalog["google"]["recommended"] == "gemini-3.8-flash"
 
@@ -110,6 +131,11 @@ class TestListProviders:
         # 2026-09-24: the new keyed providers gate the same way.
         assert by_id["xai"]["configured"] is False
         assert by_id["moonshot"]["configured"] is False
+        # 2026-10-12: Meta + Mistral gate the same way.
+        assert by_id["meta"]["configured"] is False
+        assert by_id["meta"]["key_present"] is False
+        assert by_id["mistral"]["configured"] is False
+        assert by_id["mistral"]["key_present"] is False
 
         monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
         by_id = {p["id"]: p for p in list_providers()}
@@ -125,6 +151,16 @@ class TestListProviders:
         assert by_id["moonshot"]["configured"] is True
         assert by_id["moonshot"]["key_present"] is True
         assert by_id["moonshot"]["model"] == "kimi-k3"
+
+        monkeypatch.setenv("META_API_KEY", "meta-test")
+        monkeypatch.setenv("MISTRAL_API_KEY", "mistral-test")
+        by_id = {p["id"]: p for p in list_providers()}
+        assert by_id["meta"]["configured"] is True
+        assert by_id["meta"]["key_present"] is True
+        assert by_id["meta"]["model"] == "muse-wonder-1.0"
+        assert by_id["mistral"]["configured"] is True
+        assert by_id["mistral"]["key_present"] is True
+        assert by_id["mistral"]["model"] == "mistral-large-4"
 
     def test_current_follows_explicit_provider(self, clean_env, monkeypatch):
         monkeypatch.setenv("CODING_AGENT_PROVIDER", "groq")
@@ -142,6 +178,11 @@ class TestListProviders:
         assert "moonshot" not in FREE_TIER_PROVIDERS
         assert by_id["xai"]["free_tier"] is False
         assert by_id["moonshot"]["free_tier"] is False
+        # 2026-10-12: Meta + Mistral are keyed pay-per-token, no free tier.
+        assert "meta" not in FREE_TIER_PROVIDERS
+        assert "mistral" not in FREE_TIER_PROVIDERS
+        assert by_id["meta"]["free_tier"] is False
+        assert by_id["mistral"]["free_tier"] is False
 
     def test_env_overrides_surface(self, clean_env, monkeypatch):
         monkeypatch.setenv("GROQ_MODEL", "groq/compound-test")
