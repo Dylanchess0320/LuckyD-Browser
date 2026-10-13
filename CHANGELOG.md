@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [10.7.2] - 2026-10-12
+
+New AI providers: Meta Muse Wonder + Mistral AI with automatic API-key
+detection. 16 Jules improvement PRs merged (2 security fixes: sandbox RCE,
+profiler exec() sandboxing).
+
 ## [10.6.1] - 2026-09-24
 
 Google bot-detection auto-fallback: when Google serves its "unusual traffic"

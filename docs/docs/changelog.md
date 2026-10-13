@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [10.7.2] - 2026-10-12
+
+New AI providers: Meta Muse Wonder (`muse-wonder-1.0`) + Mistral AI (`mistral-large-4`) join the roster, with automatic `META_API_KEY` / `MISTRAL_API_KEY` detection in the free-first rotation order. 16 Jules improvement PRs merged: 2 security fixes (RCE in `CodeExecutionSandbox.profile` now runs in subprocess isolation; `analyze_performance` exec() sandboxed), plus test-assertion upgrades and exception-handler cleanups. Full suite: 3354 passed, 0 failed.
+
 ## [10.7.1] - 2026-10-10
 
 Jules async delegate: dispatch real Jules cloud coding sessions from the mesh — `jules_dispatch` (approval-gated), `jules_status`/`jules_activities`/`jules_pr` (read-only), quota guards for the Google AI Pro plan (100 tasks/day, 15 concurrent), prompt-injection hardening, PRs ingested into the existing review flow. Live-shakedown verified against the real API. Hardening sweep: `_http_post` now raises the real HTTP error instead of returning None past the retry budget; local delegate concurrency capped at 8; task registries/HQ tasks/smart-context cache bounded with eviction; untrusted tool-error excerpts fenced out of system messages; quarantine timestamps microsecond + dir capped. Full suite: 3349 passed, 0 failed.

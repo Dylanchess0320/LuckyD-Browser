@@ -74,6 +74,7 @@ LuckyD also works with cloud providers if you prefer: Gemini, Groq, DeepSeek, Op
 
 ## What's new
 
+**v10.7.2** — New AI providers: Meta Muse Wonder + Mistral AI join the roster with automatic API-key detection. 16 Jules improvements merged, including 2 security fixes (CodeExecutionSandbox RCE fix, profiler exec() sandboxing).
 **v10.7.1** — Jules async delegate (dispatch real cloud coding tasks from the mesh: approval-gated, quota-guarded, PRs flow into review; live-tested against the real API) + hardening sweep (retry-budget errors surface properly, delegate concurrency capped at 8, registries pruned, prompt-injection fencing).
 **v10.7.0** — One unified agent loop: Terminal /mesh routing and Code agents merged into the browser's `CodingAgent`; deterministic model selection (every mid-run switch is now recorded, plus an opt-in pin mode); oversized-input protection (same bug class as the 10.6.3 paste fix); PTY output chunking; durable background tasks that survive restarts; classified retry wired into the HTTP layer; summarize-instead-of-drop on context truncation; subagent results quarantined out of context. New: task-completion evals (`tests/coding_eval.py`) — 14/14 after hardening, up from 12/14.
 **v10.6.3** — Antigravity agent paste fix (large pastes no longer corrupt in the terminal); 33 code-health PRs merged (exception handlers, test assertions, sandbox hardening including an RCE fix); provider-health UI polish (live status badges, one-click best-working switch). Nothing else changed since 10.6.2.
