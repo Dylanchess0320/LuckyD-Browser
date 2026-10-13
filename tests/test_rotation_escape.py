@@ -50,6 +50,8 @@ def clean_provider_env(monkeypatch):
         "OPENAI_API_KEY",
         "ANTHROPIC_API_KEY",
         "GOOGLE_API_KEY",
+        "META_API_KEY",
+        "MISTRAL_API_KEY",
         CONTRIBUTOR_ENV,
     ):
         monkeypatch.delenv(var, raising=False)

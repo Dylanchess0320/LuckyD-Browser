@@ -356,6 +356,9 @@ def detect_provider() -> str | None:
         ("openrouter", "OPENROUTER_API_KEY"),
         ("opencode", "OPENCODE_API_KEY"),
         ("minimax", "MINIMAX_API_KEY"),
+        # 2026-10-12: Meta Muse Wonder + Mistral Large 4 (keyed, paid tiers).
+        ("meta", "META_API_KEY"),
+        ("mistral", "MISTRAL_API_KEY"),
         ("ollama", "OLLAMA_MODEL"),
     ]
     for provider, env_var in checks:

@@ -59,6 +59,12 @@ _PROVIDER_ENV_VARS = (
     "OPENCODE_API_KEY",
     "MINIMAX_API_KEY",
     "DEEPSEEK_API_KEY",
+    "META_API_KEY",
+    "META_BASE_URL",
+    "META_MODEL",
+    "MISTRAL_API_KEY",
+    "MISTRAL_BASE_URL",
+    "MISTRAL_MODEL",
     "OLLAMA_HOST",
     "OLLAMA_MODEL",
 )
@@ -283,6 +289,33 @@ class TestDetectProviderFreeFirst:
         from core.providers import detect_provider
 
         assert detect_provider() is None
+
+    def test_meta_detected_by_key(self, free_env):
+        from core.providers import detect_provider
+
+        free_env.setenv("META_API_KEY", TEST_API_KEY)
+        assert detect_provider() == "meta"
+
+    def test_mistral_detected_by_key(self, free_env):
+        from core.providers import detect_provider
+
+        free_env.setenv("MISTRAL_API_KEY", TEST_API_KEY)
+        assert detect_provider() == "mistral"
+
+    def test_keyed_priority_openai_beats_meta(self, free_env):
+        from core.providers import detect_provider
+
+        free_env.setenv("OPENAI_API_KEY", TEST_API_KEY)
+        free_env.setenv("META_API_KEY", TEST_API_KEY)
+        free_env.setenv("MISTRAL_API_KEY", TEST_API_KEY)
+        assert detect_provider() == "openai"
+
+    def test_meta_beats_mistral(self, free_env):
+        from core.providers import detect_provider
+
+        free_env.setenv("META_API_KEY", TEST_API_KEY)
+        free_env.setenv("MISTRAL_API_KEY", TEST_API_KEY)
+        assert detect_provider() == "meta"
 
 
 # ── resolve_provider_config: ollama terminal fallback ──────────────────
