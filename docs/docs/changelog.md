@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [10.7.3] - 2026-10-17
+
+Lazy session restore, smoother terminal, stable tabs.
+
 ## [10.7.2] - 2026-10-12
 
 New AI providers: Meta Muse Wonder (`muse-wonder-1.0`) + Mistral AI (`mistral-large-4`) join the roster, with automatic `META_API_KEY` / `MISTRAL_API_KEY` detection in the free-first rotation order. 16 Jules improvement PRs merged: 2 security fixes (RCE in `CodeExecutionSandbox.profile` now runs in subprocess isolation; `analyze_performance` exec() sandboxed), plus test-assertion upgrades and exception-handler cleanups. Full suite: 3354 passed, 0 failed.

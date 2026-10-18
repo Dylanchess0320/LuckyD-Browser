@@ -56,6 +56,48 @@ def is_restorable(url: str) -> bool:
     return url.startswith(_RESTORABLE_PREFIXES)
 
 
+def effective_url(pending_url: str | None, live_url: str | None) -> str:
+    """The URL a tab should be treated as having.
+
+    A lazily restored tab has not loaded yet: its live URL is still
+    ``about:blank`` while the URL it *will* load sits in its pending slot.
+    Snapshots, duplicate/copy actions, and the closed-tab stack must all
+    see the pending URL, or deferred tabs silently lose their page.
+    """
+    pending = (pending_url or "").strip()
+    return pending if pending else (live_url or "")
+
+
+def plan_restore(tabs: list, current: int = 0) -> tuple[list[dict], int]:
+    """Plan a lazy session restore: which restored tabs load immediately.
+
+    Returns ``(plan, current_index)``. Plan entries copy the restorable
+    saved records (dicts with an http/https/file URL) in order, each with
+    a ``load_now`` flag. Only the active tab loads eagerly — every other
+    tab is created deferred and loads on first activation, so restoring
+    a 30-tab session no longer spawns 30 Chromium renderers at startup.
+    ``current`` is clamped into range (0 when there is nothing to show).
+    """
+    records = [
+        rec
+        for rec in (tabs or [])
+        if isinstance(rec, dict) and is_restorable(str(rec.get("url") or ""))
+    ]
+    if not records:
+        return [], 0
+    try:
+        current_index = int(current)
+    except (TypeError, ValueError):
+        current_index = 0
+    current_index = max(0, min(current_index, len(records) - 1))
+    plan = []
+    for i, rec in enumerate(records):
+        entry = dict(rec)
+        entry["load_now"] = i == current_index
+        plan.append(entry)
+    return plan, current_index
+
+
 def tab_record(url: str, title: str = "", pinned: bool = False, group: str = "") -> dict | None:
     """One tab's serializable state, or None when not restorable."""
     if not is_restorable(url):
@@ -82,6 +124,11 @@ class SessionStore:
 
     def __init__(self, path: Path | None = None):
         self._path = Path(path) if path is not None else session_path()
+        # Serialized payload of the last successful save by THIS store.
+        # The autosave fires on every tab/URL change; when nothing actually
+        # changed, re-writing the file (plus the .prev copy) is pure I/O
+        # churn on the GUI thread's debounce timer.
+        self._last_payload: str | None = None
 
     @property
     def path(self) -> Path:
@@ -113,6 +160,14 @@ class SessionStore:
             "saved_at": time.time(),
             "windows": windows[:MAX_WINDOWS],
         }
+        # Coalesce: the debounced autosave fires on every tab change, but
+        # many snapshots are identical (title/icon churn). Skip the write
+        # entirely when this store already saved the same windows payload
+        # and the file is still there. saved_at is deliberately excluded
+        # from the comparison — it is the only field that would differ.
+        windows_key = json.dumps(payload["windows"], sort_keys=True, default=str)
+        if windows_key == self._last_payload and self._path.exists():
+            return True
         tmp = None
         try:
             self._path.parent.mkdir(parents=True, exist_ok=True)
@@ -133,6 +188,7 @@ class SessionStore:
                     # Copy, don't move, so we keep old content as backup.
                     self._prev_path().write_bytes(self._path.read_bytes())
             tmp.replace(self._path)
+            self._last_payload = windows_key
         except Exception:
             return False
         finally:
@@ -161,3 +217,4 @@ class SessionStore:
             self._path.unlink(missing_ok=True)
         with contextlib.suppress(Exception):
             self._prev_path().unlink(missing_ok=True)
+        self._last_payload = None

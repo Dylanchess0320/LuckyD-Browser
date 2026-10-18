@@ -23,7 +23,8 @@ from browser_core.lifecycle import (
     next_state,
     should_protect,
 )
-from PySide6.QtCore import QPoint, QRect, Qt, QTimer
+from browser_core.session import effective_url
+from PySide6.QtCore import QPoint, QRect, Qt, QTimer, QUrl
 from PySide6.QtGui import QColor, QGuiApplication, QIcon, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
     QHBoxLayout,
@@ -164,7 +165,7 @@ class BrowserTabBar(QTabBar):
             return
         rect = self.tabRect(index)
         pos = self.mapToGlobal(QPoint(rect.left(), rect.bottom() + 6))
-        self._preview.show_for(view.title(), view.url().toString(), pos)
+        self._preview.show_for(view.title(), self._tabs.view_url(view), pos)
 
     def leaveEvent(self, event):  # noqa: N802 (Qt API)
         self._hover_timer.stop()
@@ -236,7 +237,7 @@ class BrowserTabWidget(QTabWidget):
 
         self._closed_stack: list[str] = []
         self._pinned: set[int] = set()  # id() of pinned WebViews
-        self._loading: set[int] = set()  # indexes currently loading
+        self._loading: set[int] = set()  # id() of views currently loading
         self._muted: set[int] = set()
         self._spin_angle = 0
         # Tab groups: gid -> {"name", "color", "collapsed"}; view id -> gid.
@@ -273,32 +274,45 @@ class BrowserTabWidget(QTabWidget):
 
     # ── lifecycle ────────────────────────────────────────────────────
 
-    def new_tab(self, url=None, make_current=True) -> WebView:
+    def new_tab(self, url=None, make_current=True, defer_load=False, title="") -> WebView:
         view = WebView(self._mw, self._mw.profile)
+        view._ld_pending_url = ""
+        view._ld_pending_title = ""
         index = self.addTab(view, "New Tab")
         self._wire(view)
+        if url is not None and defer_load and not make_current:
+            # Lazy restore: keep the URL/title without starting a renderer.
+            # _wake_view() performs the real load on first activation.
+            view._ld_pending_url = url.toString()
+            view._ld_pending_title = (title or "").strip()
+            self._retitle(view, view.title())
+        elif url is not None:
+            view.setUrl(url)
         if make_current:
             self.setCurrentIndex(index)
-        if url is not None:
-            view.setUrl(url)
         return view
+
+    def view_url(self, view) -> str:
+        """The tab's real URL — the pending URL while a deferred tab waits."""
+        if view is None:
+            return ""
+        return effective_url(getattr(view, "_ld_pending_url", ""), view.url().toString())
 
     def close_tab(self, index: int) -> None:
         view = self.widget(index)
         if view is not None:
-            url = view.url().toString()
+            url = self.view_url(view)
             if url.startswith(("http://", "https://", "file://")):
                 self._closed_stack.append(url)
                 self._closed_stack = self._closed_stack[-25:]
             self._pinned.discard(id(view))
             self._muted.discard(id(view))
+            self._loading.discard(id(view))
             self._tab_group.pop(id(view), None)
             self._idle_since.pop(id(view), None)
             with contextlib.suppress(Exception):
                 view._ld_sleep = None
-        self._loading.discard(index)
         self.removeTab(index)
-        self._loading = {i for i in self._loading if i < self.count()}
         # Groups with no members left dissolve.
         for dead in [g for g in self._groups if g not in self._tab_group.values()]:
             del self._groups[dead]
@@ -369,7 +383,7 @@ class BrowserTabWidget(QTabWidget):
         for i in range(self.count()):
             view = self.widget(i)
             if view is not None and id(view) in self._pinned:
-                url = view.url().toString()
+                url = self.view_url(view)
                 if url.startswith(("http://", "https://")):
                     urls.append(url)
         return urls
@@ -437,7 +451,7 @@ class BrowserTabWidget(QTabWidget):
             return
         mw = self._mw
         menu = QMenu(self)
-        menu.addAction("Duplicate Tab", lambda: mw.open_in_new_tab(view.url()))
+        menu.addAction("Duplicate Tab", lambda: mw.open_in_new_tab(QUrl(self.view_url(view))))
         pinned = self.is_pinned(index)
         menu.addAction("Unpin Tab" if pinned else "Pin Tab", lambda: self.toggle_pin(index))
         muted = id(view) in self._muted
@@ -462,7 +476,7 @@ class BrowserTabWidget(QTabWidget):
         menu.addAction("Reload Tab", view.reload)
         menu.addAction(
             "Copy Page URL",
-            lambda: QGuiApplication.clipboard().setText(view.url().toString()),
+            lambda: QGuiApplication.clipboard().setText(self.view_url(view)),
         )
         menu.addSeparator()
         menu.addAction("Close Other Tabs", lambda: self._close_others(index))
@@ -522,15 +536,19 @@ class BrowserTabWidget(QTabWidget):
     # ── loading spinner ──────────────────────────────────────────────
     def _tick_spinner(self) -> None:
         self._spin_angle = (self._spin_angle + _SPIN_DEG_PER_STEP) % 360
-        for index in list(self._loading):
-            if 0 <= index < self.count():
+        # _loading holds view ids: tab indexes shift on close/reorder, so
+        # resolve each spinner's tab fresh (and drop views that are gone).
+        for vid in list(self._loading):
+            index = next((i for i in range(self.count()) if id(self.widget(i)) == vid), -1)
+            if index >= 0:
                 self.setTabIcon(index, _spinner_icon(self._spin_angle))
+            else:
+                self._loading.discard(vid)
 
     def _start_loading(self, view: WebView) -> None:
-        index = self.indexOf(view)
-        if index < 0:
+        if self.indexOf(view) < 0:
             return
-        self._loading.add(index)
+        self._loading.add(id(view))
         if not self._spinner.isActive():
             self._spinner.start()
 
@@ -538,7 +556,7 @@ class BrowserTabWidget(QTabWidget):
         index = self.indexOf(view)
         if index < 0:
             return
-        self._loading.discard(index)
+        self._loading.discard(id(view))
         self.setTabIcon(index, view.icon())
         if not self._loading and self._spinner.isActive():
             self._spinner.stop()
@@ -582,7 +600,11 @@ class BrowserTabWidget(QTabWidget):
             elif id(view) in self._pinned:
                 self.setTabText(index, "")
             else:
-                short = (title or "").strip() or "New Tab"
+                short = (
+                    (title or "").strip()
+                    or (getattr(view, "_ld_pending_title", "") or "").strip()
+                    or "New Tab"
+                )
                 prefix = ""
                 try:
                     if view.page().recentlyAudible():
@@ -593,7 +615,7 @@ class BrowserTabWidget(QTabWidget):
                 if sleep in (FROZEN, DISCARDED) and not prefix:
                     prefix = "💤 "
                 self.setTabText(index, prefix + short[:40])
-            tip = title or ""
+            tip = title or (getattr(view, "_ld_pending_title", "") or "")
             if group:
                 tip = f"[{group['name']}] {tip}"
             self.setTabToolTip(index, tip)
@@ -633,8 +655,16 @@ class BrowserTabWidget(QTabWidget):
                 view.page().setVisible(view is current)
 
     def _wake_view(self, view: WebView) -> None:
-        """Bring a frozen/discarded tab back to Active."""
+        """Bring a frozen/discarded (or lazily restored) tab back to Active."""
         self._idle_since.pop(id(view), None)
+        pending = getattr(view, "_ld_pending_url", "")
+        if pending:
+            # First activation of a deferred restore tab: load it now.
+            view._ld_pending_url = ""
+            view._ld_sleep = None
+            with contextlib.suppress(Exception):
+                view.setUrl(QUrl(pending))
+            return
         view._ld_sleep = None
         page = view.page()
         with contextlib.suppress(Exception):
@@ -656,11 +686,13 @@ class BrowserTabWidget(QTabWidget):
             view = self.widget(i)
             if view is None:
                 continue
+            if getattr(view, "_ld_pending_url", ""):
+                continue  # never loaded — nothing to freeze or discard
             audible = False
             with contextlib.suppress(Exception):
                 audible = bool(view.page().recentlyAudible())
             if should_protect(
-                url=view.url().toString(),
+                url=self.view_url(view),
                 is_current=view is current,
                 pinned=self.is_pinned(i),
                 audible=audible,

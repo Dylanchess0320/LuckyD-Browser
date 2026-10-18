@@ -817,7 +817,7 @@ class QtBrowserBackend:
             view = win.tabs.current_view()
             return {
                 "tabs": win.tabs.count(),
-                "current_url": view.url().toString() if view else "",
+                "current_url": win.tabs.view_url(view) if view else "",
             }
 
         info = self._invoker.run(_do)
@@ -861,7 +861,7 @@ class QtBrowserBackend:
                 out.append(
                     {
                         "index": i,
-                        "url": view.url().toString() if view else "",
+                        "url": win.tabs.view_url(view) if view else "",
                         "title": win.tabs.tabText(i),
                         "active": i == win.tabs.currentIndex(),
                     }

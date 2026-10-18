@@ -188,21 +188,47 @@ class SettingsStore:
     def save(self) -> bool:
         """Persist settings atomically. Returns True on success; logs and
         returns False on failure instead of silently dropping the write."""
+        tmp = None
         try:
             self._path.parent.mkdir(parents=True, exist_ok=True)
-            tmp = self._path.with_suffix(".tmp")
+            # Unique tmp name per process: a second window/process saving at
+            # the same moment must not clobber this staging file (the final
+            # replace is last-writer-wins; a torn shared tmp is corruption).
+            tmp = self._path.with_name(
+                f"{self._path.name}.{os.getpid()}.{secrets.token_hex(4)}.tmp"
+            )
             tmp.write_text(json.dumps(self._data, indent=2), encoding="utf-8")
             # Atomic replace — power loss or AV lock can't leave a truncated file.
             tmp.replace(self._path)
         except Exception as exc:
             print(f"[settings] save failed for {self._path}: {exc}")
             return False
+        finally:
+            if tmp is not None:
+                with contextlib.suppress(Exception):
+                    tmp.unlink(missing_ok=True)
         return True
 
     def get(self, key: str, default=None):
         return self._data.get(key, default)
 
     def set(self, key: str, value) -> None:
+        # Skip the disk write when nothing changed — callers like per-site
+        # zoom memory re-assert the same value on ordinary navigations,
+        # and each save is a full-file write + atomic replace.
+        #
+        # get() hands out the live object, so a caller that mutated a dict or
+        # list in place and passes the SAME object back (ai_sidebar's model
+        # overrides) would always compare equal to itself — that case must
+        # still save. Skip only for immutable scalars or a distinct-but-equal
+        # container (e.g. zoom.remember() returns a fresh dict).
+        if key in self._data:
+            current = self._data[key]
+            if current == value and (
+                current is not value
+                or isinstance(value, (str, int, float, bool, bytes, type(None)))
+            ):
+                return
         self._data[key] = value
         self.save()
 

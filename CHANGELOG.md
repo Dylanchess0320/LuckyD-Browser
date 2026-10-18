@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [10.7.3] - 2026-10-17
+
+Lazy session restore, smoother terminal, stable tabs.
+
+### Performance
+- **Lazy session restore**: Restoring a saved session now loads only the active tab's page; every other tab is created deferred (URL, title, pinned state, and group intact, but no Chromium renderer) and loads on first click. Deferred tabs survive another restart unvisited — session snapshots, the closed-tab stack (Ctrl+Shift+T), duplicate/copy actions, vertical tabs, and the Control API tab list all report the pending URL via `BrowserTabWidget.view_url()`.
+- **Session-save coalescing**: The debounced autosave skips the disk write (and the `.prev` generation copy) when the snapshot is identical to the last one saved.
+- **Settings write coalescing**: `SettingsStore.set()` no longer rewrites `settings.json` for unchanged values, and saves stage through a per-process unique tmp file.
+- **WAL history database**: The history/bookmarks SQLite store now runs in WAL mode with `synchronous=NORMAL` and a 5s busy timeout, so per-page-load history writes stop fsync-stalling the GUI thread.
+- **Single startup settings load**: The browser entry point's CDP and video-decode flag passes share one `SettingsStore` instead of re-reading `settings.json` twice before Qt starts.
+- **Terminal mesh probing cached**: `mesh_shells_available()` caches its PATH probe for 5 seconds instead of re-scanning ~24 agent CLI executables on every terminal/mesh page render.
+- **Terminal output pump coalescing**: The PTY→WebSocket pump batches small writes for up to 8ms into single frames (still 8KB-sliced on send) and backs its idle poll off exponentially (10ms → 50ms cap). Buffered output is always flushed before the socket closes.
+
+### Fixed
+- **Tab loading spinners tracked the wrong tab**: Loading state was stored by tab index, so closing/reordering tabs mid-load shifted spinners onto innocent tabs. Now tracked by view identity.
+- **LuckyD Code probes fail soft without httpx**: `_ollama_reachable()` and `should_rotate_free_model()` crashed with `ModuleNotFoundError` when the optional `httpx` dependency was absent, taking down `lucky-code providers`. Both now return `False`.
+- **Stale PE version tuples**: `browser/version_info.txt` filevers/prodvers were stuck at (10, 7, 0, 0) through the 10.7.1/10.7.2 bumps while the string versions moved on; unified at the current release (assertions in `tests/test_security_40.py` aligned).
+
+
 ## [10.7.2] - 2026-10-12
 
 New AI providers: Meta Muse Wonder + Mistral AI with automatic API-key

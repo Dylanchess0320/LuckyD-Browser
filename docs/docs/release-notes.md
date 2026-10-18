@@ -1,5 +1,15 @@
 # LuckyD Browser — Release Notes
 
+## [10.7.3] — Lazy session restore, smoother terminal, stable tabs — 2026-10-17
+
+**[`LuckyDBrowserSetup-10.7.3.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.7.3/LuckyDBrowserSetup-10.7.3.exe)** — Windows 10/11 x64 · per-user install · no admin needed.
+**[`LuckyDBrowser-Portable-10.7.3.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.7.3/LuckyDBrowser-Portable-10.7.3.zip)** — unzip and run, for locked-down PCs.
+
+- **Lazy session restore** — restoring a saved session loads only the active tab's page; background tabs stay deferred without spawning Chromium renderers until clicked, while preserving URLs, titles, pin states, and tab groups across restarts.
+- **Faster storage & settings** — SQLite history/bookmarks now run in WAL mode (`synchronous=NORMAL`, 5s busy timeout), and session/settings writes coalesce unchanged snapshots to eliminate redundant disk I/O.
+- **Smoother terminal** — `mesh_shells_available()` caches PATH probes (5s TTL) and the PTY→WebSocket output pump batches small writes (8ms window) with exponential idle backoff.
+- **Fixes** — tab loading spinners now track by view identity instead of tab index, `lucky-code providers` fails soft when `httpx` is absent, and Windows PE version tuples in `version_info.txt` are unified at `10.7.3.0`.
+
 ## [10.6.1] — Google bot-detection auto-fallback — 2026-09-24
 
 **[`LuckyDBrowserSetup-10.6.1.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.6.1/LuckyDBrowserSetup-10.6.1.exe)** — Windows 10/11 x64 · per-user install · no admin needed.

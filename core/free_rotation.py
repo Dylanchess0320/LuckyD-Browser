@@ -160,7 +160,12 @@ def should_rotate_free_model(error: object) -> bool:
     # No code to inspect — timeouts and transport errors are worth a rotate.
     # (httpx.TimeoutException subclasses httpx.TransportError.)
     # Lazy: httpx costs ~0.7s to import; only needed when a call failed.
-    import httpx
+    # Fail soft when the optional dependency is absent (minimal installs):
+    # an unclassifiable error is not a rotation trigger.
+    try:
+        import httpx
+    except ImportError:
+        return False
 
     return isinstance(error, httpx.TransportError)
 
@@ -170,7 +175,10 @@ def _ollama_reachable() -> bool:
     ``core.providers.detect_provider`` performs — no new network surface)."""
     import os
 
-    import httpx  # lazy: only needed when actually probing Ollama
+    try:
+        import httpx  # lazy: only needed when actually probing Ollama
+    except ImportError:
+        return False  # optional dependency absent — treat as unreachable
 
     try:
         host = (os.environ.get("OLLAMA_HOST", "") or "http://127.0.0.1:11434").rstrip("/")

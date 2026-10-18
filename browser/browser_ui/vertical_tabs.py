@@ -80,17 +80,15 @@ class VerticalTabsDock(QDockWidget):
                 title = tabs.tabText(i) or view.title() or "New Tab"
                 item.setText(title)
                 icon = view.icon()
-                item.setIcon(
-                    letter_tile(view.url().toString(), 18) if icon.isNull() else QIcon(icon)
-                )
+                item.setIcon(letter_tile(tabs.view_url(view), 18) if icon.isNull() else QIcon(icon))
                 gid = tabs.group_of(i)
                 info = tabs.group_info(gid) if gid else None
                 if info is not None:
                     item.setForeground(QColor(info["color"]))
-                    item.setToolTip(f"[{info['name']}] {view.url().toString()}")
+                    item.setToolTip(f"[{info['name']}] {tabs.view_url(view)}")
                 else:
                     item.setForeground(QColor())  # theme default
-                    item.setToolTip(view.url().toString())
+                    item.setToolTip(tabs.view_url(view))
             self.list.setCurrentRow(tabs.currentIndex())
         finally:
             self._syncing = False

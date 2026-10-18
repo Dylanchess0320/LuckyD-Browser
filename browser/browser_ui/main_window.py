@@ -13,7 +13,7 @@ from pathlib import Path
 from browser_core import tts as _tts
 from browser_core.permissions import ALLOW, ASK, DENY, feature_key, feature_label, origin_of
 from browser_core.profile import incognito_profile
-from browser_core.session import tab_record, window_record
+from browser_core.session import plan_restore, tab_record, window_record
 
 # Kept importable: other modules (About dialog, selftest) import from
 # browser_core.updater, so the module stays — these two names are just no
@@ -888,10 +888,10 @@ class MainWindow(QMainWindow):
 
         def _work() -> None:
             try:
-                from browser_core.ai_bridge import AIBridge
+                from browser_core.ai_bridge import get_shared_bridge
                 from browser_core.extract import parse_json_loose
 
-                bridge = AIBridge()
+                bridge = get_shared_bridge()
                 system = (
                     "You organize browser tabs into topical groups. Reply with ONLY "
                     'JSON: {"groups": [{"name": "1-3 word label", "tabs": [<index>, ...]}]}. '
@@ -1524,8 +1524,8 @@ class MainWindow(QMainWindow):
             if view is None:
                 continue
             rec = tab_record(
-                view.url().toString(),
-                view.title(),
+                self.tabs.view_url(view),
+                view.title() or (getattr(view, "_ld_pending_title", "") or ""),
                 self.tabs.is_pinned(i),
                 group=self.tabs.group_of(i) or "",
             )
@@ -1540,42 +1540,71 @@ class MainWindow(QMainWindow):
         return window_record(records, current, groups=groups or None)
 
     def restore_session(self, window_data: dict, announce: bool = True) -> None:
-        """Reopen a saved window's tabs (pinned state + active index too)."""
+        """Reopen a saved window's tabs (pinned state + active index too).
+
+        Lazy since 10.7: only the active tab loads its page during restore.
+        Every other tab is created deferred (URL + title, no renderer) and
+        loads on first activation, so a big restored session starts fast.
+        """
         if self.incognito:
             return
-        records = [r for r in (window_data.get("tabs") or []) if isinstance(r, dict)]
-        urls = [r for r in records if r.get("url")]
-        if not urls:
+        raw_current = window_data.get("current", 0)
+        plan, current = plan_restore(
+            window_data.get("tabs") or [],
+            raw_current if isinstance(raw_current, int) else 0,
+        )
+        if not plan:
             return
         # Reuse the pristine initial tab for the first restored URL instead
         # of leaving a stray new-tab page in front of the restored ones.
         first = self.tabs.widget(0) if self.tabs.count() == 1 else None
         fresh_targets = {self._newtab_url().toString(), "about:blank", ""}
         start = 0
+        # The view created/reused for each plan entry. Plan positions are NOT
+        # tab indexes: existing tabs may precede them and pinning can reorder.
+        views: list = []
         if first is not None and first.url().toString() in fresh_targets:
-            first.setUrl(QUrl(urls[0]["url"]))
-            if urls[0].get("pinned"):
+            rec = plan[0]
+            if rec["load_now"]:
+                # Clear any pending URL left by an earlier lazy restore
+                # (workspace switch), or view_url()/wake would resurrect it.
+                first._ld_pending_url = ""
+                first._ld_pending_title = ""
+                first.setUrl(QUrl(rec["url"]))
+            else:
+                first._ld_pending_url = rec["url"]
+                first._ld_pending_title = (rec.get("title") or "").strip()
+                self.tabs._retitle(first, first.title())
+            if rec.get("pinned"):
                 self.tabs.toggle_pin(0)
+            views.append(first)
             start = 1
-        for rec in urls[start:]:
-            view = self.tabs.new_tab(QUrl(rec["url"]), make_current=False)
+        for rec in plan[start:]:
+            view = self.tabs.new_tab(
+                QUrl(rec["url"]),
+                make_current=False,
+                defer_load=not rec["load_now"],
+                title=rec.get("title") or "",
+            )
             if rec.get("pinned"):
                 self.tabs.toggle_pin(self.tabs.indexOf(view))
+            views.append(view)
         # Recreate tab groups (ids are remapped — they only need uniqueness).
         gid_map: dict[str, str] = {}
         for old_gid, info in (window_data.get("groups") or {}).items():
             gid_map[old_gid] = self.tabs.create_group(info.get("name", ""), info.get("color"))
-        for i, rec in enumerate(urls):
+        for view, rec in zip(views, plan, strict=False):
             old_gid = rec.get("group")
-            if old_gid and old_gid in gid_map and i < self.tabs.count():
-                self.tabs.set_tab_group(i, gid_map[old_gid])
+            index = self.tabs.indexOf(view)
+            if old_gid and old_gid in gid_map and index >= 0:
+                self.tabs.set_tab_group(index, gid_map[old_gid])
         for old_gid, info in (window_data.get("groups") or {}).items():
             if info.get("collapsed") and old_gid in gid_map:
                 self.tabs.toggle_group_collapsed(gid_map[old_gid])
-        current = int(window_data.get("current", 0) or 0)
-        if 0 <= current < self.tabs.count():
-            self.tabs.setCurrentIndex(current)
-        count = len(urls)
+        current_index = self.tabs.indexOf(views[current]) if current < len(views) else -1
+        if current_index >= 0:
+            self.tabs.setCurrentIndex(current_index)
+        count = len(plan)
         if announce:
             self.toast(f"Session restored — {count} tab{'s' if count != 1 else ''} back", "ok")
 

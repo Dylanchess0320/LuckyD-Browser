@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import os
 import sqlite3
 import sys
@@ -75,6 +76,14 @@ class Storage:
         db_path.parent.mkdir(parents=True, exist_ok=True)
         self.db_path = Path(db_path)
         self._conn = sqlite3.connect(str(db_path), check_same_thread=False)
+        # WAL + NORMAL sync: history is written on every page load from the
+        # GUI thread. The default rollback journal + FULL sync fsyncs per
+        # commit, which stalls navigation on slow/AV-scanned disks. WAL
+        # keeps durability for committed rows without the per-write fsync.
+        with contextlib.suppress(Exception):
+            self._conn.execute("PRAGMA journal_mode=WAL")
+            self._conn.execute("PRAGMA synchronous=NORMAL")
+            self._conn.execute("PRAGMA busy_timeout=5000")
         self._conn.executescript(_SCHEMA)
         self._conn.commit()
 
@@ -88,8 +97,10 @@ class Storage:
         self._conn.commit()
 
     def recent(self, limit: int = 500) -> list[tuple[str, str, float]]:
+        # id breaks visit_time ties: without the WAL-era fsync, back-to-back
+        # visits can share a timestamp on Windows' coarse clock.
         cur = self._conn.execute(
-            "SELECT url, title, visit_time FROM history ORDER BY visit_time DESC LIMIT ?",
+            "SELECT url, title, visit_time FROM history ORDER BY visit_time DESC, id DESC LIMIT ?",
             (limit,),
         )
         return cur.fetchall()
@@ -98,7 +109,7 @@ class Storage:
         like = f"%{query}%"
         cur = self._conn.execute(
             "SELECT url, title, visit_time FROM history "
-            "WHERE url LIKE ? OR title LIKE ? ORDER BY visit_time DESC LIMIT ?",
+            "WHERE url LIKE ? OR title LIKE ? ORDER BY visit_time DESC, id DESC LIMIT ?",
             (like, like, limit),
         )
         return cur.fetchall()

@@ -24,6 +24,7 @@ import os
 import subprocess
 import sys
 import threading
+import time
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
@@ -483,6 +484,24 @@ def _find_wsl_exe() -> str | None:
     return None
 
 
+# Availability probing walks PATH for ~24 executables (plus well-known
+# install dirs), and the terminal/mesh pages ask on every render — cache
+# the answer briefly so page loads stop paying for the rescan. 5s is short
+# enough that a just-installed agent CLI appears on the next page refresh.
+_AVAIL_TTL_SEC = 5.0
+_avail_cache: dict[str, bool] | None = None
+_avail_cache_at = 0.0
+_avail_lock = threading.Lock()
+
+
+def _reset_mesh_availability_cache() -> None:
+    """Drop the cached availability answer (tests, post-install refresh)."""
+    global _avail_cache, _avail_cache_at
+    with _avail_lock:
+        _avail_cache = None
+        _avail_cache_at = 0.0
+
+
 def mesh_shells_available() -> dict[str, bool]:
     """Which Agent Mesh shells can actually spawn right now (exe on PATH).
 
@@ -490,12 +509,39 @@ def mesh_shells_available() -> dict[str, bool]:
     possibly-broken distro). Whether `muse` exists INSIDE Ubuntu is checked
     at spawn time with a friendly install hint, so a broken/missing distro
     shows a helpful message instead of a dead pane or a hung page load.
+
+    The probe result is cached for a few seconds (see _AVAIL_TTL_SEC);
+    callers receive a copy they may freely mutate.
     """
+    global _avail_cache, _avail_cache_at
+    with _avail_lock:
+        if _avail_cache is not None and time.monotonic() - _avail_cache_at < _AVAIL_TTL_SEC:
+            return dict(_avail_cache)
     avail = {name: bool(_find_mesh_exe(exe)) for name, exe in MESH_SHELLS.items()}
     wsl_ok = bool(_find_wsl_exe())
     for shell in MESH_WSL_SHELLS:
         avail[shell] = wsl_ok
+    with _avail_lock:
+        _avail_cache = dict(avail)
+        _avail_cache_at = time.monotonic()
     return avail
+
+
+# ── PTY pump pacing ───────────────────────────────────────────────────
+# Output is coalesced for up to _FLUSH_AFTER_SEC (or _FLUSH_BYTES) so a
+# chatty TUI's hundreds of tiny writes become a handful of WebSocket
+# frames; the idle poll backs off exponentially so a quiet terminal
+# costs almost no wakeups.
+_FLUSH_BYTES = 16_384
+_FLUSH_AFTER_SEC = 0.008
+_POLL_BASE_SEC = 0.01
+_POLL_MAX_SEC = 0.05
+
+
+def poll_delay_seconds(idle_streak: int) -> float:
+    """Sleep between empty PTY reads: 10ms doubling to a 50ms cap."""
+    streak = min(max(int(idle_streak), 0), 3)
+    return min(_POLL_MAX_SEC, _POLL_BASE_SEC * (2**streak))
 
 
 def _wsl_muse_command() -> list[str]:
@@ -620,11 +666,11 @@ def _spawn_pty(
     if shell == "agent":
         env["LUCKYD_AGENT_SLOT"] = "1"
         env["LUCKYD_AGENT_NAME"] = "Agent 1"
-        env["LUCKYD_AGENT_VERSION"] = "v10.7.2"
+        env["LUCKYD_AGENT_VERSION"] = "v10.7.3"
     elif shell == "agent2":
         env["LUCKYD_AGENT_SLOT"] = "2"
         env["LUCKYD_AGENT_NAME"] = "Agent 2"
-        env["LUCKYD_AGENT_VERSION"] = "v10.7.2"
+        env["LUCKYD_AGENT_VERSION"] = "v10.7.3"
     # pywinpty's PTY.spawn() expects the environment as a NUL-joined block
     # string ("name=value\0name=value\0…"), NOT a dict — passing a dict
     # raises cffi's "argument env: 'dict' object is not an instance of str",
@@ -706,29 +752,69 @@ class TerminalServer:
         stop = threading.Event()
 
         def pump_out() -> None:
-            """PTY → WebSocket.
+            """PTY → WebSocket (coalesced; idle polls back off).
 
-            Chunked at 8KB: a single huge ws.send() can garble or drop data
-            the same way a single huge pty.write() did on the input side
-            (10.6.3 paste fix) — the shell reassembles the chunks.
+            Small writes batch for up to _FLUSH_AFTER_SEC so a chatty TUI
+            emits a handful of frames instead of hundreds; each frame is
+            still sliced at 8KB on send — a single huge ws.send() can
+            garble or drop data the same way a single huge pty.write()
+            did on the input side (10.6.3 paste fix).
             """
+            chunks: list[str] = []
+            buffered = 0
+            first_at: float | None = None
+            idle_streak = 0
+
+            def _flush() -> bool:
+                """Send buffered output; False when the client is gone."""
+                nonlocal buffered, first_at
+                if not chunks:
+                    return True
+                payload = "".join(chunks)
+                chunks.clear()
+                buffered = 0
+                first_at = None
+                try:
+                    # Slicing works for both str and bytes payloads.
+                    for i in range(0, len(payload), 8192):
+                        ws.send(payload[i : i + 8192])
+                except Exception:
+                    return False
+                return True
+
             try:
                 while not stop.is_set():
                     if not pty.isalive():
                         break
                     data = pty.read(blocking=False)
                     if data:
-                        try:
-                            # Slicing works for both str and bytes payloads.
-                            for i in range(0, len(data), 8192):
-                                ws.send(data[i : i + 8192])
-                        except Exception:
+                        idle_streak = 0
+                        if first_at is None:
+                            first_at = time.monotonic()
+                        chunks.append(data)
+                        buffered += len(data)
+                        if (
+                            buffered >= _FLUSH_BYTES
+                            or time.monotonic() - first_at >= _FLUSH_AFTER_SEC
+                        ) and not _flush():
+                            break
+                    elif chunks:
+                        # Output is pending: wait only out the rest of the
+                        # coalesce window, not the idle backoff — otherwise a
+                        # keystroke echo sits buffered for 20ms+.
+                        remaining = _FLUSH_AFTER_SEC - (time.monotonic() - (first_at or 0))
+                        if remaining > 0:
+                            stop.wait(remaining)
+                        elif not _flush():
                             break
                     else:
-                        stop.wait(0.01)
+                        stop.wait(poll_delay_seconds(idle_streak))
+                        idle_streak += 1
             except Exception:
                 pass
             finally:
+                with contextlib.suppress(Exception):
+                    _flush()  # never drop the child's final output
                 stop.set()
                 with contextlib.suppress(Exception):
                     ws.close()

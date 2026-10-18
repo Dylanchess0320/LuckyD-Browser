@@ -21,15 +21,58 @@ for path in (BASE.parent, BASE):
     sys.path.insert(0, entry)
 
 
+def _handle_cli_flags(argv: list[str]) -> None:
+    """Answer --version/--help without launching Qt (exits 0 when handled).
+
+    Runs before any Qt import so the flags stay fast and work headless.
+    From-source the version comes from the browser package; frozen builds
+    have no package context (and no console), so they report unknown.
+    """
+    from browser_core.startup import cli_action_from_argv, help_text, version_line
+
+    action = cli_action_from_argv(argv)
+    if action is None:
+        return
+    try:
+        from browser import __version__
+    except Exception:
+        __version__ = ""
+    if action == "version":
+        print(version_line(__version__), flush=True)
+    else:
+        print(help_text(__version__), flush=True)
+    raise SystemExit(0)
+
+
+# Guarded so `pytest -v` (or any importer) never trips the "-v" flag:
+# only a real launch answers CLI flags.
+if __name__ == "__main__":
+    _handle_cli_flags(sys.argv)
+
+
 # Expose Chrome DevTools Protocol on localhost only — the agent's CDP
 # driver + GPU-safe screenshots need it at engine startup (see
 # browser/README.md). Disable via Settings, or LUCKYD_CDP_DEBUG=0.
-def _apply_cdp_debugging() -> None:
+def _load_startup_settings():
+    """Load settings.json once for the pre-Qt flag passes (None on failure).
+
+    Each SettingsStore() re-reads the file (and may rewrite it to mint
+    first-run tokens), so sharing one instance halves that startup I/O.
+    """
+    try:
+        from browser_core.settings import SettingsStore
+
+        return SettingsStore()
+    except Exception:
+        return None
+
+
+def _apply_cdp_debugging(settings=None) -> None:
     """Set QTWEBENGINE_REMOTE_DEBUGGING unless the user disabled CDP."""
     try:
         from browser_core.settings import SettingsStore, cdp_debugging_endpoint
 
-        endpoint = cdp_debugging_endpoint(SettingsStore(), os.environ)
+        endpoint = cdp_debugging_endpoint(settings or SettingsStore(), os.environ)
         if endpoint:
             os.environ.setdefault("QTWEBENGINE_REMOTE_DEBUGGING", endpoint)
         else:
@@ -42,10 +85,11 @@ def _apply_cdp_debugging() -> None:
         pass  # a flag problem must never block startup
 
 
-_apply_cdp_debugging()
+_STARTUP_SETTINGS = _load_startup_settings()
+_apply_cdp_debugging(_STARTUP_SETTINGS)
 
 
-def _apply_video_decode_flags() -> None:
+def _apply_video_decode_flags(settings=None) -> None:
     """Force software video decode unless the user opted into GPU decode.
 
     Must run before any QtWebEngine import: Chromium reads
@@ -56,7 +100,8 @@ def _apply_video_decode_flags() -> None:
     try:
         from browser_core.settings import SettingsStore, webengine_chromium_flags
 
-        extra = webengine_chromium_flags(bool(SettingsStore().get("hw_video_decode", False)))
+        store = settings or SettingsStore()
+        extra = webengine_chromium_flags(bool(store.get("hw_video_decode", False)))
         if extra:
             prior = os.environ.get("QTWEBENGINE_CHROMIUM_FLAGS", "").strip()
             combined = (prior + " " + extra).strip()
@@ -69,7 +114,7 @@ def _apply_video_decode_flags() -> None:
         pass  # a flag problem must never block startup
 
 
-_apply_video_decode_flags()
+_apply_video_decode_flags(_STARTUP_SETTINGS)
 
 if getattr(sys, "frozen", False):
     # Packaged builds have no console — without this hook a startup exception
