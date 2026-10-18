@@ -82,17 +82,22 @@ def test_jules_shell_command_resolves(monkeypatch, tmp_path: Path) -> None:
 
 def test_jules_availability_reported(monkeypatch) -> None:
     """mesh_shells_available() reflects whether `jules` is on PATH."""
-    from browser.browser_core.terminal_server import mesh_shells_available
+    from browser.browser_core.terminal_server import (
+        _reset_mesh_availability_cache,
+        mesh_shells_available,
+    )
 
     monkeypatch.setattr(
         "browser.browser_core.terminal_server._find_mesh_exe",
         lambda exe: "/fake/jules" if exe == "jules" else None,
     )
+    _reset_mesh_availability_cache()
     avail = mesh_shells_available()
     assert avail["mesh-jules"] is True
     assert avail["jules"] is True
 
     monkeypatch.setattr("browser.browser_core.terminal_server._find_mesh_exe", lambda exe: None)
+    _reset_mesh_availability_cache()
     avail = mesh_shells_available()
     assert avail["mesh-jules"] is False
     assert avail["jules"] is False

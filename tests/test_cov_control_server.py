@@ -228,6 +228,17 @@ class _FakeTabs:
     def tabText(self, i):  # noqa: N802
         return f"Tab {i}"
 
+    def view_url(self, view):
+        """Mirror BrowserTabWidget.view_url: pending URL wins while deferred."""
+        if view is None:
+            return ""
+        pending = getattr(view, "_ld_pending_url", "")
+        if pending:
+            return pending
+        url = getattr(view, "url", lambda: None)()
+        to_string = getattr(url, "toString", None)
+        return to_string() if callable(to_string) else (url or "")
+
     def close_tab(self, i):
         self.closed.append(i)
         del self._views[i]
@@ -1097,6 +1108,12 @@ def test_status_reports_browser_state(monkeypatch):
     monkeypatch.setenv("QTWEBENGINE_REMOTE_DEBUGGING", "127.0.0.1:9222")
     be, _app, win, _view, _page = _qt_backend()
     win.tabs._views.append(_FakeView("https://b.com/"))
+
+    class _Down:
+        def __call__(self, *a, **k):
+            raise ConnectionError("no harness in unit tests")
+
+    monkeypatch.setattr("httpx.get", _Down())
     info = be.status()
     assert info["tabs"] == 2
     assert info["current_url"] == "https://example.com/"
@@ -1104,7 +1121,7 @@ def test_status_reports_browser_state(monkeypatch):
     assert info["version"] == API_VERSION
     assert info["cdp"] == "127.0.0.1:9222"
     assert info["ads_blocked"] == 7
-    assert info["harness"] is False  # nothing listens on :8000
+    assert info["harness"] is False  # probe mocked down — hermetic w/ live :8000
 
 
 def test_status_reports_cdp_disabled(monkeypatch):
@@ -1318,8 +1335,14 @@ def test_eval_js_passthrough():
     assert be.eval_js("document.title") == "ok"
 
 
-def test_screenshot_raises_when_cdp_unreachable():
+def test_screenshot_raises_when_cdp_unreachable(monkeypatch):
     be, *_ = _qt_backend()
+
+    class _Down:
+        def __call__(self, *a, **k):
+            raise ConnectionError("no CDP in unit tests")
+
+    monkeypatch.setattr("httpx.get", _Down())
     with pytest.raises(RuntimeError, match="CDP endpoint unreachable"):
         be.screenshot("")
 
