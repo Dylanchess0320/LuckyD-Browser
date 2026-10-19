@@ -14,16 +14,28 @@ echo  the top-level dist\ folder, so this script builds browser\dist.
 echo =================================================================
 echo.
 
-REM -- Step 1: Close any running LuckyD Browser so its files aren't locked --
-echo [1/4] Closing LuckyD Browser if it's running...
-taskkill /IM LuckyDBrowser.exe /F >nul 2>&1
-if !errorlevel! == 0 (
-    echo       Closed a running instance.
-) else (
-    echo       Not currently running - nothing to close.
-)
-REM Give Windows a moment to release file handles.
-timeout /t 2 /nobreak >nul
+REM -- Gentle pre-build: ask a running browser to exit cleanly, never force-kill.
+REM PyInstaller fails on locked files if the old exe is still running. We send
+REM WM_CLOSE via PowerShell (lets Qt save session + release handles), wait up
+REM to 60s, and only then build. If it is still running we SKIP -- never kill.
+powershell -NoProfile -ExecutionPolicy RemoteSigned -Command "$p = Get-Process -Name LuckyDBrowser -ErrorAction SilentlyContinue; if ($p) { $p.CloseMainWindow() | Out-Null }" >nul 2>&1
+set /a WAITCOUNT=0
+:waitloop
+tasklist /FI "IMAGENAME eq LuckyDBrowser.exe" 2>nul | find /I "LuckyDBrowser.exe" >nul
+if errorlevel 1 goto notrunning
+timeout /t 5 /nobreak >nul
+set /a WAITCOUNT+=1
+if %WAITCOUNT% GEQ 12 goto stillrunning
+goto waitloop
+:stillrunning
+echo.
+echo NOTE: LuckyD Browser is still running. Close it once (Alt+F4 is fine),
+echo then re-run this script -- the build will continue cleanly.
+echo Refusing to force-kill a running browser (crash-safe mode).
+pause
+exit /b 2
+:notrunning
+echo       Browser is closed - safe to build.
 echo.
 
 REM -- Step 2: Find Python (prefer project venv, then Python 3.10-3.12) --

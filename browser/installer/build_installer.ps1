@@ -39,10 +39,13 @@ function Write-Step($msg) { Write-Host '' ; Write-Host "== $msg ==" -ForegroundC
 function Write-Ok($msg)   { Write-Host "  OK: $msg" -ForegroundColor Green }
 
 # Rebuild one repo-root backend exe from its spec and refresh the repo-root
-# copy that LuckyDBrowser.spec bundles. Kills any process by that name first
-# (it may still be running, spawned earlier by harness_bridge.py or
-# terminal_server.py, and holding its own exe file open) and retries the
-# overwrite briefly in case the OS hasn't released the handle yet.
+# copy that LuckyDBrowser.spec bundles. Crash-safe mode: NEVER force-kill.
+# A backend exe may still be running (spawned by harness_bridge.py or
+# terminal_server.py, holding its own exe file open). We build the fresh exe
+# into dist\ first (always safe), then try the repo-root refresh copy with
+# retries; if the old copy is locked, we close the browser gently
+# (CloseMainWindow lets Qt save session + release child handles), wait, and
+# retry. If it is STILL locked we stop with a clear message -- never kill.
 function Rebuild-BackendExe([string]$SpecFile, [string]$ExeName) {
     Push-Location $repoRoot
     try {
@@ -54,10 +57,6 @@ function Rebuild-BackendExe([string]$SpecFile, [string]$ExeName) {
 
     $fresh = Join-Path $repoRoot "dist\$ExeName"
     if (-not (Test-Path $fresh)) { throw "Build output missing: $fresh" }
-
-    $procName = [System.IO.Path]::GetFileNameWithoutExtension($ExeName)
-    Get-Process -Name $procName -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-    Start-Sleep -Milliseconds 500
 
     $dest = Join-Path $repoRoot $ExeName
     $copied = $false
@@ -71,7 +70,18 @@ function Rebuild-BackendExe([string]$SpecFile, [string]$ExeName) {
         }
     }
     if (-not $copied) {
-        throw "Could not overwrite $ExeName -- it's still locked by a running process. Close it manually (check Task Manager for $ExeName) and re-run."
+        Write-Host "  Old $ExeName is locked by a running browser -- asking it to close gently..." -ForegroundColor Yellow
+        Get-Process -Name 'LuckyDBrowser' -ErrorAction SilentlyContinue | ForEach-Object { $_.CloseMainWindow() | Out-Null }
+        for ($w = 0; $w -lt 12 -and -not $copied; $w++) {
+            Start-Sleep -Seconds 5
+            try {
+                Copy-Item $fresh -Destination $dest -Force
+                $copied = $true
+            } catch { }
+        }
+    }
+    if (-not $copied) {
+        throw "Could not overwrite $ExeName -- it's still locked by a running process. Close LuckyD Browser once (Alt+F4 is fine) and re-run. Refusing to force-kill (crash-safe mode)."
     }
     Write-Ok "$ExeName rebuilt and refreshed at repo root ($('{0:N1}' -f ((Get-Item $fresh).Length / 1MB)) MB)"
 }
