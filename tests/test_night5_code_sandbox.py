@@ -381,6 +381,18 @@ def test_remove_tree_best_effort(tmp_path):
     _remove_tree(str(tmp_path / "never-existed"))  # must not raise
 
 
+def _assertion_for(skeleton: str, func: str) -> str:
+    """The generated assertion line (stripped) inside ``test_<func>``."""
+    lines = skeleton.splitlines()
+    i = lines.index(f"def test_{func}():")
+    for line in lines[i + 1 :]:
+        if line.strip().startswith("assert "):
+            return line.strip()
+        if line.startswith("def "):
+            break
+    raise AssertionError(f"no assertion generated for {func}")
+
+
 def test_generate_tests_assertions(sandbox):
     code = """
 def test_bool() -> bool:
@@ -388,6 +400,9 @@ def test_bool() -> bool:
 
 def test_int() -> int:
     return 1
+
+def test_float() -> float:
+    return 1.5
 
 def test_str() -> str:
     return "a"
@@ -400,12 +415,6 @@ def test_dict() -> dict[str, int]:
 
 def test_set() -> set[str]:
     return {"a"}
-
-def test_set_list() -> set[list]:
-    return set()
-
-def test_set_dict() -> set[dict[str, int]]:
-    return set()
 
 def test_tuple() -> tuple[int, int]:
     return (1, 2)
@@ -430,40 +439,33 @@ def test_attr() -> models.User:
 """
     skeleton = sandbox.generate_tests(code)
 
-    assert "def test_test_bool():" in skeleton
-    assert "assert isinstance(result, bool)" in skeleton
-
-    assert "def test_test_int():" in skeleton
-    assert "assert isinstance(result, int)  # TODO: real assertion" in skeleton
-
-    assert "def test_test_str():" in skeleton
-    assert "assert isinstance(result, str)" in skeleton
-
-    assert "def test_test_list():" in skeleton
-    assert "assert isinstance(result, list) and all(isinstance(x, int) for x in result)" in skeleton
-
-    assert "def test_test_dict():" in skeleton
+    assert _assertion_for(skeleton, "test_bool") == "assert isinstance(result, bool)"
+    assert _assertion_for(skeleton, "test_int") == "assert isinstance(result, int)"
+    assert _assertion_for(skeleton, "test_float") == "assert isinstance(result, (int, float))"
+    assert _assertion_for(skeleton, "test_str") == "assert isinstance(result, str)"
     assert (
-        "assert isinstance(result, dict) and all(isinstance(k, str) and isinstance(v, int) for k, v in result.items())  # TODO: real assertion"
-        in skeleton
+        _assertion_for(skeleton, "test_list")
+        == "assert isinstance(result, list) and all(isinstance(x, int) for x in result)"
     )
-
-    assert "def test_test_set():" in skeleton
-    assert "assert isinstance(result, set)" in skeleton
-
-    assert "def test_test_tuple():" in skeleton
+    assert _assertion_for(skeleton, "test_dict") == (
+        "assert isinstance(result, dict) and all(isinstance(k, str) and isinstance(v, int) "
+        "for k, v in result.items())"
+    )
     assert (
-        "assert isinstance(result, tuple) and len(result) == 2  # TODO: real assertion" in skeleton
+        _assertion_for(skeleton, "test_set")
+        == "assert isinstance(result, set) and all(isinstance(x, str) for x in result)"
     )
-
-    assert "def test_test_none():" in skeleton
-    assert "assert result is None" in skeleton
-
-    assert "def test_test_bytes():" in skeleton
-    assert "assert isinstance(result, bytes)" in skeleton
-
-    assert "def test_test_unannotated():" in skeleton
-    assert "assert result == 0  # TODO: real assertion" in skeleton
+    assert _assertion_for(skeleton, "test_tuple") == (
+        "assert isinstance(result, tuple) and len(result) == 2 "
+        "and isinstance(result[0], int) and isinstance(result[1], int)"
+    )
+    assert _assertion_for(skeleton, "test_none") == "assert result is None"
+    assert _assertion_for(skeleton, "test_bytes") == "assert isinstance(result, bytes)"
+    assert _assertion_for(skeleton, "test_unannotated") == "assert isinstance(result, int)"
+    assert _assertion_for(skeleton, "test_custom") == "assert isinstance(result, MyClass)"
+    assert _assertion_for(skeleton, "test_generic") == "assert isinstance(result, MyGeneric)"
+    assert _assertion_for(skeleton, "test_attr") == "assert isinstance(result, models.User)"
+    assert "TODO" not in skeleton
 
 
 def test_infer_assertion_generic_dict(sandbox):
@@ -482,36 +484,98 @@ def test_dict_any_any() -> dict[Any, Any]:
 
 def test_dict_bare() -> dict:
     return {"a": 1}
+
+def test_dict_typing() -> Dict[str, List[int]]:
+    return {"a": [1]}
 """
     skeleton = sandbox.generate_tests(code)
 
-    assert "def test_test_dict_both():" in skeleton
-    assert (
-        "assert isinstance(result, dict) and all(isinstance(k, str) and isinstance(v, int) for k, v in result.items())  # TODO: real assertion"
-        in skeleton
+    assert _assertion_for(skeleton, "test_dict_both") == (
+        "assert isinstance(result, dict) and all(isinstance(k, str) and isinstance(v, int) "
+        "for k, v in result.items())"
+    )
+    assert _assertion_for(skeleton, "test_dict_key_only") == (
+        "assert isinstance(result, dict) and all(isinstance(k, str) for k in result.keys())"
+    )
+    assert _assertion_for(skeleton, "test_dict_val_only") == (
+        "assert isinstance(result, dict) and all(isinstance(v, list) for v in result.values())"
+    )
+    assert _assertion_for(skeleton, "test_dict_any_any") == "assert isinstance(result, dict)"
+    assert _assertion_for(skeleton, "test_dict_bare") == "assert isinstance(result, dict)"
+    assert _assertion_for(skeleton, "test_dict_typing") == (
+        "assert isinstance(result, dict) and all(isinstance(k, str) and isinstance(v, list) "
+        "and all(isinstance(x1, int) for x1 in v) for k, v in result.items())"
     )
 
-    assert "def test_test_dict_key_only():" in skeleton
+
+def test_infer_assertion_unions_and_specials(sandbox):
+    code = """
+def test_optional() -> Optional[int]:
+    return None
+
+def test_pep604() -> int | str | None:
+    return "x"
+
+def test_union_compound() -> Union[list[int], str]:
+    return "x"
+
+def test_literal() -> Literal["a", "b"]:
+    return "a"
+
+def test_literal_one() -> Literal[3]:
+    return 3
+
+def test_forward_ref() -> "MyClass":
+    return MyClass()
+
+def test_callable() -> Callable[[int], int]:
+    return abs
+
+def test_varlen_tuple() -> tuple[int, ...]:
+    return (1, 2)
+
+def test_empty_tuple() -> tuple[()]:
+    return ()
+
+def test_any() -> Any:
+    return 1
+
+def test_typevar() -> T:
+    return 1
+
+def test_optional_any() -> Optional[Any]:
+    return None
+"""
+    skeleton = sandbox.generate_tests(code)
+
     assert (
-        "assert isinstance(result, dict) and all(isinstance(k, str) for k in result.keys())  # TODO: real assertion"
-        in skeleton
+        _assertion_for(skeleton, "test_optional")
+        == "assert result is None or isinstance(result, int)"
     )
-
-    assert "def test_test_dict_val_only():" in skeleton
     assert (
-        "assert isinstance(result, dict) and all(isinstance(v, list) for v in result.values())  # TODO: real assertion"
-        in skeleton
+        _assertion_for(skeleton, "test_pep604")
+        == "assert result is None or isinstance(result, (int, str))"
     )
-
-    assert "def test_test_dict_any_any():" in skeleton
-    assert "assert isinstance(result, dict)  # TODO: real assertion" in skeleton
-
-    assert "def test_test_dict_bare():" in skeleton
-    assert "assert isinstance(result, dict)" in skeleton
+    assert _assertion_for(skeleton, "test_union_compound") == (
+        "assert isinstance(result, str) or "
+        "(isinstance(result, list) and all(isinstance(x, int) for x in result))"
+    )
+    assert _assertion_for(skeleton, "test_literal") == "assert result in ('a', 'b')"
+    assert _assertion_for(skeleton, "test_literal_one") == "assert result == 3"
+    assert _assertion_for(skeleton, "test_forward_ref") == "assert isinstance(result, MyClass)"
+    assert _assertion_for(skeleton, "test_callable") == "assert callable(result)"
+    assert _assertion_for(skeleton, "test_varlen_tuple") == (
+        "assert isinstance(result, tuple) and all(isinstance(x, int) for x in result)"
+    )
+    assert _assertion_for(skeleton, "test_empty_tuple") == "assert result == ()"
+    for name in ("test_any", "test_typevar", "test_optional_any"):
+        assert (
+            _assertion_for(skeleton, name) == "assert result is not None  # TODO: real assertion"
+        )
 
 
 def test_infer_assertion_from_body(sandbox):
-    """Unannotated functions: infer assertion from return statements."""
+    """Unannotated functions: infer assertion from their own return statements."""
     code = """
 def test_int():
     return 1
@@ -521,17 +585,64 @@ def test_list():
 
 def test_none():
     return None
+
+def test_no_return():
+    pass
+
+def test_bool_compare(a, b):
+    return a > b
+
+def test_builtin_call(x):
+    return len(x)
+
+def test_mixed(flag):
+    if flag:
+        return True
+    return "no"
+
+def test_fall_through(flag):
+    if flag:
+        return 1
+
+def test_try_both_paths():
+    try:
+        return 1
+    except Exception:
+        return 2
+
+def test_opaque(x):
+    return x
+
+def test_nested_scope_ignored():
+    def inner():
+        return "nested"
+    return [1]
+
+def test_generator():
+    yield 1
 """
     skeleton = sandbox.generate_tests(code)
 
-    assert "def test_test_int():" in skeleton
-    assert "assert result == 0  # TODO: real assertion" in skeleton
-
-    assert "def test_test_list():" in skeleton
-    assert "assert result == []  # TODO: real assertion" in skeleton
-
-    assert "def test_test_none():" in skeleton
-    assert "assert result is None  # TODO: real assertion" in skeleton
+    assert _assertion_for(skeleton, "test_int") == "assert isinstance(result, int)"
+    assert _assertion_for(skeleton, "test_list") == "assert isinstance(result, list)"
+    assert _assertion_for(skeleton, "test_none") == "assert result is None"
+    assert _assertion_for(skeleton, "test_no_return") == "assert result is None"
+    assert _assertion_for(skeleton, "test_bool_compare") == "assert isinstance(result, bool)"
+    assert _assertion_for(skeleton, "test_builtin_call") == "assert isinstance(result, int)"
+    assert _assertion_for(skeleton, "test_mixed") == "assert isinstance(result, (bool, str))"
+    assert (
+        _assertion_for(skeleton, "test_fall_through")
+        == "assert result is None or isinstance(result, int)"
+    )
+    assert _assertion_for(skeleton, "test_try_both_paths") == "assert isinstance(result, int)"
+    assert (
+        _assertion_for(skeleton, "test_opaque")
+        == "assert result is not None  # TODO: real assertion"
+    )
+    assert (
+        _assertion_for(skeleton, "test_nested_scope_ignored") == "assert isinstance(result, list)"
+    )
+    assert _assertion_for(skeleton, "test_generator") == 'assert hasattr(result, "__next__")'
 
 
 def test_infer_assertion_custom_types(sandbox):
@@ -548,11 +659,121 @@ def test_attr() -> models.User:
 """
     skeleton = sandbox.generate_tests(code)
 
-    assert "def test_test_custom():" in skeleton
-    assert "assert isinstance(result, MyClass)  # TODO: real assertion" in skeleton
+    assert _assertion_for(skeleton, "test_custom") == "assert isinstance(result, MyClass)"
+    assert _assertion_for(skeleton, "test_generic") == "assert isinstance(result, MyGeneric)"
+    assert _assertion_for(skeleton, "test_attr") == "assert isinstance(result, models.User)"
 
-    assert "def test_test_generic():" in skeleton
-    assert "assert isinstance(result, MyGeneric)  # TODO: real assertion" in skeleton
 
-    assert "def test_test_attr():" in skeleton
-    assert "assert isinstance(result, models.User)  # TODO: real assertion" in skeleton
+def test_generate_tests_async_functions(sandbox):
+    code = """
+async def fetch() -> int:
+    return 1
+
+async def stream():
+    yield 1
+
+def plain() -> int:
+    return 1
+"""
+    skeleton = sandbox.generate_tests(code)
+
+    assert "import asyncio" in skeleton
+    assert "    result = asyncio.run(fetch())" in skeleton
+    assert _assertion_for(skeleton, "fetch") == "assert isinstance(result, int)"
+    assert "    result = stream()" in skeleton
+    assert _assertion_for(skeleton, "stream") == 'assert hasattr(result, "__anext__")'
+    assert "    result = plain()" in skeleton
+
+
+def test_generate_tests_no_asyncio_import_without_coroutines(sandbox):
+    skeleton = sandbox.generate_tests("def f() -> int:\n    return 1\n")
+    assert "import asyncio" not in skeleton
+
+
+def test_generated_assertions_pass_against_real_implementations(sandbox):
+    """Every generated assertion is valid Python and holds for a correct implementation."""
+    import asyncio
+
+    code = """
+from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Union
+
+
+class MyClass:
+    pass
+
+
+def t_bool() -> bool:
+    return False
+
+def t_float() -> float:
+    return 3
+
+def t_list() -> list[int]:
+    return [1, 2]
+
+def t_nested() -> list[dict[str, list[int]]]:
+    return [{"a": [1, 2]}, {}]
+
+def t_dict_typing() -> Dict[str, Optional[int]]:
+    return {"a": None, "b": 2}
+
+def t_tuple() -> tuple[int, str]:
+    return (1, "a")
+
+def t_tuple_typing() -> Tuple[int, ...]:
+    return ()
+
+def t_optional() -> Optional[int]:
+    return None
+
+def t_union() -> Union[List[int], str]:
+    return [3]
+
+def t_pep604() -> int | None:
+    return 0
+
+def t_literal() -> Literal["a", "b"]:
+    return "b"
+
+def t_callable() -> Callable[[int], int]:
+    return abs
+
+def t_custom() -> MyClass:
+    return MyClass()
+
+def t_forward() -> "MyClass":
+    return MyClass()
+
+def t_body_mixed(flag=False):
+    if flag:
+        return 1
+    return "x"
+
+def t_body_fall_through(flag=False):
+    if flag:
+        return [1]
+
+def t_generator():
+    yield 1
+
+async def t_async() -> dict[str, int]:
+    return {"a": 1}
+
+async def t_async_gen():
+    yield 1
+"""
+    namespace: dict = {}
+    exec(compile(code, "<impl>", "exec"), namespace)
+    namespace["asyncio"] = asyncio
+
+    skeleton = sandbox.generate_tests(code)
+    lines = [line.strip() for line in skeleton.splitlines()]
+    pairs = [
+        (lines[i], lines[i + 2])
+        for i in range(len(lines) - 2)
+        if lines[i].startswith("result = ") and lines[i + 2].startswith("assert ")
+    ]
+    assert len(pairs) == 19
+    for act, assertion in pairs:
+        exec(f"{act}\n{assertion}", namespace)
+

@@ -323,128 +323,17 @@ class CodeExecutionSandbox:
         issues.sort(key=lambda i: i.line)
         return issues
 
-    def _infer_assertion(self, returns_node: ast.expr | None, body: list[ast.stmt]) -> str:
-        """Infer a more realistic assertion based on the AST returns node."""
-        if not returns_node:
-            return_types = set()
-            has_return = False
-            for stmt in body:
-                for node in ast.walk(stmt):
-                    if isinstance(node, ast.Return):
-                        has_return = True
-                        if node.value is None:
-                            return_types.add("NoneType")
-                        elif isinstance(node.value, ast.Constant):
-                            if node.value.value is None:
-                                return_types.add("NoneType")
-                            else:
-                                return_types.add(type(node.value.value).__name__)
-                        elif isinstance(node.value, (ast.List, ast.ListComp)):
-                            return_types.add("list")
-                        elif isinstance(node.value, (ast.Dict, ast.DictComp)):
-                            return_types.add("dict")
-                        elif isinstance(node.value, (ast.Set, ast.SetComp)):
-                            return_types.add("set")
-                        elif isinstance(node.value, ast.Tuple):
-                            return_types.add("tuple")
-                        elif isinstance(node.value, ast.JoinedStr):
-                            return_types.add("str")
+    def _infer_assertion(
+        self, returns_node: ast.expr | None, body: list[ast.stmt], *, is_async: bool = False
+    ) -> str:
+        """Infer a runtime type-check assertion from the return annotation or body.
 
-            if not has_return:
-                return "assert result is None  # TODO: real assertion"
-
-            if len(return_types) == 1:
-                ret_type = return_types.pop()
-                if ret_type == "bool":
-                    return "assert result is True  # TODO: real assertion"
-                elif ret_type in ("int", "float"):
-                    return "assert result == 0  # TODO: real assertion"
-                elif ret_type == "str":
-                    return 'assert result == ""  # TODO: real assertion'
-                elif ret_type == "list":
-                    return "assert result == []  # TODO: real assertion"
-                elif ret_type == "dict":
-                    return "assert result == {}  # TODO: real assertion"
-                elif ret_type == "set":
-                    return "assert result == set()  # TODO: real assertion"
-                elif ret_type == "tuple":
-                    return "assert result == ()  # TODO: real assertion"
-                elif ret_type == "bytes":
-                    return "assert result == b''  # TODO: real assertion"
-                elif ret_type == "NoneType":
-                    return "assert result is None  # TODO: real assertion"
-
-            return "assert result is not None  # TODO: real assertion"
-        if isinstance(returns_node, ast.Name):
-            if returns_node.id == "bool":
-                return "assert isinstance(result, bool)"
-            elif returns_node.id in ("int", "float"):
-                return f"assert isinstance(result, {returns_node.id})  # TODO: real assertion"
-            elif returns_node.id == "str":
-                return "assert isinstance(result, str)"
-            elif returns_node.id == "list":
-                return "assert isinstance(result, list)  # TODO: real assertion"
-            elif returns_node.id == "dict":
-                return "assert isinstance(result, dict)"
-            elif returns_node.id == "set":
-                return "assert isinstance(result, set)"
-            elif returns_node.id == "tuple":
-                return "assert isinstance(result, tuple)  # TODO: real assertion"
-            elif returns_node.id == "bytes":
-                return "assert isinstance(result, bytes)"
-        elif isinstance(returns_node, ast.Constant):
-            if returns_node.value is None:
-                return "assert result is None"
-        elif isinstance(returns_node, ast.Subscript) and isinstance(returns_node.value, ast.Name):
-            if returns_node.value.id == "list":
-                if isinstance(returns_node.slice, ast.Name):
-                    return f"assert isinstance(result, list) and all(isinstance(x, {returns_node.slice.id}) for x in result)"
-                return "assert isinstance(result, list)"
-            elif returns_node.value.id == "dict":
-                if isinstance(returns_node.slice, ast.Tuple) and len(returns_node.slice.elts) == 2:
-                    k_node = returns_node.slice.elts[0]
-                    v_node = returns_node.slice.elts[1]
-
-                    k_type = k_node.id if isinstance(k_node, ast.Name) else None
-                    v_type = v_node.id if isinstance(v_node, ast.Name) else None
-
-                    if k_type and v_type and "Any" not in (k_type, v_type):
-                        return f"assert isinstance(result, dict) and all(isinstance(k, {k_type}) and isinstance(v, {v_type}) for k, v in result.items())  # TODO: real assertion"
-                    elif k_type and k_type != "Any":
-                        return f"assert isinstance(result, dict) and all(isinstance(k, {k_type}) for k in result.keys())  # TODO: real assertion"
-                    elif v_type and v_type != "Any":
-                        return f"assert isinstance(result, dict) and all(isinstance(v, {v_type}) for v in result.values())  # TODO: real assertion"
-
-                return "assert isinstance(result, dict)  # TODO: real assertion"
-            elif returns_node.value.id == "set":
-                return "assert isinstance(result, set)"
-            elif returns_node.value.id == "tuple":
-                if isinstance(returns_node.slice, ast.Tuple):
-                    if not returns_node.slice.elts:
-                        return "assert result == ()  # TODO: real assertion"
-                    if (
-                        len(returns_node.slice.elts) == 2
-                        and isinstance(returns_node.slice.elts[1], ast.Constant)
-                        and returns_node.slice.elts[1].value == Ellipsis
-                    ):
-                        return "assert isinstance(result, tuple)  # TODO: real assertion"
-                    length = len(returns_node.slice.elts)
-                    return f"assert isinstance(result, tuple) and len(result) == {length}  # TODO: real assertion"
-                elif isinstance(returns_node.slice, (ast.Name, ast.Subscript)):
-                    return "assert isinstance(result, tuple) and len(result) == 1  # TODO: real assertion"
-                return "assert isinstance(result, tuple)  # TODO: real assertion"
-
-        try:
-            base_node = returns_node
-            if isinstance(base_node, ast.Subscript):
-                base_node = base_node.value
-            if isinstance(base_node, (ast.Name, ast.Attribute)):
-                base_name = ast.unparse(base_node)
-                return f"assert isinstance(result, {base_name})  # TODO: real assertion"
-        except Exception:
-            pass
-
-        return "assert result is not None  # TODO: real assertion"
+        See the module-level ``infer_assertion`` helpers: annotations are
+        checked recursively (generics, unions, Optional, Literal, tuples);
+        unannotated functions are inferred from their own ``return``
+        statements. Unknown shapes fall back to a ``# TODO`` placeholder.
+        """
+        return infer_assertion(returns_node, body, is_async=is_async)
 
     def generate_tests(self, code: str) -> str:
         """Generate a pytest skeleton with one stub test per top-level function."""
@@ -458,9 +347,17 @@ class CodeExecutionSandbox:
             for n in tree.body
             if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and not n.name.startswith("_")
         ]
+        # Coroutine functions are awaited via asyncio.run so the assertion sees
+        # the declared return value; async generators are iterated, not awaited.
+        awaited = {
+            fn.name
+            for fn in funcs
+            if isinstance(fn, ast.AsyncFunctionDef) and not _is_generator(fn.body)
+        }
         lines = [
             '"""Auto-generated test skeleton. Fill in the assertions."""',
             "",
+            *(["import asyncio", ""] if awaited else []),
             "import pytest",
             "",
             "# from your_module import " + ", ".join(f.name for f in funcs) if funcs else "",
@@ -469,6 +366,12 @@ class CodeExecutionSandbox:
         for fn in funcs:
             args = ", ".join(a.arg for a in fn.args.args)
             call_args = ", ".join(f"{a.arg}=..." for a in fn.args.args)
+            call = f"{fn.name}({call_args})"
+            if fn.name in awaited:
+                call = f"asyncio.run({call})"
+            assertion = self._infer_assertion(
+                fn.returns, fn.body, is_async=isinstance(fn, ast.AsyncFunctionDef)
+            )
             lines += [
                 "",
                 f"def test_{fn.name}():",
@@ -476,9 +379,9 @@ class CodeExecutionSandbox:
                 "    # Arrange",
                 "    # ...",
                 "    # Act",
-                f"    result = {fn.name}({call_args})" if args else f"    result = {fn.name}()",
+                f"    result = {call}",
                 "    # Assert",
-                f"    {self._infer_assertion(fn.returns, fn.body)}",
+                f"    {assertion}",
                 "",
             ]
         if not funcs:
@@ -787,6 +690,325 @@ def _call_name(func: ast.expr) -> str | None:
             parts.append(node.id)
             return ".".join(reversed(parts))
     return None
+
+
+# ── Test-skeleton assertion inference ──────────────────────────────────
+#
+# generate_tests() emits one ``assert`` per function. These helpers turn a
+# return annotation (or, when unannotated, the function's own ``return``
+# statements) into a runtime type check that a correct implementation
+# passes. Anything that can't be expressed falls back to
+# ``assert result is not None  # TODO: real assertion``.
+
+_FALLBACK_ASSERTION = "assert result is not None  # TODO: real assertion"
+
+# Builtins that are valid isinstance() targets.
+_BUILTIN_TYPES = frozenset(
+    {
+        "bool",
+        "int",
+        "str",
+        "bytes",
+        "bytearray",
+        "complex",
+        "list",
+        "dict",
+        "set",
+        "frozenset",
+        "tuple",
+        "type",
+        "range",
+        "memoryview",
+    }
+)
+# Old ``typing`` spellings of builtin containers.
+_TYPING_ALIASES = {
+    "List": "list",
+    "Dict": "dict",
+    "Set": "set",
+    "FrozenSet": "frozenset",
+    "Tuple": "tuple",
+    "Type": "type",
+    "Text": "str",
+}
+# Annotations that carry no checkable constraint.
+_UNCONSTRAINED = frozenset({"Any", "object"})
+# ``return f(...)`` with these builtins has a known result type.
+_CALL_RESULT_TYPES = {
+    "str": "str",
+    "repr": "str",
+    "int": "int",
+    "len": "int",
+    "float": "float",
+    "bool": "bool",
+    "isinstance": "bool",
+    "callable": "bool",
+    "list": "list",
+    "sorted": "list",
+    "dict": "dict",
+    "set": "set",
+    "frozenset": "frozenset",
+    "tuple": "tuple",
+    "bytes": "bytes",
+}
+_SCOPE_NODES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)
+
+
+def _ann_name(node: ast.expr) -> str | None:
+    """Name of a Name/Attribute annotation, ``typing.`` prefix stripped."""
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        dotted = _call_name(node)
+        if dotted is None:
+            return None
+        for prefix in ("typing.", "typing_extensions."):
+            if dotted.startswith(prefix):
+                return dotted[len(prefix) :]
+        return dotted
+    return None
+
+
+def _is_none_annotation(node: ast.expr) -> bool:
+    if isinstance(node, ast.Constant):
+        return node.value is None
+    return _ann_name(node) in ("None", "NoneType")
+
+
+def _plain_types(node: ast.expr) -> list[str] | None:
+    """isinstance() targets for a plain (non-generic) type name, else None."""
+    name = _ann_name(node)
+    if name is None or name in _UNCONSTRAINED or name in ("None", "NoneType", "Callable"):
+        return None
+    if len(name) == 1 and name.isupper():  # TypeVar convention (T, K, V) - not a runtime type
+        return None
+    name = _TYPING_ALIASES.get(name, name)
+    if name == "float":  # PEP 484 numeric tower: int is acceptable where float is declared
+        return ["int", "float"]
+    if name in _BUILTIN_TYPES:
+        return [name]
+    return [ast.unparse(node)]
+
+
+def _isinstance_expr(var: str, types: list[str]) -> str:
+    target = types[0] if len(types) == 1 else "(" + ", ".join(types) + ")"
+    return f"isinstance({var}, {target})"
+
+
+def _paren(expr: str) -> str:
+    return f"({expr})" if " or " in expr else expr
+
+
+def _flatten_bitor(node: ast.expr) -> list[ast.expr]:
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitOr):
+        return _flatten_bitor(node.left) + _flatten_bitor(node.right)
+    return [node]
+
+
+def _union_check(members: list[ast.expr], var: str, depth: int) -> str | None:
+    allows_none = False
+    simple: list[str] = []
+    compound: list[str] = []
+    for member in members:
+        if _is_none_annotation(member):
+            allows_none = True
+            continue
+        plain = _plain_types(member)
+        if plain is not None:
+            simple.extend(t for t in plain if t not in simple)
+            continue
+        check = _type_check(member, var, depth)
+        if check is None:  # one unconstrained member (Any, T) => the whole union is
+            return None
+        compound.append(f"({check})" if " and " in check or " or " in check else check)
+    parts = ([f"{var} is None"] if allows_none else []) + (
+        [_isinstance_expr(var, simple)] if simple else []
+    )
+    parts += compound
+    return " or ".join(parts) if parts else None
+
+
+def _generic_check(node: ast.Subscript, var: str, depth: int) -> str | None:
+    base = _ann_name(node.value)
+    if base is None:
+        return None
+    base = _TYPING_ALIASES.get(base, base)
+    args = list(node.slice.elts) if isinstance(node.slice, ast.Tuple) else [node.slice]
+    sfx = str(depth) if depth else ""
+
+    if base == "Optional":
+        return _union_check([args[0], ast.Constant(value=None)], var, depth)
+    if base == "Union":
+        return _union_check(args, var, depth)
+    if base == "Annotated":
+        return _type_check(args[0], var, depth)
+    if base == "Literal":
+        values = [ast.unparse(a) for a in args]
+        if len(values) == 1:
+            return f"{var} == {values[0]}"
+        return f"{var} in ({', '.join(values)})"
+    if base == "Callable":
+        return f"callable({var})"
+    if base == "type":
+        return f"isinstance({var}, type)"
+
+    if base in ("list", "set", "frozenset"):
+        head = f"isinstance({var}, {base})"
+        item = f"x{sfx}"
+        inner = _type_check(args[0], item, depth + 1)
+        return f"{head} and all({_paren(inner)} for {item} in {var})" if inner else head
+
+    if base == "dict":
+        head = f"isinstance({var}, dict)"
+        if len(args) != 2:
+            return head
+        k, v = f"k{sfx}", f"v{sfx}"
+        k_check = _type_check(args[0], k, depth + 1)
+        v_check = _type_check(args[1], v, depth + 1)
+        if k_check and v_check:
+            return f"{head} and all({_paren(k_check)} and {_paren(v_check)} for {k}, {v} in {var}.items())"
+        if k_check:
+            return f"{head} and all({_paren(k_check)} for {k} in {var}.keys())"
+        if v_check:
+            return f"{head} and all({_paren(v_check)} for {v} in {var}.values())"
+        return head
+
+    if base == "tuple":
+        head = f"isinstance({var}, tuple)"
+        if isinstance(node.slice, ast.Tuple) and not node.slice.elts:  # tuple[()]
+            return f"{var} == ()"
+        if len(args) == 2 and isinstance(args[1], ast.Constant) and args[1].value is Ellipsis:
+            item = f"x{sfx}"
+            inner = _type_check(args[0], item, depth + 1)
+            return f"{head} and all({_paren(inner)} for {item} in {var})" if inner else head
+        parts = [head, f"len({var}) == {len(args)}"]
+        for i, arg in enumerate(args):
+            check = _type_check(arg, f"{var}[{i}]", depth + 1)
+            if check:
+                parts.append(_paren(check))
+        return " and ".join(parts)
+
+    # Any other generic (MyGeneric[int], typing.Sequence[str], ...): check the origin.
+    return _type_check(node.value, var, depth)
+
+
+def _type_check(node: ast.expr | None, var: str, depth: int = 0) -> str | None:
+    """Boolean expression asserting *var* matches annotation *node*.
+
+    Returns None when the annotation carries no checkable constraint.
+    """
+    if node is None:
+        return None
+    if _is_none_annotation(node):
+        return f"{var} is None"
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):  # forward reference
+        try:
+            parsed = ast.parse(node.value, mode="eval").body
+        except SyntaxError:
+            return None
+        return _type_check(parsed, var, depth)
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitOr):
+        return _union_check(_flatten_bitor(node), var, depth)
+    if isinstance(node, ast.Subscript):
+        return _generic_check(node, var, depth)
+    if _ann_name(node) == "Callable":
+        return f"callable({var})"
+    plain = _plain_types(node)
+    return _isinstance_expr(var, plain) if plain else None
+
+
+def _own_nodes(body: list[ast.stmt]):
+    """Walk *body* without descending into nested functions, classes or lambdas."""
+    stack: list[ast.AST] = [n for n in reversed(body) if not isinstance(n, _SCOPE_NODES)]
+    while stack:
+        node = stack.pop()
+        yield node
+        stack.extend(
+            c for c in reversed(list(ast.iter_child_nodes(node))) if not isinstance(c, _SCOPE_NODES)
+        )
+
+
+def _always_exits(stmts: list[ast.stmt]) -> bool:
+    """Conservative: True only when control provably never falls off the end."""
+    if not stmts:
+        return False
+    last = stmts[-1]
+    if isinstance(last, (ast.Return, ast.Raise)):
+        return True
+    if isinstance(last, ast.If):
+        return _always_exits(last.body) and _always_exits(last.orelse)
+    if isinstance(last, (ast.With, ast.AsyncWith)):
+        return _always_exits(last.body)
+    if isinstance(last, ast.Try):
+        if _always_exits(last.finalbody):
+            return True
+        main = last.orelse if last.orelse else last.body
+        return _always_exits(main) and all(_always_exits(h.body) for h in last.handlers)
+    if isinstance(last, ast.While):
+        endless = isinstance(last.test, ast.Constant) and bool(last.test.value)
+        return endless and not any(isinstance(n, ast.Break) for n in _own_nodes(last.body))
+    return False
+
+
+def _returned_type(value: ast.expr | None) -> str | None:
+    """Type name of a ``return`` expression when it is evident, else None."""
+    if value is None:
+        return "NoneType"
+    if isinstance(value, ast.Constant):
+        if value.value is Ellipsis:
+            return None
+        return type(value.value).__name__  # NoneType/bool/int/float/complex/str/bytes
+    if isinstance(value, (ast.List, ast.ListComp)):
+        return "list"
+    if isinstance(value, (ast.Dict, ast.DictComp)):
+        return "dict"
+    if isinstance(value, (ast.Set, ast.SetComp)):
+        return "set"
+    if isinstance(value, ast.Tuple):
+        return "tuple"
+    if isinstance(value, ast.JoinedStr):
+        return "str"
+    if isinstance(value, ast.Compare) or (
+        isinstance(value, ast.UnaryOp) and isinstance(value.op, ast.Not)
+    ):
+        return "bool"
+    if isinstance(value, ast.Call) and isinstance(value.func, ast.Name):
+        return _CALL_RESULT_TYPES.get(value.func.id)
+    return None
+
+
+def _is_generator(body: list[ast.stmt]) -> bool:
+    return any(isinstance(n, (ast.Yield, ast.YieldFrom)) for n in _own_nodes(body))
+
+
+def _infer_from_body(body: list[ast.stmt], is_async: bool = False) -> str:
+    if _is_generator(body):
+        return f'assert hasattr(result, "{"__anext__" if is_async else "__next__"}")'
+    values = [n.value for n in _own_nodes(body) if isinstance(n, ast.Return)]
+    if not values:
+        return "assert result is None"
+    names = [_returned_type(v) for v in values]
+    if any(n is None for n in names):  # some return is opaque (``return x``)
+        return _FALLBACK_ASSERTION
+    if not _always_exits(body):  # implicit ``return None`` on fall-through
+        names.append("NoneType")
+    unique = list(dict.fromkeys(n for n in names if n is not None))
+    members: list[ast.expr] = [
+        ast.Constant(value=None) if n == "NoneType" else ast.Name(id=n, ctx=ast.Load())
+        for n in unique
+    ]
+    check = _union_check(members, "result", 0)
+    return f"assert {check}" if check else _FALLBACK_ASSERTION
+
+
+def infer_assertion(
+    returns_node: ast.expr | None, body: list[ast.stmt], *, is_async: bool = False
+) -> str:
+    """Assertion line (without indentation) for a generated test skeleton."""
+    if returns_node is None:
+        return _infer_from_body(body, is_async)
+    check = _type_check(returns_node, "result")
+    return f"assert {check}" if check else _FALLBACK_ASSERTION
 
 
 def _make_memory_limiter(limit_mb: int):
