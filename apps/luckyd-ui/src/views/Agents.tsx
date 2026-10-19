@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAgents, MESH_AGENTS, terminalUrl } from '../state/agents';
 import { useSched } from '../state/schedules';
 import { useLuckyBase } from '../state/chat';
@@ -7,8 +7,8 @@ import type { Schedule } from '../lib/backend';
 type Page = { kind: 'mesh' } | { kind: 'term'; shell: string; label: string; emoji: string };
 
 const CORE: { shell: string; label: string; emoji: string }[] = [
-  { shell: 'agent', label: 'Agent 1 (v10.7.3)', emoji: 'ðŸ€' },
-  { shell: 'agent2', label: 'Agent 2 (v10.7.3)', emoji: 'ðŸ”§' },
+  { shell: 'agent', label: 'Agent 1 (v10.7.4)', emoji: 'ðŸ€' },
+  { shell: 'agent2', label: 'Agent 2 (v10.7.4)', emoji: 'ðŸ”§' },
   { shell: 'powershell', label: 'PowerShell', emoji: 'âŒ¨' },
   { shell: 'cmd', label: 'CMD', emoji: 'ðŸªŸ' },
 ];

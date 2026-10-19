@@ -1,5 +1,15 @@
 # LuckyD Browser — Release Notes
 
+## [10.7.4] — Agent Mesh Doctor, reversible tab undo & one-click Ollama — 2026-10-19
+
+**[`LuckyDBrowserSetup-10.7.4.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.7.4/LuckyDBrowserSetup-10.7.4.exe)** — Windows 10/11 x64 · per-user install · no admin needed.
+**[`LuckyDBrowser-Portable-10.7.4.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.7.4/LuckyDBrowser-Portable-10.7.4.zip)** — unzip and run, for locked-down PCs.
+
+- **Agent Mesh Doctor & tier badges** — `lucky-code mesh --doctor` inspects all 19 mesh agents, local/cloud providers, and Jules quota readiness (`--json` for scripts, `--recommend "<task>"` for auto-routing), with `[Free]` / `[Local]` / `[Paid]` / `[Cloud]` / `[Media]` badges in the terminal and UI.
+- **Reversible tab action undo** — undo pin/unpin, mute/unmute, group/ungroup, close, move, and duplicate actions via `Ctrl+Alt+Z` or `POST /tabs/undo` on the Control API.
+- **One-click Ollama setup & live onboarding status** — new `/onboarding/status` and `/onboarding/ollama-setup` Control API endpoints report local Ollama readiness and launch background setup from the UI.
+- **Steadier Cline credit fallback & CLI ergonomics** — exponential 402 cooldown (`1h` -> `6h` -> `24h`) with `/api/providers/cline-credit` endpoints, prefix/title matching for `lucky-code --resume`, and token/cost summaries on `lucky-code -p`.
+
 ## [10.7.3] — Lazy session restore, smoother terminal, stable tabs — 2026-10-17
 
 **[`LuckyDBrowserSetup-10.7.3.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.7.3/LuckyDBrowserSetup-10.7.3.exe)** — Windows 10/11 x64 · per-user install · no admin needed.

@@ -74,6 +74,8 @@ LuckyD also works with cloud providers if you prefer: Gemini, Groq, DeepSeek, Op
 
 ## What's new
 
+**v10.7.4** — Agent Mesh Doctor (`lucky-code mesh --doctor` / `--recommend`) with cost-tier badges across all 19 agents, reversible tab action undo (`Ctrl+Alt+Z` + `/tabs/undo`), one-click Ollama setup & onboarding APIs, exponential Cline 402 credit backoff, and CLI session prefix/title resolution + run cost summaries.
+
 **v10.7.3** — Lazy session restore, smoother terminal, stable tabs
 
 **v10.7.1** — Jules async delegate (dispatch real cloud coding tasks from the mesh: approval-gated, quota-guarded, PRs flow into review; live-tested against the real API) + hardening sweep (retry-budget errors surface properly, delegate concurrency capped at 8, registries pruned, prompt-injection fencing).

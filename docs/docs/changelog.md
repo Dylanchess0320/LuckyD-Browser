@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [10.7.4] - 2026-10-19
+
+Agent Mesh Doctor (`lucky-code mesh --doctor` / `--json` / `--recommend`) with cost-tier badges across all 19 mesh agents, reversible tab action undo (`Ctrl+Alt+Z` + `POST /tabs/undo`), one-click Ollama setup and onboarding status endpoints (`/onboarding/status`, `/onboarding/ollama-setup`), steadier Cline credit fallback with exponential cooldown (`1h` -> `6h` -> `24h`) and HQ inspection/reset routes, CLI session prefix/title resolution (`--resume`), `-p` run cost/token summary (`--no-cost`), and an 18-module strict mypy typing burn-down.
+
 ## [10.7.3] - 2026-10-17
 
 Lazy session restore, smoother terminal, stable tabs.

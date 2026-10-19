@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [10.7.4] - 2026-10-19
+
+Agent Mesh Doctor, reversible tab action undo, one-click Ollama setup, steadier Cline credit fallback, CLI session prefix/title resolution + cost estimates, and 18-module strict mypy typing burn-down.
+
+### Added
+- **Agent Mesh Doctor (`lucky-code mesh --doctor`)**: Readiness diagnostics table (`OK`, `WARN`, `MISSING`) across all 19 mesh agents, local/cloud providers, and Jules quota status, plus JSON output (`--json`), auto-routing recommendation (`--recommend "<task>"`), and cost-tier badges (`[Free]`, `[Local]`, `[Paid]`, `[Cloud]`, `[Media]`).
+- **Reversible tab action undo**: Every mutating tab operation (`pin`, `unpin`, `mute`, `unmute`, `group`, `ungroup`, `close`, `move`, `duplicate`) records a bounded undo stack entry (50 items) accessible via `Ctrl+Alt+Z` or `POST /tabs/undo` on the Control API.
+- **One-click Ollama setup & live onboarding status**: `GET /onboarding/status` and `POST /onboarding/ollama-setup` on the Control API expose live local AI readiness (installed, running, models pulled, cloud keys, default search engine) and trigger `ollama_setup.ps1` with a 60s double-trigger guard.
+- **CLI session prefix/title resolution & run cost estimates**: `lucky-code --resume <prefix|title>` resolves sessions by ID prefix or title substring via `SessionManager.resolve_session_id()`, and `--print` (`-p`) prints token usage and estimated USD cost on stderr (`--no-cost` to suppress).
+- **Rich Cline credit state (`ClineCreditState`)**: Tracks `consecutive_402s`, `last_error`, and exponential cooldown (`1h` -> `6h` -> `24h`) with `GET /api/providers/cline-credit` and `POST /api/providers/cline-credit/clear`.
+
+### Changed
+- **Type-safety burn-down**: Reduced strict mypy overrides in `pyproject.toml` by 18 modules across `core/`, `tools/`, `orchestration/`, `trust/`, and `utils/`.
+
 ## [10.7.3] - 2026-10-17
 
 Lazy session restore, smoother terminal, stable tabs.
