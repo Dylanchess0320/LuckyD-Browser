@@ -5,10 +5,10 @@ the build). The modules below predate the gate and are explicitly
 grandfathered in `pyproject.toml` (`[[tool.mypy.overrides]]`,
 `ignore_errors = true`).
 
-**Debt as of 2026-09-13: 182 errors in 57 modules** (down from
-~1,400 under `strict = true`; the gate now enforces every strict check
-except the four annotation-coverage flags the codebase was never written
-for — see `pyproject.toml`).
+**Debt as of 2026-10-19: 140 errors in 39 modules** (down from 182 errors in
+57 modules on 2026-09-13, and ~1,400 originally under `strict = true`; the
+gate enforces every strict check except the four annotation-coverage flags
+the codebase was never written for — see `pyproject.toml`).
 
 ## How to burn it down
 1. Pick a module, fix its errors for real (no drive-by `# type: ignore`).
@@ -18,12 +18,10 @@ for — see `pyproject.toml`).
 
 ## Inventory (errors per module)
 - `core/agent_loop.py` — 14
-- `llm/__init__.py` — 11
 - `browser/browser_core/ai_bridge.py` — 11
 - `browser/browser_ui/main_window.py` — 9
 - `core/multi_model_orchestrator.py` — 8
 - `tools/skill_market_tools.py` — 7
-- `project/detector.py` — 7
 - `tools/web_tools.py` — 6
 - `core/project_intelligence.py` — 6
 - `tools/schedule_tools.py` — 5
@@ -44,38 +42,21 @@ for — see `pyproject.toml`).
 - `browser/browser_core/control_server.py` — 3
 - `memory/graph.py` — 2
 - `memory/embeddings.py` — 2
-- `features/deep_research/cli.py` — 2
 - `core/parallel_executor.py` — 2
 - `core/mcp_client.py` — 2
-- `core/marketplace.py` — 2
-- `core/llm_client.py` — 2
 - `core/approval_hook.py` — 2
 - `core/advanced_memory.py` — 2
 - `core/advanced_debugging.py` — 2
 - `browser/browser_core/workflows.py` — 2
 - `browser/browser_core/scheduler.py` — 2
-- `browser/browser_core/harness_bridge.py` — 2
 - `tools/task_tools.py` — 1
-- `tools/skill_tools.py` — 1
 - `tools/memory_tools.py` — 1
 - `tools/lsp_tools.py` — 1
 - `tools/git_tools.py` — 1
 - `tools/file_tools.py` — 1
-- `llm/google_client.py` — 1
-- `features/deep_research/workers/verifier.py` — 1
-- `features/deep_research/workers/finalizer.py` — 1
-- `features/deep_research/tools/fetch.py` — 1
 - `features/deep_research/runtime/tui.py` — 1
-- `features/deep_research/runtime/budget.py` — 1
-- `features/deep_research/evals/harness.py` — 1
-- `core/smart_context.py` — 1
-- `core/schedule_runner.py` — 1
-- `core/context_manager.py` — 1
 - `browser/browser_ui/tab_widget.py` — 1
-- `browser/browser_core/settings.py` — 1
-- `browser/browser_core/agent.py` — 1
 
-## Already fixed (2026-09-13)
-- 13 stale `# type: ignore` comments removed (`warn_unused_ignores`)
-- 7 missing variable annotations added (`var-annotated`)
-- 3 untyped-decorator sites documented via grandfathering
+## Already fixed
+- **2026-10-19:** Burned down 18 modules (`browser.browser_core.agent`, `browser.browser_core.harness_bridge`, `browser.browser_core.settings`, `core.context_manager`, `core.llm_client`, `core.marketplace`, `core.schedule_runner`, `core.smart_context`, `features.deep_research.cli`, `features.deep_research.evals.harness`, `features.deep_research.runtime.budget`, `features.deep_research.tools.fetch`, `features.deep_research.workers.finalizer`, `features.deep_research.workers.verifier`, `llm`, `llm.google_client`, `project.detector`, `tools.skill_tools`).
+- **2026-09-13:** 13 stale `# type: ignore` comments removed (`warn_unused_ignores`), 7 missing variable annotations added (`var-annotated`), 3 untyped-decorator sites documented via grandfathering.

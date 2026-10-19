@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 
 import httpx
 
@@ -138,7 +139,7 @@ class GoogleClient(LLMClient):
                         ],
                     }
                 )
-        body = {"contents": contents}
+        body: dict[str, Any] = {"contents": contents}
         if system_instruction:
             body["systemInstruction"] = {"parts": [{"text": system_instruction}]}
         if tools:

@@ -11,8 +11,10 @@ through JsBridge's queued signals.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import re
+import threading
 import time
 
 from PySide6.QtCore import QObject, Qt, Signal
@@ -27,7 +29,7 @@ You control the user's current tab. Each turn you receive a snapshot (URL,
 title, numbered interactive elements, visible text). Reply with EXACTLY ONE
 JSON object — no markdown fences, no commentary:
 
-{"actions": [{"action": "click|type|press|select|scroll|navigate|back|wait|done",
+{"actions": [{"action": "click|type|press|select|scroll|navigate|back|undo|wait|done",
  "index": <element number>, "text": "<type text / Enter|Tab|Escape / option
  text / up / seconds / final answer>", "url": "<absolute url>",
  "reason": "<2-6 words>"}]}
@@ -36,7 +38,8 @@ Rules:
 - click: index. type: index + text. press: Enter|Tab|Escape (submits the
   focused field — use right after typing). select: index + option text.
   scroll: "up" or empty. navigate: absolute http/https url.
-  back: previous page. wait: text = seconds (max 5) for spinners/loading.
+  back: previous page. undo: revert your last reversible action (type/select/scroll/navigate).
+  wait: text = seconds (max 5) for spinners/loading.
   done: final answer (always a single action).
 - SPEED: batch 1-4 obvious actions in one reply (e.g. type then press Enter).
   Use ONE action when unsure or right after a navigation.
@@ -97,6 +100,11 @@ _TYPE_JS = (
     " return 'typed ' + String(e.value.length) + ' chars into <' +"
     " e.tagName.toLowerCase() + '>'; }})()"
 )
+_READ_VALUE_JS = (
+    "(() => {{ const e = document.querySelector('[data-ld-agent=\"{i}\"]');"
+    " if (!e) return '';"
+    " return String(e.value !== undefined ? e.value : ''); }})()"
+)
 _HIGHLIGHT_JS = (
     '(() => {{ const e = document.querySelector("[data-ld-agent={i}]");'
     " if (!e) return 'no target';"
@@ -145,6 +153,70 @@ _SELECT_JS = (
 )
 
 
+class ActionUndoStack:
+    """Thread-safe bounded stack of reversible browser tab actions."""
+
+    def __init__(self, max_entries: int = 50):
+        self._lock = threading.Lock()
+        self._max = max(1, int(max_entries))
+        self._entries: list[dict] = []
+
+    def push(self, entry: dict) -> None:
+        item = {**entry, "timestamp": time.time()}
+        with self._lock:
+            self._entries.append(item)
+            if len(self._entries) > self._max:
+                self._entries = self._entries[-self._max :]
+
+    def pop(self) -> dict | None:
+        with self._lock:
+            return self._entries.pop() if self._entries else None
+
+    def peek(self) -> dict | None:
+        with self._lock:
+            return dict(self._entries[-1]) if self._entries else None
+
+    def list_entries(self) -> list[dict]:
+        with self._lock:
+            return [dict(e) for e in reversed(self._entries)]
+
+    list = list_entries
+
+    def clear(self) -> None:
+        with self._lock:
+            self._entries.clear()
+
+    def __len__(self) -> int:
+        with self._lock:
+            return len(self._entries)
+
+    @staticmethod
+    def undo_js_for(entry: dict) -> str | None:
+        """Build the JS snippet that reverses `entry`."""
+        kind = str(entry.get("kind", ""))
+        if kind == "type":
+            idx = int(entry.get("index", -1))
+            if idx < 0:
+                return None
+            prev_val = json.dumps(str(entry.get("prev_value", "")))
+            return _TYPE_JS.format(i=idx, text=prev_val)
+        if kind == "select":
+            idx = int(entry.get("index", -1))
+            if idx < 0:
+                return None
+            prev_val = json.dumps(str(entry.get("prev_value", "")))
+            return _SELECT_JS.format(i=idx, text=prev_val)
+        if kind == "scroll":
+            dy = -int(entry.get("dy", 700))
+            return f"(() => {{ window.scrollBy(0, {dy}); return 'scrolled back {dy}px'; }})()"
+        if kind in ("navigate", "click_nav"):
+            prev_url = str(entry.get("prev_url", "") or "")
+            if prev_url.startswith(("http://", "https://")):
+                return f"(() => {{ window.location.href = {json.dumps(prev_url)}; return 'navigated back'; }})()"
+            return "(() => { history.back(); return 'navigated back'; })()"
+        return None
+
+
 def parse_action(raw: str) -> list[dict] | None:
     """Extract the action list from an LLM reply.
 
@@ -190,10 +262,12 @@ class JsBridge(QObject):
 class JsDriver:
     """Async driver around JsBridge (used from the agent's worker thread)."""
 
-    def __init__(self, bridge: JsBridge):
+    def __init__(self, bridge, undo_stack: ActionUndoStack | None = None):
         self._bridge = bridge
         self._pending: dict[object, asyncio.Future] = {}
-        bridge.response.connect(self._on_response)
+        self.undo_stack = undo_stack if undo_stack is not None else ActionUndoStack()
+        if hasattr(bridge, "response"):
+            bridge.response.connect(self._on_response)
 
     def _on_response(self, token, result) -> None:
         future = self._pending.pop(token, None)
@@ -201,6 +275,8 @@ class JsDriver:
             future.get_loop().call_soon_threadsafe(future.set_result, result)
 
     async def _js(self, script: str):
+        if hasattr(self._bridge, "run") and not hasattr(self._bridge, "request"):
+            return await self._bridge.run(script)
         loop = asyncio.get_running_loop()
         future = loop.create_future()
         token = object()
@@ -228,10 +304,30 @@ class JsDriver:
             "more_below": False,
         }
 
+    async def undo(self) -> str:
+        """Revert the most recent reversible browser action."""
+        entry = self.undo_stack.pop()
+        if entry is None:
+            return "nothing to undo"
+        js = ActionUndoStack.undo_js_for(entry)
+        if not js:
+            return "nothing to undo"
+        res = str(await self._js(js) or "")
+        if entry.get("kind") in ("navigate", "click_nav"):
+            await self._wait_loaded(timeout=4.0, initial=0.35)
+        else:
+            await asyncio.sleep(0.2)
+        return f"undid {entry.get('kind')}: {res}"
+
     async def act(self, action: dict) -> str:
         kind = action.get("action")
+        if kind == "undo":
+            return await self.undo()
         if kind == "click":
             index = int(action.get("index", -1))
+            prev_url = ""
+            with contextlib.suppress(Exception):
+                prev_url = str(await self._js("location.href") or "")
             await self._js(_HIGHLIGHT_JS.format(i=index))
             # The ring persists ~0.9s after the click, so a long pause here
             # is wasted time — 0.15s is plenty to register visually.
@@ -240,13 +336,39 @@ class JsDriver:
             # Click may navigate (adaptive wait) or just fire AJAX (returns
             # immediately) — no blind settle either way.
             await self._wait_loaded(timeout=2.5, initial=0.3)
+            with contextlib.suppress(Exception):
+                new_url = str(await self._js("location.href") or "")
+                if prev_url and new_url and new_url != prev_url:
+                    self.undo_stack.push(
+                        {
+                            "kind": "click_nav",
+                            "index": index,
+                            "prev_url": prev_url,
+                            "url": new_url,
+                            "description": f"click [{index}] navigated to {new_url}",
+                        }
+                    )
             return result
         if kind == "type":
             index = int(action.get("index", -1))
-            text = json.dumps(str(action.get("text", "")))
+            raw_text = str(action.get("text", ""))
+            text = json.dumps(raw_text)
+            prev_val = ""
+            with contextlib.suppress(Exception):
+                prev_val = str(await self._js(_READ_VALUE_JS.format(i=index)) or "")
             await self._js(_HIGHLIGHT_JS.format(i=index))
             await asyncio.sleep(0.15)
             result = str(await self._js(_TYPE_JS.format(i=index, text=text)))
+            if not result.startswith("element not found"):
+                self.undo_stack.push(
+                    {
+                        "kind": "type",
+                        "index": index,
+                        "prev_value": prev_val,
+                        "new_value": raw_text,
+                        "description": f"type into [{index}]",
+                    }
+                )
             await asyncio.sleep(0.2)
             return result
         if kind == "press":
@@ -258,10 +380,24 @@ class JsDriver:
             return result
         if kind == "select":
             index = int(action.get("index", -1))
-            text = json.dumps(str(action.get("text", "")))
+            raw_text = str(action.get("text", ""))
+            text = json.dumps(raw_text)
+            prev_val = ""
+            with contextlib.suppress(Exception):
+                prev_val = str(await self._js(_READ_VALUE_JS.format(i=index)) or "")
             await self._js(_HIGHLIGHT_JS.format(i=index))
             await asyncio.sleep(0.15)
             result = str(await self._js(_SELECT_JS.format(i=index, text=text)))
+            if result.startswith("selected "):
+                self.undo_stack.push(
+                    {
+                        "kind": "select",
+                        "index": index,
+                        "prev_value": prev_val,
+                        "new_value": raw_text,
+                        "description": f"select '{raw_text}' on [{index}]",
+                    }
+                )
             await asyncio.sleep(0.2)
             return result
         if kind == "back":
@@ -279,13 +415,31 @@ class JsDriver:
         if kind == "scroll":
             dy = -700 if str(action.get("text", "")).lower() == "up" else 700
             await self._js(f"window.scrollBy(0, {dy})")
+            self.undo_stack.push(
+                {
+                    "kind": "scroll",
+                    "dy": dy,
+                    "description": f"scroll {'up' if dy < 0 else 'down'}",
+                }
+            )
             await asyncio.sleep(0.2)
             return "scrolled"
         if kind == "navigate":
             url = str(action.get("url", ""))
             if url.startswith(("http://", "https://")):
+                prev_url = ""
+                with contextlib.suppress(Exception):
+                    prev_url = str(await self._js("location.href") or "")
                 await self._js(f"window.location.href = {json.dumps(url)}")
                 await self._wait_loaded(timeout=8.0, initial=0.6)
+                self.undo_stack.push(
+                    {
+                        "kind": "navigate",
+                        "prev_url": prev_url,
+                        "url": url,
+                        "description": f"navigate to {url}",
+                    }
+                )
                 return f"navigated to {url}"
             return "refused: invalid url"
         return "no-op"
@@ -317,6 +471,7 @@ class AgentSession:
         use_cdp: bool = True,
         get_url=None,
         vision: bool = False,
+        undo_stack: ActionUndoStack | None = None,
     ):
         self._ai = ai_bridge
         self._js_bridge = js_bridge
@@ -325,9 +480,15 @@ class AgentSession:
         self._get_url = get_url
         self._vision = vision
         self.stop_requested = False
+        self.undo_stack = undo_stack if undo_stack is not None else ActionUndoStack()
 
     def stop(self) -> None:
         self.stop_requested = True
+
+    async def undo_last(self) -> str:
+        """Revert the most recent reversible action performed in this session."""
+        driver = JsDriver(self._js_bridge, undo_stack=self.undo_stack)
+        return await driver.undo()
 
     async def run(self, task: str, provider=None, on_step=None) -> str:
         global ACTIVE_SESSIONS
@@ -355,7 +516,7 @@ class AgentSession:
             except Exception as exc:
                 say(f"⚠ CDP unavailable ({exc}) — using JS driver")
         if driver is None:
-            driver = JsDriver(self._js_bridge)
+            driver = JsDriver(self._js_bridge, undo_stack=self.undo_stack)
         # Local CPU models get a smaller snapshot to keep each step snappy.
         effective = provider or self._ai.default_provider()
         compact = bool(effective) and self._ai.is_local(effective)
@@ -386,7 +547,7 @@ class AgentSession:
             # Vision: attach the current frame (cloud models only — local
             # CPU vision is too slow for a per-step loop).
             shot = snap.pop("shot_b64", "")
-            content = self._prompt(task, snap, history, plan, stuck)
+            content: str | list[dict[str, object]] = self._prompt(task, snap, history, plan, stuck)
             if shot and self._vision and not compact:
                 content = [
                     {"type": "text", "text": content},
@@ -419,7 +580,8 @@ class AgentSession:
 
             actions = actions[:4]  # cap batches
             reasons = " → ".join(str(a.get("reason") or a.get("action")) for a in actions)
-            say(f"▶ Step {step} [{think_s:.1f}s think]: {reasons}")
+            pct = round((step / max(1, self.max_steps)) * 100)
+            say(f"▶ Step {step}/{self.max_steps} ({pct}%) [{think_s:.1f}s think]: {reasons}")
 
             for sub in actions:
                 if self.stop_requested:
@@ -430,7 +592,10 @@ class AgentSession:
                     say(f"✅ {answer}")
                     return answer
                 try:
-                    result = await driver.act(sub)
+                    if kind == "undo" and not hasattr(driver, "undo"):
+                        result = await self.undo_last()
+                    else:
+                        result = await driver.act(sub)
                 except Exception as exc:
                     result = f"error: {exc}"
                 history.append(f"{kind}({sub.get('index', '')}) -> {result}")

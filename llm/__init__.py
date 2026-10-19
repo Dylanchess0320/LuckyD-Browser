@@ -90,9 +90,9 @@ class LLMConfig:
 
             cfg = resolve_provider_config("clinepass")
             return cls(
-                api_key=cfg["api_key"],
-                base_url=cfg["base_url"],
-                model=cfg["model"],
+                api_key=str(cfg["api_key"]),
+                base_url=str(cfg["base_url"]),
+                model=str(cfg["model"]),
                 provider="clinepass",
                 temperature=float(os.environ.get("CODING_AGENT_TEMP", "0.0")),
                 max_tokens=int(os.environ.get("CODING_AGENT_MAX_TOKENS", "8192")),
@@ -102,9 +102,9 @@ class LLMConfig:
 
             cfg = resolve_provider_config("cline-usage")
             return cls(
-                api_key=cfg["api_key"],
-                base_url=cfg["base_url"],
-                model=cfg["model"],
+                api_key=str(cfg["api_key"]),
+                base_url=str(cfg["base_url"]),
+                model=str(cfg["model"]),
                 provider="cline-usage",
                 temperature=float(os.environ.get("CODING_AGENT_TEMP", "0.0")),
                 max_tokens=int(os.environ.get("CODING_AGENT_MAX_TOKENS", "8192")),
@@ -125,12 +125,12 @@ class LLMConfig:
 
         cfg = get_config()
         return cls(
-            api_key=cfg["api_key"],
-            base_url=cfg.get("base_url", "https://api.deepseek.com/v1"),
-            model=cfg.get("model", "deepseek-chat"),
+            api_key=str(cfg["api_key"]),
+            base_url=str(cfg.get("base_url", "https://api.deepseek.com/v1")),
+            model=str(cfg.get("model", "deepseek-chat")),
             provider="deepseek",
-            temperature=cfg.get("temperature", 0.0),
-            max_tokens=cfg.get("max_tokens", 8192),
+            temperature=float(str(cfg.get("temperature", 0.0))),
+            max_tokens=int(str(cfg.get("max_tokens", 8192))),
         )
 
 

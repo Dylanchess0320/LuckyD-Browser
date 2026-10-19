@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import sys
 
-if sys.platform == "win32":
+if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 import tools.agent_orchestration

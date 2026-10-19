@@ -83,7 +83,7 @@ def _exe_file_version() -> str:
             data, sub, ctypes.byref(val), ctypes.byref(vlen)
         ):
             return ""
-        return ctypes.wstring_at(val.value) or ""
+        return ctypes.wstring_at(val.value or 0) if val.value else ""
     except Exception:
         return ""
 

@@ -355,7 +355,7 @@ class SmartContextEngine:
         if not query_terms or not content:
             return 0.0
         lowered = content.lower()
-        hits = 0
+        hits: float = 0.0
         for term in query_terms:
             # Count up to 5 occurrences; log-dampen to avoid keyword-stuffed files.
             count = min(lowered.count(term), 5)

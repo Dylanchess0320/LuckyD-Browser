@@ -208,7 +208,7 @@ class ProjectDetector:
 
         if not lang_scores:
             return ""
-        return max(lang_scores, key=lang_scores.get)
+        return max(lang_scores, key=lambda k: lang_scores[k])
 
     def _detect_framework(self, root: Path, language: str) -> str:
         if not language:

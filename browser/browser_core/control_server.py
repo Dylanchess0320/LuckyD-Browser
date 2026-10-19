@@ -53,9 +53,11 @@ from browser_core.agent import (
     _CLICK_JS,
     _HIGHLIGHT_JS,
     _PRESS_JS,
+    _READ_VALUE_JS,
     _SELECT_JS,
     _SNAPSHOT_JS,
     _TYPE_JS,
+    ActionUndoStack,
 )
 from browser_core.dashboard import (
     dashboard_html,
@@ -69,6 +71,7 @@ from browser_core.netmon import NetMonitor, to_har
 from browser_core.research_page import research_html, swarm_manager
 from browser_core.scheduler import INTERVALS, ScheduleStore
 from browser_core.terminal_page import STATIC_DIR, mesh_html, terminal_html
+from browser_core.terminal_server import mesh_doctor
 from browser_core.workflows import (
     INDEXED_ACTIONS,
     WorkflowRecorder,
@@ -98,6 +101,9 @@ _ROUTES = (
     ("GET  /dashboard", "live new-tab dashboard (HTML hub of the platform)"),
     ("GET  /hq", "coding agent workspace — opens the exe UI (auto-starts if needed)"),
     ("GET  /mesh", "Agent Mesh — four parallel terminal sessions in one workspace"),
+    ("GET  /mesh/doctor", "per-backend Agent Mesh health check + tier labels (JSON)"),
+    ("GET  /onboarding/status", "first-run Ollama & provider onboarding status + FAQ"),
+    ("POST /onboarding/ollama-pull", '{"model": "llama3.2:3b"} — pull local Ollama model'),
     ("GET  /terminal", "live LuckyD Code terminal in a tab (xterm.js + PTY)"),
     ("GET  /status", "browser state + harness/AI reachability"),
     ("GET  /tabs", "open tabs (index, url, title, active)"),
@@ -108,9 +114,11 @@ _ROUTES = (
     ("POST /snapshot", "URL, title, numbered interactive elements, visible text"),
     (
         "POST /act",
-        '{"action": "click|type|press|select|scroll|navigate|back|wait",'
+        '{"action": "click|type|press|select|scroll|navigate|back|undo|wait",'
         ' "index": N, "text": "…", "url": "https://…"}',
     ),
+    ("GET  /undo/stack", "reversible browser actions recorded in the active tab"),
+    ("POST /undo", "revert the most recent reversible browser action"),
     ("GET  /screenshot?url=", "base64 JPEG of a tab (CDP; needs websockets)"),
     ("POST /eval", '{"js": "…"} — run JavaScript in the active tab'),
     ("POST /ask", '{"question": "…", "provider": "…" (optional)} — AI + page context'),
@@ -446,6 +454,24 @@ def make_handler(backend, token: str = "", harness=None, settings=None):
                     return self._hq(query)
                 if path == "/mesh":
                     return self._send_html(mesh_html())
+                if path == "/mesh/doctor":
+                    rows = mesh_doctor()
+                    return self._ok(
+                        backends=rows,
+                        ready_count=sum(1 for r in rows if r.get("ready")),
+                        total_count=len(rows),
+                    )
+                if path == "/onboarding/status":
+                    if hasattr(backend, "onboarding_status"):
+                        status = backend.onboarding_status()
+                    else:
+                        from browser_core.ai_bridge import AIBridge
+
+                        status = AIBridge().onboarding_status()
+                    return self._ok(**status)
+                if path == "/undo/stack":
+                    stack = backend.undo_stack() if hasattr(backend, "undo_stack") else []
+                    return self._ok(stack=stack)
                 if path == "/terminal":
                     shell = (query.get("shell") or ["agent"])[0]
                     # B604 false positive: `shell` is an allowlisted terminal profile name.
@@ -523,6 +549,21 @@ def make_handler(backend, token: str = "", harness=None, settings=None):
                     if not body.get("action"):
                         return self._send(400, {"ok": False, "error": "action required"})
                     return self._ok(result=backend.act(body))
+                if path == "/undo":
+                    res = (
+                        backend.undo_last()
+                        if hasattr(backend, "undo_last")
+                        else {"undone": False, "detail": "nothing to undo"}
+                    )
+                    return self._ok(**res)
+                if path == "/onboarding/ollama-pull":
+                    from browser_core.ai_bridge import AIBridge
+
+                    model = str(body.get("model", "llama3.2:3b") or "llama3.2:3b").strip()
+                    res = AIBridge.start_ollama_pull(model)
+                    if not res.get("started") and "invalid" in str(res.get("error", "")):
+                        return self._send(400, {"ok": False, **res})
+                    return self._ok(**res)
                 if path == "/eval":
                     js = str(body.get("js", ""))
                     if not js:
@@ -761,6 +802,7 @@ class QtBrowserBackend:
         self._replaying = False  # replayed steps must not re-record
         self._netmon: NetMonitor | None = None  # lazy network capture
         self._schedules: ScheduleStore | None = None  # lazy schedule store
+        self._undo_stack = ActionUndoStack()
 
     # ── GUI-thread helpers ────────────────────────────────────────────
     def _window(self):
@@ -851,6 +893,33 @@ class QtBrowserBackend:
             }
         except Exception:
             return {"ai_providers": [], "ai_default": None, "ai_local_status": {}}
+
+    def onboarding_status(self) -> dict:
+        """First-run onboarding status for /onboarding/status."""
+        if self._ai is None:
+            from browser_core.ai_bridge import AIBridge
+
+            self._ai = AIBridge()
+        return self._ai.onboarding_status()
+
+    def undo_stack(self) -> list[dict]:
+        """Return reversible action history for /undo/stack."""
+        return self._undo_stack.list_entries()
+
+    def undo_last(self) -> dict:
+        """Pop and revert the most recent reversible action."""
+        entry = self._undo_stack.pop()
+        if entry is None:
+            return {"undone": False, "detail": "nothing to undo"}
+        js = ActionUndoStack.undo_js_for(entry)
+        if not js:
+            return {"undone": False, "detail": "cannot undo last action"}
+        prev = None
+        with contextlib.suppress(Exception):
+            prev = self.run_js(_SETTLE_JS)
+        res = self.run_js(js)
+        self._wait_settled(prev, timeout=4.0)
+        return {"undone": True, "detail": str(res or "undid action"), "entry": entry}
 
     def tabs(self) -> list[dict]:
         def _do():
@@ -964,11 +1033,14 @@ class QtBrowserBackend:
         return result
 
     def _perform_act(self, action: dict) -> str:
-        """One agent-style action (click/type/press/select/scroll/navigate/…)."""
+        """One agent-style action (click/type/press/select/scroll/navigate/undo/…)."""
         kind = str(action.get("action", ""))
         index = action_index(action)
         text = str(action.get("text", "") or "")
         url = str(action.get("url", "") or "")
+
+        if kind == "undo":
+            return str(self.undo_last().get("detail", "nothing to undo"))
 
         if kind == "wait":
             try:
@@ -983,36 +1055,94 @@ class QtBrowserBackend:
         with contextlib.suppress(Exception):
             prev = self.run_js(_SETTLE_JS)  # settle detection is best-effort
 
+        prev_url = str(prev).split("|", 1)[0] if prev else ""
+
         if kind == "click":
             if index < 0:
                 return "click needs an element index"
             self.run_js(_HIGHLIGHT_JS.format(i=index))
             time.sleep(0.15)
             result = self.run_js(_CLICK_JS.format(i=index))
+            self._wait_settled(prev)
+            cur = None
+            with contextlib.suppress(Exception):
+                cur = self.run_js(_SETTLE_JS)
+            cur_url = str(cur).split("|", 1)[0] if cur else ""
+            if prev_url and cur_url and cur_url != prev_url:
+                self._undo_stack.push(
+                    {
+                        "kind": "click_nav",
+                        "prev_url": prev_url,
+                        "new_url": cur_url,
+                        "summary": f"click [{index}] → {cur_url[:40]}",
+                    }
+                )
+            return str(result)
         elif kind == "type":
             if index < 0:
                 return "type needs an element index"
+            old_val = None
+            with contextlib.suppress(Exception):
+                old_val = self.run_js(_READ_VALUE_JS.format(i=index))
             self.run_js(_HIGHLIGHT_JS.format(i=index))
             time.sleep(0.15)
             result = self.run_js(_TYPE_JS.format(i=index, text=json.dumps(text)))
+            if not str(result).startswith("element not found"):
+                self._undo_stack.push(
+                    {
+                        "kind": "type",
+                        "index": index,
+                        "prev_value": str(old_val or ""),
+                        "new_value": text,
+                        "summary": f"type [{index}] = {text[:30]!r}",
+                    }
+                )
         elif kind == "press":
             key = text if text in ("Enter", "Tab", "Escape") else "Enter"
             result = self.run_js(_PRESS_JS.format(key=json.dumps(key)))
         elif kind == "select":
             if index < 0:
                 return "select needs an element index"
+            old_val = None
+            with contextlib.suppress(Exception):
+                old_val = self.run_js(_READ_VALUE_JS.format(i=index))
             self.run_js(_HIGHLIGHT_JS.format(i=index))
             time.sleep(0.15)
             result = self.run_js(_SELECT_JS.format(i=index, text=json.dumps(text)))
+            if not str(result).startswith(("element not found", "no option matching")):
+                self._undo_stack.push(
+                    {
+                        "kind": "select",
+                        "index": index,
+                        "prev_value": str(old_val or ""),
+                        "new_value": text,
+                        "summary": f"select [{index}] = {text[:30]!r}",
+                    }
+                )
         elif kind == "scroll":
             dy = -700 if text.lower() == "up" else 700
             self.run_js(f"window.scrollBy(0, {dy})")
+            self._undo_stack.push(
+                {
+                    "kind": "scroll",
+                    "dy": dy,
+                    "summary": f"scroll {'up' if dy < 0 else 'down'} ({abs(dy)}px)",
+                }
+            )
             time.sleep(0.2)
             return "scrolled"
         elif kind == "navigate":
             if not url.startswith(("http://", "https://")):
                 return "refused: invalid url"
             self.run_js(f"window.location.href = {json.dumps(url)}")
+            self._undo_stack.push(
+                {
+                    "kind": "navigate",
+                    "prev_url": prev_url,
+                    "new_url": url,
+                    "summary": f"navigate → {url[:40]}",
+                }
+            )
             self._wait_settled(prev, timeout=8.0)
             return f"navigated to {url}"
         elif kind == "back":

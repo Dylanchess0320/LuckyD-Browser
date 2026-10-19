@@ -70,12 +70,13 @@ def run_schedule(
         )
         register_plugin(AuditHook(session_id=session_id))
         try:
-            return _run_with_retries(store, sched, session_id, reason, retry_delay_sec)
+            result = _run_with_retries(store, sched, session_id, reason, retry_delay_sec)
         finally:
             # Restore whatever hooks the host process had.
             from core import hooks as _hooks_mod
 
             _hooks_mod._hooks = previous_hooks
+    return result
 
 
 def _run_with_retries(

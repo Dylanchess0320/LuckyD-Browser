@@ -34,7 +34,7 @@ class BudgetTracker:
             "max_llm_calls": settings.max_llm_calls or None,
             "max_search_queries": settings.max_search_queries or None,
             "max_fetches": settings.max_fetches or None,
-            "max_seconds": settings.max_seconds or None,
+            "max_seconds": int(settings.max_seconds) if settings.max_seconds else None,
         }
 
     def _mark_exhausted(self, reason: str) -> None:

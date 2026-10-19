@@ -274,7 +274,7 @@ class LLMClient:
                 if parts:
                     contents.append({"role": "model", "parts": parts})
             elif role == "tool":
-                name = m.get("name") or id_to_name.get(m.get("tool_call_id"), "tool")
+                name = m.get("name") or id_to_name.get(str(m.get("tool_call_id") or ""), "tool")
                 pending_responses.append(
                     {
                         "functionResponse": {

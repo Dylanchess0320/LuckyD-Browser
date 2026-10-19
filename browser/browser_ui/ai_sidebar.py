@@ -9,7 +9,7 @@ import html
 import json
 import re
 
-from browser_core.agent import AgentSession, JsBridge
+from browser_core.agent import ActionUndoStack, AgentSession, JsBridge
 from browser_core.ai_bridge import AIBridge
 from browser_core.brand import tokens as _brand_tokens
 from browser_core.lucky import greeting as _lucky_greeting
@@ -259,6 +259,7 @@ class AiSidebar(QDockWidget):
         self._chat_worker = None
         self._agent_worker = None
         self._agent_session = None
+        self._undo_stack = ActionUndoStack()
         self._harness_worker = None
         self._shot_worker = None
         self._shot_prompt = ""
@@ -411,9 +412,14 @@ class AiSidebar(QDockWidget):
         self.stop_btn.setToolTip("Stop the running task")
         self.stop_btn.setEnabled(False)
         self.stop_btn.clicked.connect(self._stop_agent)
+        self.undo_btn = QPushButton("Undo", body)
+        self.undo_btn.setToolTip("Undo the last reversible browser action taken by the agent")
+        self.undo_btn.setEnabled(False)
+        self.undo_btn.clicked.connect(self._undo_agent_step)
         agent_row.addWidget(self.agent_input, 1)
         agent_row.addWidget(self.agent_btn)
         agent_row.addWidget(self.stop_btn)
+        agent_row.addWidget(self.undo_btn)
         layout.addLayout(agent_row)
         self.vision_box = QCheckBox("Vision steps (auto — screenshots each step)", body)
         self.vision_box.setToolTip(
@@ -475,6 +481,11 @@ class AiSidebar(QDockWidget):
                 )
             elif state == "no_models":
                 pull = f" — run <code>{pull_cmd}</code>" if pull_cmd else ""
+                if name == "ollama":
+                    pull += (
+                        f" (<a href='luckyd://ollama-pull' style='color:{accent}'>"
+                        "click to pull llama3.2:3b now</a>)"
+                    )
                 steps.append(
                     f"• <b>{pretty} is up but has no models</b>{pull}, then restart LuckyD."
                 )
@@ -632,7 +643,25 @@ class AiSidebar(QDockWidget):
 
     def _open_link(self, url) -> None:
         """Chat links open as browser tabs — the user never leaves the app."""
+        if getattr(url, "scheme", lambda: "")() == "luckyd" and (
+            getattr(url, "host", lambda: "")() == "ollama-pull"
+        ):
+            self._pull_default_ollama_model()
+            return
         self._mw.open_in_new_tab(url)
+
+    def _pull_default_ollama_model(self, model: str = "llama3.2:3b") -> None:
+        """Trigger a background `ollama pull` from the setup hint."""
+        res = self.bridge.start_ollama_pull(model)
+        if res.get("started"):
+            self.status.setText(f"Pulling {model} via Ollama (PID {res.get('pid')})…")
+            self._append(
+                f"<i style='color:{_tok('accent')}'>Started <code>{html.escape(res.get('command', ''))}</code> "
+                "in the background. Re-select Ollama once the download completes.</i>"
+            )
+        else:
+            err = html.escape(str(res.get("error", "could not start ollama pull")))
+            self.status.setText(f"Ollama pull failed: {err}")
 
     def refresh_harness_status(self) -> None:
         """Update the coding-agent status line from the supervisor cache."""
@@ -1108,19 +1137,22 @@ class AiSidebar(QDockWidget):
                 self.vision_box.isChecked()
                 and self.bridge.supports_vision(self._selected_provider())
             ),
+            undo_stack=self._undo_stack,
         )
         self._agent_session = session
         self._agent_worker = _AgentWorker(
             self._agent_session, task, self._selected_provider(), self
         )
-        self._agent_worker.step.connect(
-            lambda m: self._append(f"<span style='color:{_tok('muted')}'>{html.escape(m)}</span>")
-        )
+        self._agent_worker.step.connect(self._on_agent_step)
         self._agent_worker.finished.connect(self._agent_done)
         self.agent_btn.setEnabled(False)
         self.stop_btn.setEnabled(True)
         self.status.setText("Agent running…")
         self._agent_worker.start()
+
+    def _on_agent_step(self, message: str) -> None:
+        self._append(f"<span style='color:{_tok('muted')}'>{html.escape(message)}</span>")
+        self.undo_btn.setEnabled(len(self._undo_stack) > 0)
 
     def _stop_agent(self) -> None:
         if self._harness_worker is not None:
@@ -1135,9 +1167,28 @@ class AiSidebar(QDockWidget):
         self._append(f"<b style='color:{_tok('accent')}'>Done:</b> {html.escape(result)}")
         self.agent_btn.setEnabled(True)
         self.stop_btn.setEnabled(False)
+        self.undo_btn.setEnabled(len(self._undo_stack) > 0)
         self.status.setText("Agent idle")
         self._agent_worker = None
         self._agent_session = None
+
+    def _undo_agent_step(self) -> None:
+        """Revert the most recent reversible browser action recorded in self._undo_stack."""
+        entry = self._undo_stack.pop()
+        if entry is None:
+            self.undo_btn.setEnabled(False)
+            self.status.setText("Nothing to undo")
+            return
+        js = ActionUndoStack.undo_js_for(entry)
+        view = self._mw.tabs.current_view()
+        if js and view is not None:
+            view.page().runJavaScript(js)
+        summary = str(entry.get("summary") or entry.get("kind") or "action")
+        self._append(
+            f"<span style='color:{_tok('accent2')}'>↩ Undid: {html.escape(summary)}</span>"
+        )
+        self.undo_btn.setEnabled(len(self._undo_stack) > 0)
+        self.status.setText(f"Undid {summary}")
 
     # ── harness-mode agent ──────────────────────────────────────────────
 

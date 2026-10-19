@@ -527,10 +527,86 @@ class AIBridge:
         """Probe diagnosis per local server: ok | not_running | no_models."""
         return dict(AIBridge._local_status)
 
+    def onboarding_status(self, recommended_model: str = "llama3.2:3b") -> dict[str, object]:
+        """First-run onboarding snapshot for local Ollama + provider health."""
+        import shutil
+
+        local = self.local_status()
+        ollama_state = local.get("ollama", "not_running")
+        ollama_bin = shutil.which("ollama")
+        def_prov = self.default_provider()
+        return {
+            "ready": bool(def_prov),
+            "default_provider": def_prov,
+            "ollama_installed": bool(ollama_bin),
+            "ollama_path": ollama_bin or "",
+            "ollama_state": ollama_state,
+            "ollama_running": ollama_state in ("ok", "no_models"),
+            "ollama_has_models": ollama_state == "ok",
+            "recommended_model": recommended_model,
+            "cline_credit_exhausted": self.cline_credit_exhausted(),
+            "faq_topics": [
+                {
+                    "id": "ollama",
+                    "title": "Free local AI (Ollama)",
+                    "summary": f"Install Ollama from https://ollama.com and pull `{recommended_model}` for unlimited offline AI.",
+                },
+                {
+                    "id": "smartscreen",
+                    "title": "Windows SmartScreen warning",
+                    "summary": "Unsigned open-source installer shows 'Unknown publisher' — click More info -> Run anyway, or use the Portable ZIP.",
+                },
+                {
+                    "id": "halcyon",
+                    "title": "Blocked installer on work PC",
+                    "summary": "Corporate AV (e.g. Halcyon) may block setup exes — download LuckyDBrowser-Portable-*.zip instead (no admin needed).",
+                },
+                {
+                    "id": "cline_zero",
+                    "title": "$0.00 Cline credit balance",
+                    "summary": "When Cline credits hit $0, LuckyD automatically falls back to free local Ollama or your next configured free provider.",
+                },
+            ],
+        }
+
+    @staticmethod
+    def start_ollama_pull(model: str = "llama3.2:3b") -> dict[str, object]:
+        """Start `ollama pull <model>` in the background (safe fixed argv)."""
+        import shutil
+        import subprocess
+
+        clean = (model or "llama3.2:3b").strip()
+        if not re.fullmatch(r"[A-Za-z0-9._:-]{1,80}", clean):
+            return {"started": False, "model": clean, "error": "invalid model name"}
+        exe = shutil.which("ollama")
+        if not exe:
+            return {
+                "started": False,
+                "model": clean,
+                "error": "ollama binary not found on PATH — install from https://ollama.com",
+            }
+        resolved = str(Path(exe).resolve())
+        if not Path(resolved).is_file():
+            return {"started": False, "model": clean, "error": "ollama binary is not a file"}
+        try:
+            proc = subprocess.Popen(
+                [resolved, "pull", clean],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            return {
+                "started": True,
+                "model": clean,
+                "pid": proc.pid,
+                "command": f"ollama pull {clean}",
+            }
+        except Exception as exc:
+            return {"started": False, "model": clean, "error": str(exc)}
+
     def is_opencode_zen(self, provider: str) -> bool:
         """True when the provider's endpoint is the OpenCode Zen gateway."""
         info = self._configs.get(provider)
-        return bool(info) and "opencode.ai" in info[1]
+        return bool(info and "opencode.ai" in info[1])
 
     def is_cline_gateway(self, provider: str) -> bool:
         """True when the provider talks to the Cline gateway (api.cline.bot).
@@ -539,7 +615,7 @@ class AIBridge:
         / free tier) — they share one endpoint and one auth.
         """
         info = self._configs.get(provider)
-        return bool(info) and "api.cline.bot" in info[1]
+        return bool(info and "api.cline.bot" in info[1])
 
     def provider_label(self, provider: str) -> str | None:
         """Endpoint-aware display name: 'OpenCode Zen' / 'Cline' vs plain 'OpenAI'."""
@@ -614,7 +690,7 @@ class AIBridge:
         Name-family heuristics (_VISION_HINTS); unknown models get False
         so screenshots are never sent to a text-only endpoint.
         """
-        model = self.model_for(provider).lower()
+        model = self.model_for(provider or "").lower()
         if not model or any(x in model for x in _VISION_EXCLUDE):
             return False
         return any(h in model for h in _VISION_HINTS)
@@ -624,7 +700,7 @@ class AIBridge:
         info = self._configs.get(provider)
         # Key check alone is not enough: session-based clinepass can hold an
         # empty placeholder token while it waits for a lazy refresh.
-        return bool(info) and info[2] == "" and provider in {name for name, *_ in _LOCAL_SPECS}
+        return bool(info and info[2] == "" and provider in {name for name, *_ in _LOCAL_SPECS})
 
     def set_model_override(self, provider: str, model: str) -> None:
         """Switch a provider's model at runtime (sidebar model picker)."""
@@ -702,8 +778,7 @@ class AIBridge:
             candidates = [configured, *[m for m in _CLINE_GATEWAY_TOP_MODELS if m != configured]]
         else:
             candidates = [configured]
-        seen: set[str] = set()
-        ordered = [m for m in candidates if m and not (m in seen or seen.add(m))]
+        ordered = list(dict.fromkeys(m for m in candidates if m))
         body: dict = {"messages": messages}
         if temperature is not None:
             body["temperature"] = temperature

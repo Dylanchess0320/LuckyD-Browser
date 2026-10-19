@@ -245,7 +245,8 @@ class HarnessBridge:
     async def list_tools(self) -> list:
         data = await self._get("/api/tools")
         if isinstance(data, dict):
-            return data.get("tools", data.get("data", []))
+            items = data.get("tools", data.get("data", []))
+            return list(items) if isinstance(items, list) else []
         return data if isinstance(data, list) else []
 
     async def list_models(self):

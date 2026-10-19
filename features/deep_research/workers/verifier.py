@@ -176,9 +176,8 @@ def audit_claims(
             )
 
     unsupported = sum(1 for f in findings if f.verdict != "supported")
-    verdict = "fail" if unsupported > 0 else "pass"
     return CitationAudit(
-        verdict=verdict,
+        verdict="fail" if unsupported > 0 else "pass",
         claims=findings,
         unsupported_count=unsupported,
         summary=f"{unsupported} of {len(findings)} claims unsupported or mis-cited",

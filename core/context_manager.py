@@ -6,6 +6,7 @@ Borrows patterns from Cline's session-compaction.ts with multiple strategies.
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import Any
 
 from .types import CompactionStrategy
 
@@ -131,7 +132,7 @@ async def summarize_messages(
     messages: list[dict],
     max_messages: int = 40,
     keep_recent: int = 15,
-    summarizer_fn: Callable[[str], str] | None = None,
+    summarizer_fn: Callable[[str], Any] | None = None,
 ) -> list[dict]:
     """Summarize older messages using an LLM call.
     Falls back to truncation if no summarizer_fn provided.

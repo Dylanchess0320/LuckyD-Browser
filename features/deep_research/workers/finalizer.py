@@ -52,10 +52,10 @@ def render_markdown(
         lines.append("")
 
     # Sources appendix
-    cited = set(report.evidence_ids_used)
+    cited_set = set(report.evidence_ids_used)
     for sec in report.sections:
-        cited.update(sec.citations)
-    cited = sorted(cited)
+        cited_set.update(sec.citations)
+    cited = sorted(cited_set)
     by_id = {e.id: e for e in evidence}
     if cited:
         lines.append("## Sources")

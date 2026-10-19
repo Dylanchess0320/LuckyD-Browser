@@ -410,7 +410,7 @@ if __name__ == "__main__":
     # Self-test:  python -m browser_core.tile_registry
     import sys
 
-    if sys.platform == "win32":
+    if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     ts = load_tiles()
     print(f"registry OK — {len(ts)} enabled tile(s)")

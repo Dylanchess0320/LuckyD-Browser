@@ -22,7 +22,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-import yaml  # type: ignore  # added to requirements (pyyaml)
+import yaml
 
 from ..config import settings
 from ..graph import run_swarm
@@ -98,7 +98,7 @@ class EvalReport:
 
 
 def _score_report(
-    report: ResearchReport, evidence: list[EvidenceCard], llm: Any | None = None
+    report: ResearchReport | None, evidence: list[EvidenceCard], llm: Any | None = None
 ) -> tuple[float, int, int]:
     """Return (citation_precision, unsupported_claims, source_diversity)."""
     if not report:
