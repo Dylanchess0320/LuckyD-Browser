@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "luckyd-code"
-version = "10.7.4"
+version = "10.7.5"
 description = "LuckyD Browser's local-first AI backend and coding agent — agent tools, memory graph, multi-LLM support, and the skills/WebMCP infrastructure"
 readme = "README.md"
 license = {text = "MIT"}
@@ -198,6 +198,15 @@ module = [
 ]
 ignore_missing_imports = true
 
+# PySide6's generated .pyi stubs contain C++ literals (`= false`) that raise
+# [name-defined] on Windows when PySide6 is installed (CI runs without PySide6).
+[[tool.mypy.overrides]]
+module = [
+    "PySide6.*",
+]
+follow_imports = "skip"
+ignore_missing_imports = true
+
 # Tools declare explicit execute() signatures over ToolBase.execute(**kwargs):
 # deliberate design, not a bug. Silence only the override check for tools.
 [[tool.mypy.overrides]]
@@ -213,16 +222,6 @@ disable_error_code = "override"
 # from this list. Full per-file inventory: docs/mypy-debt.md
 [[tool.mypy.overrides]]
 module = [
-    "browser.browser_core.ai_bridge",
-    "browser.browser_core.control_server",
-    "browser.browser_core.netmon",
-    "browser.browser_core.scheduler",
-    "browser.browser_core.terminal_server",
-    "browser.browser_core.workflows",
-    "browser.browser_core.workspaces",
-    "browser.browser_ui.ai_sidebar",
-    "browser.browser_ui.main_window",
-    "browser.browser_ui.tab_widget",
     "core.advanced_debugging",
     "core.advanced_memory",
     "core.agent_loop",
@@ -233,7 +232,6 @@ module = [
     "core.parallel_executor",
     "core.project_intelligence",
     "core.run_lock",
-    "core.scheduler",
     "features.deep_research.graph",
     "features.deep_research.models.openai_compat",
     "features.deep_research.runtime.tui",
@@ -241,17 +239,6 @@ module = [
     "memory.embeddings",
     "memory.graph",
     "memory.store",
-    "tools.bash_tool",
-    "tools.file_tools",
-    "tools.git_tools",
-    "tools.harness_tool",
-    "tools.lsp_tools",
-    "tools.memory_tools",
-    "tools.schedule_tools",
-    "tools.skill_market_tools",
-    "tools.task_tools",
-    "tools.utility_tools",
-    "tools.web_tools",
 ]
 ignore_errors = true
 

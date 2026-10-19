@@ -1,91 +1,78 @@
 # LuckyD Browser — Free Models Catalog
 
-Synced from **opencode's open model registry** ([models.dev](https://models.dev)) on **August 24, 2026**.
-`free_models` below means **$0 per token** in that registry — verified, not guessed.
-Across all 88 providers in the registry there are 961 free models; the ones wired into LuckyD are listed here.
+Synced with the wired provider catalogs on **October 19, 2026** (10.7.5).
+`free_models` below means **$0 per token** on that provider — local models,
+free-tier quotas, or `:free` catalog ids. Anything that bills per token or
+needs a paid subscription is listed as paid, never as free.
 
-## OpenCode Zen (opencode's own gateway) — 28 free
+## Always free, no key (local)
 
-- `big-pickle`
-- `deepseek-v4-flash-free`
-- `glm-4.7-free`
-- `glm-5-free`
-- `grok-code`
-- `hy3-free`
-- `hy3-preview-free`
-- `kimi-k2.5-free`
-- `laguna-s-2.1-free`
-- `ling-2.6-flash-free`
-- `ling-3.0-flash-free`
-- `ling-3.0-tiny-free`
-- `longcat-2.0-free`
-- `mimo-v2-flash-free`
-- `mimo-v2-omni-free`
-- `mimo-v2-pro-free`
-- `mimo-v2.5-free`
-- `minimax-m2.1-free`
-- `minimax-m2.5-free`
-- `minimax-m3-free`
-- `muse-spark-1.2-contributor-free`
-- `nemotron-3-ultra-free`
-- `nemotron-3.5-lightning-free`
-- `north-mini-code-free`
-- `qwen3.6-plus-free`
-- `ring-2.6-1t-free`
-- `trinity-large-preview-free`
-- `x-preview-f-free`
+- Ollama: `llama3.2:3b`, `gemma3:4b`, `phi3:mini`, `mistral:7b`, `codellama:7b`
+  (plus any model the local server reports — the first installed model wins)
 
-## OpenRouter — :free tier
+## Free with a login or free-tier key
 
-- `openrouter/free`
-- `cohere/north-mini-code:free`
-- `dots-studio/dots-3-note-preview:free`
-- `google/gemma-4-26b-a4b-it:free`
-- `google/gemma-4-31b-it:free`
-- `liquid/lfm-2.5-2.6b:free`
-- `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free`
-- `nvidia/nemotron-3-super-120b-a12b:free`
-- `nvidia/nemotron-3-ultra-550b-a55b:free`
-- `nvidia/nemotron-3.5-lightning:free`
-- `openrouter/auto`
-- `poolside/laguna-s-2.1:free`
-- `poolside/laguna-xs-2.1:free`
-- `stealth/ox-alpha`
-- `thinkingmachines/inkling-small:free`
-- `thinkingmachines/inkling:free`
-- `z-ai/glm-5.2:free`
+- **Cline Usage** (logged-in Cline CLI session, rate-limited $0 models):
+  `minimax/minimax-m2.5`, `deepseek/deepseek-chat`, `deepseek/deepseek-r1`,
+  `meta-llama/llama-3.2-3b-instruct`, `google/gemini-2.5-flash`,
+  `qwen/qwen3-8b`, `kwaipilot/kat-coder-pro`, `z-ai/glm-5`,
+  `deepseek/deepseek-v4-flash`, `z-ai/glm-5.3-flash`,
+  `poolside/laguna-s-2.1:free`, `cline-free/longcat-2.0`
+- **Google Gemini** (free-tier key): `gemini-2.5-flash`,
+  `gemini-2.5-flash-lite`, `gemini-3.5-flash-lite`, `gemini-3.5-flash`,
+  `gemini-3.8-flash`, `gemma-4-26b-a4b-it`, `gemma-4-31b-it`
+- **OpenRouter** (`:free` ids + the meta-router): `openrouter/free`,
+  `nvidia/nemotron-3-ultra-550b-a55b:free`, `z-ai/glm-5.2:free`,
+  `thinkingmachines/inkling:free`, `thinkingmachines/inkling-small:free`,
+  `google/gemma-4-31b-it:free`, `google/gemma-4-26b-a4b-it:free`,
+  `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free`,
+  `nvidia/nemotron-3-super-120b-a12b:free`,
+  `nvidia/nemotron-3.5-lightning:free`, `cohere/north-mini-code:free`,
+  `liquid/lfm-2.5-2.6b:free`, `poolside/laguna-s-2.1:free`,
+  `poolside/laguna-xs-2.1:free`
+- **Groq** (free-tier key): `groq/compound-mini`, `groq/compound`, `allam-2-7b`
+- **Z.ai** (free-tier key): `glm-5.3-flash`, `glm-4.7-flash`, `glm-4.5-flash`
 
-## Google — $0 vision/chat
+## Paid — kept as opt-in only (your own key, never the auto default)
 
-- `gemma-4-26b-a4b-it`
-- `gemma-4-31b-it`
+- OpenAI `gpt-6-sol`, Anthropic `claude-opus-5-5`, DeepSeek `deepseek-v4`
+  (cheap pay-per-token), xAI `grok-4.7`, Moonshot `kimi-k3`,
+  Meta `muse-wonder-1.0`, Mistral `mistral-large-4`, ClinePass
+  (`cline-pass/*`, $9.99/mo flat subscription), OpenCode Zen (keyed gateway;
+  its old keyless `-free` tier died in 2026-09 — every keyless call 401s, so
+  no Zen model is listed as free anymore).
 
-## Groq — $0
+## Removed in 10.7.5 (dead or mislabeled ids)
 
-- `allam-2-7b`
-- `groq/compound`
-- `groq/compound-mini`
-
-## Z.ai (GLM flash) — $0
-
-- `glm-4.5-flash`
-- `glm-4.7-flash`
-
-### Ollama (local — always free, no key)
-
-- `llama3.2:3b`, `gemma3:4b`, `phi3:mini`, `mistral:7b`, `codellama:7b`
+- OpenCode Zen `-free` ids (`*-free` keyless catalog) — tier retired 2026-09.
+- `deepseek-chat` / `deepseek-coder` / `deepseek-lite` as “free” DeepSeek
+  models — DeepSeek bills per token; the retired chat default is gone.
+- `google/gemini-2.0-flash` (Cline list) — superseded by `gemini-2.5-flash`.
+- `deepseek/deepseek-chat-v3.1:free` (free rotation) — never existed; the
+  rotation now uses the real `openrouter/free` meta-router.
+- `stealth/ox-alpha`, `openrouter/auto` (OpenRouter list) — not guaranteed
+  $0; `auto` can route to paid models.
+- Credit-billed Cline ids in the free picker (`gpt-4o`, `claude-sonnet-4-6`,
+  `gemini-2.5-pro`, …) — still reachable by exact-id override, no longer
+  presented next to the $0 models.
 
 ## How LuckyD uses this
 
-- The AI sidebar (Ctrl+J) pulls **live** model lists per provider; when a live fetch fails it falls back to the curated free catalogs baked into `browser_core/ai_bridge.py` (`_OPENCODE_FREE_CATALOG`, `_OPENROUTER_FREE_FALLBACK`).
-- OpenRouter's picker sorts every `:free` model to the top automatically.
-- `openrouter/free` is a meta-router: it auto-picks whichever free model is available.
-- The coding agent can use OpenCode Zen directly: set `CODING_AGENT_PROVIDER=opencode` (key: `OPENCODE_API_KEY`).
+- Auto mode is free-first on every surface: Cline free tier → Gemini free
+  tier → local Ollama → OpenRouter/Groq free catalogs. A paid provider is
+  used only when you pick it explicitly *and* its key is present; a stale
+  paid pick with no key falls back to the free rotation instead of failing.
+- The AI sidebar pulls **live** model lists per provider; when a live fetch
+  fails it falls back to the curated catalogs baked into
+  `browser_core/ai_bridge.py` (`_OPENROUTER_FREE_FALLBACK`,
+  `_CLINE_USAGE_CATALOG`).
+- `openrouter/free` is a meta-router: it auto-picks whichever free model is
+  available.
 
 ## Switching providers
 
 ```bash
-python main.py model nemotron-3-ultra-free   # OpenCode Zen
+python main.py model openrouter/free   # OpenRouter free meta-router
 python main.py model nvidia/nemotron-3-ultra-550b-a55b:free  # OpenRouter free
 provider openrouter
 ```

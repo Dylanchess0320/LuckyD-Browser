@@ -85,63 +85,85 @@ class RoutingResult:
     error: str | None = None
 
 
-# ── Pre-built Model Catalog ───────────────────────────────────────────
+# ── Pre-built Model Catalog (10.7.5 free-first) ───────────────────────────────────────────
 
 MODEL_CATALOG: dict[str, ModelConfig] = {
-    # Frontier models
+    # Free models ($0/token: local or free-tier catalogs) — auto default.
+    "ollama-local": ModelConfig(
+        name="Llama 3.2 3B (Local, free)",
+        provider="ollama",
+        model_id="llama3.2:3b",
+        cost_per_1k_input=0.0,
+        cost_per_1k_output=0.0,
+        avg_latency_ms=1500,
+        strengths=["code", "privacy", "offline", "speed"],
+        context_window=128_000,
+    ),
+    "openrouter-free": ModelConfig(
+        name="OpenRouter Free (auto, free)",
+        provider="openrouter",
+        model_id="openrouter/free",
+        cost_per_1k_input=0.0,
+        cost_per_1k_output=0.0,
+        avg_latency_ms=1500,
+        strengths=["code", "reasoning", "speed"],
+        context_window=128_000,
+    ),
+    "gemini-flash-free": ModelConfig(
+        name="Gemini 2.5 Flash (free tier)",
+        provider="google",
+        model_id="gemini-2.5-flash",
+        cost_per_1k_input=0.0,
+        cost_per_1k_output=0.0,
+        avg_latency_ms=1200,
+        strengths=["code", "reasoning", "speed", "long_context"],
+        context_window=1_000_000,
+    ),
+    "groq-free": ModelConfig(
+        name="Groq Compound Mini (free tier)",
+        provider="groq",
+        model_id="groq/compound-mini",
+        cost_per_1k_input=0.0,
+        cost_per_1k_output=0.0,
+        avg_latency_ms=600,
+        strengths=["speed", "simple_tasks", "code"],
+        context_window=128_000,
+    ),
+    "cline-free": ModelConfig(
+        name="DeepSeek via Cline (free tier)",
+        provider="cline-usage",
+        model_id="deepseek/deepseek-chat",
+        cost_per_1k_input=0.0,
+        cost_per_1k_output=0.0,
+        avg_latency_ms=1500,
+        strengths=["code", "reasoning"],
+        context_window=128_000,
+    ),
+    # Paid frontier (explicit picks / fallback only, user's own key).
+    # 10.7.5: retired 2025 ids (gpt-4o, claude-opus-4-6,
+    # gemini-2.5-pro-preview, codellama:34b) removed.
     "claude-opus": ModelConfig(
-        name="Claude Opus 4.6",
+        name="Claude Opus 5.5 (paid)",
         provider="anthropic",
-        model_id="claude-opus-4-6",
-        cost_per_1k_input=0.015,
-        cost_per_1k_output=0.075,
+        model_id="claude-opus-5-5",
+        cost_per_1k_input=0.004,
+        cost_per_1k_output=0.02,
         avg_latency_ms=3000,
         strengths=["reasoning", "code", "analysis", "writing"],
         context_window=200_000,
     ),
-    "gpt-4o": ModelConfig(
-        name="GPT-4o",
+    "gpt-frontier": ModelConfig(
+        name="GPT-6 Sol (paid)",
         provider="openai",
-        model_id="gpt-4o",
-        cost_per_1k_input=0.005,
-        cost_per_1k_output=0.015,
+        model_id="gpt-6-sol",
+        cost_per_1k_input=0.002,
+        cost_per_1k_output=0.01,
         avg_latency_ms=2000,
         strengths=["code", "reasoning", "multimodal"],
         context_window=128_000,
     ),
-    "gemini-2.5-pro": ModelConfig(
-        name="Gemini 2.5 Pro",
-        provider="openrouter",
-        model_id="google/gemini-2.5-pro-preview",
-        cost_per_1k_input=0.00125,
-        cost_per_1k_output=0.01,
-        avg_latency_ms=2500,
-        strengths=["reasoning", "code", "long_context"],
-        context_window=1_000_000,
-    ),
-    # Fast/cheap models
-    "claude-haiku": ModelConfig(
-        name="Claude Haiku 4.5",
-        provider="anthropic",
-        model_id="claude-haiku-4-5",
-        cost_per_1k_input=0.0008,
-        cost_per_1k_output=0.004,
-        avg_latency_ms=800,
-        strengths=["speed", "code"],
-        context_window=200_000,
-    ),
-    "gpt-4o-mini": ModelConfig(
-        name="GPT-4o Mini",
-        provider="openai",
-        model_id="gpt-4o-mini",
-        cost_per_1k_input=0.00015,
-        cost_per_1k_output=0.0006,
-        avg_latency_ms=600,
-        strengths=["speed", "simple_tasks"],
-        context_window=128_000,
-    ),
     "kimi-k3": ModelConfig(
-        name="Kimi K3",
+        name="Kimi K3 (paid)",
         provider="openrouter",
         model_id="moonshotai/kimi-k3",
         cost_per_1k_input=0.0005,
@@ -149,17 +171,6 @@ MODEL_CATALOG: dict[str, ModelConfig] = {
         avg_latency_ms=1200,
         strengths=["code", "reasoning", "speed"],
         context_window=256_000,
-    ),
-    # Local models
-    "ollama-codellama": ModelConfig(
-        name="CodeLlama 34B (Local)",
-        provider="ollama",
-        model_id="codellama:34b",
-        cost_per_1k_input=0.0,
-        cost_per_1k_output=0.0,
-        avg_latency_ms=5000,
-        strengths=["code", "privacy", "offline"],
-        context_window=16_000,
     ),
 }
 
@@ -262,7 +273,7 @@ class ModelRouter:
     def __init__(
         self,
         models: list[ModelConfig] | None = None,
-        default_model: str = "kimi-k3",
+        default_model: str = "llama3.2:3b",
         max_cost_per_task: float = 0.50,  # USD
         fallback_enabled: bool = True,
     ):
@@ -389,6 +400,12 @@ class ModelRouter:
         needed = complexity_scores.get(complexity, {})
         for strength in model.strengths:
             score += needed.get(strength, 0)
+
+        # 10.7.5 free-first: $0 models (local / free-tier catalogs) win
+        # auto-routing so LuckyD works with no key and no bill by default.
+        # Paid frontier models remain reachable as fallbacks/explicit picks.
+        if model.cost_per_1k_input == 0 and model.cost_per_1k_output == 0:
+            score += 60
 
         # Latency penalty
         if latency_req == LatencyRequirement.INTERACTIVE:

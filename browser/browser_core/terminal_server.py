@@ -685,7 +685,8 @@ def mesh_doctor() -> list[dict[str, object]]:
         label = str(spec["label"])
         exe = str(spec["exe"])
         tier = str(spec["tier"])
-        env_keys = tuple(spec.get("env_keys") or ())  # type: ignore[arg-type]
+        raw_env_keys = spec.get("env_keys")
+        env_keys = tuple(raw_env_keys) if isinstance(raw_env_keys, (list, tuple)) else ()
         install_hint = str(spec.get("install_hint") or "")
 
         exe_path = _find_wsl_exe() if shell in MESH_WSL_SHELLS else _find_mesh_exe(exe)
@@ -890,11 +891,11 @@ def _spawn_pty(
     if shell == "agent":
         env["LUCKYD_AGENT_SLOT"] = "1"
         env["LUCKYD_AGENT_NAME"] = "Agent 1"
-        env["LUCKYD_AGENT_VERSION"] = "v10.7.4"
+        env["LUCKYD_AGENT_VERSION"] = "v10.7.5"
     elif shell == "agent2":
         env["LUCKYD_AGENT_SLOT"] = "2"
         env["LUCKYD_AGENT_NAME"] = "Agent 2"
-        env["LUCKYD_AGENT_VERSION"] = "v10.7.4"
+        env["LUCKYD_AGENT_VERSION"] = "v10.7.5"
     # pywinpty's PTY.spawn() expects the environment as a NUL-joined block
     # string ("name=value\0name=value\0…"), NOT a dict — passing a dict
     # raises cffi's "argument env: 'dict' object is not an instance of str",
@@ -929,7 +930,7 @@ class TerminalServer:
         self.cli_path = cli_path  # explicit CLI override (browser `terminal_cli` setting)
         self.cli2_path = cli2_path  # 2nd-agent override (browser `terminal_cli2` setting)
         self._token = token
-        self._server = None
+        self._server: object = None
         self._thread: threading.Thread | None = None
         self._clients: set = set()
         self._lock = threading.Lock()
@@ -1012,11 +1013,16 @@ class TerminalServer:
                         break
                     data = pty.read(blocking=False)
                     if data:
+                        text_chunk = (
+                            data.decode("utf-8", errors="replace")
+                            if isinstance(data, bytes)
+                            else str(data)
+                        )
                         idle_streak = 0
                         if first_at is None:
                             first_at = time.monotonic()
-                        chunks.append(data)
-                        buffered += len(data)
+                        chunks.append(text_chunk)
+                        buffered += len(text_chunk)
                         if (
                             buffered >= _FLUSH_BYTES
                             or time.monotonic() - first_at >= _FLUSH_AFTER_SEC
@@ -1096,19 +1102,21 @@ class TerminalServer:
             return False
         try:
             # Limit WS frame size — unbounded messages can OOM via pty.write.
-            self._server = serve(self._handle, self.host, self.port, max_size=1 << 20)
+            server = serve(self._handle, self.host, self.port, max_size=1 << 20)
+            self._server = server
         except OSError:
             return False
         self._thread = threading.Thread(
-            target=self._server.serve_forever, name="terminal-ws", daemon=True
+            target=server.serve_forever, name="terminal-ws", daemon=True
         )
         self._thread.start()
         return True
 
     def stop(self) -> None:
         with contextlib.suppress(Exception):
-            if self._server is not None:
-                self._server.shutdown()
+            shutdown = getattr(self._server, "shutdown", None)
+            if callable(shutdown):
+                shutdown()
         with self._lock:
             clients = list(self._clients)
             self._clients.clear()

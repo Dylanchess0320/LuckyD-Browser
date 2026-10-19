@@ -290,6 +290,9 @@ CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
 """
 
 
+_List = list
+
+
 class ScheduleStore:
     """Thread-safe SQLite store for schedules, run history, and digest state."""
 
@@ -353,7 +356,7 @@ class ScheduleStore:
         d["allow_scopes"] = _json.loads(d["allow_scopes"] or "[]")
         return Schedule.from_dict(d)
 
-    def list(self, enabled_only: bool = False) -> list[Schedule]:
+    def list(self, enabled_only: bool = False) -> _List[Schedule]:
         import json as _json
 
         with self._lock, self._connect() as conn:
@@ -411,7 +414,7 @@ class ScheduleStore:
             conn.execute("DELETE FROM runs WHERE schedule_id=?", (schedule_id,))
             return cur.rowcount > 0
 
-    def due(self, now: datetime | None = None) -> list[Schedule]:
+    def due(self, now: datetime | None = None) -> _List[Schedule]:
         now = now or datetime.now(timezone.utc)
         return [
             s
@@ -447,7 +450,7 @@ class ScheduleStore:
                 (_now_iso(), status, summary[:2000], turns, duration_sec, error[:1000], run_id),
             )
 
-    def history(self, schedule_id: str | None = None, limit: int = 20) -> list[dict[str, Any]]:
+    def history(self, schedule_id: str | None = None, limit: int = 20) -> _List[dict[str, Any]]:
         # rowid DESC breaks started_at ties (timestamps have 1s granularity,
         # so rapid retries land in the same second) — newest row first,
         # deterministically, on every platform.
@@ -464,7 +467,7 @@ class ScheduleStore:
         return [dict(r) for r in rows]
 
     # ── digest ──
-    def digest(self, since_iso: str | None = None) -> list[dict[str, Any]]:
+    def digest(self, since_iso: str | None = None) -> _List[dict[str, Any]]:
         """Runs finished since `since_iso` (or since the digest watermark)."""
         watermark = since_iso or self.get_meta("digest_seen") or "1970-01-01T00:00:00+00:00"
         with self._lock, self._connect() as conn:

@@ -11,6 +11,7 @@ import os
 import re
 import time
 from pathlib import Path
+from typing import Any
 
 from .base import ToolBase, ToolOutput
 from .registry import register_tool
@@ -26,9 +27,24 @@ _pw_manager = None
 _headless = True
 _device_config: dict | None = None
 _intercepts: list[dict] = []
+_console_logs: list[dict[str, Any]] = []
+_MAX_CONSOLE_LOGS = 200
 # Path to a saved storage_state file (.browser_state.json); passed to
 # new_context() so cookies AND localStorage are restored on load.
 _storage_state_path: str | None = None
+
+
+def _record_console_entry(entry_type: str, text: str) -> None:
+    """Append a bounded console or pageerror entry."""
+    _console_logs.append(
+        {
+            "type": str(entry_type or "log"),
+            "text": str(text)[:2000],
+            "ts": time.time(),
+        }
+    )
+    if len(_console_logs) > _MAX_CONSOLE_LOGS:
+        del _console_logs[:-_MAX_CONSOLE_LOGS]
 
 
 def _make_fulfill_handler(status: int):
@@ -76,6 +92,20 @@ async def _get_page():
         _browser = await p.chromium.launch(headless=_headless)
         ctx = await _browser.new_context(**context_opts)
         _page = await ctx.new_page()
+        if hasattr(_page, "on"):
+            with contextlib.suppress(Exception):
+                _page.on(
+                    "console",
+                    lambda msg: _record_console_entry(
+                        msg.type()
+                        if callable(getattr(msg, "type", None))
+                        else str(getattr(msg, "type", "log")),
+                        msg.text()
+                        if callable(getattr(msg, "text", None))
+                        else str(getattr(msg, "text", msg)),
+                    ),
+                )
+                _page.on("pageerror", lambda err: _record_console_entry("pageerror", str(err)))
         # Apply pending intercepts
         for ic in _intercepts:
             await _page.route(ic["pattern"], _make_fulfill_handler(ic.get("status", 200)))
@@ -477,7 +507,9 @@ class BrowserEmulateTool(ToolBase):
         global _device_config
         try:
             if device and device.lower() != "desktop":
-                from playwright.async_api import devices as pw_devices
+                import playwright.async_api as _pw_api
+
+                pw_devices = _pw_api.devices
 
                 device_name = None
                 # Try exact match first
@@ -660,6 +692,400 @@ class BrowserToggleHeadlessTool(ToolBase):
             return ToolOutput(text=f"Headless toggle error: {e}", error=True)
 
 
+# ---------------------------------------------------------------------------
+# 16. BrowserConsoleTool -- inspect console messages and uncaught page errors
+# ---------------------------------------------------------------------------
+class BrowserConsoleTool(ToolBase):
+    name = "BrowserConsole"
+    description = (
+        "Read or clear captured console messages and uncaught page errors from "
+        "the active Playwright browser session."
+    )
+    aliases = ["ConsoleLogs", "PageErrors"]
+    parameters = {
+        "action": {
+            "type": "string",
+            "enum": ["list", "clear"],
+            "description": "Action: 'list' (default) to read logs or 'clear' to empty the log buffer.",
+        },
+        "level": {
+            "type": "string",
+            "description": (
+                "Optional filter by level ('error', 'warning', 'log', 'info', 'pageerror'). "
+                "Empty returns all levels."
+            ),
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Maximum number of recent log entries to return (default: 50).",
+        },
+    }
+
+    async def execute(
+        self, action: str = "list", level: str = "", limit: int = 50
+    ) -> ToolOutput:
+        try:
+            if action == "clear":
+                _console_logs.clear()
+                return ToolOutput(
+                    text="Console log buffer cleared.",
+                    title="Console Cleared",
+                    metadata={"cleared": True, "count": 0},
+                )
+            if action != "list":
+                return ToolOutput(text=f"Unknown action: {action}", error=True)
+
+            lvl = (level or "").strip().lower()
+            entries = list(_console_logs)
+            if lvl:
+                if lvl == "error":
+                    entries = [e for e in entries if e.get("type") in ("error", "pageerror")]
+                else:
+                    entries = [e for e in entries if e.get("type") == lvl]
+            cap = max(1, min(int(limit or 50), _MAX_CONSOLE_LOGS))
+            entries = entries[-cap:]
+            if not entries:
+                return ToolOutput(
+                    text="No console messages or page errors recorded.",
+                    title="Browser Console (0)",
+                    metadata={"logs": [], "count": 0},
+                )
+            lines = [f"  [{e.get('type', 'log')}] {e.get('text', '')}" for e in entries]
+            return ToolOutput(
+                text=f"Console logs ({len(entries)}):\n" + "\n".join(lines),
+                title=f"Browser Console ({len(entries)})",
+                metadata={"logs": entries, "count": len(entries)},
+            )
+        except Exception as e:
+            return ToolOutput(text=f"Browser console error: {e}", error=True)
+
+
+# ---------------------------------------------------------------------------
+# 17. BrowserControlTool -- drive the LIVE LuckyD Browser desktop window
+# ---------------------------------------------------------------------------
+
+
+def _discover_control_api(port: int = 0, token: str = "") -> tuple[str, str]:
+    """Resolve the live LuckyD Browser Control API base URL and bearer token.
+
+    Checks explicit arguments first, then environment variables
+    (LUCKYD_API_PORT / BROWSER_API_PORT, LUCKYD_API_TOKEN / BROWSER_API_TOKEN),
+    and finally the browser's settings.json file on disk.
+    """
+    resolved_port = int(port or 0)
+    if not resolved_port:
+        for env_key in ("LUCKYD_API_PORT", "BROWSER_API_PORT"):
+            raw = os.environ.get(env_key, "").strip()
+            if raw.isdigit():
+                resolved_port = int(raw)
+                break
+
+    resolved_token = (token or "").strip()
+    if not resolved_token:
+        for env_key in ("LUCKYD_API_TOKEN", "BROWSER_API_TOKEN"):
+            val = os.environ.get(env_key, "").strip()
+            if val:
+                resolved_token = val
+                break
+
+    if not resolved_port or not resolved_token:
+        candidates: list[Path] = [
+            Path(__file__).resolve().parent.parent / "browser" / "data" / "settings.json",
+        ]
+        local_appdata = os.environ.get("LOCALAPPDATA", "").strip()
+        if local_appdata:
+            candidates.append(Path(local_appdata) / "LuckyDBrowser" / "settings.json")
+        candidates.append(Path.home() / "AppData" / "Local" / "LuckyDBrowser" / "settings.json")
+        candidates.append(Path.home() / ".luckyd-browser" / "settings.json")
+
+        for path in candidates:
+            try:
+                if not path.is_file():
+                    continue
+                data = json.loads(path.read_text(encoding="utf-8"))
+                if not isinstance(data, dict):
+                    continue
+                if not resolved_port and int(data.get("browser_api_port", 0) or 0) > 0:
+                    resolved_port = int(data["browser_api_port"])
+                if not resolved_token and str(data.get("browser_api_token", "") or "").strip():
+                    resolved_token = str(data["browser_api_token"]).strip()
+                if resolved_port and resolved_token:
+                    break
+            except Exception:
+                continue
+
+    if resolved_port <= 0:
+        resolved_port = 9777
+    return f"http://127.0.0.1:{resolved_port}", resolved_token
+
+
+class BrowserControlTool(ToolBase):
+    name = "BrowserControl"
+    description = (
+        "Drive the user's LIVE LuckyD Browser desktop window via the local "
+        "Browser Control API (127.0.0.1:9777). Supports reading open tabs, "
+        "snapshots with numbered interactive elements, clicking/typing/scrolling, "
+        "reversible tab actions (pin, mute, move, duplicate, close_duplicates, "
+        "undo_tab), JS evaluation, and page-grounded AI queries. Auto-discovers "
+        "the API port and bearer token from settings.json or environment."
+    )
+    aliases = ["LuckyDBrowser", "LiveBrowser", "ControlBrowser"]
+    parameters = {
+        "action": {
+            "type": "string",
+            "enum": [
+                "status",
+                "tabs",
+                "navigate",
+                "new_tab",
+                "activate_tab",
+                "close_tab",
+                "tab_action",
+                "undo_tab",
+                "snapshot",
+                "act",
+                "undo",
+                "eval",
+                "ask",
+                "extract",
+                "screenshot",
+            ],
+            "description": "Control API operation to execute against the live LuckyD Browser.",
+        },
+        "url": {
+            "type": "string",
+            "description": "Target URL (for navigate, new_tab, act=navigate, or screenshot).",
+        },
+        "new_tab": {
+            "type": "boolean",
+            "description": "When action='navigate', open the URL in a new tab if True.",
+        },
+        "index": {
+            "type": "integer",
+            "description": "Tab index (for activate_tab, close_tab, tab_action) or element index (for act).",
+        },
+        "to_index": {
+            "type": "integer",
+            "description": "Destination tab index when action='tab_action' and tab_op='move'.",
+        },
+        "tab_op": {
+            "type": "string",
+            "enum": [
+                "pin",
+                "mute",
+                "duplicate",
+                "move",
+                "close_duplicates",
+                "reopen_closed",
+                "undo",
+            ],
+            "description": "Tab bar operation when action='tab_action'.",
+        },
+        "act_type": {
+            "type": "string",
+            "enum": [
+                "click",
+                "type",
+                "press",
+                "select",
+                "scroll",
+                "navigate",
+                "back",
+                "undo",
+                "wait",
+            ],
+            "description": "Page interaction kind when action='act'.",
+        },
+        "text": {
+            "type": "string",
+            "description": "Text to type/select, key to press, or scroll direction ('up'/'down') when action='act'.",
+        },
+        "js": {
+            "type": "string",
+            "description": "JavaScript expression to run in the active tab when action='eval'.",
+        },
+        "question": {
+            "type": "string",
+            "description": "Question or extraction instruction for action='ask' or action='extract'.",
+        },
+        "provider": {
+            "type": "string",
+            "description": "Optional AI provider override for action='ask' or action='extract'.",
+        },
+        "port": {
+            "type": "integer",
+            "description": "Optional Control API port override (default: auto-discovered or 9777).",
+        },
+        "token": {
+            "type": "string",
+            "description": "Optional Control API bearer token override (default: auto-discovered).",
+        },
+    }
+
+    async def execute(
+        self,
+        action: str = "status",
+        url: str = "",
+        new_tab: bool = False,
+        index: int = -1,
+        to_index: int = 0,
+        tab_op: str = "",
+        act_type: str = "",
+        text: str = "",
+        js: str = "",
+        question: str = "",
+        provider: str = "",
+        port: int = 0,
+        token: str = "",
+    ) -> ToolOutput:
+        import httpx
+
+        base_url, bearer = _discover_control_api(port=port, token=token)
+        headers: dict[str, str] = {"Content-Type": "application/json"}
+        if bearer:
+            headers["Authorization"] = f"Bearer {bearer}"
+
+        method = "GET"
+        route = "/status"
+        payload: dict[str, Any] = {}
+
+        act_norm = (action or "status").strip().lower()
+        if act_norm == "status":
+            method, route = "GET", "/status"
+        elif act_norm == "tabs":
+            method, route = "GET", "/tabs"
+        elif act_norm == "navigate":
+            if not url.strip():
+                return ToolOutput(text="url is required for action='navigate'", error=True)
+            method, route = "POST", "/navigate"
+            payload = {"url": url.strip(), "new_tab": bool(new_tab)}
+        elif act_norm == "new_tab":
+            method, route = "POST", "/tab/new"
+            if url.strip():
+                payload = {"url": url.strip()}
+        elif act_norm == "activate_tab":
+            method, route = "POST", "/tab/activate"
+            payload = {"index": max(0, int(index))}
+        elif act_norm == "close_tab":
+            method, route = "POST", "/tab/close"
+            payload = {"index": int(index)}
+        elif act_norm == "tab_action":
+            if not tab_op.strip():
+                return ToolOutput(text="tab_op is required for action='tab_action'", error=True)
+            method, route = "POST", "/tab/action"
+            payload = {
+                "action": tab_op.strip(),
+                "index": int(index),
+                "to_index": int(to_index),
+            }
+        elif act_norm == "undo_tab":
+            method, route = "POST", "/tabs/undo"
+        elif act_norm == "snapshot":
+            method, route = "POST", "/snapshot"
+        elif act_norm == "act":
+            if not act_type.strip():
+                return ToolOutput(text="act_type is required for action='act'", error=True)
+            method, route = "POST", "/act"
+            payload = {
+                "action": act_type.strip(),
+                "index": int(index),
+                "text": text,
+                "url": url,
+            }
+        elif act_norm == "undo":
+            method, route = "POST", "/undo"
+        elif act_norm == "eval":
+            if not js.strip():
+                return ToolOutput(text="js is required for action='eval'", error=True)
+            method, route = "POST", "/eval"
+            payload = {"js": js}
+        elif act_norm == "ask":
+            if not question.strip():
+                return ToolOutput(text="question is required for action='ask'", error=True)
+            method, route = "POST", "/ask"
+            payload = {"question": question.strip()}
+            if provider.strip():
+                payload["provider"] = provider.strip()
+        elif act_norm == "extract":
+            if not question.strip():
+                return ToolOutput(text="question is required for action='extract'", error=True)
+            method, route = "POST", "/extract"
+            payload = {"instruction": question.strip()}
+            if provider.strip():
+                payload["provider"] = provider.strip()
+        elif act_norm == "screenshot":
+            from urllib.parse import quote
+
+            method = "GET"
+            route = f"/screenshot?url={quote(url.strip())}" if url.strip() else "/screenshot"
+        else:
+            return ToolOutput(text=f"Unknown BrowserControl action: {action!r}", error=True)
+
+        try:
+            async with httpx.AsyncClient(timeout=20.0, trust_env=False) as client:
+                if method == "GET":
+                    resp = await client.get(f"{base_url}{route}", headers=headers)
+                else:
+                    resp = await client.post(f"{base_url}{route}", headers=headers, json=payload)
+            try:
+                data = resp.json()
+            except Exception:
+                data = {"ok": False, "error": resp.text[:400]}
+            if resp.status_code >= 400 or not data.get("ok", True):
+                err = data.get("error") or f"HTTP {resp.status_code}"
+                return ToolOutput(
+                    text=f"LuckyD Browser Control API error ({route}): {err}",
+                    title=f"BrowserControl {act_norm} (error)",
+                    metadata=data if isinstance(data, dict) else {"error": str(err)},
+                    error=True,
+                )
+            return ToolOutput(
+                text=self._format_response(act_norm, data),
+                title=f"BrowserControl: {act_norm}",
+                metadata=data if isinstance(data, dict) else {"result": data},
+            )
+        except Exception as e:
+            return ToolOutput(
+                text=(
+                    f"Could not reach LuckyD Browser Control API at {base_url}{route}: {e}. "
+                    "Ensure LuckyD Browser is open and Browser Control API is enabled in Tools."
+                ),
+                error=True,
+            )
+
+    @staticmethod
+    def _format_response(action: str, data: dict[str, Any]) -> str:
+        if action == "tabs":
+            tabs = data.get("tabs", [])
+            if not tabs:
+                return "No open tabs."
+            lines = [
+                f"  [{'*' if t.get('active') else ' '}] #{t.get('index')}: {t.get('title', '')} — {t.get('url', '')}"
+                for t in tabs
+            ]
+            return f"Open tabs ({len(tabs)}):\n" + "\n".join(lines)
+        if action == "snapshot":
+            snap = data.get("snapshot", {})
+            if not isinstance(snap, dict):
+                return json.dumps(data, ensure_ascii=False, indent=2)[:6000]
+            els = snap.get("elements", [])
+            lines = [
+                f"Page: {snap.get('title', '')}",
+                f"URL: {snap.get('url', '')}",
+                f"\nInteractive elements ({len(els)}):",
+            ]
+            for el in els[:60]:
+                idx = el.get("i", el.get("index", "?"))
+                tag = el.get("tag", "")
+                label = el.get("label") or el.get("text") or ""
+                lines.append(f"  [{idx}] <{tag}> {str(label)[:70]}")
+            page_text = str(snap.get("text", "") or "").strip()
+            if page_text:
+                lines.append(f"\nVisible text:\n{page_text[:3000]}")
+            return "\n".join(lines)[:6000]
+        return json.dumps(data, ensure_ascii=False, indent=2)[:6000]
+
+
 # ── Auto-register ──────────────────────────────────────────────────────
 
 register_tool(BrowserNavigateTool())
@@ -675,6 +1101,8 @@ register_tool(BrowserEmulateTool())
 register_tool(BrowserInterceptTool())
 register_tool(BrowserTraceTool())
 register_tool(BrowserToggleHeadlessTool())
+register_tool(BrowserConsoleTool())
+register_tool(BrowserControlTool())
 
 
 # ---------------------------------------------------------------------------
@@ -683,6 +1111,8 @@ register_tool(BrowserToggleHeadlessTool())
 __all__ = [
     "BrowserClickTool",
     "BrowserCloseTool",
+    "BrowserConsoleTool",
+    "BrowserControlTool",
     "BrowserEmulateTool",
     "BrowserEvaluateTool",
     "BrowserInterceptTool",
@@ -695,3 +1125,4 @@ __all__ = [
     "BrowserTypeTool",
     "OpenInBrowserTool",
 ]
+

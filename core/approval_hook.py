@@ -138,6 +138,8 @@ _TOOL_PERMISSIONS: dict[str, ToolPermissionLevel] = {
     "BrowserIntercept": ToolPermissionLevel.REQUIRES_APPROVAL,
     "BrowserTrace": ToolPermissionLevel.REQUIRES_APPROVAL,
     "BrowserToggleHeadless": ToolPermissionLevel.REQUIRES_APPROVAL,
+    "BrowserConsole": ToolPermissionLevel.ALWAYS_ALLOW,
+    "BrowserControl": ToolPermissionLevel.REQUIRES_APPROVAL,
     "BrowserUse": ToolPermissionLevel.REQUIRES_APPROVAL,
     "BrowserUseClose": ToolPermissionLevel.REQUIRES_APPROVAL,
     "WebMCPCall": ToolPermissionLevel.REQUIRES_APPROVAL,

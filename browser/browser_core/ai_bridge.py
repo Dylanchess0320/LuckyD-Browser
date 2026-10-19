@@ -17,6 +17,7 @@ import os
 import re
 import time
 from pathlib import Path
+from typing import Any
 
 import httpx
 from browser_core import cline_session
@@ -24,6 +25,7 @@ from browser_core import cline_session
 # Smart model routing (core/router.py) — optional. The router is a pure local
 # heuristic (no network); if it cannot be imported, auto mode keeps today's
 # static fallback chain.
+_route_task: Any = None
 try:
     from core.router import route_task as _route_task
 except Exception:  # pragma: no cover - import guard
@@ -33,6 +35,8 @@ except Exception:  # pragma: no cover - import guard
 # router above: the frozen browser may not have `core` importable, so fall
 # back to reading the state file directly. Both paths agree on location,
 # format, TTL (24 h), and the LUCKYD_CLINE_CREDIT_STATE seam; both fail open.
+_core_cline_exhausted: Any = None
+_core_cline_record: Any = None
 try:
     from core.cline_credit import is_cline_credit_exhausted as _core_cline_exhausted
     from core.cline_credit import record_cline_credit_exhausted as _core_cline_record
@@ -117,12 +121,12 @@ _PROVIDER_SPECS = [
         "https://generativelanguage.googleapis.com/v1beta",
         "gemini",
     ),
-    ("groq", "GROQ_API_KEY", "llama-3.3-70b-versatile", "https://api.groq.com/openai/v1", "openai"),
+    ("groq", "GROQ_API_KEY", "groq/compound-mini", "https://api.groq.com/openai/v1", "openai"),
     ("zai", "ZAI_API_KEY", "glm-5.3-flash", "https://api.z.ai/api/paas/v4", "openai"),
     (
         "openrouter",
         "OPENROUTER_API_KEY",
-        "deepseek/deepseek-chat-v3.1",
+        "openrouter/free",
         "https://openrouter.ai/api/v1",
         "openai",
     ),
@@ -385,13 +389,11 @@ _CLINE_USAGE_CATALOG = [
     "z-ai/glm-5.3-flash",  # Z-AI flash free
     "poolside/laguna-s-2.1:free",  # poolside free
     "cline-free/longcat-2.0",  # Cline promo free
-    # ── Credit-billed — deduct from Cline Credits balance
-    "google/gemini-2.5-pro",
-    "anthropic/claude-sonnet-4-6",
-    "openai/gpt-4o",
-    "openai/gpt-4o-mini",
-    "mistral/mistral-large",
 ]
+# 10.7.5: credit-billed ids (gemini-2.5-pro, claude-sonnet-4-6, gpt-4o, ...)
+# were removed from this catalog — the picker presented them next to the $0
+# models and picking one silently billed Cline Credits. Paid Cline models
+# remain reachable by typing the exact id as a model override.
 
 # Cline gateway catalog (usage-billed free tier + flat subscription):
 # the picker fallback when the live /models request fails, and the rotation
@@ -569,6 +571,8 @@ class AIBridge:
             ],
         }
 
+    _ollama_pull_inflight: dict[str, float] = {}
+
     @staticmethod
     def start_ollama_pull(model: str = "llama3.2:3b") -> dict[str, object]:
         """Start `ollama pull <model>` in the background (safe fixed argv)."""
@@ -578,6 +582,15 @@ class AIBridge:
         clean = (model or "llama3.2:3b").strip()
         if not re.fullmatch(r"[A-Za-z0-9._:-]{1,80}", clean):
             return {"started": False, "model": clean, "error": "invalid model name"}
+        now = time.monotonic()
+        last_started = AIBridge._ollama_pull_inflight.get(clean, 0.0)
+        if last_started and (now - last_started) < 60.0:
+            return {
+                "started": True,
+                "already_running": True,
+                "model": clean,
+                "command": f"ollama pull {clean}",
+            }
         exe = shutil.which("ollama")
         if not exe:
             return {
@@ -594,6 +607,7 @@ class AIBridge:
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
+            AIBridge._ollama_pull_inflight[clean] = now
             return {
                 "started": True,
                 "model": clean,
@@ -1294,7 +1308,7 @@ class AIBridge:
             else:
                 r = "user" if m["role"] in ("user", "tool") else "model"
                 parts.append({"role": r, "parts": AIBridge._parts_gemini(m["content"])})
-        body = {"contents": parts}
+        body: dict[str, Any] = {"contents": parts}
         if system:
             body["systemInstruction"] = {"parts": [{"text": system.strip()}]}
         return body

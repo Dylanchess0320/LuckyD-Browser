@@ -102,7 +102,10 @@ class NetMonitor:
                     except TimeoutError:
                         continue
                     with contextlib.suppress(Exception):
-                        self._handle(json.loads(raw))
+                        payload = (
+                            raw if isinstance(raw, (str, bytes, bytearray)) else str(raw)
+                        )
+                        self._handle(json.loads(payload))
         except Exception as exc:
             self.error = str(exc) or repr(exc)
 
@@ -134,23 +137,23 @@ class NetMonitor:
                         self._by_id.pop(stale["id"], None)
                     del self._rows[: len(self._rows) - MAX_ROWS]
         elif method == "Network.responseReceived":
-            row = self._by_id.get(str(params.get("requestId", "")))
-            if row is not None:
+            existing = self._by_id.get(str(params.get("requestId", "")))
+            if existing is not None:
                 resp = params.get("response", {}) or {}
-                row["status"] = int(resp.get("status", 0) or 0)
+                existing["status"] = int(resp.get("status", 0) or 0)
                 if params.get("type"):
-                    row["type"] = str(params["type"])
+                    existing["type"] = str(params["type"])
         elif method == "Network.loadingFinished":
-            row = self._by_id.get(str(params.get("requestId", "")))
-            if row is not None:
-                row["size"] = int(params.get("encodedDataLength", 0) or 0)
+            existing = self._by_id.get(str(params.get("requestId", "")))
+            if existing is not None:
+                existing["size"] = int(params.get("encodedDataLength", 0) or 0)
                 ended = float(params.get("timestamp", 0) or 0)
-                if ended and row["started"]:
-                    row["ms"] = max(0, int((ended - row["started"]) * 1000))
+                if ended and existing["started"]:
+                    existing["ms"] = max(0, int((ended - existing["started"]) * 1000))
         elif method == "Network.loadingFailed":
-            row = self._by_id.get(str(params.get("requestId", "")))
-            if row is not None and not row["status"]:
-                row["status"] = -1
+            existing = self._by_id.get(str(params.get("requestId", "")))
+            if existing is not None and not existing["status"]:
+                existing["status"] = -1
 
 
 def to_har(rows: list[dict], page_url: str = "") -> dict:

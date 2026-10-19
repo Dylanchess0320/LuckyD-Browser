@@ -107,6 +107,8 @@ _TOOL_SCOPE_OVERRIDES: dict[str, str] = {
     "BrowserScreenshot": "browser",
     "BrowserEvaluate": "browser",
     "BrowserClose": "browser",
+    "BrowserConsole": "browser",
+    "BrowserControl": "browser",
     # files
     "Write": "files",
     "Edit": "files",

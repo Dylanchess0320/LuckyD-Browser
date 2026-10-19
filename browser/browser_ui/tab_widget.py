@@ -236,6 +236,8 @@ class BrowserTabWidget(QTabWidget):
         self.setElideMode(Qt.TextElideMode.ElideRight)
 
         self._closed_stack: list[str] = []
+        self._tab_undo_stack: list[dict] = []
+        self._undoing_tab_action = False
         self._pinned: set[int] = set()  # id() of pinned WebViews
         self._loading: set[int] = set()  # id() of views currently loading
         self._muted: set[int] = set()
@@ -272,6 +274,16 @@ class BrowserTabWidget(QTabWidget):
         self._sleep.timeout.connect(self._tick_memory_saver)
         self._sleep.start()
 
+    def _push_tab_undo(self, entry: dict) -> None:
+        if self._undoing_tab_action:
+            return
+        self._tab_undo_stack.append(entry)
+        self._tab_undo_stack = self._tab_undo_stack[-25:]
+
+    def tab_undo_stack(self) -> list[dict]:
+        """Return a copy of the reversible tab-bar action stack."""
+        return list(self._tab_undo_stack)
+
     # ── lifecycle ────────────────────────────────────────────────────
 
     def new_tab(self, url=None, make_current=True, defer_load=False, title="") -> WebView:
@@ -302,9 +314,19 @@ class BrowserTabWidget(QTabWidget):
         view = self.widget(index)
         if view is not None:
             url = self.view_url(view)
+            was_pinned = id(view) in self._pinned
             if url.startswith(("http://", "https://", "file://")):
                 self._closed_stack.append(url)
                 self._closed_stack = self._closed_stack[-25:]
+                self._push_tab_undo(
+                    {
+                        "kind": "close",
+                        "url": url,
+                        "index": index,
+                        "pinned": was_pinned,
+                        "summary": f"close tab {url[:40]}",
+                    }
+                )
             self._pinned.discard(id(view))
             self._muted.discard(id(view))
             self._loading.discard(id(view))
@@ -337,7 +359,12 @@ class BrowserTabWidget(QTabWidget):
         return self.currentWidget()
 
     def all_views(self) -> list[WebView]:
-        return [self.widget(i) for i in range(self.count())]
+        views: list[WebView] = []
+        for i in range(self.count()):
+            v = self.widget(i)
+            if v is not None:
+                views.append(v)
+        return views
 
     # ── pinned tabs ──────────────────────────────────────────────────
     def is_pinned(self, index: int) -> bool:
@@ -348,7 +375,17 @@ class BrowserTabWidget(QTabWidget):
         view = self.widget(index)
         if view is None:
             return
-        if id(view) in self._pinned:
+        was_pinned = id(view) in self._pinned
+        self._push_tab_undo(
+            {
+                "kind": "pin",
+                "view_id": id(view),
+                "was_pinned": was_pinned,
+                "prev_index": index,
+                "summary": f"{'unpin' if was_pinned else 'pin'} tab #{index}",
+            }
+        )
+        if was_pinned:
             self._pinned.discard(id(view))
             self._retitle(view, view.title())
             self._apply_close_button(index, True)
@@ -440,7 +477,9 @@ class BrowserTabWidget(QTabWidget):
         for pos, index in enumerate(members):
             self.tabBar().setTabVisible(index, not group["collapsed"] or pos == 0)
         if group["collapsed"] and members:
-            self._retitle(self.widget(members[0]), self.widget(members[0]).title())
+            first_view = self.widget(members[0])
+            if first_view is not None:
+                self._retitle(first_view, first_view.title())
         self.tabBar().update()
         self._mw.on_tabs_changed()
 
@@ -449,9 +488,8 @@ class BrowserTabWidget(QTabWidget):
         view = self.widget(index)
         if view is None:
             return
-        mw = self._mw
         menu = QMenu(self)
-        menu.addAction("Duplicate Tab", lambda: mw.open_in_new_tab(QUrl(self.view_url(view))))
+        menu.addAction("Duplicate Tab", lambda: self.duplicate_tab(index))
         pinned = self.is_pinned(index)
         menu.addAction("Unpin Tab" if pinned else "Pin Tab", lambda: self.toggle_pin(index))
         muted = id(view) in self._muted
@@ -484,7 +522,47 @@ class BrowserTabWidget(QTabWidget):
         menu.addAction("Close Duplicate Tabs", self.close_duplicates)
         reopen = menu.addAction("Reopen Closed Tab", self.reopen_last_closed)
         reopen.setEnabled(bool(self._closed_stack))
+        undo_act = menu.addAction("Undo Tab Action", self.undo_last_tab_action)
+        undo_act.setEnabled(bool(self._tab_undo_stack))
         menu.exec(global_pos)
+
+    def duplicate_tab(self, index: int) -> int:
+        """Duplicate the tab at ``index`` and record a reversible undo entry."""
+        view = self.widget(index)
+        if view is None:
+            return -1
+        url = self.view_url(view)
+        new_view = self._mw.open_in_new_tab(QUrl(url))
+        new_idx = self.indexOf(new_view) if new_view is not None else self.currentIndex()
+        if new_view is not None:
+            self._push_tab_undo(
+                {
+                    "kind": "duplicate",
+                    "new_view_id": id(new_view),
+                    "url": url,
+                    "summary": f"duplicate tab #{index}",
+                }
+            )
+        return new_idx
+
+    def move_tab(self, from_index: int, to_index: int) -> int:
+        """Move a tab from ``from_index`` to ``to_index`` and record undo."""
+        count = self.count()
+        if not 0 <= from_index < count:
+            raise IndexError(f"tab index {from_index} out of range (0..{count - 1})")
+        target = max(0, min(int(to_index), count - 1))
+        if from_index != target:
+            self._push_tab_undo(
+                {
+                    "kind": "move",
+                    "from_index": from_index,
+                    "to_index": target,
+                    "summary": f"move tab #{from_index} → #{target}",
+                }
+            )
+            self.tabBar().moveTab(from_index, target)
+            self._mw.on_tabs_changed()
+        return target
 
     def close_duplicates(self) -> int:
         """Close tabs whose URL already has an open sibling (keeps the first)."""
@@ -494,7 +572,7 @@ class BrowserTabWidget(QTabWidget):
             if self.is_pinned(i):
                 continue
             view = self.widget(i)
-            url = view.url().toString() if view else ""
+            url = self.view_url(view) if view else ""
             if url and url in seen:
                 self.close_tab(i)
                 closed += 1
@@ -521,17 +599,113 @@ class BrowserTabWidget(QTabWidget):
                 self.close_tab(i)
 
     # ── audio / mute ─────────────────────────────────────────────────
+    def is_muted(self, index: int) -> bool:
+        view = self.widget(index)
+        return view is not None and id(view) in self._muted
+
     def toggle_mute(self, index: int) -> None:
         view = self.widget(index)
         if view is None:
             return
-        if id(view) in self._muted:
+        was_muted = id(view) in self._muted
+        self._push_tab_undo(
+            {
+                "kind": "mute",
+                "view_id": id(view),
+                "was_muted": was_muted,
+                "summary": f"{'unmute' if was_muted else 'mute'} tab #{index}",
+            }
+        )
+        if was_muted:
             self._muted.discard(id(view))
             view.page().setAudioMuted(False)
         else:
             self._muted.add(id(view))
             view.page().setAudioMuted(True)
         self._retitle(view, view.title())
+
+    def undo_last_tab_action(self) -> dict:
+        """Ctrl+Alt+Z / POST /tabs/undo: revert the most recent tab-bar operation."""
+        while self._tab_undo_stack:
+            entry = self._tab_undo_stack.pop()
+            kind = entry.get("kind")
+            self._undoing_tab_action = True
+            try:
+                if kind == "close":
+                    url = str(entry.get("url", "") or "")
+                    if not url:
+                        continue
+                    if self._closed_stack and self._closed_stack[-1] == url:
+                        self._closed_stack.pop()
+                    new_view = self._mw.open_in_new_tab(QUrl(url))
+                    new_idx = (
+                        self.indexOf(new_view) if new_view is not None else self.currentIndex()
+                    )
+                    target_idx = int(entry.get("index", new_idx))
+                    if 0 <= target_idx < self.count() and new_idx != target_idx:
+                        self.tabBar().moveTab(new_idx, target_idx)
+                        new_idx = target_idx
+                    if entry.get("pinned") and 0 <= new_idx < self.count():
+                        self.toggle_pin(new_idx)
+                    return {
+                        "undone": True,
+                        "detail": f"reopened {url}",
+                        "entry": entry,
+                    }
+                if kind == "pin":
+                    vid = entry.get("view_id")
+                    idx = next((i for i in range(self.count()) if id(self.widget(i)) == vid), -1)
+                    if idx < 0:
+                        continue
+                    self.toggle_pin(idx)
+                    prev_idx = int(entry.get("prev_index", idx))
+                    cur_idx = next(
+                        (i for i in range(self.count()) if id(self.widget(i)) == vid), idx
+                    )
+                    if 0 <= prev_idx < self.count() and cur_idx != prev_idx:
+                        self.tabBar().moveTab(cur_idx, prev_idx)
+                    return {
+                        "undone": True,
+                        "detail": f"reverted {entry.get('summary', 'pin')}",
+                        "entry": entry,
+                    }
+                if kind == "mute":
+                    vid = entry.get("view_id")
+                    idx = next((i for i in range(self.count()) if id(self.widget(i)) == vid), -1)
+                    if idx < 0:
+                        continue
+                    self.toggle_mute(idx)
+                    return {
+                        "undone": True,
+                        "detail": f"reverted {entry.get('summary', 'mute')}",
+                        "entry": entry,
+                    }
+                if kind == "move":
+                    from_idx = int(entry.get("from_index", 0))
+                    to_idx = int(entry.get("to_index", 0))
+                    if 0 <= to_idx < self.count() and 0 <= from_idx < self.count():
+                        self.tabBar().moveTab(to_idx, from_idx)
+                        self._mw.on_tabs_changed()
+                        return {
+                            "undone": True,
+                            "detail": f"moved tab #{to_idx} back to #{from_idx}",
+                            "entry": entry,
+                        }
+                    continue
+                if kind == "duplicate":
+                    vid = entry.get("new_view_id")
+                    idx = next((i for i in range(self.count()) if id(self.widget(i)) == vid), -1)
+                    if idx < 0 or self.count() <= 1:
+                        continue
+                    self.close_tab(idx)
+                    return {
+                        "undone": True,
+                        "detail": f"closed duplicated tab #{idx}",
+                        "entry": entry,
+                    }
+            finally:
+                self._undoing_tab_action = False
+        return {"undone": False, "detail": "nothing to undo"}
 
     # ── loading spinner ──────────────────────────────────────────────
     def _tick_spinner(self) -> None:
@@ -593,7 +767,7 @@ class BrowserTabWidget(QTabWidget):
         if index >= 0:
             gid = self._tab_group.get(id(view))
             group = self._groups.get(gid) if gid else None
-            members = self.group_indexes(gid) if group else []
+            members = self.group_indexes(gid) if (gid and group) else []
             if group and group.get("collapsed") and members and members[0] == index:
                 # The visible chip for a collapsed group: "▸ name · n tabs".
                 self.setTabText(index, f"▸ {group['name']} · {len(members)}")
@@ -624,7 +798,7 @@ class BrowserTabWidget(QTabWidget):
 
     def _icon(self, view: WebView, icon) -> None:
         index = self.indexOf(view)
-        if index >= 0 and index not in self._loading:
+        if index >= 0 and id(view) not in self._loading:
             self.setTabIcon(index, icon)
 
     def _url(self, view: WebView, url) -> None:

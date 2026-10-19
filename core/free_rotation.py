@@ -50,7 +50,10 @@ FREE_MODEL_PRIORITY: tuple[tuple[str, str], ...] = (
     ("cline-usage", "deepseek/deepseek-chat"),
     ("gemini", "gemini-2.5-flash"),
     ("ollama", "llama3.2:3b"),
-    ("openrouter", "deepseek/deepseek-chat-v3.1:free"),
+    # 10.7.5: the old "deepseek/deepseek-chat-v3.1:free" id never existed in
+    # the OpenRouter free catalog (it 404'd on rotation). "openrouter/free"
+    # is the live meta-router that auto-picks any available $0 model.
+    ("openrouter", "openrouter/free"),
     ("groq", "groq/compound-mini"),
 )
 

@@ -57,7 +57,7 @@ def gradient(flip=False):
         tiny.putpixel((1, 0), BG_TR)
         tiny.putpixel((0, 1), BG_BL)
         tiny.putpixel((1, 1), BG_BR)
-    return tiny.resize((BIG, BIG), Image.BICUBIC)
+    return tiny.resize((BIG, BIG), Image.Resampling.BICUBIC)
 
 
 def tile_mask():
@@ -159,7 +159,7 @@ def main():
     )
     gloss(img)
 
-    small = img.resize((SIZE, SIZE), Image.LANCZOS)
+    small = img.resize((SIZE, SIZE), Image.Resampling.LANCZOS)
     small.save(ASSETS / "icon.png")
     small.save(
         ASSETS / "icon.ico",

@@ -215,6 +215,9 @@ class WorkflowRecorder:
             return {"recording": self.active, "name": self._name, "steps": len(self._steps)}
 
 
+_List = list
+
+
 class WorkflowStore:
     """JSON-file persistence for workflows (one file per workflow)."""
 
@@ -224,7 +227,7 @@ class WorkflowStore:
     def _path(self, name: str) -> Path:
         return self._dir / f"{slugify(name)}.json"
 
-    def list(self) -> list[dict]:
+    def list(self) -> _List[dict]:
         rows = []
         with contextlib.suppress(Exception):
             for path in sorted(self._dir.glob("*.json")):
@@ -248,7 +251,7 @@ class WorkflowStore:
             return None
         return data
 
-    def save(self, name: str, steps: list[dict]) -> str:
+    def save(self, name: str, steps: _List[dict]) -> str:
         slug = slugify(name)
         payload = {
             "version": SCHEMA_VERSION,

@@ -45,6 +45,9 @@ def is_due(entry: dict, now: float | None = None) -> bool:
     return (now if now is not None else time.time()) >= float(entry.get("next_run", 0) or 0)
 
 
+_List = list
+
+
 class ScheduleStore:
     """name → {"every_min", "next_run", "last_run", "last_result"} persisted as JSON."""
 
@@ -65,7 +68,7 @@ class ScheduleStore:
             tmp.write_text(json.dumps(data, indent=1), encoding="utf-8")
             tmp.replace(self._path)
 
-    def list(self) -> list[dict]:
+    def list(self) -> _List[dict]:
         rows = []
         for name, entry in sorted(self._read().items()):
             every = int(entry.get("every_min", 0) or 0)
@@ -85,6 +88,7 @@ class ScheduleStore:
         """Set (or disable, every_min=0) a workflow's schedule. Returns the entry."""
         data = self._read()
         every_min = int(every_min)
+        entry: dict
         if every_min <= 0:
             data.pop(name, None)
             entry = {"every_min": 0}
@@ -96,7 +100,7 @@ class ScheduleStore:
         self._write(data)
         return entry
 
-    def due(self, now: float | None = None) -> list[str]:
+    def due(self, now: float | None = None) -> _List[str]:
         return [name for name, entry in self._read().items() if is_due(entry, now)]
 
     def mark_run(self, name: str, result: str, now: float | None = None) -> None:

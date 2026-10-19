@@ -140,14 +140,18 @@ _CONTROL_API_HINT = """
 
 ---
 ENVIRONMENT: The user's LIVE desktop browser (the tabs they are looking at
-right now) is controllable through the local Browser Control API at {base}
-(localhost only). Use WebFetch for GET routes and Bash with curl
-for POST routes:
+right now) is controllable through the `BrowserControl` (`LuckyDBrowser`) tool
+or directly via the local Browser Control API at {base}
+(localhost only). Prefer `BrowserControl` when available, or use WebFetch for
+GET routes and Bash with curl for POST routes:
   GET  {base}/status       browser state
   GET  {base}/tabs         open tabs
   POST {base}/navigate     {{"url": "https://example.com", "new_tab": false}}
+  POST {base}/tab/action   {{"action": "pin|mute|duplicate|move|close_duplicates|reopen_closed|undo", "index": N, "to_index": M}}
+  POST {base}/tabs/undo    revert the most recent tab-bar operation
   POST {base}/snapshot     URL, title, numbered interactive elements, text
-  POST {base}/act          {{"action": "click|type|press|select|scroll|navigate|back|wait", "index": N, "text": "...", "url": "..."}}
+  POST {base}/act          {{"action": "click|type|press|select|scroll|navigate|back|undo|wait", "index": N, "text": "...", "url": "..."}}
+  POST {base}/undo         revert the most recent page interaction
   GET  {base}/screenshot   base64 JPEG of the visible tab
   POST {base}/eval         {{"js": "..."}} - run JS in the active tab
   POST {base}/ask          {{"question": "..."}} - AI answer grounded in the page
@@ -346,7 +350,7 @@ class AiSidebar(QDockWidget):
             (
                 "🔬 Research",
                 "Open Deep Research with the text below as the question",
-                lambda: self._mw.open_deep_research(self.input.text().strip()),
+                self._open_research_from_input,
             ),
             ("📋 Copy", "Copy this conversation as Markdown", self._copy_chat),
         ):
@@ -439,6 +443,9 @@ class AiSidebar(QDockWidget):
         self._restore_provider()
         self._greet()
         self.refresh_harness_status()
+
+    def _open_research_from_input(self) -> None:
+        self._mw.open_deep_research(self.input.text().strip())
 
     def _apply_theme(self) -> None:
         """Adopt the active theme's tokens and re-render the chat with them."""
@@ -543,7 +550,7 @@ class AiSidebar(QDockWidget):
         try:
             # NOTE: keep this in a separate name — `providers` above is the
             # joined display string used in the greeting HTML below.
-            available = getattr(self.bridge, "providers", lambda: [])()
+            available: list[str] = getattr(self.bridge, "providers", lambda: [])()
             if "cline-usage" in available or "clinepass" in available:
                 free_pool: list[str] = getattr(self.bridge, "free_top_models", lambda: [])()
                 if free_pool:
@@ -1285,15 +1292,17 @@ class _HarnessWorker(QThread):
         self._bridge = bridge
         self._task_text = task
         self._supervisor = supervisor
-        self._loop = None
-        self._task = None
+        self._loop: asyncio.AbstractEventLoop | None = None
+        self._task: asyncio.Task[str] | None = None
 
     def run(self):
-        self._loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(self._loop)
-        self._task = self._loop.create_task(self._flow())
+        loop = asyncio.new_event_loop()
+        self._loop = loop
+        asyncio.set_event_loop(loop)
+        task = loop.create_task(self._flow())
+        self._task = task
         try:
-            result = self._loop.run_until_complete(self._task)
+            result = loop.run_until_complete(task)
         except asyncio.CancelledError:
             self.finished.emit("Stopped.")
             return
@@ -1301,7 +1310,7 @@ class _HarnessWorker(QThread):
             self.failed.emit(str(exc))
             return
         finally:
-            self._loop.close()
+            loop.close()
         self.finished.emit(result or "(empty reply — try again)")
 
     def stop(self):

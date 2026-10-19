@@ -50,10 +50,13 @@ def sanitize_tabs(tabs: list) -> list[dict]:
     return clean
 
 
+_List = list
+
+
 class WorkspaceStore:
     def __init__(self, path: Path | None = None):
         self._path = path or (_data_dir() / "workspaces.json")
-        self._workspaces: list[dict] = []
+        self._workspaces: _List[dict] = []
         self._active: str = ""
         self.load()
 
@@ -69,7 +72,7 @@ class WorkspaceStore:
             self._active = ""
             return
         items = raw.get("workspaces")
-        out: list[dict] = []
+        out: _List[dict] = []
         if isinstance(items, list):
             for item in items[:MAX_WORKSPACES]:
                 if not isinstance(item, dict) or not item.get("id"):
@@ -102,7 +105,7 @@ class WorkspaceStore:
             return False
         return True
 
-    def list(self) -> list[dict]:
+    def list(self) -> _List[dict]:
         return list(self._workspaces)
 
     def get(self, ws_id: str) -> dict | None:
@@ -121,8 +124,8 @@ class WorkspaceStore:
         self._active = ws_id
         self.save()
 
-    def create(self, name: str, tabs: list[dict], current: int = 0) -> dict:
-        item = {
+    def create(self, name: str, tabs: _List[dict], current: int = 0) -> dict:
+        item: dict = {
             "id": new_id(),
             "name": (name or "").strip()[:60] or "Workspace",
             "tabs": sanitize_tabs(tabs),
@@ -132,11 +135,11 @@ class WorkspaceStore:
         if len(self._workspaces) >= MAX_WORKSPACES:
             self._workspaces.pop(0)
         self._workspaces.append(item)
-        self._active = item["id"]
+        self._active = str(item["id"])
         self.save()
         return item
 
-    def update_tabs(self, ws_id: str, tabs: list[dict], current: int = 0) -> bool:
+    def update_tabs(self, ws_id: str, tabs: _List[dict], current: int = 0) -> bool:
         item = self.get(ws_id)
         if item is None:
             return False

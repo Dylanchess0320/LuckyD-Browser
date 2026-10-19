@@ -26,6 +26,7 @@ import os
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 
@@ -104,6 +105,7 @@ _ROUTES = (
     ("GET  /mesh/doctor", "per-backend Agent Mesh health check + tier labels (JSON)"),
     ("GET  /onboarding/status", "first-run Ollama & provider onboarding status + FAQ"),
     ("POST /onboarding/ollama-pull", '{"model": "llama3.2:3b"} — pull local Ollama model'),
+    ("POST /onboarding/ollama-setup", '{"model": "llama3.2:3b"} — alias for /onboarding/ollama-pull'),
     ("GET  /terminal", "live LuckyD Code terminal in a tab (xterm.js + PTY)"),
     ("GET  /status", "browser state + harness/AI reachability"),
     ("GET  /tabs", "open tabs (index, url, title, active)"),
@@ -111,6 +113,13 @@ _ROUTES = (
     ("POST /tab/new", '{"url": "https://…" (optional)}'),
     ("POST /tab/activate", '{"index": N}'),
     ("POST /tab/close", '{"index": N} (refuses to close the last tab)'),
+    (
+        "POST /tab/action",
+        '{"action": "pin|mute|duplicate|move|close_duplicates|reopen_closed|undo",'
+        ' "index": N, "to_index": M}',
+    ),
+    ("GET  /tabs/undo", "reversible tab-bar operations recorded in this window"),
+    ("POST /tabs/undo", "revert the most recent reversible tab-bar operation"),
     ("POST /snapshot", "URL, title, numbered interactive elements, visible text"),
     (
         "POST /act",
@@ -177,7 +186,9 @@ elsewhere.</p></div></body></html>"""
 # ── HTTP routing layer (Qt-free — unit-testable with a fake backend) ──────
 
 
-def make_handler(backend, token: str = "", harness=None, settings=None):
+def make_handler(
+    backend: Any, token: str = "", harness: Any = None, settings: Any = None
+) -> type[BaseHTTPRequestHandler]:
     """Build a BaseHTTPRequestHandler subclass bound to ``backend``.
 
     The backend must provide: status(), tabs(), navigate(), new_tab(),
@@ -472,6 +483,9 @@ def make_handler(backend, token: str = "", harness=None, settings=None):
                 if path == "/undo/stack":
                     stack = backend.undo_stack() if hasattr(backend, "undo_stack") else []
                     return self._ok(stack=stack)
+                if path == "/tabs/undo":
+                    stack = backend.tab_undo_stack() if hasattr(backend, "tab_undo_stack") else []
+                    return self._ok(stack=stack)
                 if path == "/terminal":
                     shell = (query.get("shell") or ["agent"])[0]
                     # B604 false positive: `shell` is an allowlisted terminal profile name.
@@ -537,12 +551,31 @@ def make_handler(backend, token: str = "", harness=None, settings=None):
                         return self._send(400, {"ok": False, "error": "url required"})
                     return self._ok(url=backend.navigate(url, bool(body.get("new_tab"))))
                 if path == "/tab/new":
-                    url = str(body.get("url", "")).strip() or None
-                    return self._ok(index=backend.new_tab(url))
+                    url_arg = str(body.get("url", "")).strip() or None
+                    return self._ok(index=backend.new_tab(url_arg))
                 if path == "/tab/activate":
                     return self._ok(index=backend.activate_tab(int(body.get("index", 0))))
                 if path == "/tab/close":
                     return self._ok(closed=backend.close_tab(int(body.get("index", -1))))
+                if path == "/tab/action":
+                    op = str(body.get("action", "")).strip()
+                    if not op:
+                        return self._send(400, {"ok": False, "error": "action required"})
+                    if not hasattr(backend, "tab_action"):
+                        return self._send(
+                            400, {"ok": False, "error": "tab_action not supported by backend"}
+                        )
+                    res = backend.tab_action(body)
+                    if not res.get("ok", True):
+                        return self._send(400, res)
+                    return self._ok(**res)
+                if path == "/tabs/undo":
+                    res = (
+                        backend.undo_tab_action()
+                        if hasattr(backend, "undo_tab_action")
+                        else {"undone": False, "detail": "nothing to undo"}
+                    )
+                    return self._ok(**res)
                 if path == "/snapshot":
                     return self._ok(snapshot=backend.snapshot())
                 if path == "/act":
@@ -556,7 +589,7 @@ def make_handler(backend, token: str = "", harness=None, settings=None):
                         else {"undone": False, "detail": "nothing to undo"}
                     )
                     return self._ok(**res)
-                if path == "/onboarding/ollama-pull":
+                if path in ("/onboarding/ollama-pull", "/onboarding/ollama-setup"):
                     from browser_core.ai_bridge import AIBridge
 
                     model = str(body.get("model", "llama3.2:3b") or "llama3.2:3b").strip()
@@ -682,7 +715,12 @@ class BrowserControlServer:
         )
         self._httpd.daemon_threads = True
         # Resolve the real bound address (matters when port=0 → OS-assigned).
-        self.host, self.port = self._httpd.server_address[:2]
+        raw_host, self.port = self._httpd.server_address[:2]
+        self.host = (
+            raw_host.decode("utf-8", errors="replace")
+            if isinstance(raw_host, bytes)
+            else str(raw_host)
+        )
         self.base_url = f"http://{self.host}:{self.port}"
         self.token = token  # exposed so the app can seed the session cookie
         self._thread: threading.Thread | None = None
@@ -829,7 +867,12 @@ class QtBrowserBackend:
             view = self._view()
             box: dict = {}
             loop = QEventLoop()
-            view.page().runJavaScript(js, lambda res: (box.__setitem__("r", res), loop.quit()))
+
+            def _on_res(res: Any) -> None:
+                box["r"] = res
+                loop.quit()
+
+            view.page().runJavaScript(js, _on_res)
             QTimer.singleShot(int(timeout * 1000), loop.quit)
             loop.exec()
             if "r" not in box:
@@ -995,6 +1038,79 @@ class QtBrowserBackend:
                 raise RuntimeError("refusing to close the last tab in the window")
             win.tabs.close_tab(target)
             return target
+
+        return self._invoker.run(_do)
+
+    def tab_undo_stack(self) -> list[dict]:
+        """Return reversible tab-bar operations from the active window."""
+
+        def _do():
+            tabs = self._window().tabs
+            return tabs.tab_undo_stack() if hasattr(tabs, "tab_undo_stack") else []
+
+        return self._invoker.run(_do)
+
+    def undo_tab_action(self) -> dict:
+        """Undo the most recent reversible tab-bar operation in the active window."""
+
+        def _do():
+            tabs = self._window().tabs
+            if hasattr(tabs, "undo_last_tab_action"):
+                return tabs.undo_last_tab_action()
+            return {"undone": False, "detail": "nothing to undo"}
+
+        return self._invoker.run(_do)
+
+    def tab_action(self, body: dict) -> dict:
+        """Perform a reversible tab-bar operation on the active window."""
+        op = str(body.get("action", "")).strip().lower()
+        raw_index = int(body.get("index", -1))
+        to_index = int(body.get("to_index", 0))
+
+        def _do():
+            win = self._window()
+            tabs = win.tabs
+            count = tabs.count()
+            target = tabs.currentIndex() if raw_index < 0 else raw_index
+            if op == "close_duplicates":
+                closed = tabs.close_duplicates()
+                return {"action": op, "closed": closed}
+            if op == "reopen_closed":
+                reopened = tabs.reopen_last_closed()
+                return {"action": op, "reopened": reopened, "index": tabs.currentIndex()}
+            if op == "undo":
+                res = tabs.undo_last_tab_action()
+                return {"action": op, **res}
+            if not 0 <= target < count:
+                raise IndexError(f"tab index {target} out of range (0..{count - 1})")
+            if op == "pin":
+                tabs.toggle_pin(target)
+                return {"action": op, "index": target, "pinned": tabs.is_pinned(target)}
+            if op == "mute":
+                tabs.toggle_mute(target)
+                muted = (
+                    tabs.is_muted(target)
+                    if hasattr(tabs, "is_muted")
+                    else False
+                )
+                return {"action": op, "index": target, "muted": muted}
+            if op == "duplicate":
+                if hasattr(tabs, "duplicate_tab"):
+                    new_idx = tabs.duplicate_tab(target)
+                else:
+                    from PySide6.QtCore import QUrl
+
+                    win.open_in_new_tab(QUrl(tabs.view_url(tabs.widget(target))))
+                    new_idx = tabs.currentIndex()
+                return {"action": op, "index": new_idx}
+            if op == "move":
+                if hasattr(tabs, "move_tab"):
+                    dest = tabs.move_tab(target, to_index)
+                else:
+                    dest = max(0, min(to_index, count - 1))
+                    tabs.tabBar().moveTab(target, dest)
+                return {"action": op, "from_index": target, "to_index": dest}
+            return {"ok": False, "error": f"unknown tab action: {op!r}"}
 
         return self._invoker.run(_do)
 

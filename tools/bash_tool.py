@@ -12,6 +12,8 @@ import re
 import signal
 import subprocess
 
+from typing import Any
+
 from .base import ToolBase, ToolOutput
 from .registry import register_tool
 from .session_tools import record_shell_command
@@ -21,6 +23,7 @@ from .session_tools import record_shell_command
 # SINGLE SOURCE OF TRUTH lives in sandbox.py (BLOCKLIST / is_safe) — this
 # module delegates to it so the two can never diverge again. BLOCKED_PATTERNS
 # is kept as an alias for backward compatibility.
+_sandbox_is_safe: Any = None
 try:
     from sandbox import BLOCKLIST as BLOCKED_PATTERNS
     from sandbox import is_safe as _sandbox_is_safe
@@ -141,8 +144,12 @@ async def _kill_process_tree(proc: asyncio.subprocess.Process) -> None:
         # The child runs in its own session (start_new_session=True), so it
         # leads its process group — killpg takes the whole tree with it.
         with contextlib.suppress(Exception):
-            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-            killed = True
+            killpg = getattr(os, "killpg", None)
+            getpgid = getattr(os, "getpgid", None)
+            sigkill = getattr(signal, "SIGKILL", 9)
+            if killpg is not None and getpgid is not None:
+                killpg(getpgid(proc.pid), sigkill)
+                killed = True
     else:
         # taskkill /T terminates the process tree on Windows.
         with contextlib.suppress(Exception):
@@ -285,7 +292,7 @@ class BashTool(ToolBase):
 
         output = "\n".join(text_parts).strip() or "(no output)"
 
-        exit_code = proc.returncode
+        exit_code = proc.returncode if proc.returncode is not None else 0
         record_shell_command(command, exit_code, output, shell_name="bash")
 
         return ToolOutput(
@@ -357,7 +364,7 @@ class PowerShellTool(ToolBase):
         if err:
             parts.append(f"\n[stderr]\n{err}")
         output = "\n".join(parts).strip() or "(no output)"
-        exit_code = proc.returncode
+        exit_code = proc.returncode if proc.returncode is not None else 0
         record_shell_command(command, exit_code, output, shell_name="powershell")
 
         return ToolOutput(

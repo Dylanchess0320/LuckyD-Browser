@@ -132,6 +132,8 @@ _TOOL_SCOPE_OVERRIDES: dict[str, str] = {
     "BrowserIntercept": "browser",
     "BrowserTrace": "browser",
     "BrowserToggleHeadless": "browser",
+    "BrowserConsole": "browser",
+    "BrowserControl": "browser",
     "BrowserUse": "browser",
     "BrowserUseClose": "browser",
     "OpenInBrowser": "browser",

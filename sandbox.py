@@ -408,12 +408,18 @@ class ResourceLimits:
             try:
                 import resource
 
-                # Memory limit (soft + hard)
-                mem_bytes = self.max_memory_mb * 1024 * 1024
-                resource.setrlimit(resource.RLIMIT_AS, (mem_bytes, mem_bytes))
-                # CPU time limit
-                cpu_seconds = int(self.max_cpu_percent / 100 * 60)  # rough
-                resource.setrlimit(resource.RLIMIT_CPU, (cpu_seconds, cpu_seconds))
+                setrlimit = getattr(resource, "setrlimit", None)
+                rlimit_as = getattr(resource, "RLIMIT_AS", None)
+                rlimit_cpu = getattr(resource, "RLIMIT_CPU", None)
+                if callable(setrlimit):
+                    # Memory limit (soft + hard)
+                    mem_bytes = self.max_memory_mb * 1024 * 1024
+                    if rlimit_as is not None:
+                        setrlimit(rlimit_as, (mem_bytes, mem_bytes))
+                    # CPU time limit
+                    cpu_seconds = int(self.max_cpu_percent / 100 * 60)  # rough
+                    if rlimit_cpu is not None:
+                        setrlimit(rlimit_cpu, (cpu_seconds, cpu_seconds))
             except Exception:
                 pass  # Limits not supported on this platform
 

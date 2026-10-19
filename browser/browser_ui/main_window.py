@@ -9,6 +9,7 @@ import json
 import sys
 import threading
 from pathlib import Path
+from typing import Any
 
 from browser_core import tts as _tts
 from browser_core.permissions import ALLOW, ASK, DENY, feature_key, feature_label, origin_of
@@ -101,8 +102,8 @@ class MainWindow(QMainWindow):
             app.install_local_auth_cookies(self.profile)
 
         self.resize(1280, 800)
-        self._dev_window = None
-        self._dev_view = None
+        self._dev_window: QDialog | None = None
+        self._dev_view: QWebEngineView | None = None
         # Element fullscreen (a page's video player asked for the screen):
         # tracks the state plus the chrome we hid, so exit restores exactly.
         self._video_fs = False
@@ -114,7 +115,7 @@ class MainWindow(QMainWindow):
 
         # Quiet update badge state BEFORE the toolbar creates the real QAction.
         self._pending_update: dict | None = None
-        self._update_act = None
+        self._update_act: QAction | None = None
         self._build_toolbar()
         self._build_bookmark_bar()
         self._build_statusbar()
@@ -471,7 +472,8 @@ class MainWindow(QMainWindow):
 
         # Side pane: a second, docked web view for link previews/reference —
         # shares the profile (cookies, adblock) but owns no tabs.
-        self._side_pane = None
+        self._side_pane: Any = None
+        self._side_view: Any = None
 
         self.ai_sidebar = AiSidebar(self)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.ai_sidebar)
@@ -653,40 +655,56 @@ class MainWindow(QMainWindow):
         self.toast("Added to Read Later 📖", "ok")
 
     def _build_shortcuts(self) -> None:
-        QShortcut(QKeySequence("Ctrl+L"), self, activated=self.focus_omnibox)
-        QShortcut(QKeySequence("Ctrl+Alt+S"), self, activated=self.save_read_later)
-        QShortcut(QKeySequence("Alt+Left"), self, activated=lambda: self._nav("back"))
-        QShortcut(QKeySequence("Alt+Right"), self, activated=lambda: self._nav("forward"))
-        QShortcut(QKeySequence("F5"), self, activated=lambda: self._nav("reload"))
-        esc = QShortcut(QKeySequence("Esc"), self, activated=self._escape)
+        _qshortcut: Any = QShortcut
+        _qshortcut(QKeySequence("Ctrl+L"), self, activated=self.focus_omnibox)
+        _qshortcut(QKeySequence("Ctrl+Alt+S"), self, activated=self.save_read_later)
+        _qshortcut(QKeySequence("Alt+Left"), self, activated=lambda: self._nav("back"))
+        _qshortcut(QKeySequence("Alt+Right"), self, activated=lambda: self._nav("forward"))
+        _qshortcut(QKeySequence("F5"), self, activated=lambda: self._nav("reload"))
+        esc = _qshortcut(QKeySequence("Esc"), self, activated=self._escape)
         esc.setContext(Qt.ShortcutContext.WindowShortcut)
-        QShortcut(QKeySequence("Ctrl+Tab"), self, activated=lambda: self._cycle_tab(1))
-        QShortcut(
+        _qshortcut(QKeySequence("Ctrl+Tab"), self, activated=lambda: self._cycle_tab(1))
+        _qshortcut(
             QKeySequence("Ctrl+Shift+Tab"),
             self,
             activated=lambda: self._cycle_tab(-1),
         )
-        QShortcut(
+        _qshortcut(
             QKeySequence("Ctrl+9"),
             self,
             activated=lambda: self.tabs.setCurrentIndex(self.tabs.count() - 1),
         )
         for i in range(1, 9):
-            QShortcut(
+            _qshortcut(
                 QKeySequence(f"Ctrl+{i}"),
                 self,
                 activated=lambda i=i: self._jump_tab(i),
             )
         # Command palette (Ctrl+K)
-        QShortcut(QKeySequence("Ctrl+K"), self, activated=self.show_palette)
+        _qshortcut(QKeySequence("Ctrl+K"), self, activated=self.show_palette)
         # Reopen closed tab (Ctrl+Shift+T)
-        QShortcut(
+        _qshortcut(
             QKeySequence("Ctrl+Shift+T"),
             self,
             activated=lambda: self.tabs.reopen_last_closed(),
         )
-        QShortcut(QKeySequence("Ctrl+Shift+L"), self, activated=self.read_aloud_page)
-        QShortcut(QKeySequence("Ctrl+Shift+U"), self, activated=self.summarize_page)
+        # Undo last reversible tab action (Ctrl+Alt+Z)
+        _qshortcut(
+            QKeySequence("Ctrl+Alt+Z"),
+            self,
+            activated=self.undo_tab_action,
+        )
+        _qshortcut(QKeySequence("Ctrl+Shift+L"), self, activated=self.read_aloud_page)
+        _qshortcut(QKeySequence("Ctrl+Shift+U"), self, activated=self.summarize_page)
+
+    def undo_tab_action(self) -> dict:
+        """Ctrl+Alt+Z: undo the most recent reversible tab-bar operation."""
+        res = self.tabs.undo_last_tab_action()
+        if res.get("undone"):
+            self.toast(f"↩ {res.get('detail', 'Undid tab action')}", "ok")
+        else:
+            self.toast("Nothing to undo", "info")
+        return res
 
     # ── tab / navigation API ─────────────────────────────────────────
 
@@ -1334,9 +1352,11 @@ class MainWindow(QMainWindow):
             self._dev_view = QWebEngineView(dlg)
             layout.addWidget(self._dev_view)
             self._dev_window = dlg
-        view.page().setDevToolsPage(self._dev_view.page())
-        self._dev_window.show()
-        self._dev_window.raise_()
+        if self._dev_view is not None:
+            view.page().setDevToolsPage(self._dev_view.page())
+        if self._dev_window is not None:
+            self._dev_window.show()
+            self._dev_window.raise_()
 
     def toggle_fullscreen(self) -> None:
         # During element fullscreen, F11 must exit THROUGH the page so the
@@ -1623,7 +1643,7 @@ class MainWindow(QMainWindow):
         """Restore the previous session generation (session.prev.json)."""
         app = getattr(self, "_app", None)
         store = getattr(app, "session_store", None)
-        if store is None:
+        if store is None or app is None:
             return
         windows = store.load_previous().get("windows") or []
         if not windows:

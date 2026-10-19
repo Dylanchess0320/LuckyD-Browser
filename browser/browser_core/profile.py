@@ -33,7 +33,8 @@ def desktop_ua() -> str:
     try:
         from PySide6.QtWebEngineCore import qWebEngineChromiumVersion
 
-        major = int(qWebEngineChromiumVersion().majorVersion())
+        ver: Any = qWebEngineChromiumVersion()
+        major = int(ver.majorVersion())
         if major >= 100:
             return (
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "

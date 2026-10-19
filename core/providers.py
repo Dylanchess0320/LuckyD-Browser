@@ -400,6 +400,32 @@ def _assistant_browser_settings() -> dict[str, object]:
         return {}
 
 
+def _mirror_provider_usable(provider: str) -> bool:
+    """True when a mirrored browser provider pick can serve right now.
+
+    Local Ollama always qualifies; the Cline gateways qualify with a key or
+    a logged-in CLI session; every other provider needs its env key (or the
+    shared CODING_AGENT_API_KEY fallback). Never probes the network.
+    """
+    pid = normalize_provider_id(provider)
+    if pid == "ollama":
+        return True
+    if pid in ("clinepass", "cline-usage"):
+        if is_cline_credit_exhausted():
+            return False
+        env_key = (PROVIDER_DEFAULTS.get(pid) or {}).get("env_key")
+        if env_key and (os.environ.get(env_key, "") or "").strip():
+            return True
+        return bool(cline_session_token())
+    env_key = (PROVIDER_DEFAULTS.get(pid) or {}).get("env_key")
+    if not env_key:
+        return False
+    return bool(
+        (os.environ.get(env_key, "") or "").strip()
+        or (os.environ.get("CODING_AGENT_API_KEY", "") or "").strip()
+    )
+
+
 def resolve_provider_config(provider: str | None = None) -> dict[str, object]:
     """Build a full provider config dict. Returns the standard config fields.
 
@@ -420,6 +446,14 @@ def resolve_provider_config(provider: str | None = None) -> dict[str, object]:
             # rotation / local Ollama (10.7.4).
             bs = _assistant_browser_settings()
             ap = normalize_provider_id(str(bs.get("ai_provider", "") or ""))
+            # 10.7.5 free-on-any-setting: a mirrored browser pick is only
+            # honored when that provider can actually serve right now (local,
+            # Cline session/key, or its env key present). A stale paid pick
+            # saved in the browser (e.g. OpenAI with no key on this machine)
+            # must not strand LuckyD Code on an empty-key provider — fall
+            # through to the free-first detection / Ollama instead.
+            if ap in VALID_PROVIDERS and not _mirror_provider_usable(ap):
+                ap = ""
             if ap in VALID_PROVIDERS and not (
                 ap in ("clinepass", "cline-usage") and is_cline_credit_exhausted()
             ):
@@ -478,6 +512,9 @@ def resolve_provider_config(provider: str | None = None) -> dict[str, object]:
             # For ClinePass fallback: silently retry with DeepSeek (Agent Mesh doesn't need Cline)
             else:
                 provider = "deepseek"
+                # 10.7.5: reload the entry too — otherwise the config kept
+                # the Cline gateway base/model under a DeepSeek label.
+                entry = PROVIDER_DEFAULTS["deepseek"]
 
     env_base = str(entry.get("env_base") or fallback["env_base"])
     env_model = str(entry.get("env_model") or fallback["env_model"])
@@ -621,18 +658,20 @@ def provider_key_from_label(label: str) -> str:
 
 
 # Providers with a usable $0 tier: local servers, the OpenRouter free catalog,
-# Groq's free tier, the Gemini free tier (GOOGLE_API_KEY), and the Cline
-# gateways (flat subscription or usage-billed free models). Everything else
-# bills per token.
+# Groq's free tier, the Gemini free tier (GOOGLE_API_KEY), and Cline Usage
+# (usage-billed free models via the logged-in CLI session). Everything else
+# bills per token or per subscription.
 #
 # NOTE (2026-09-21): OpenCode Zen is restored to the mesh at Dylan's request,
 # but keyed only — its $0 keyless tier died in 2026-09 (every keyless call
 # 401s) — so it is NOT in the free tier anymore. Cline (usage-billed free
 # models + the logged-in CLI session) remains the default free agent brain —
 # see resolve_provider_config().
-FREE_TIER_PROVIDERS = frozenset(
-    {"openrouter", "ollama", "groq", "clinepass", "cline-usage", "gemini"}
-)
+#
+# 10.7.5: ClinePass is a $9.99/mo flat subscription, not a $0 tier, so it is
+# no longer flagged free_tier (it still works with a $0 credit balance once
+# subscribed, and stays in the provider list as a paid option).
+FREE_TIER_PROVIDERS = frozenset({"openrouter", "ollama", "groq", "cline-usage", "gemini"})
 
 # Stable display order for the provider list (local first, then free, then paid).
 PROVIDER_ORDER = (

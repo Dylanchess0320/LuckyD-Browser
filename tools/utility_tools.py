@@ -11,9 +11,12 @@ import time
 import uuid
 from pathlib import Path
 
+from typing import Any
+
 from .base import ToolBase, ToolOutput
 from .registry import register_tool
 
+_sandbox_is_safe: Any = None
 try:
     from sandbox import is_safe as _sandbox_is_safe
 except ImportError:
@@ -174,8 +177,13 @@ class ProcessTool(ToolBase):
                 lines = []
                 for pid, proc in _processes.items():
                     running = proc.poll() is None
+                    args_repr = (
+                        proc.args.decode("utf-8", errors="replace")
+                        if isinstance(proc.args, bytes)
+                        else str(proc.args)
+                    )
                     lines.append(
-                        f"  {pid}: {'🟢 running' if running else '🔴 exited'} | {proc.args}"
+                        f"  {pid}: {'🟢 running' if running else '🔴 exited'} | {args_repr}"
                     )
                 return ToolOutput(
                     text="\n".join(lines) if lines else "No processes.",
@@ -285,9 +293,8 @@ class ProcessTool(ToolBase):
             elif op == "kill":
                 if process_id not in _processes:
                     return ToolOutput(text=f"Process not found: {process_id}", error=True)
-                proc = _processes.pop(process_id, None)
-                if proc:
-                    proc.kill()
+                proc = _processes.pop(process_id)
+                proc.kill()
                 _process_outputs.pop(process_id, None)
                 return ToolOutput(text=f"Killed: {process_id}", title=f"🛑 Killed {process_id}")
 

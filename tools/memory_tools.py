@@ -115,5 +115,11 @@ class MemoryClear(ToolBase):
         return ToolOutput(text="All memories cleared.", title="Memory Wiped")
 
 
-for cls in [MemoryRemember, MemoryRecall, MemoryForget, MemorySummary, MemoryClear]:
-    register_tool(cls())
+for _tool in (
+    MemoryRemember(),
+    MemoryRecall(),
+    MemoryForget(),
+    MemorySummary(),
+    MemoryClear(),
+):
+    register_tool(_tool)

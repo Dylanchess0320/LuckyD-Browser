@@ -72,6 +72,8 @@ LuckyD also works with cloud providers if you prefer: Gemini, Groq, DeepSeek, Op
 
 ## What's new
 
+**v10.7.5** — Free-model cleanup: dead model ids pruned, every auto-selected model is a verified $0 route (local Ollama / free tiers), and LuckyD Code falls back to the free rotation on any setting instead of failing on a stale paid pick. Paid providers remain explicit opt-ins with your own key.
+
 **v10.7.4** — Agent Mesh Doctor (`lucky-code mesh --doctor` / `--recommend`) with cost-tier badges across all 19 agents, reversible tab action undo (`Ctrl+Alt+Z` + `/tabs/undo`), one-click Ollama setup & onboarding APIs, exponential Cline 402 credit backoff, and CLI session prefix/title resolution + run cost summaries.
 
 **v10.7.3** — Lazy session restore, smoother terminal, stable tabs

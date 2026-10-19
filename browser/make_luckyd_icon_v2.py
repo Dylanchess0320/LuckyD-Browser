@@ -18,6 +18,7 @@ def main():
     # Saturated midnight tile, intentionally simple enough for small taskbar sizes.
     im = Image.new("RGBA", (N, N), (0, 0, 0, 0))
     px = im.load()
+    assert px is not None
     for y in range(N):
         for x in range(N):
             t = (x / N) * 0.40 + (y / N) * 0.60

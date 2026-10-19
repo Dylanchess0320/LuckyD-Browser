@@ -192,5 +192,14 @@ class GitPR(ToolBase):
             )
 
 
-for cls in [GitStatus, GitDiff, GitLog, GitCommit, GitAdd, GitPush, GitBranch, GitPR]:
-    register_tool(cls())
+for _tool in (
+    GitStatus(),
+    GitDiff(),
+    GitLog(),
+    GitCommit(),
+    GitAdd(),
+    GitPush(),
+    GitBranch(),
+    GitPR(),
+):
+    register_tool(_tool)

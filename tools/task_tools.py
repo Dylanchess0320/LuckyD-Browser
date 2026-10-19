@@ -270,5 +270,11 @@ class TaskStopTool(ToolBase):
 
 
 # Auto-register
-for cls in [TaskCreateTool, TaskUpdateTool, TaskGetTool, TaskListTool, TaskStopTool]:
-    register_tool(cls())
+for _tool in (
+    TaskCreateTool(),
+    TaskUpdateTool(),
+    TaskGetTool(),
+    TaskListTool(),
+    TaskStopTool(),
+):
+    register_tool(_tool)

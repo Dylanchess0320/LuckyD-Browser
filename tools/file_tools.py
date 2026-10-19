@@ -350,5 +350,5 @@ class GrepTool(ToolBase):
 
 
 # Auto-register
-for cls in [ReadTool, WriteTool, EditTool, GlobTool, GrepTool]:
-    register_tool(cls())
+for _tool in (ReadTool(), WriteTool(), EditTool(), GlobTool(), GrepTool()):
+    register_tool(_tool)

@@ -247,11 +247,12 @@ class HarnessTool(ToolBase):
         data, err = await _get("/api/tools", timeout=10.0)
         if err:
             return ToolOutput(text=f"Error: {err}", error=True)
-        tools = (
+        raw_tools = (
             data.get("tools", data.get("data", []))
             if isinstance(data, dict)
             else (data if isinstance(data, list) else [])
         )
+        tools: list = raw_tools if isinstance(raw_tools, list) else []
         lines = [f"**{len(tools)} tools:**"]
         for t in tools:
             lines.append(f"  \U0001f527 {t.get('name', t) if isinstance(t, dict) else t}")

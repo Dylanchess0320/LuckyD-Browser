@@ -102,16 +102,16 @@ class SkillSearchTool(ToolBase):
             except Exception as e:
                 hits.append(f"  (source '{src.name}' unreachable: {e})")
                 continue
-            for e in entries:
-                hay = f"{e.get('name', '')} {e.get('description', '')} {' '.join(e.get('tags', []) or [])}".lower()
+            for entry in entries:
+                hay = f"{entry.get('name', '')} {entry.get('description', '')} {' '.join(entry.get('tags', []) or [])}".lower()
                 if q and q not in hay:
                     continue
-                installed = store.get_installed(str(e.get("name", "")))
+                installed = store.get_installed(str(entry.get("name", "")))
                 mark = f" [installed v{installed['version']}]" if installed else ""
                 hits.append(
-                    f"• {e.get('name')} v{e.get('version', '?')} by {e.get('author', '?')}{mark}\n"
-                    f"  {e.get('description', '')}\n"
-                    f"  source: {src.name} · tags: {', '.join(e.get('tags', []) or [])}"
+                    f"• {entry.get('name')} v{entry.get('version', '?')} by {entry.get('author', '?')}{mark}\n"
+                    f"  {entry.get('description', '')}\n"
+                    f"  source: {src.name} · tags: {', '.join(entry.get('tags', []) or [])}"
                 )
         text = "\n".join(hits) if hits else "No skills matched."
         return ToolOutput(text=text, title="Marketplace search", metadata={"count": len(hits)})
@@ -257,7 +257,7 @@ class SkillUpdateTool(ToolBase):
                     )
                 ):
                     best, best_src = e, src
-        if not best:
+        if not best or best_src is None:
             return ToolOutput(text=f"{name} is up to date (v{installed['version']}).")
         try:
             pkg = fetch_package(best, best_src)

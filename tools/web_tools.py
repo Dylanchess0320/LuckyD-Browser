@@ -12,6 +12,7 @@ import socket
 import urllib.error
 import urllib.parse
 import urllib.request
+from typing import Any, cast
 
 from .base import ToolBase, ToolOutput
 from .registry import register_tool
@@ -40,7 +41,7 @@ def _assert_public_url(url: str) -> list[str]:
         raise ValueError(f"DNS resolution failed for {host!r}: {e}") from e
     ips: list[str] = []
     for info in infos:
-        ip_str = info[4][0]
+        ip_str = str(info[4][0])
         try:
             ip = ipaddress.ip_address(ip_str)
         except ValueError:
@@ -67,11 +68,13 @@ def _assert_public_url(url: str) -> list[str]:
 class _PinnedHTTPConnection(http.client.HTTPConnection):
     """Dials a pre-validated IP while keeping the hostname for Host/SNI."""
 
-    def __init__(self, host, pinned_ip, *args, **kwargs):
+    source_address: tuple[str, int] | None
+
+    def __init__(self, host: str, pinned_ip: str = "", *args: Any, **kwargs: Any):
         super().__init__(host, *args, **kwargs)
         self._pinned_ip = pinned_ip
 
-    def connect(self):
+    def connect(self) -> None:
         self.sock = socket.create_connection(
             (self._pinned_ip, self.port), self.timeout, self.source_address
         )
@@ -80,11 +83,14 @@ class _PinnedHTTPConnection(http.client.HTTPConnection):
 class _PinnedHTTPSConnection(http.client.HTTPSConnection):
     """TLS variant: pinned IP for TCP, real hostname for SNI + cert check."""
 
-    def __init__(self, host, pinned_ip, *args, **kwargs):
+    source_address: tuple[str, int] | None
+    _context: Any
+
+    def __init__(self, host: str, pinned_ip: str = "", *args: Any, **kwargs: Any):
         super().__init__(host, *args, **kwargs)
         self._pinned_ip = pinned_ip
 
-    def connect(self):
+    def connect(self) -> None:
         self.sock = socket.create_connection(
             (self._pinned_ip, self.port), self.timeout, self.source_address
         )
@@ -92,15 +98,15 @@ class _PinnedHTTPSConnection(http.client.HTTPSConnection):
 
 
 class _SSRFHTTPHandler(urllib.request.HTTPHandler):
-    def http_open(self, req):
+    def http_open(self, req: urllib.request.Request) -> http.client.HTTPResponse:
         pinned = _assert_public_url(req.full_url)[0]
-        return self.do_open(_PinnedHTTPConnection, req, pinned_ip=pinned)
+        return self.do_open(cast(Any, _PinnedHTTPConnection), req, pinned_ip=pinned)
 
 
 class _SSRFHTTPSHandler(urllib.request.HTTPSHandler):
-    def https_open(self, req):
+    def https_open(self, req: urllib.request.Request) -> http.client.HTTPResponse:
         pinned = _assert_public_url(req.full_url)[0]
-        return self.do_open(_PinnedHTTPSConnection, req, pinned_ip=pinned)
+        return self.do_open(cast(Any, _PinnedHTTPSConnection), req, pinned_ip=pinned)
 
 
 class _SSRFRedirectHandler(urllib.request.HTTPRedirectHandler):
@@ -326,6 +332,7 @@ class WebSearchTool(ToolBase):
                     results.append(f"  [{i + 1}] {title}\n      {href}\n      {body}")
             return results
 
+        DDGS: Any
         try:
             from ddgs import DDGS
         except ImportError:

@@ -34,19 +34,21 @@ TASK_TYPES = {"code", "chat", "reasoning", "vision", "speed", "cost"}
 # models fall back to a neutral 1.0/1.0 estimate.
 _KNOWN_PRICING: dict[str, tuple[float, float]] = {
     # model substring -> (input_usd_per_1m, output_usd_per_1m)
-    "gpt-4o-mini": (0.15, 0.60),
-    "gpt-4o": (2.50, 10.00),
-    "claude-sonnet-4": (3.00, 15.00),
-    "claude-opus": (15.00, 75.00),
-    "claude-haiku": (0.25, 1.25),
-    "gemini-2.0-flash": (0.10, 0.40),
-    "gemini-1.5-pro": (1.25, 5.00),
+    # 10.7.5: free routes price at $0 so cost-aware routing never treats a
+    # free model as a $1/$1 unknown. Paid rows track current defaults.
+    "openrouter/free": (0.00, 0.00),
+    ":free": (0.00, 0.00),
+    "llama3.2:3b": (0.00, 0.00),
+    "groq/compound": (0.00, 0.00),
+    "gemini-2.5-flash": (0.00, 0.00),  # Gemini free tier (rate-limited)
+    "gpt-6-sol": (2.00, 10.00),
+    "claude-opus-5": (4.00, 20.00),
+    "claude-sonnet-5": (3.00, 15.00),
+    "gemini-3.8-flash": (0.10, 0.40),
+    "deepseek-v4": (0.14, 0.28),
     "deepseek-chat": (0.27, 1.10),
-    "deepseek-reasoner": (0.55, 2.19),
-    "deepseek-v3": (0.27, 1.10),
-    "glm-4.5": (0.50, 2.00),
-    "codellama": (0.00, 0.00),  # local ollama
-    "llama3": (0.00, 0.00),
+    "glm-5.3-flash": (0.00, 0.00),  # Z.ai flash free tier
+    "llama3": (0.00, 0.00),  # local ollama
 }
 
 

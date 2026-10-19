@@ -489,15 +489,15 @@ class LspOutgoingCallsTool(ToolBase):
 
 
 # Auto-register
-for cls in [
-    LspDefinitionTool,
-    LspReferencesTool,
-    LspHoverTool,
-    LspRenameTool,
-    LspDocumentSymbolsTool,
-    LspWorkspaceSymbolsTool,
-    LspImplementationTool,
-    LspIncomingCallsTool,
-    LspOutgoingCallsTool,
-]:
-    register_tool(cls())
+for _tool in (
+    LspDefinitionTool(),
+    LspReferencesTool(),
+    LspHoverTool(),
+    LspRenameTool(),
+    LspDocumentSymbolsTool(),
+    LspWorkspaceSymbolsTool(),
+    LspImplementationTool(),
+    LspIncomingCallsTool(),
+    LspOutgoingCallsTool(),
+):
+    register_tool(_tool)

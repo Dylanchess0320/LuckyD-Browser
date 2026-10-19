@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [10.7.5] - 2026-10-19
+
+Free-model cleanup: every auto-selected model is now a verified $0 route, dead model ids are pruned, and LuckyD Code falls back to the free rotation on any setting instead of failing on a stale paid pick.
+
+### Fixed
+- **Free rotation OpenRouter leg**: `deepseek/deepseek-chat-v3.1:free` never existed in the OpenRouter free catalog and 404'd on rotation; the leg now uses the real `openrouter/free` meta-router.
+- **Browser-mirror paywall trap**: a provider saved in the browser AI sidebar (e.g. OpenAI) was mirrored into LuckyD Code even with no API key on the machine, stranding it on an empty-key provider. The mirror is now honored only when the provider can serve right now; otherwise the free-first detection / local Ollama takes over. Explicit `CODING_AGENT_PROVIDER` still always wins.
+- **Cline fallback mislabel**: the Cline-session failure fallback relabeled the config DeepSeek but kept the Cline gateway base URL/model; the provider entry is now reloaded with the label.
+- **Browser bridge defaults**: Groq now defaults to the free `groq/compound-mini` (was the non-catalog `llama-3.3-70b-versatile`) and OpenRouter to `openrouter/free` (was the paid `deepseek/deepseek-chat-v3.1`).
+
+### Changed
+- **Dead/mislabeled models removed**: the retired OpenCode Zen keyless `-free` catalog, DeepSeek's retired `deepseek-chat`/`deepseek-coder`/`deepseek-lite` "free" claims (DeepSeek is cheap pay-per-token, now labeled paid), Cline's superseded `gemini-2.0-flash`, non-guaranteed-free OpenRouter ids (`stealth/ox-alpha`, `openrouter/auto`), and credit-billed Cline ids in the free picker. ClinePass ($9.99/mo) is no longer flagged as a $0 tier.
+- **Task router free-first**: `core/router.py` catalog rebuilt around $0 models (local Ollama, `openrouter/free`, Gemini/Groq/Cline free tiers) with a free-first scoring bonus and a local free default; retired 2025 frontier ids (`gpt-4o`, `claude-opus-4-6`, `gemini-2.5-pro-preview`, `codellama:34b`) removed. Paid frontier models remain as explicit picks/fallbacks with the user's own key.
+- **Cost table honesty**: orchestrator pricing now prices free routes at $0 instead of the $1/$1 unknown-model fallback.
+- Paid providers are unchanged as explicit opt-ins with your own key — 10.7.5 only removes broken ids and guarantees the free path is the auto default everywhere.
+
+
 ## [10.7.4] - 2026-10-19
 
 Agent Mesh Doctor, reversible tab action undo, one-click Ollama setup, steadier Cline credit fallback, CLI session prefix/title resolution + cost estimates, and 18-module strict mypy typing burn-down.
