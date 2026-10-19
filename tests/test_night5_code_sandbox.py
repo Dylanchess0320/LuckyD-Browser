@@ -569,9 +569,7 @@ def test_optional_any() -> Optional[Any]:
     )
     assert _assertion_for(skeleton, "test_empty_tuple") == "assert result == ()"
     for name in ("test_any", "test_typevar", "test_optional_any"):
-        assert (
-            _assertion_for(skeleton, name) == "assert result is not None  # TODO: real assertion"
-        )
+        assert _assertion_for(skeleton, name) == "assert result is not None  # TODO: real assertion"
 
 
 def test_infer_assertion_from_body(sandbox):
@@ -776,4 +774,3 @@ async def t_async_gen():
     assert len(pairs) == 19
     for act, assertion in pairs:
         exec(f"{act}\n{assertion}", namespace)
-
