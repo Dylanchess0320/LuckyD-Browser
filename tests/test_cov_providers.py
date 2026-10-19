@@ -78,6 +78,10 @@ def clean_env(monkeypatch, tmp_path):
             monkeypatch.delenv(var, raising=False)
     providers.reset_cline_session_cache()
     monkeypatch.setattr(providers, "cline_session_token", lambda: "")
+    # 10.7.4: a developer's running local Ollama must not win the free-first
+    # walk — the liveness probe refuses by default; Ollama tests opt back in
+    # by patching httpx.get themselves.
+    monkeypatch.setattr(httpx, "get", _fake_httpx_get(exc=ConnectionError("refused")))
     return monkeypatch
 
 

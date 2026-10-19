@@ -27,20 +27,27 @@ class TestProviders:
         assert cfg["api_key"] == "sk-test-or"
         assert "openrouter.ai" in cfg["base_url"]
 
-    def test_zai_auto_detect(self):
+    def test_zai_auto_detect(self, monkeypatch):
+        import core.free_rotation
         from core.providers import detect_provider
 
-        os.environ["ZAI_API_KEY"] = "sk-test-zai"
+        monkeypatch.setenv("ZAI_API_KEY", "sk-test-zai")
         # Clear other provider keys that conftest sets, plus any explicit
-        # override coming from the local .env, so detection is deterministic.
+        # override / Cline keys coming from the local .env, so detection is
+        # deterministic.
         for key in (
             "OPENAI_API_KEY",
             "ANTHROPIC_API_KEY",
             "GOOGLE_API_KEY",
             "OPENROUTER_API_KEY",
             "CODING_AGENT_PROVIDER",
+            "CLINEPASS_API_KEY",
+            "CLINE_USAGE_MODEL",
         ):
-            os.environ.pop(key, None)
+            monkeypatch.delenv(key, raising=False)
+        # The free-first walk sees a developer's real Cline CLI session /
+        # local Ollama; stub it out so only the keyed priority order is tested.
+        monkeypatch.setattr(core.free_rotation, "best_free_provider", lambda: None)
         assert detect_provider() == "zai"
 
     def test_valid_providers_includes_new(self):

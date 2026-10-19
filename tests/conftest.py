@@ -56,6 +56,17 @@ def _mock_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         # ~/.luckyd/last_working_model.json must never reorder rotation in
         # the suite. (tests/test_last_working_105.py overrides this.)
         monkeypatch.setenv("LUCKYD_LAST_WORKING_STATE", str(tmp_path / "last_working_model.json"))
+        # 10.7.4: same for the browser sidebar's saved provider pick — a
+        # developer's real (gitignored) browser/data/settings.json (e.g.
+        # ai_provider=cline-usage) must never steer resolve_provider_config().
+        # tests/test_cov_providers.py exercises the real reader via its
+        # module-level import, and per-test patches still override this.
+        try:
+            from core import providers as _providers
+
+            monkeypatch.setattr(_providers, "_assistant_browser_settings", lambda: {})
+        except Exception:
+            pass
     # 10.5: the rotator's live active pair is module-global — reset it every
     # test so agent constructions can't leak state across tests.
     try:
