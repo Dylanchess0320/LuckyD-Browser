@@ -177,7 +177,7 @@ class HarnessBridge:
             # Re-check inside the lock: another worker may have started it.
             if await self.connect(timeout=1.5):
                 return True
-            flags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+            flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) if sys.platform == "win32" else 0
             # A .py launcher must be run through the Python interpreter; a
             # frozen .exe runs directly. Under a frozen browser,
             # sys.executable is the browser itself — never use it here.
