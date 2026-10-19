@@ -109,17 +109,19 @@ def _driver(script_map=None, seq=None):
 
 @pytest.mark.asyncio()
 async def test_act_click(fast_sleep) -> None:
-    drv, calls = _driver(seq=["highlighted", "clicked <a> link", "complete"])
+    drv, calls = _driver(
+        seq=["https://example.com/", "highlighted", "clicked <a> link", "complete"]
+    )
     assert await drv.act({"action": "click", "index": 2}) == "clicked <a> link"
-    assert "data-ld-agent" in calls[1]  # _CLICK_JS targets the indexed element
+    assert "data-ld-agent" in calls[2]  # _CLICK_JS targets the indexed element
 
 
 @pytest.mark.asyncio()
 async def test_act_type_quotes_text_safely(fast_sleep) -> None:
-    drv, calls = _driver(seq=["highlighted", "typed 11 chars into <input>", "complete"])
+    drv, calls = _driver(seq=["", "highlighted", "typed 11 chars into <input>", "complete"])
     result = await drv.act({"action": "type", "index": 1, "text": 'say "hi"'})
     assert result == "typed 11 chars into <input>"
-    assert '"say \\"hi\\""' in calls[1]  # json.dumps-escaped into the JS
+    assert '"say \\"hi\\""' in calls[2]  # json.dumps-escaped into the JS
 
 
 @pytest.mark.asyncio()
@@ -138,7 +140,7 @@ async def test_act_press_tab(fast_sleep) -> None:
 
 @pytest.mark.asyncio()
 async def test_act_select(fast_sleep) -> None:
-    drv, _calls = _driver(seq=["highlighted", "selected Option B"])
+    drv, _calls = _driver(seq=["", "highlighted", "selected Option B", "complete"])
     assert await drv.act({"action": "select", "index": 4, "text": "B"}) == "selected Option B"
 
 
@@ -160,10 +162,10 @@ async def test_act_back(fast_sleep) -> None:
 
 @pytest.mark.asyncio()
 async def test_act_navigate_valid(fast_sleep) -> None:
-    drv, calls = _driver(seq=["ok", "complete"])
+    drv, calls = _driver(seq=["https://old.example/", "ok", "complete"])
     url = "https://example.com/page"
     assert await drv.act({"action": "navigate", "url": url}) == f"navigated to {url}"
-    assert json.dumps(url) in calls[0]
+    assert json.dumps(url) in calls[1]
 
 
 @pytest.mark.asyncio()
@@ -311,7 +313,7 @@ def _session(ai, driver, **kw):
 def patched_jsdriver(monkeypatch):
     made = {}
 
-    def _factory(bridge):
+    def _factory(bridge, **kw):
         drv = made["driver"]
         return drv
 

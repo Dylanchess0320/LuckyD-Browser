@@ -112,11 +112,13 @@ def test_step_record_skips_negative_index():
 
 def _backend():
     """QtBrowserBackend without Qt: __new__ + the attributes act() touches."""
+    from browser_core.agent import ActionUndoStack
     from browser_core.control_server import QtBrowserBackend
 
     backend = QtBrowserBackend.__new__(QtBrowserBackend)
     backend._recorder = WorkflowRecorder()
     backend._replaying = False
+    backend._undo_stack = ActionUndoStack()
     return backend
 
 

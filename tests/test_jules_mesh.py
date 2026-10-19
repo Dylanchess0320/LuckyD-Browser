@@ -135,14 +135,9 @@ def test_mesh_doctor_and_tier_labels(monkeypatch) -> None:
         "browser.browser_core.terminal_server._find_mesh_exe",
         lambda exe: f"/fake/{exe}" if exe in ("jules", "aider") else None,
     )
-    for var in (
-        "OPENAI_API_KEY",
-        "ANTHROPIC_API_KEY",
-        "DEEPSEEK_API_KEY",
-        "OPENROUTER_API_KEY",
-        "GOOGLE_API_KEY",
-        "GEMINI_API_KEY",
-    ):
+    # Delete every env key aider accepts so "no key env is set" holds
+    # even as the spec's env_keys grow (OLLAMA_MODEL was missed before).
+    for var in MESH_BACKEND_SPECS["mesh-aider"]["env_keys"]:
         monkeypatch.delenv(var, raising=False)
     _reset_mesh_availability_cache()
 
