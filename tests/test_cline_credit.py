@@ -377,3 +377,32 @@ class TestProviderUIIndicator:
         TerminalUI()._show_providers_ansi(rows)
         out = capsys.readouterr().out
         assert "exhausted" not in out
+
+
+class TestExhaustedClineFallback:
+    def test_resolve_provider_config_skips_exhausted_browser_setting(self, credit_env, monkeypatch):
+        monkeypatch.setattr(
+            providers,
+            "_assistant_browser_settings",
+            lambda: {"ai_provider": "cline-usage", "ai_model": "deepseek/deepseek-chat"},
+        )
+        record_cline_credit_exhausted(_REASON)
+        cfg = providers.resolve_provider_config()
+        assert cfg["provider"] == "ollama"
+
+    def test_validate_api_key_degrades_to_free_provider_when_cline_exhausted(
+        self, credit_env, monkeypatch
+    ):
+        import main
+
+        record_cline_credit_exhausted(_REASON)
+        monkeypatch.setattr(providers, "detect_provider", lambda: None)
+        cfg = {
+            "provider": "cline-usage",
+            "model": "deepseek/deepseek-chat",
+            "api_key": "",
+            "base_url": "https://api.cline.bot/api/v1",
+        }
+        new_cfg, new_model = main._validate_api_key(cfg, one_shot="test query")
+        assert new_cfg["provider"] == "ollama"
+        assert new_model == new_cfg["model"]

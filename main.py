@@ -1228,8 +1228,17 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
         save_path.write_text(json.dumps(agent.messages, indent=2, default=str))
         ui.success(f"Saved to: {save_path}")
 
-    elif cmd == "cost":
-        ui.markdown(agent.cost_tracker.summary())
+    elif cmd == "cost" or cmd.startswith("cost "):
+        parts = cmd.split()
+        est_turns = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 10
+        cur_model = getattr(agent, "model", "") or ""
+        ui.markdown(
+            f"{agent.cost_tracker.summary()}\n"
+            f"{agent.cost_tracker.estimate_summary(model=cur_model, turns=est_turns)}"
+        )
+
+    elif cmd in ("doctor", "mesh-doctor"):
+        _cli_doctor([])
 
     elif cmd == "undo":
         from core.checkpoint import get_checkpoint_manager
@@ -1249,22 +1258,40 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
             ui.info("No saved sessions")
         else:
             parts = []
-            for s in sessions:
+            for idx, s in enumerate(sessions, 1):
                 sid = s.get("conversation_id", "?")
                 ts = (s.get("updated_at") or "")[-19:] if s.get("updated_at") else "---"
                 prev = (s.get("preview") or "")[:80]
                 mod = s.get("model", "?")
-                parts.append(f"  {sid}  {ts}  {mod}  | {prev}")
-            ui.markdown("**Recent Sessions:**\n" + "\n".join(parts))
+                msgs = s.get("message_count", 0)
+                parts.append(f"  {idx:>2}. {sid}  {ts}  {mod} ({msgs} msgs)  | {prev}")
+            ui.markdown(
+                "**Recent Sessions** (resume with `/resume <# | id | keyword>`):\n"
+                + "\n".join(parts)
+            )
 
     elif cmd.startswith("resume"):
         parts = cmd.split(maxsplit=1)
-        sid = parts[1] if len(parts) > 1 else "latest"
-        sess = get_session_store().latest() if sid == "latest" else get_session_store().load(sid)
+        sid = parts[1].strip() if len(parts) > 1 else "latest"
+        store = get_session_store()
+        if hasattr(store, "resolve"):
+            sess, candidates = store.resolve(sid)
+        else:
+            sess = store.latest() if sid == "latest" else store.load(sid)
+            candidates = []
         if sess:
             agent.restore_session(sess)
             prev = (sess.get("preview") or "")[:80]
-            ui.success(f"Resumed: {prev}")
+            cid = sess.get("conversation_id", sid)
+            n_msgs = sess.get("message_count", len(sess.get("messages", [])))
+            ui.success(f"Resumed [{cid}] ({n_msgs} msgs): {prev}")
+        elif candidates:
+            lines = [f"Multiple sessions match '{sid}':"]
+            for c in candidates[:5]:
+                cid = c.get("conversation_id", "?")
+                prev = (c.get("preview") or "")[:60]
+                lines.append(f"  - `/resume {cid}` — {prev}")
+            ui.warn("\n".join(lines))
         else:
             ui.error(f"Session not found: {sid}")
 
@@ -2184,6 +2211,64 @@ lucky-code custom-provider — user-defined OpenAI-compatible providers (9.8)
     sys.exit(2)
 
 
+def _cli_doctor(args: list[str]) -> None:
+    """lucky-code doctor [--json] — provider & Agent Mesh per-backend health check."""
+    from pathlib import Path as _Path
+
+    from core.providers import (
+        detect_provider,
+        is_cline_credit_exhausted,
+        list_providers,
+        resolve_provider_config,
+    )
+
+    try:
+        from browser.browser_core.terminal_server import mesh_doctor
+    except ImportError:
+        bc = str(_Path(__file__).resolve().parent / "browser" / "browser_core")
+        if bc not in sys.path:
+            sys.path.insert(0, bc)
+        from terminal_server import mesh_doctor  # type: ignore
+
+    cfg = resolve_provider_config()
+    mesh_rows = mesh_doctor()
+    cline_exhausted = is_cline_credit_exhausted()
+    ollama_ready = any(p.get("id") == "ollama" and p.get("configured") for p in list_providers())
+    free_fallback = detect_provider() or "ollama"
+
+    if "--json" in args:
+        payload = {
+            "active_provider": cfg.get("provider", ""),
+            "active_model": cfg.get("model", ""),
+            "cline_credit_exhausted": cline_exhausted,
+            "ollama_ready": ollama_ready,
+            "recommended_fallback": free_fallback,
+            "mesh_backends": mesh_rows,
+        }
+        print(json.dumps(payload, indent=2))
+        return
+
+    print("\nLuckyD Code & Agent Mesh Doctor")
+    print("=" * 68)
+    print(f"  Active Provider : {cfg.get('provider', '?')} ({cfg.get('model', '?')})")
+    print(
+        f"  Cline Credits   : {'EXHAUSTED ($0 — auto-degrades to ' + free_fallback + ')' if cline_exhausted else 'OK / not tripped'}"
+    )
+    print(
+        f"  Local Ollama    : {'READY (models installed)' if ollama_ready else 'offline / no models'}"
+    )
+    print("\nAgent Mesh Backends (free vs keyed vs credit-billed):")
+    print(f"  {'Backend':<18} {'Tier':<14} {'Binary':<10} {'Auth/Env':<12} Status")
+    print("  " + "-" * 64)
+    for r in mesh_rows:
+        bin_str = "found" if r["installed"] else "missing"
+        auth_str = "ready" if r["auth_ok"] else "missing key"
+        status_str = "READY" if r["ready"] else str(r["detail"])
+        print(f"  {r['label']!s:<18} {r['tier']!s:<14} {bin_str:<10} {auth_str:<12} {status_str}")
+    ready_count = sum(1 for r in mesh_rows if r["ready"])
+    print(f"\n  Summary: {ready_count}/{len(mesh_rows)} mesh backends ready.\n")
+
+
 def _dispatch_early_subcommands(args: list[str]) -> bool:
     """Dispatches early subcommands that don't need a full agent/API key. Returns True if handled."""
     if not args:
@@ -2195,6 +2280,9 @@ def _dispatch_early_subcommands(args: list[str]) -> bool:
         return True
     if cmd in ("providers", "provider"):
         _cli_providers(args[1:])
+        return True
+    if cmd in ("doctor", "mesh-doctor"):
+        _cli_doctor(args[1:])
         return True
     if cmd == "plugin":
         _cli_plugin(args[1:])
@@ -2230,6 +2318,7 @@ Usage:
   lucky-code                       Interactive REPL (Agent 1 · v10.7.3)
   lucky-code --agent 2             Interactive REPL (Agent 2 · v10.7.3)
   lucky-code providers           List AI providers — status, cost tier, current
+  lucky-code doctor [--json]     Check provider & Agent Mesh backend health + tiers
   lucky-code model <name>        Switch model (fuzzy Cline-style picker)
   lucky-code plugin list --available   List/install plugins
   lucky-code custom-provider list      List user-defined providers
@@ -2255,7 +2344,7 @@ Options:
                      (every skip is still audited)
   --max-turns N      Override max agent turns (default: 30)
   -c, --continue     Resume most recent session
-  --resume <id>      Resume a specific session by ID or prefix
+  --resume <id>      Resume a specific session by ID, number, prefix, or keyword
   --acp              ACP stdio server (JSON-RPC for editors)
   --json             Structured JSON-line output (for extensions)
   -v, --version      Show version
@@ -2263,7 +2352,7 @@ Options:
 
 REPL slash commands (9.8): /goal <text> | /goal budget=50K | /goal pause|resume|clear,
   /steer <guidance> (guide the current response), /btw <text> (queue follow-up),
-  /model, /providers, /contributor, /compact, /review, /init.
+  /model, /providers, /doctor, /cost [turns], /sessions, /resume, /contributor, /compact, /review, /init.
 
 Environment:
   <PROVIDER>_API_KEY   Set in .env for your provider
@@ -2370,10 +2459,30 @@ def _validate_api_key(cfg: dict, one_shot: str) -> tuple[dict, str]:
     """Validates the API key, prompts if needed, and returns updated cfg and model."""
     _ensure_ui()
 
-    from core.providers import PROVIDER_DEFAULTS, PROVIDER_NAMES
+    from core.providers import (
+        PROVIDER_DEFAULTS,
+        PROVIDER_NAMES,
+        detect_provider,
+        is_cline_credit_exhausted,
+        resolve_provider_config,
+    )
 
     provider = cfg.get("provider", "deepseek")
     model = cfg["model"]
+
+    # Graceful fallback when Cline credits are exhausted ($0 balance): degrade to
+    # best available detected provider or local Ollama instead of failing/prompting.
+    if provider in ("clinepass", "cline-usage") and is_cline_credit_exhausted():
+        fb = detect_provider() or "ollama"
+        if fb in ("clinepass", "cline-usage"):
+            fb = "ollama"
+        fb_cfg = resolve_provider_config(fb)
+        cfg = {**cfg, **fb_cfg}
+        model = cfg["model"]
+        ui.warn(
+            f"Cline credits exhausted ($0 balance) — falling back to {cfg['provider']} ({model})."
+        )
+        return cfg, model
 
     if provider != "ollama" and (not cfg["api_key"] or cfg["api_key"] == "sk-your-api-key-here"):
         provider_defaults = PROVIDER_DEFAULTS.get(provider, PROVIDER_DEFAULTS["deepseek"])
@@ -2434,17 +2543,35 @@ def _run_agent(
     mcp_manager = MCPManager()
     agent._mcp_manager = mcp_manager
 
-    # Session resume
-    if resume_session_id == "latest":
-        sess = get_session_store().latest()
+    # Session resume (supports 'latest', 1-based index, prefix, or preview keyword)
+    if resume_session_id:
+        store = get_session_store()
+        if hasattr(store, "resolve"):
+            sess, candidates = store.resolve(resume_session_id)
+        else:
+            sess = (
+                store.latest() if resume_session_id == "latest" else store.load(resume_session_id)
+            )
+            candidates = []
         if sess:
             agent.restore_session(sess)
-            print(f"  [Session] Resumed: {(sess.get('preview') or '')[:60]}")
-    elif resume_session_id:
-        sess = get_session_store().load(resume_session_id)
-        if sess:
-            agent.restore_session(sess)
-            print(f"  [Session] Resumed: {(sess.get('preview') or '')[:60]}")
+            cid = sess.get("conversation_id", resume_session_id)
+            print(f"  [Session] Resumed [{cid}]: {(sess.get('preview') or '')[:60]}")
+        elif candidates and not json_mode:
+            print(f"  [Session] Multiple sessions match '{resume_session_id}':")
+            for c in candidates[:5]:
+                print(
+                    f"    --resume {c.get('conversation_id', '?')}  ({(c.get('preview') or '')[:50]})"
+                )
+        elif not json_mode:
+            print(f"  [Session] Session not found: {resume_session_id}")
+
+    # Upfront cost visibility before a multi-turn one-shot run
+    if one_shot and not json_mode and hasattr(agent, "cost_tracker"):
+        max_turns = int(os.environ.get("CODING_AGENT_MAX_TURNS", cfg.get("max_turns", 30)) or 30)
+        if max_turns >= 10:
+            est_line = agent.cost_tracker.estimate_summary(model=model, turns=max_turns)
+            print(f"  [Cost] {est_line}")
 
     try:
         if one_shot:

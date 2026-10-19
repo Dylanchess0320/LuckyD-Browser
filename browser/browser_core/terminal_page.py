@@ -81,6 +81,27 @@ _MESH_AGENTS = {
     "mesh-aider": ("Aider", "⌨️", "#a3e635", "Aider · git-native pair programmer"),
 }
 
+# Billing/auth tier per Agent Mesh backend ("free" | "keyed" | "credit-billed").
+# Kept in sync with terminal_server.MESH_BACKEND_SPECS.
+_MESH_TIERS: dict[str, str] = {
+    "mesh-agy": "free",
+    "mesh-claude": "credit-billed",
+    "mesh-codex": "credit-billed",
+    "mesh-copilot": "credit-billed",
+    "mesh-qwen": "free",
+    "mesh-opencode": "keyed",
+    "mesh-mcode": "keyed",
+    "mesh-mmx": "keyed",
+    "mesh-cline": "credit-billed",
+    "mesh-openclaw": "free",
+    "mesh-hermes": "free",
+    "mesh-pi": "free",
+    "mesh-grok": "keyed",
+    "mesh-muse": "keyed",
+    "mesh-jules": "free",
+    "mesh-aider": "keyed",
+}
+
 
 def _mesh_available() -> dict:
     """Which mesh agent CLIs are installed (probed via terminal_server)."""
@@ -101,14 +122,17 @@ def _mesh_dock_html() -> str:
         ok = avail.get(shell, False)
         cls = "chip" + (" on" if ok else " off")
         state = "ready" if ok else "not installed"
+        tier = _MESH_TIERS.get(shell, "keyed")
         chips.append(
             f'<button class="{cls}" data-sh="{shell}" data-avail="{str(ok).lower()}" '
-            f'style="--ac:{color}" title="{label} — {blurb} ({state})">'
+            f'data-tier="{tier}" style="--ac:{color}" '
+            f'title="{label} — {blurb} [{tier}] ({state})">'
             f'<span class="ce">{emoji}</span>{label}</button>'
         )
     return (
         '<div id="meshdock"><div id="meshhead"><span class="mh-t">◈ AGENT MESH</span>'
-        '<span class="mh-s">pick an agent — each gets its own live PTY session</span></div>'
+        '<span class="mh-s">pick an agent — each gets its own live PTY session · '
+        "tiers: free · keyed · credit-billed</span></div>"
         '<div id="meshchips">' + "".join(chips) + "</div></div>"
     )
 
@@ -126,6 +150,10 @@ def _mesh_dock_css() -> str:
         "border:1px solid var(--ld-border);background:var(--ld-panel);color:var(--ld-text);cursor:pointer;"
         "font:600 12px/1 system-ui,Segoe UI,Arial;transition:all .15s ease}"
         ".chip .ce{font-size:13px}"
+        ".chip::after{content:attr(data-tier);font-size:9px;font-weight:600;padding:2px 5px;"
+        "border-radius:999px;letter-spacing:.02em;opacity:.78;"
+        "background:color-mix(in srgb,var(--ld-border) 60%,transparent);color:var(--ld-muted)}"
+        '.chip[data-tier="free"]::after{color:var(--ld-ok)}'
         ".chip:hover{border-color:var(--ac);transform:translateY(-1px);"
         "box-shadow:0 4px 14px rgba(0,0,0,.4)}"
         ".chip.on{border-color:color-mix(in srgb,var(--ac) 55%,transparent)}"

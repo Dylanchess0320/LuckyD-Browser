@@ -107,6 +107,58 @@ class SessionStore:
                 continue
         return None
 
+    def resolve(self, query: str) -> tuple[dict | None, list[dict]]:
+        """Resolve a session query by 'latest', 1-based list index, ID/prefix, or preview substring.
+
+        Returns `(session_record, candidates)`:
+        - `(record, [])` when uniquely resolved
+        - `(None, [summary, ...])` when multiple sessions match `query`
+        - `(None, [])` when no session matches
+        """
+        q = (query or "").strip()
+        if not q or q.lower() == "latest":
+            rec = self.latest()
+            return (rec, [])
+
+        recent = self.list(limit=50)
+        # 1-based numeric index into recent sessions (matches `/sessions` numbering)
+        if q.isdigit():
+            idx = int(q)
+            if 1 <= idx <= len(recent):
+                cid = recent[idx - 1].get("conversation_id", "")
+                rec = self.load(cid) if cid else None
+                if rec:
+                    return (rec, [])
+
+        # Exact file match
+        exact_path = self._path(q)
+        if exact_path.exists():
+            try:
+                return (json.loads(exact_path.read_text(encoding="utf-8")), [])
+            except Exception:
+                return (None, [])
+
+        # Prefix match on conversation_id
+        q_low = q.lower()
+        id_matches = [
+            s for s in recent if str(s.get("conversation_id", "")).lower().startswith(q_low)
+        ]
+        if len(id_matches) == 1:
+            rec = self.load(id_matches[0]["conversation_id"])
+            return (rec, [])
+        if len(id_matches) > 1:
+            return (None, id_matches[:10])
+
+        # Substring match on preview text
+        preview_matches = [s for s in recent if q_low in str(s.get("preview", "")).lower()]
+        if len(preview_matches) == 1:
+            rec = self.load(preview_matches[0]["conversation_id"])
+            return (rec, [])
+        if len(preview_matches) > 1:
+            return (None, preview_matches[:10])
+
+        return (None, [])
+
     def list(self, limit: int = 15) -> list[dict]:
         """Session summaries, newest first."""
         files = sorted(self.dir.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
@@ -120,6 +172,7 @@ class SessionStore:
                         "preview": data.get("preview", ""),
                         "updated_at": data.get("updated_at", ""),
                         "model": data.get("model", ""),
+                        "provider": data.get("provider", ""),
                         "message_count": data.get("message_count", 0),
                     }
                 )

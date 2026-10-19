@@ -527,6 +527,230 @@ def mesh_shells_available() -> dict[str, bool]:
     return avail
 
 
+# ── Agent Mesh backend tiers & doctor (10.7.4) ────────────────────────
+#
+# Each canonical mesh-* backend is labeled with its billing/auth tier:
+#   - "free":          $0 / included tier (CLI login or keyless)
+#   - "keyed":         requires an API key in .env / environment
+#   - "credit-billed": usage-billed credits or paid subscription
+MESH_BACKEND_SPECS: dict[str, dict[str, object]] = {
+    "mesh-agy": {
+        "label": "Antigravity",
+        "exe": "agy",
+        "tier": "free",
+        "env_keys": (),
+        "install_hint": "Install Google Antigravity CLI (agy) to %LOCALAPPDATA%\\agy\\bin",
+    },
+    "mesh-claude": {
+        "label": "Claude",
+        "exe": "claude",
+        "tier": "credit-billed",
+        "env_keys": ("ANTHROPIC_API_KEY",),
+        "install_hint": "npm i -g @anthropic-ai/claude-code",
+    },
+    "mesh-codex": {
+        "label": "Codex",
+        "exe": "codex",
+        "tier": "credit-billed",
+        "env_keys": ("OPENAI_API_KEY",),
+        "install_hint": "npm i -g @openai/codex",
+    },
+    "mesh-copilot": {
+        "label": "Copilot",
+        "exe": "copilot",
+        "tier": "credit-billed",
+        "env_keys": ("GITHUB_TOKEN", "GH_TOKEN"),
+        "install_hint": "gh extension install github/gh-copilot",
+    },
+    "mesh-qwen": {
+        "label": "Qwen",
+        "exe": "qwen",
+        "tier": "free",
+        "env_keys": (),
+        "install_hint": "npm i -g @qwen-code/qwen-code",
+    },
+    "mesh-opencode": {
+        "label": "OpenCode",
+        "exe": "opencode",
+        "tier": "keyed",
+        "env_keys": (
+            "OPENCODE_API_KEY",
+            "OPENROUTER_API_KEY",
+            "OPENAI_API_KEY",
+            "ANTHROPIC_API_KEY",
+        ),
+        "install_hint": "npm i -g opencode-ai",
+    },
+    "mesh-mcode": {
+        "label": "MiniMax Code",
+        "exe": "mcode",
+        "tier": "keyed",
+        "env_keys": ("MINIMAX_API_KEY",),
+        "install_hint": "npm i -g @minimax-code/cli",
+    },
+    "mesh-mmx": {
+        "label": "MiniMax Media",
+        "exe": "mmx",
+        "tier": "keyed",
+        "env_keys": ("MINIMAX_API_KEY",),
+        "install_hint": "npm i -g @minimax-ai/mmx",
+    },
+    "mesh-cline": {
+        "label": "Cline",
+        "exe": "cline",
+        "tier": "credit-billed",
+        "env_keys": ("CLINEPASS_API_KEY",),
+        "install_hint": "npm i -g cline && cline auth",
+    },
+    "mesh-openclaw": {
+        "label": "OpenClaw",
+        "exe": "openclaw",
+        "tier": "free",
+        "env_keys": (),
+        "install_hint": "npm i -g openclaw",
+    },
+    "mesh-hermes": {
+        "label": "Hermes",
+        "exe": "hermes",
+        "tier": "free",
+        "env_keys": (),
+        "install_hint": "pip install hermes-agent",
+    },
+    "mesh-pi": {
+        "label": "Pi",
+        "exe": "pi",
+        "tier": "free",
+        "env_keys": (),
+        "install_hint": "npm i -g @mariozechner/pi-coding-agent",
+    },
+    "mesh-grok": {
+        "label": "Grok",
+        "exe": "grok",
+        "tier": "keyed",
+        "env_keys": ("XAI_API_KEY",),
+        "install_hint": "npm i -g @xai-official/grok",
+    },
+    "mesh-muse": {
+        "label": "Muse Code",
+        "exe": "wsl",
+        "tier": "keyed",
+        "env_keys": ("META_API_KEY",),
+        "install_hint": "wsl --install -d Ubuntu && curl -fsSL https://dev.meta.ai/install.sh | bash",
+    },
+    "mesh-jules": {
+        "label": "Jules",
+        "exe": "jules",
+        "tier": "free",
+        "env_keys": ("JULES_API_KEY",),
+        "install_hint": "npm i -g @google/jules",
+    },
+    "mesh-aider": {
+        "label": "Aider",
+        "exe": "aider",
+        "tier": "keyed",
+        "env_keys": (
+            "OPENAI_API_KEY",
+            "ANTHROPIC_API_KEY",
+            "DEEPSEEK_API_KEY",
+            "GOOGLE_API_KEY",
+            "OPENROUTER_API_KEY",
+            "OLLAMA_MODEL",
+        ),
+        "install_hint": "pip install aider-chat",
+    },
+}
+
+
+def mesh_doctor() -> list[dict[str, object]]:
+    """Run a non-blocking readiness check across every Agent Mesh backend.
+
+    Each entry reports: ``shell``, ``label``, ``exe``, ``exe_path``, ``tier``
+    (``"free"`` | ``"keyed"`` | ``"credit-billed"``), ``installed``,
+    ``auth_ok``, ``status`` (``"ready"`` | ``"exhausted"`` | ``"needs_auth"``
+    | ``"not_installed"``), and a one-line human ``detail`` string.
+    """
+    cline_exhausted = False
+    cline_session_ok = False
+    try:
+        from core.cline_credit import is_cline_credit_exhausted
+        from core.providers import cline_session_token
+
+        cline_exhausted = is_cline_credit_exhausted()
+        cline_session_ok = bool(cline_session_token())
+    except Exception:
+        pass
+
+    results: list[dict[str, object]] = []
+    for shell, spec in MESH_BACKEND_SPECS.items():
+        label = str(spec["label"])
+        exe = str(spec["exe"])
+        tier = str(spec["tier"])
+        env_keys = tuple(spec.get("env_keys") or ())  # type: ignore[arg-type]
+        install_hint = str(spec.get("install_hint") or "")
+
+        exe_path = _find_wsl_exe() if shell in MESH_WSL_SHELLS else _find_mesh_exe(exe)
+        installed = bool(exe_path)
+        present_keys = [k for k in env_keys if (os.environ.get(k, "") or "").strip()]
+
+        if not installed:
+            auth_ok = False
+            status = "not_installed"
+            detail = f"not installed — {install_hint}" if install_hint else "not installed"
+        elif shell == "mesh-cline":
+            has_cred = bool(present_keys) or cline_session_ok
+            if cline_exhausted:
+                auth_ok = False
+                status = "exhausted"
+                detail = "credits exhausted (HTTP 402 marker active)"
+            elif has_cred:
+                auth_ok = True
+                status = "ready"
+                src = present_keys[0] if present_keys else "cline CLI session"
+                detail = f"ready ({src})"
+            else:
+                auth_ok = False
+                status = "needs_auth"
+                detail = "run `cline auth` or set CLINEPASS_API_KEY"
+        elif tier == "keyed":
+            if present_keys:
+                auth_ok = True
+                status = "ready"
+                detail = f"ready ({present_keys[0]})"
+            elif shell == "mesh-muse":
+                # Muse Code inside WSL can also authenticate via `muse login`.
+                auth_ok = True
+                status = "ready"
+                detail = "WSL bridge ready (uses META_API_KEY or `muse login`)"
+            else:
+                auth_ok = False
+                status = "needs_auth"
+                needed = " or ".join(env_keys[:2]) if env_keys else "API key"
+                detail = f"installed — set {needed} in .env"
+        else:
+            # Free or CLI-login-capable backends are ready once the binary is on PATH.
+            auth_ok = True
+            status = "ready"
+            via = f" ({present_keys[0]})" if present_keys else ""
+            detail = f"ready{via}"
+
+        results.append(
+            {
+                "shell": shell,
+                "label": label,
+                "exe": exe,
+                "exe_path": exe_path,
+                "tier": tier,
+                "installed": installed,
+                "auth_ok": auth_ok,
+                "ready": status == "ready",
+                "status": status,
+                "detail": detail,
+                "install_hint": install_hint,
+            }
+        )
+    return results
+
+
 # ── PTY pump pacing ───────────────────────────────────────────────────
 # Output is coalesced for up to _FLUSH_AFTER_SEC (or _FLUSH_BYTES) so a
 # chatty TUI's hundreds of tiny writes become a handful of WebSocket

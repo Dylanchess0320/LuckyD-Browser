@@ -414,10 +414,15 @@ def resolve_provider_config(provider: str | None = None) -> dict[str, object]:
         if explicit in VALID_PROVIDERS:
             provider = explicit
         else:
-            # Mirror the browser AI assistant's chosen provider (and model).
+            # Mirror the browser AI assistant's chosen provider (and model),
+            # unless it points at Cline while a 402 credit-exhausted marker is
+            # active — in that case degrade gracefully to the free-first
+            # rotation / local Ollama (10.7.4).
             bs = _assistant_browser_settings()
             ap = normalize_provider_id(str(bs.get("ai_provider", "") or ""))
-            if ap in VALID_PROVIDERS:
+            if ap in VALID_PROVIDERS and not (
+                ap in ("clinepass", "cline-usage") and is_cline_credit_exhausted()
+            ):
                 provider = ap
                 overrides = bs.get("ai_model_overrides", {})
                 if isinstance(overrides, dict):

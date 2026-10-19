@@ -115,3 +115,129 @@ def test_jules_coexists_with_other_agents() -> None:
         assert shell in SHELLS
         assert shell in MESH_SHELLS
         assert shell in _MESH_AGENTS
+
+
+def test_mesh_doctor_and_tier_labels(monkeypatch) -> None:
+    """mesh_doctor() and dock chips label every backend as free, keyed, or credit-billed."""
+    from browser.browser_core.terminal_page import _MESH_AGENTS, _MESH_TIERS, _mesh_dock_html
+    from browser.browser_core.terminal_server import (
+        MESH_BACKEND_SPECS,
+        _reset_mesh_availability_cache,
+        mesh_doctor,
+    )
+
+    assert set(MESH_BACKEND_SPECS.keys()) == set(_MESH_AGENTS.keys())
+    assert set(_MESH_TIERS.keys()) == set(_MESH_AGENTS.keys())
+
+    monkeypatch.setattr(
+        "browser.browser_core.terminal_server._find_mesh_exe",
+        lambda exe: f"/fake/{exe}" if exe in ("jules", "aider") else None,
+    )
+    for var in (
+        "OPENAI_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "DEEPSEEK_API_KEY",
+        "OPENROUTER_API_KEY",
+        "GOOGLE_API_KEY",
+        "GEMINI_API_KEY",
+    ):
+        monkeypatch.delenv(var, raising=False)
+    _reset_mesh_availability_cache()
+
+    rows = {r["shell"]: r for r in mesh_doctor()}
+    assert len(rows) == len(_MESH_AGENTS)
+    for shell, r in rows.items():
+        assert r["tier"] in ("free", "keyed", "credit-billed")
+        assert r["tier"] == _MESH_TIERS[shell]
+        assert isinstance(r["install_hint"], str) and r["install_hint"]
+
+    # Jules is free and installed -> ready
+    assert rows["mesh-jules"]["tier"] == "free"
+    assert rows["mesh-jules"]["installed"] is True
+    assert rows["mesh-jules"]["ready"] is True
+
+    # Aider is keyed -> installed but missing API key when no key env is set
+    assert rows["mesh-aider"]["tier"] == "keyed"
+    assert rows["mesh-aider"]["installed"] is True
+    assert rows["mesh-aider"]["auth_ok"] is False
+    assert rows["mesh-aider"]["ready"] is False
+
+    # Cline is credit-billed
+    assert rows["mesh-cline"]["tier"] == "credit-billed"
+
+    html = _mesh_dock_html()
+    assert 'data-tier="free"' in html
+    assert 'data-tier="keyed"' in html
+    assert 'data-tier="credit-billed"' in html
+
+
+def test_session_store_resolve_and_cost_estimate(tmp_path: Path) -> None:
+    """SessionStore.resolve supports latest, 1-based index, prefix, and keyword with ambiguity hints."""
+    from core.session_store import SessionStore
+    from llm import CostTracker
+
+    store = SessionStore(sessions_dir=tmp_path)
+    store.save(
+        "conv_alpha_111",
+        [{"role": "user", "content": "Fix authentication bug in login flow"}],
+        model="deepseek-v4",
+        provider="deepseek",
+    )
+    store.save(
+        "conv_beta_222",
+        [{"role": "user", "content": "Add dark mode toggle to settings"}],
+        model="claude-sonnet-4-5",
+        provider="anthropic",
+    )
+
+    # 1-based index resolution
+    rec1, cands1 = store.resolve("1")
+    assert rec1 is not None and not cands1
+    assert rec1["conversation_id"] in ("conv_alpha_111", "conv_beta_222")
+
+    # Unique prefix resolution
+    rec_a, cands_a = store.resolve("conv_alpha")
+    assert rec_a is not None and rec_a["conversation_id"] == "conv_alpha_111"
+    assert not cands_a
+
+    # Ambiguous prefix returns candidates
+    rec_amb, cands_amb = store.resolve("conv_")
+    assert rec_amb is None
+    assert len(cands_amb) == 2
+
+    # Keyword substring in preview
+    rec_kw, cands_kw = store.resolve("dark mode")
+    assert rec_kw is not None and rec_kw["conversation_id"] == "conv_beta_222"
+    assert not cands_kw
+
+    # CostTracker upfront run estimation
+    tracker = CostTracker()
+    est_paid = tracker.estimate_run("deepseek-v4", turns=10)
+    assert est_paid["pricing_known"] is True
+    assert est_paid["is_free"] is False
+    assert float(est_paid["estimated_cost_usd"]) > 0.0
+
+    est_free = tracker.estimate_run("nvidia/nemotron-3-ultra-550b-a55b:free", turns=10)
+    assert est_free["is_free"] is True
+    assert est_free["estimated_cost_usd"] == 0.0
+    assert "$0 / free tier" in tracker.estimate_summary(
+        "nvidia/nemotron-3-ultra-550b-a55b:free", turns=10
+    )
+
+
+def test_cli_doctor_json_and_text(capsys) -> None:
+    """lucky-code doctor outputs both JSON and human-readable diagnostics."""
+    import json
+
+    import main
+
+    main._cli_doctor(["--json"])
+    payload = json.loads(capsys.readouterr().out)
+    assert "active_provider" in payload
+    assert "mesh_backends" in payload
+    assert len(payload["mesh_backends"]) >= 16
+
+    main._cli_doctor([])
+    text_out = capsys.readouterr().out
+    assert "LuckyD Code & Agent Mesh Doctor" in text_out
+    assert "credit-billed" in text_out

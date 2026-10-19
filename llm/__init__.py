@@ -167,6 +167,7 @@ MODEL_COSTS: dict[str, dict[str, float]] = {
     "deepseek-chat": {"input": 0.27, "output": 1.10},
     "deepseek-reasoner": {"input": 0.55, "output": 2.19},
     # Current DeepSeek v4 IDs (billed like chat/reasoner; adjust when priced)
+    "deepseek-v4": {"input": 0.27, "output": 1.10},
     "deepseek-v4-flash": {"input": 0.27, "output": 1.10},
     "deepseek-v4-pro": {"input": 0.55, "output": 2.19},
     # OpenRouter free-tier models ($0 marginal cost). (The OpenCode Zen
@@ -184,22 +185,32 @@ MODEL_COSTS: dict[str, dict[str, float]] = {
     "gemini-2.0-pro": {"input": 2.00, "output": 8.00},
     "gemini-2.5-flash": {"input": 0.10, "output": 0.40},  # verify on-platform
     "gemini-3-flash-preview": {"input": 0.10, "output": 0.40},  # verify on-platform
+    "gemini-3.8-flash": {"input": 0.10, "output": 0.40},
     "gemma-4-26b-a4b-it": {"input": 0.0, "output": 0.0},  # free-tier preview
     # OpenAI
+    "gpt-6-sol": {"input": 2.50, "output": 10.00},
     "gpt-4o": {"input": 2.50, "output": 10.00},
     "gpt-4o-mini": {"input": 0.15, "output": 0.60},
     "gpt-4-turbo": {"input": 10.00, "output": 30.00},
     "o1-mini": {"input": 1.10, "output": 4.40},
     "o1-preview": {"input": 15.00, "output": 60.00},
     # Anthropic
+    "claude-opus-5-5": {"input": 15.00, "output": 75.00},
+    "claude-sonnet-4-5": {"input": 3.00, "output": 15.00},
     "claude-sonnet-4-20250514": {"input": 3.00, "output": 15.00},
     "claude-3-5-sonnet-20241022": {"input": 3.00, "output": 15.00},
     "claude-3-opus-20240229": {"input": 15.00, "output": 75.00},
     "claude-3-haiku-20240307": {"input": 0.25, "output": 1.25},
     # Z.ai GLM (reference, verify on-platform)
+    "glm-5.3-flash": {"input": 0.0, "output": 0.0},
     "glm-4.6": {"input": 0.60, "output": 2.20},
     "glm-4.5": {"input": 0.60, "output": 2.20},
     "glm-4.5-air": {"input": 0.20, "output": 1.10},
+    # xAI / Moonshot / Meta / Mistral flagship defaults
+    "grok-4.7": {"input": 2.00, "output": 10.00},
+    "kimi-k3": {"input": 0.60, "output": 2.50},
+    "muse-wonder": {"input": 1.25, "output": 4.25},
+    "mistral-large-4": {"input": 2.00, "output": 6.00},
     # Muse Spark 1.3 — Standard tier (was an OpenCode Zen platform model; the
     # Zen gateway's keyless tier died in 2026-09, so Zen is keyed-only now.
     # Kept for legacy cost accounting). The
@@ -247,6 +258,55 @@ class CostTracker:
             else:
                 self.total_cost += (inp / 1_000_000) * costs.get("input", 0)
             self.total_cost += (out / 1_000_000) * costs.get("output", 0)
+
+    @classmethod
+    def estimate_run(
+        cls,
+        model: str,
+        turns: int = 10,
+        avg_input_tokens: int = 4000,
+        avg_output_tokens: int = 800,
+    ) -> dict[str, object]:
+        """Estimate token usage and USD cost for an upcoming multi-turn run."""
+        turns = max(1, int(turns))
+        total_in = turns * max(0, int(avg_input_tokens))
+        total_out = turns * max(0, int(avg_output_tokens))
+        costs = MODEL_COSTS.get(model, {})
+        in_rate = float(costs.get("input", 0.0))
+        out_rate = float(costs.get("output", 0.0))
+        known = bool(costs) or model.endswith(":free") or model.startswith("cline-pass/")
+        est_cost = (total_in / 1_000_000) * in_rate + (total_out / 1_000_000) * out_rate
+        return {
+            "model": model,
+            "turns": turns,
+            "input_tokens": total_in,
+            "output_tokens": total_out,
+            "input_rate_per_1m": in_rate,
+            "output_rate_per_1m": out_rate,
+            "estimated_cost_usd": round(est_cost, 6),
+            "pricing_known": known,
+            "is_free": known and est_cost == 0.0,
+        }
+
+    def estimate_summary(self, model: str = "", turns: int = 10) -> str:
+        """Human-readable upfront cost estimate for `turns` turns on `model`."""
+        target = model or self._model or "unknown"
+        est = self.estimate_run(target, turns=turns)
+        if est["is_free"]:
+            rate_str = "$0 / free tier"
+            est_str = "$0.0000"
+        elif est["pricing_known"]:
+            rate_str = (
+                f"${est['input_rate_per_1m']:.2f}/1M in, ${est['output_rate_per_1m']:.2f}/1M out"
+            )
+            est_str = f"~${est['estimated_cost_usd']:.4f}"
+        else:
+            rate_str = "unlisted model rate (local/free or custom)"
+            est_str = "$0.0000 (unlisted)"
+        return (
+            f"Estimate ({est['turns']} turns @ ~{est['input_tokens']:,} in / "
+            f"{est['output_tokens']:,} out): {est_str} [{rate_str}]"
+        )
 
     def summary(self) -> str:
         cost_str = f"${self.total_cost:.4f}" if self.total_cost > 0 else "free"
