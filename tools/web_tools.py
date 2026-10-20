@@ -321,10 +321,11 @@ class WebSearchTool(ToolBase):
     async def _search_ddg_library(self, query: str) -> ToolOutput:
         """Search using the official ddgs library (most reliable)."""
         import asyncio
+        import importlib
 
         def _do_search():
             results = []
-            with DDGS() as ddgs:
+            with ddgs_cls() as ddgs:
                 for i, r in enumerate(ddgs.text(query, max_results=10)):
                     title = r.get("title", "").strip()
                     href = r.get("href", "")
@@ -333,9 +334,9 @@ class WebSearchTool(ToolBase):
             return results
 
         try:
-            from ddgs import DDGS
+            ddgs_cls = importlib.import_module("ddgs").DDGS
         except ImportError:
-            from duckduckgo_search import DDGS  # fallback to old package name
+            ddgs_cls = importlib.import_module("duckduckgo_search").DDGS  # old package name
 
         results = await asyncio.to_thread(_do_search)
 

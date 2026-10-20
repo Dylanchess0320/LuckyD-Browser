@@ -32,8 +32,8 @@ class _DefaultGroup(click.Group):
         return super().parse_args(ctx, args)
 
 
-@click.group(cls=_DefaultGroup, default="research")  # type: ignore[untyped-decorator]
-@click.version_option(package_name="deep-research-swarm")  # type: ignore[untyped-decorator]
+@click.group(cls=_DefaultGroup, default="research")
+@click.version_option(package_name="deep-research-swarm")
 def main() -> None:
     """Deep Research Swarm — a multi-agent, citation-grounded research engine."""
 
