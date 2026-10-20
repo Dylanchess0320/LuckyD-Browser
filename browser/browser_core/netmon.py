@@ -102,9 +102,7 @@ class NetMonitor:
                     except TimeoutError:
                         continue
                     with contextlib.suppress(Exception):
-                        payload = (
-                            raw if isinstance(raw, (str, bytes, bytearray)) else str(raw)
-                        )
+                        payload = raw if isinstance(raw, (str, bytes, bytearray)) else str(raw)
                         self._handle(json.loads(payload))
         except Exception as exc:
             self.error = str(exc) or repr(exc)

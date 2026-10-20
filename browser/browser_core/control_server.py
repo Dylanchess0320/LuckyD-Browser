@@ -105,7 +105,10 @@ _ROUTES = (
     ("GET  /mesh/doctor", "per-backend Agent Mesh health check + tier labels (JSON)"),
     ("GET  /onboarding/status", "first-run Ollama & provider onboarding status + FAQ"),
     ("POST /onboarding/ollama-pull", '{"model": "llama3.2:3b"} — pull local Ollama model'),
-    ("POST /onboarding/ollama-setup", '{"model": "llama3.2:3b"} — alias for /onboarding/ollama-pull'),
+    (
+        "POST /onboarding/ollama-setup",
+        '{"model": "llama3.2:3b"} — alias for /onboarding/ollama-pull',
+    ),
     ("GET  /terminal", "live LuckyD Code terminal in a tab (xterm.js + PTY)"),
     ("GET  /status", "browser state + harness/AI reachability"),
     ("GET  /tabs", "open tabs (index, url, title, active)"),
@@ -1088,11 +1091,7 @@ class QtBrowserBackend:
                 return {"action": op, "index": target, "pinned": tabs.is_pinned(target)}
             if op == "mute":
                 tabs.toggle_mute(target)
-                muted = (
-                    tabs.is_muted(target)
-                    if hasattr(tabs, "is_muted")
-                    else False
-                )
+                muted = tabs.is_muted(target) if hasattr(tabs, "is_muted") else False
                 return {"action": op, "index": target, "muted": muted}
             if op == "duplicate":
                 if hasattr(tabs, "duplicate_tab"):

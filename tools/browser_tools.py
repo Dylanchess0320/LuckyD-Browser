@@ -721,9 +721,7 @@ class BrowserConsoleTool(ToolBase):
         },
     }
 
-    async def execute(
-        self, action: str = "list", level: str = "", limit: int = 50
-    ) -> ToolOutput:
+    async def execute(self, action: str = "list", level: str = "", limit: int = 50) -> ToolOutput:
         try:
             if action == "clear":
                 _console_logs.clear()
@@ -1125,4 +1123,3 @@ __all__ = [
     "BrowserTypeTool",
     "OpenInBrowserTool",
 ]
-
