@@ -11,7 +11,6 @@ import platform
 import re
 import signal
 import subprocess
-
 from typing import Any
 
 from .base import ToolBase, ToolOutput
