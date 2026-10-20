@@ -5,12 +5,15 @@
   "description": "LuckyD YouTube deck generator - Marp pipeline with real-browser overflow checking",
   "dependencies": {
     "@marp-team/marp-cli": "^4.5.0",
-    "puppeteer": "^23.0.0"
+    "puppeteer": "^25.15.0"
   },
   "overrides": {
-    "@xmldom/xmldom": "0.9.12"
+    "@xmldom/xmldom": "0.9.12",
+    "basic-ftp": "^6.2.1",
+    "katex": "^0.18.2",
+    "@puppeteer/browsers": "3.2.5"
   },
   "allowScripts": {
-    "puppeteer@23.11.1": true
+    "puppeteer@25.15.0": true
   }
 }

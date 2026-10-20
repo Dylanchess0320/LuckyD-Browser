@@ -294,7 +294,8 @@ class ProcessTool(ToolBase):
                 if process_id not in _processes:
                     return ToolOutput(text=f"Process not found: {process_id}", error=True)
                 proc = _processes.pop(process_id)
-                proc.kill()
+                if proc:
+                    proc.kill()
                 _process_outputs.pop(process_id, None)
                 return ToolOutput(text=f"Killed: {process_id}", title=f"🛑 Killed {process_id}")
 
