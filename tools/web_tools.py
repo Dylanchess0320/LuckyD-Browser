@@ -332,7 +332,6 @@ class WebSearchTool(ToolBase):
                     results.append(f"  [{i + 1}] {title}\n      {href}\n      {body}")
             return results
 
-        DDGS: Any  # noqa: N806 — holds the DDGS class, imported conditionally below
         try:
             from ddgs import DDGS
         except ImportError:
