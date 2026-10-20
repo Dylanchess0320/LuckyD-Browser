@@ -1,4 +1,44 @@
-# LuckyD Browser v10.2.0 — Release Notes
+# LuckyD Browser v10.7.6 — Release Notes
+
+> **The AI browser that doesn't need an API key.** Free AI built in — plus coding
+> agents, deep research, workflows, and a deck studio living in your tabs.
+
+**[⬇ Download `LuckyDBrowserSetup-10.7.6.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.7.6/LuckyDBrowserSetup-10.7.6.exe)** — Windows 10/11 x64 · per-user install · no admin needed
+
+Prefer no installer? **[`LuckyDBrowser-Portable-10.7.6.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.7.6/LuckyDBrowser-Portable-10.7.6.zip)** — unzip and run, best option for locked-down work PCs.
+
+---
+
+## What's new in 10.7.6 — everything fixed, everything simplified
+
+- **MiniMax Media works in the Agent Mesh** — the `mmx` CLI is now found even
+  with a stale PATH or frozen build (npm global probe), the install hint points
+  at the real package (`npm i -g mmx-cli`), and the mesh chip reports ready
+  once installed (`mmx auth login` or `MINIMAX_API_KEY`).
+- **Agent 2 works in the terminal** — no more hard-fail when the second
+  checkout is missing: the slot falls back to the Agent 1 CLI as `--agent 2`
+  and boots in the repo workspace, so both agent slots always start.
+- **Ask Lucky answers you** — the homepage button is a general assistant now.
+  It no longer reads the current homepage back at you; page text is used only
+  when your question is about the page ("summarize this page").
+- **LuckyD HQ never goes blank** — a model that returns an empty reply gets a
+  named cause and a fix (retry / ` /model` to another free model) instead of a
+  bare "(no reply)".
+- **Workflows: Generate with AI** — describe an automation in plain English
+  ("open github.com, click Search, type LuckyD, press Enter") and your best
+  free AI model turns it into a saved workflow that replays, self-heals drifted
+  element targets, and runs on a schedule.
+- **Built-in apps on the best free models** — Deep Researcher defaults to the
+  `openrouter/free` meta-router (a retired id can never 404 a run), Deck Studio
+  runs one free-first cascade (Cline → Gemini → OpenRouter `:free`) with
+  verified $0 model defaults. No key required for any of them.
+
+On top of everything from 10.7.5 below (free-model cleanup: every auto pick is
+a verified $0 route).
+
+---
+
+# LuckyD Browser v10.2.0 — Release Notes (archive)
 
 > **The AI browser that doesn't need an API key.** Free, unlimited, offline AI built in —
 > plus a full coding agent and developer terminal living in your tabs.

@@ -6,7 +6,9 @@ Modernized from the standalone deep-research-swarm:
 - DRS_PROVIDER: auto | gemini | luckyd | bridge | cline | opencode | openrouter
   | ollama | mock. auto rides the AI assistant's connected providers (bridge
   chain: keyless locals → Cline gateways → keyed clouds), then OpenRouter
-  :free, then local Ollama, then Gemini native grounding.
+  :free, then local Ollama, then Gemini native grounding. (10.7.6:
+  `opencode` is the keyed/paid OpenCode Zen gateway — kept for explicit
+  opt-in only, never part of the free auto chain.)
 - DRS_SEARCH_BACKEND: auto | gemini | ddg | none — auto resolves from provider.
 - Runs/cache default under LuckyD DATA_DIR (data/deep_research/...) when
   available, with env overrides (DRS_RUNS_DIR / DRS_CACHE_DIR).
@@ -71,9 +73,10 @@ class Settings:
     # backend-scoped via DRS_OPENCODE_MODEL / DRS_OPENROUTER_MODEL /
     # DRS_OLLAMA_MODEL.
     opencode_model: str = os.getenv("DRS_OPENCODE_MODEL", "gemini-3.5-flash-lite")
-    openrouter_model: str = os.getenv(
-        "DRS_OPENROUTER_MODEL", "nvidia/nemotron-3-ultra-550b-a55b:free"
-    )
+    # 10.7.6: the openrouter/free meta-router instead of one pinned id —
+    # it auto-picks whichever verified $0 model is live, so a retired
+    # catalog id can never 404 a run.
+    openrouter_model: str = os.getenv("DRS_OPENROUTER_MODEL", "openrouter/free")
     ollama_model: str = os.getenv("DRS_OLLAMA_MODEL", os.getenv("OLLAMA_MODEL", "llama3.2:3b"))
     openrouter_base_url: str = os.getenv("DRS_OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
 

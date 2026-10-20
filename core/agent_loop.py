@@ -1770,10 +1770,21 @@ class CodingAgent:
                     self.messages.append({"role": "user", "content": continuation})
                     continue
 
-                # Genuine final answer (optionally reflection-verified)
+                # Genuine final answer (optionally reflection-verified).
+                # An empty final answer is never returned as "" (10.7.6):
+                # reasoning-only / empty-content replies from free models
+                # surfaced in HQ as a bare "(no reply)". Name the cause
+                # and the fix instead.
                 self._no_tool_call_turns = 0
                 self._consecutive_failed_tool_turns = 0
                 final_text = await self._verify_final_answer(user_message, content)
+                if not (final_text or "").strip():
+                    final_text = (
+                        f"[ERR] The {self.provider_name} model ({self.model}) "
+                        "returned an empty reply. Try again, or use /model to "
+                        "switch to another free model (local Ollama and the "
+                        "Cline free tier work without a paid key)."
+                    )
                 assistant_msg["content"] = final_text
                 self._emit_event(AgentEventType.TURN_END, {"final": True})
                 break

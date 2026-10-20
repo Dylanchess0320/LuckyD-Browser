@@ -1,3 +1,14 @@
+## [10.7.6] — MiniMax Media, Agent 2, Ask Lucky & free-model apps — 2026-10-20
+
+**[`LuckyDBrowserSetup-10.7.6.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.7.6/LuckyDBrowserSetup-10.7.6.exe)** — Windows 10/11 x64 · per-user install · no admin needed
+
+**[`LuckyDBrowser-Portable-10.7.6.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.7.6/LuckyDBrowser-Portable-10.7.6.zip)** — unzip and run
+
+- **Fixed** — MiniMax Media (`mmx`) is found in the Agent Mesh even with a stale PATH (npm global probe; install hint corrected to `npm i -g mmx-cli`); Agent 2 boots in the terminal everywhere (falls back to the Agent 1 CLI as `--agent 2`); the homepage **Ask Lucky** button answers general questions instead of reading the homepage back at you; LuckyD HQ never returns a bare "(no reply)" — an empty model reply names the cause and the fix.
+- **Added** — Workflows: **Generate with AI**. Describe an automation in plain English and your best free AI model turns it into a saved workflow that replays, self-heals drifted element targets, and runs on a schedule (`POST /workflow/generate`).
+- **Simplified** — Deep Researcher, Workflows, and Deck Studio all run on the best free models with no configuration: verified $0 defaults (`openrouter/free` meta-router for research, a single Cline → Gemini → OpenRouter `:free` cascade for Deck Studio).
+
+
 # LuckyD Browser — Release Notes
 
 ## [10.7.4] — Agent Mesh Doctor, reversible tab undo & one-click Ollama — 2026-10-19

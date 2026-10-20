@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [10.7.6] - 2026-10-20
+
+Bug-fix + simplification release: MiniMax Media works in the Agent Mesh, Agent 2 boots everywhere, Ask Lucky answers general questions, HQ never goes blank, and the built-in apps (Deep Researcher, Workflows, Deck Studio) run on the best free models.
+
+### Fixed
+- **MiniMax Media in the Agent Mesh**: the `mmx` binary probe now checks the npm global locations directly (`%APPDATA%\npm\mmx.cmd`, `~/.npm-global/bin`), so a frozen browser or stale PATH no longer leaves the mesh chip dimmed with every spawn failing "not installed". Install hints corrected to the real packages (`npm i -g mmx-cli`, `npm i -g @minimax-ai/code`), and both MiniMax shells report ready once installed — they authenticate via `mmx auth login` / `mcode login` (or `MINIMAX_API_KEY`), not an env key alone.
+- **Agent 2 terminal slot**: without a Desktop checkout Agent 2 hard-failed while Agent 1 kept working. It now falls back to the Agent 1 CLI with `--agent 2` (same `main.py` build, slot selected by flag + `LUCKYD_AGENT_SLOT=2`), boots in the repo root instead of the bare home directory, and an explicit `terminal_cli2` path that no longer exists raises a clear error instead of spawning garbage.
+- **Ask Lucky (homepage button)**: was a page-QA machine — it snapshotted whatever tab was active (on the homepage, the new-tab page itself) and read it back at you. It is now a general assistant first; page text is attached only for page-referential questions ("summarize this page", "what does this article say", …) or when the caller forces `use_page: true/false` on `POST /ask`.
+- **LuckyD HQ "(no reply)"**: reasoning-only / empty-content replies from free models surfaced as a bare "(no reply)". An empty final answer now names the cause and the fix (retry or `/model` to another free model) instead of returning `""`.
+
+### Added
+- **Workflows: "Generate with AI"** — describe an automation in plain English and the free-model chain (keyless locals → Cline gateways → keyed clouds) turns it into a saved, replayable workflow. Generated steps go through the same validation as recorded ones, keep optional element fingerprints so replay self-heals drifted targets, and work with schedules. New `POST /workflow/generate` Control API route.
+
+### Changed
+- **Deck Studio free-first cascade**: `browser/studio/ai.js` is one cascade (Cline free tier → Gemini free tier → OpenRouter `:free` — the same best-free-first order as `core/free_rotation.py`) instead of two overlapping fallbacks, with catalog-verified $0 model defaults (`gemini-2.5-flash`, `openrouter/free`) and an error that lists the three keyless/keyed free routes.
+- **Deep Researcher free defaults**: the OpenRouter leg defaults to the `openrouter/free` meta-router (auto-picks a live $0 id — a retired catalog id can never 404 a run); the keyed/paid OpenCode Zen gateway is documented as explicit opt-in only, never part of the free auto chain.
+- **Version consistency**: `LUCKYD_AGENT_VERSION`, ACP, terminal page, installer (`LuckyDBrowser.iss`), `version_info.txt`, and pyproject all report 10.7.6 together (the FFI tuples are bumped too — 10.7.5 shipped them stale in tests only).
+
 ## [10.7.5] - 2026-10-19
 
 Free-model cleanup: every auto-selected model is now a verified $0 route, dead model ids are pruned, and LuckyD Code falls back to the free rotation on any setting instead of failing on a stale paid pick.

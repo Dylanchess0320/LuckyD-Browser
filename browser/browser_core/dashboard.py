@@ -778,6 +778,17 @@ _WORKFLOWS_HTML = (
     </div>
   </div>
 
+  <div class="card">
+    <div class="row"><b>✨ Generate with AI</b><span class="sp"></span>
+      <button id="genbtn">✨ Generate</button></div>
+    <div class="row" style="margin-top:8px">
+      <input id="genname" type="text" placeholder="workflow name (optional)" maxlength="60">
+      <input id="gendesc" type="text" placeholder="Describe it — e.g. open github.com, click Search, type LuckyD, press Enter">
+    </div>
+    <div class="sub" style="margin:8px 0 0">Uses your best free AI model. Generated steps save just like
+      recorded ones — replay re-resolves targets by fingerprint (self-healing) and schedules work too.</div>
+  </div>
+
   <div class="card" id="list-card">
     <div class="row"><b>Saved workflows</b><span class="sp"></span>
       <button id="refresh">↻ Refresh</button></div>
@@ -875,6 +886,31 @@ $('recbtn').onclick = async () => {
   refresh();
 };
 $('refresh').onclick = refresh;
+
+$('genbtn').onclick = async () => {
+  const description = $('gendesc').value.trim();
+  if (!description) { $('gendesc').focus(); return; }
+  $('genbtn').disabled = true;
+  $('log-card').style.display = '';
+  $('log').innerHTML = '✨ generating workflow…\n';
+  try {
+    const r = await api('/workflow/generate',
+      {name: $('genname').value.trim(), description});
+    if (r.ok === false) throw new Error(r.error || 'generate failed');
+    const lines = (r.preview || []).map((s, i) => {
+      const extra = s.url ? ' ' + s.url :
+        ((s.text ? ' ' + JSON.stringify(s.text) : '') +
+         (s.index != null ? ' #' + s.index : ''));
+      return `  ${i + 1}. ${s.action}${extra}`;
+    });
+    $('log').innerHTML = `✨ saved "${r.name}" — ${r.steps} step(s):\n` + lines.join('\n');
+    $('genname').value = ''; $('gendesc').value = '';
+  } catch (e) {
+    $('log').innerHTML += 'generate failed: ' + e;
+  }
+  $('genbtn').disabled = false;
+  refresh();
+};
 
 async function replay(name, btn) {
   btn.disabled = true;

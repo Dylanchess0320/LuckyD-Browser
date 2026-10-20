@@ -27,6 +27,9 @@ from .luckyd import LuckyDProvider
 from .mock import MockProvider
 from .openai_compat import OpenAICompatProvider
 
+# OpenAI-compat backends selectable by name. ("opencode" is the keyed/paid
+# OpenCode Zen gateway since 2026-09 — kept for explicit opt-in only, never
+# part of the free auto chain. The verified-free ones are openrouter/ollama.)
 _FREE_BACKENDS = ("opencode", "openrouter", "ollama")
 
 # Assistant-side providers the bridge handoff can pin (Cline gateways).

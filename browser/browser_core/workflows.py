@@ -128,6 +128,35 @@ def step_record(action: dict, fingerprint: dict | None = None) -> dict | None:
     return step
 
 
+def normalize_generated_steps(raw: object) -> list[dict]:
+    """Validate plain-English AI-generated steps into stored workflow steps.
+
+    10.7.6: the Workflows page's "Generate with AI" turns a description into
+    a JSON step list. Accepts a bare list of step dicts or a
+    ``{"steps": [...]}`` wrapper and reuses :func:`step_record` for every
+    shape/validity rule, so a generated workflow is stored exactly like a
+    recorded one (replay, healing and schedules all work unchanged).
+
+    An optional per-step ``"target"`` fingerprint (``{"tag": …, "text": …}``)
+    is kept — that is what lets replay self-heal element indexes on a
+    re-rendered page. Bad steps are dropped, never fatal: a 6-step answer
+    with one typo still saves the 5 good steps.
+    """
+    if isinstance(raw, dict):
+        raw = raw.get("steps", [])
+    if not isinstance(raw, list):
+        return []
+    steps: list[dict] = []
+    for item in raw[:MAX_STEPS]:
+        if not isinstance(item, dict):
+            continue
+        target = item.get("target")
+        step = step_record(item, target if isinstance(target, dict) else None)
+        if step is not None:
+            steps.append(step)
+    return steps
+
+
 def score_fingerprint(saved: dict, candidate: dict) -> float:
     """Similarity of a recorded fingerprint to a live element, 0.0-1.0."""
     score = 0.0

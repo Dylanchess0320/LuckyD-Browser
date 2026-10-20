@@ -10,8 +10,8 @@ from typing import Any
 
 from .base import ToolBase
 
-MCODE_INSTALL_HINT = "Install it: npm i -g @minimax-code/cli (provides the `mcode` command)"
-MMX_INSTALL_HINT = "Install it: npm i -g @minimax/mmi (provides the `mmx` command)"
+MCODE_INSTALL_HINT = "Install it: npm i -g @minimax-ai/code (provides the `mcode` command)"
+MMX_INSTALL_HINT = "Install it: npm i -g mmx-cli (provides the `mmx` command)"
 
 _MCODE_EXE = "mcode.cmd" if os.name == "nt" else "mcode"
 _MMX_EXE = "mmx.cmd" if os.name == "nt" else "mmx"
@@ -22,12 +22,17 @@ def find_mcode_exe() -> str | None:
     found = shutil.which("mcode") or shutil.which(_MCODE_EXE)
     if found:
         return found
-    cand = Path.home() / ".minimax-code" / ("bin" if os.name != "nt" else "") / _MCODE_EXE
-    try:
-        if cand.is_file():
-            return str(cand)
-    except OSError:
-        pass
+    # The installer drops mcode.cmd directly in ~/.minimax-code (no bin/
+    # subfolder on Windows); probe both layouts plus the USERPROFILE root.
+    for cand in (
+        Path.home() / ".minimax-code" / _MCODE_EXE,
+        Path.home() / ".minimax-code" / "bin" / _MCODE_EXE,
+    ):
+        try:
+            if cand.is_file():
+                return str(cand)
+        except OSError:
+            pass
     up = os.environ.get("USERPROFILE", "").strip()
     if up:
         cand2 = Path(up) / ".minimax-code" / _MCODE_EXE
@@ -40,8 +45,28 @@ def find_mcode_exe() -> str | None:
 
 
 def find_mmx_exe() -> str | None:
-    """Locate the mmx CLI on PATH (honest None when missing)."""
-    return shutil.which("mmx") or shutil.which(_MMX_EXE)
+    """Locate the mmx CLI (PATH + npm-global fallbacks).
+
+    A bare ``shutil.which`` misses a correct ``npm i -g mmx-cli`` install
+    whenever the caller's PATH is stale (frozen browser, old shell), which
+    made MiniMax Media look permanently uninstalled. Probe the standard
+    npm global locations before giving up (honest None when truly missing).
+    """
+    found = shutil.which("mmx") or shutil.which(_MMX_EXE)
+    if found:
+        return found
+    for cand in (
+        Path.home() / "AppData" / "Roaming" / "npm" / _MMX_EXE,
+        Path.home() / "AppData" / "Roaming" / "npm" / "mmx.exe",
+        Path.home() / ".npm-global" / "bin" / "mmx",
+        Path.home() / ".npm-global" / "bin" / _MMX_EXE,
+    ):
+        try:
+            if cand.is_file():
+                return str(cand)
+        except OSError:
+            pass
+    return None
 
 
 def _run_capture(cmd: list[str], timeout_sec: float, runner: Any = None) -> dict[str, Any]:

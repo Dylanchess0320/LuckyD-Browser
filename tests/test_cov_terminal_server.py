@@ -363,11 +363,14 @@ def test_agent2_cwd_prefers_checkout_dir(monkeypatch, tmp_path) -> None:
     assert _agent2_cwd("") == tmp_path
 
 
-def test_agent2_cwd_falls_back_to_home(monkeypatch, tmp_path) -> None:
+def test_agent2_cwd_falls_back_to_repo_root(monkeypatch, tmp_path) -> None:
+    # 10.7.6: without a Desktop checkout the session runs the Agent 1 CLI
+    # fallback (see _agent2_command), so it boots in the repo root — the same
+    # workspace Agent 1 uses — not the bare home directory.
     monkeypatch.delenv("LUCKYD_CLI2", raising=False)
     monkeypatch.setattr(ts, "_agent2_dir", lambda: None)
     _home_to(monkeypatch, tmp_path)
-    assert _agent2_cwd("") == tmp_path
+    assert _agent2_cwd("") == ts._REPO_ROOT
 
 
 # ── _agent2_command ──────────────────────────────────────────────────
@@ -415,31 +418,52 @@ def test_agent2_command_checkout_main_py(monkeypatch, tmp_path) -> None:
     assert _agent2_command("") == [sys.executable, str(main)]
 
 
-def test_agent2_command_no_checkout_raises(monkeypatch, tmp_path) -> None:
+def test_agent2_command_no_checkout_falls_back_to_agent1(monkeypatch, tmp_path) -> None:
+    # 10.7.6 fallback: run the Agent 1 CLI as slot 2 instead of hard-failing.
     monkeypatch.setattr(ts, "_agent2_dir", lambda: None)
     monkeypatch.delenv("LUCKYD_CLI2", raising=False)
+    monkeypatch.setattr(ts, "_cli_command", lambda p="": ["agent1"])
+    assert _agent2_command("") == ["agent1", "--agent", "2"]
+
+
+def test_agent2_command_no_checkout_no_agent1_raises(monkeypatch, tmp_path) -> None:
+    def _boom(_p=""):
+        raise FileNotFoundError("no agent1 either")
+
+    monkeypatch.setattr(ts, "_agent2_dir", lambda: None)
+    monkeypatch.delenv("LUCKYD_CLI2", raising=False)
+    monkeypatch.setattr(ts, "_cli_command", _boom)
     with pytest.raises(FileNotFoundError, match="no 2nd agent found"):
         _agent2_command("")
 
 
-def test_agent2_command_checkout_main_py_no_interpreter_raises(monkeypatch, tmp_path) -> None:
+def test_agent2_command_override_missing_file_raises(tmp_path) -> None:
+    # 10.7.6: an explicit terminal_cli2 that no longer exists is a clear
+    # error, not a garbage spawn.
+    with pytest.raises(FileNotFoundError, match="terminal_cli2 does not exist"):
+        _agent2_command(str(tmp_path / "gone.py"))
+
+
+def test_agent2_command_checkout_main_py_no_interpreter_falls_back(monkeypatch, tmp_path) -> None:
+    # 10.7.6: checkout main.py but no interpreter -> the Agent 1 CLI
+    # fallback runs as slot 2 instead of raising.
     checkout = tmp_path / "coding-agent"
     checkout.mkdir()
     (checkout / "main.py").write_text("# agent2")
     monkeypatch.setattr(ts, "_agent2_dir", lambda: checkout)
     monkeypatch.setattr(ts, "_python_for_scripts", lambda: None)
     monkeypatch.delenv("LUCKYD_CLI2", raising=False)
-    with pytest.raises(FileNotFoundError, match="no 2nd agent found"):
-        _agent2_command("")
+    monkeypatch.setattr(ts, "_cli_command", lambda p="": ["agent1"])
+    assert _agent2_command("") == ["agent1", "--agent", "2"]
 
 
-def test_agent2_command_checkout_without_main_py_raises(monkeypatch, tmp_path) -> None:
+def test_agent2_command_checkout_without_main_py_falls_back(monkeypatch, tmp_path) -> None:
     empty = tmp_path / "empty-checkout"
     empty.mkdir()
     monkeypatch.setattr(ts, "_agent2_dir", lambda: empty)
     monkeypatch.delenv("LUCKYD_CLI2", raising=False)
-    with pytest.raises(FileNotFoundError, match="no 2nd agent found"):
-        _agent2_command("")
+    monkeypatch.setattr(ts, "_cli_command", lambda p="": ["agent1"])
+    assert _agent2_command("") == ["agent1", "--agent", "2"]
 
 
 # ── _find_mesh_exe ───────────────────────────────────────────────────
@@ -668,7 +692,7 @@ def test_spawn_pty_agent_gets_workspace_cwd_and_env(monkeypatch, tmp_path) -> No
     parts = _env_parts(kw["env"])
     assert "LUCKYD_AGENT_SLOT=1" in parts
     assert "LUCKYD_AGENT_NAME=Agent 1" in parts
-    assert "LUCKYD_AGENT_VERSION=v10.7.5" in parts
+    assert "LUCKYD_AGENT_VERSION=v10.7.6" in parts
 
 
 def test_spawn_pty_agent2_gets_slot2_env(monkeypatch, tmp_path) -> None:
@@ -683,7 +707,7 @@ def test_spawn_pty_agent2_gets_slot2_env(monkeypatch, tmp_path) -> None:
     parts = _env_parts(kw["env"])
     assert "LUCKYD_AGENT_SLOT=2" in parts
     assert "LUCKYD_AGENT_NAME=Agent 2" in parts
-    assert "LUCKYD_AGENT_VERSION=v10.7.5" in parts
+    assert "LUCKYD_AGENT_VERSION=v10.7.6" in parts
 
 
 def test_spawn_pty_env_block_sanitizes_bad_entries(monkeypatch) -> None:

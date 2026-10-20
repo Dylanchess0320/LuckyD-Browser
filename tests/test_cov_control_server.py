@@ -1697,3 +1697,110 @@ def test_workflow_delete_requires_name(server):
     status, _, data = _req(server, "POST", "/workflow/delete", {}, headers=_authz())
     assert status == 400
     assert json.loads(data)["error"] == "name required"
+
+
+# ── 10.7.6: workflow AI generation + Ask Lucky page detection ────────────
+
+
+def test_generate_workflow_saves_valid_steps(tmp_path):
+    from browser_core.workflows import WorkflowStore
+
+    reply = (
+        '[{"action": "navigate", "url": "https://example.com"},'
+        ' {"action": "click", "index": 0, "target": {"tag": "a", "text": "Docs"}}]'
+    )
+    stub = SimpleNamespace(_ai=_FakeAI(reply), _wf_store=WorkflowStore(directory=tmp_path))
+    result = QtBrowserBackend.generate_workflow(stub, "my-flow", "open example.com and click Docs")
+    assert result["saved"] is True
+    assert result["name"] == "my-flow"
+    assert result["steps"] == 2
+    assert len(result["preview"]) == 2
+    data = stub._wf_store.load("my-flow")
+    assert data is not None and len(data["steps"]) == 2
+    messages, _provider = stub._ai.seen[0]
+    assert "workflow" in messages[0]["content"].lower()
+    assert messages[1]["content"] == "open example.com and click Docs"
+
+
+def test_generate_workflow_cleans_junk_and_names_fallback(tmp_path):
+    from browser_core.workflows import WorkflowStore
+
+    reply = (
+        '```json\n{"steps": [{"action": "navigate", "url": "https://a.io"},'
+        ' {"action": "explode"}, {"action": "wait", "text": "1"}]}\n```'
+    )
+    stub = SimpleNamespace(_ai=_FakeAI(reply), _wf_store=WorkflowStore(directory=tmp_path))
+    result = QtBrowserBackend.generate_workflow(stub, "", "do a thing")
+    assert result["steps"] == 2  # junk step dropped
+    assert result["name"].startswith("ai-workflow-")  # name fallback
+
+
+def test_generate_workflow_rejects_unusable_output(tmp_path):
+    from browser_core.workflows import WorkflowStore
+
+    stub = SimpleNamespace(
+        _ai=_FakeAI("sorry, I cannot help with that"),
+        _wf_store=WorkflowStore(directory=tmp_path),
+    )
+    with pytest.raises(RuntimeError, match="did not return usable workflow steps"):
+        QtBrowserBackend.generate_workflow(stub, "x", "do a thing")
+    assert stub._wf_store.list() == []  # nothing half-saved
+
+
+class _GenBackend:
+    def __init__(self):
+        self.calls = []
+
+    def status(self):
+        return {"ok": True}
+
+    def generate_workflow(self, name, description, provider=None):
+        self.calls.append((name, description, provider))
+        return {"saved": True, "name": name or "auto", "steps": 1, "preview": []}
+
+
+@pytest.fixture()
+def gen_server():
+    backend = _GenBackend()
+    handler = make_handler(backend, token=TOKEN)
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    port = srv.server_address[1]
+    t = threading.Thread(target=srv.serve_forever, daemon=True)
+    t.start()
+    yield port, backend
+    srv.shutdown()
+    t.join(timeout=5)
+
+
+def test_workflow_generate_route_roundtrip(gen_server):
+    port, backend = gen_server
+    status, _, data = _req(
+        port, "POST", "/workflow/generate", {"name": "n1", "description": "open a site"}, _authz()
+    )
+    assert status == 200
+    out = json.loads(data)
+    assert out["ok"] is True and out["name"] == "n1"
+    assert out["steps"] == 1
+    assert backend.calls == [("n1", "open a site", None)]
+
+
+def test_workflow_generate_route_requires_description(gen_server):
+    port, backend = gen_server
+    status, _, data = _req(port, "POST", "/workflow/generate", {"name": "n1"}, _authz())
+    assert status == 400
+    assert "description" in json.loads(data)["error"]
+    assert backend.calls == []
+
+
+def test_ask_general_questions_never_page_snapshotted():
+    # The homepage bug (10.7.6): general questions got the new-tab page
+    # read back at the user instead of an answer.
+    assert cs._ask_needs_page("what is 2+2?") is False
+    assert cs._ask_needs_page("write a haiku about cats") is False
+    assert cs._ask_needs_page("how do I center a div?") is False
+
+
+def test_ask_page_referential_questions_take_the_page():
+    assert cs._ask_needs_page("summarize this page") is True
+    assert cs._ask_needs_page("What does this article say?") is True
+    assert cs._ask_needs_page("translate this") is True

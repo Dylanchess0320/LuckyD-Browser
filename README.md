@@ -43,6 +43,16 @@ The browser's AI isn't a single chatbot — it's a routing layer that finds you 
 
 ---
 
+## Built-in apps
+
+Three apps ship inside the browser — all wired to the same free-model routing, so they work out of the box with no API key.
+
+- 🔬 **Deep Researcher** (`Ctrl+Shift+R`) — a multi-agent research swarm (planner → parallel grounded workers → synthesizer → critic → verifier) that returns citation-backed reports. Auto-rides your best free model, `openrouter/free` as the resilient fallback.
+- 🎬 **Workflows** — record and replay browser automations with self-healing element targets, run them on a schedule, or just **describe one in plain English** and let Generate with AI build it.
+- 🎞 **Deck Studio** — Markdown in, finished video deck out (Marp pipeline: paginate → AI images → fit check → export), with one free-first model cascade: Cline → Gemini → OpenRouter `:free`.
+
+---
+
 ## Install in 3 steps
 
 1. **[Download the installer](https://github.com/Dylanchess0320/LuckyD-Browser/releases/latest)** (Windows 10/11, 64-bit)
@@ -71,6 +81,8 @@ LuckyD also works with cloud providers if you prefer: Gemini, Groq, DeepSeek, Op
 ---
 
 ## What's new
+
+**v10.7.6** — Everything fixed, everything simplified: MiniMax Media works in the Agent Mesh, Agent 2 boots in the terminal even without a second checkout, **Ask Lucky** answers general questions (it no longer reads the homepage back at you), LuckyD HQ never returns a blank "(no reply)", and the built-in apps run on the best free models — plus **Workflows: Generate with AI**, which turns a plain-English description into a replayable, self-healing automation.
 
 **v10.7.5** — Free-model cleanup: dead model ids pruned, every auto-selected model is a verified $0 route (local Ollama / free tiers), and LuckyD Code falls back to the free rotation on any setting instead of failing on a stale paid pick. Paid providers remain explicit opt-ins with your own key.
 

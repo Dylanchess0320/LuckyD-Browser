@@ -1,9 +1,10 @@
 """LuckyD Browser - a full-featured Chromium-based web browser for Windows."""
 
-__version__ = "10.7.5"
+__version__ = "10.7.6"
 
 # Shown once after an update (first launch with a new version).
 WHATS_NEW = (
-    "LuckyD v10.7.5 - Free-model cleanup: every auto pick is a verified $0 route, "
-    "dead model ids pruned, free fallback on any setting"
+    "LuckyD v10.7.6 - MiniMax Media mesh + Agent 2 fixed, Ask Lucky answers "
+    "general questions (no more homepage readings), HQ never goes blank, "
+    "Workflows can be AI-generated, built-in apps on the best free models"
 )

@@ -242,11 +242,16 @@ def _agent_cwd(cli_path: str = "") -> Path:
 
 
 def _agent2_cwd(cli2_path: str = "") -> Path:
-    """Working dir for 2nd-agent sessions — its own checkout (its workspace)."""
+    """Working dir for 2nd-agent sessions — its own checkout (its workspace).
+
+    Without a Desktop checkout the session falls back to the Agent 1 CLI
+    (see _agent2_command), so it boots in the repo root — the same
+    workspace Agent 1 uses — instead of the bare home directory.
+    """
     override = cli2_path.strip() or os.environ.get("LUCKYD_CLI2", "").strip()
     if override:
         return _expand(override).parent
-    return _agent2_dir() or Path.home()
+    return _agent2_dir() or _REPO_ROOT
 
 
 def _agent2_command(cli2_path: str = "") -> list[str]:
@@ -258,6 +263,12 @@ def _agent2_command(cli2_path: str = "") -> list[str]:
       3. Live source: ``python main.py`` from the Desktop ``coding-agent``
          checkout — the same interactive REPL the ``LuckyD Code.lnk``
          shortcut starts via ``run.bat``.
+      4. Fallback: the Agent 1 CLI itself with ``--agent 2`` (10.7.6).
+         Agent 2 used to hard-fail whenever the Desktop checkout was
+         missing or moved, while Agent 1 — with its long fallback chain —
+         kept working. Both slots run the same ``main.py`` build; the
+         slot is selected by the flag (and by the LUCKYD_AGENT_SLOT=2
+         env the PTY spawn sets), so the fallback is a real Agent 2.
 
     The checkout's ``luckyd-code.exe`` is deliberately NOT auto-used: it is
     the Harness HQ backend server (built from ``web_server.py``, with the
@@ -276,6 +287,8 @@ def _agent2_command(cli2_path: str = "") -> list[str]:
     override = cli2_path.strip() or os.environ.get("LUCKYD_CLI2", "").strip()
     if override:
         p = _expand(override)
+        if not p.is_file():
+            raise FileNotFoundError(f"terminal_cli2 does not exist: {p}")
         if p.suffix.lower() == ".py":
             interp = _python_for_scripts()
             if interp is None:
@@ -294,6 +307,15 @@ def _agent2_command(cli2_path: str = "") -> list[str]:
             interp = _python_for_scripts()
             if interp is not None:
                 return [interp, str(live)]
+    # Fallback (10.7.6): no Desktop checkout — run the Agent 1 CLI as
+    # slot 2. _cli_command("") applies Agent 1's full resolution chain
+    # (Desktop exe, repo builds, frozen _internal, live main.py).
+    try:
+        base = _cli_command("")
+    except FileNotFoundError:
+        base = None
+    if base:
+        return [*base, "--agent", "2"]
     raise FileNotFoundError(
         "no 2nd agent found — expected main.py in the coding-agent checkout "
         "on the Desktop; set the browser's terminal_cli2 setting (or the "
@@ -453,13 +475,30 @@ def _find_mesh_exe(exe_name: str) -> str | None:
             if cand.is_file():
                 return str(cand)
     if exe_name == "mcode":
-        # MiniMax Code CLI: npm i -g @minimax-code/cli. Probe the
+        # MiniMax Code CLI: npm i -g @minimax-ai/code. Probe the
         # %USERPROFILE%/.minimax-code fallback like tools/minimax_cli.
         for cand in (
             Path.home() / ".minimax-code" / ("mcode.cmd" if os.name == "nt" else "mcode"),
             Path(os.environ.get("USERPROFILE", "").strip() or str(Path.home()))
             / ".minimax-code"
             / ("mcode.cmd" if os.name == "nt" else "mcode"),
+        ):
+            try:
+                if cand.is_file():
+                    return str(cand)
+            except OSError:
+                pass
+    if exe_name == "mmx":
+        # MiniMax Media CLI: npm i -g mmx-cli. shutil.which usually finds
+        # it, but a frozen browser / stale PATH may not — probe the npm
+        # global locations directly (mirrors the cline fallback above).
+        # Without this probe the mesh chip stayed dimmed and every spawn
+        # failed with "not installed" even after a correct install.
+        for cand in (
+            Path.home() / "AppData" / "Roaming" / "npm" / "mmx.cmd",
+            Path.home() / "AppData" / "Roaming" / "npm" / "mmx.exe",
+            Path.home() / ".npm-global" / "bin" / "mmx",
+            Path.home() / ".npm-global" / "bin" / "mmx.cmd",
         ):
             try:
                 if cand.is_file():
@@ -586,14 +625,14 @@ MESH_BACKEND_SPECS: dict[str, dict[str, object]] = {
         "exe": "mcode",
         "tier": "keyed",
         "env_keys": ("MINIMAX_API_KEY",),
-        "install_hint": "npm i -g @minimax-code/cli",
+        "install_hint": "npm i -g @minimax-ai/code",
     },
     "mesh-mmx": {
         "label": "MiniMax Media",
         "exe": "mmx",
         "tier": "keyed",
         "env_keys": ("MINIMAX_API_KEY",),
-        "install_hint": "npm i -g @minimax-ai/mmx",
+        "install_hint": "npm i -g mmx-cli",
     },
     "mesh-cline": {
         "label": "Cline",
@@ -722,6 +761,14 @@ def mesh_doctor() -> list[dict[str, object]]:
                 auth_ok = True
                 status = "ready"
                 detail = "WSL bridge ready (uses META_API_KEY or `muse login`)"
+            elif shell in ("mesh-mmx", "mesh-mcode"):
+                # MiniMax CLIs authenticate with their own login flow
+                # (`mmx auth login` / `mcode login`), not only an env key —
+                # an installed binary is usable, so report ready.
+                auth_ok = True
+                status = "ready"
+                login = "mmx auth login" if shell == "mesh-mmx" else "mcode login"
+                detail = f"ready (MINIMAX_API_KEY or `{login}`)"
             else:
                 auth_ok = False
                 status = "needs_auth"
@@ -891,11 +938,11 @@ def _spawn_pty(
     if shell == "agent":
         env["LUCKYD_AGENT_SLOT"] = "1"
         env["LUCKYD_AGENT_NAME"] = "Agent 1"
-        env["LUCKYD_AGENT_VERSION"] = "v10.7.5"
+        env["LUCKYD_AGENT_VERSION"] = "v10.7.6"
     elif shell == "agent2":
         env["LUCKYD_AGENT_SLOT"] = "2"
         env["LUCKYD_AGENT_NAME"] = "Agent 2"
-        env["LUCKYD_AGENT_VERSION"] = "v10.7.5"
+        env["LUCKYD_AGENT_VERSION"] = "v10.7.6"
     # pywinpty's PTY.spawn() expects the environment as a NUL-joined block
     # string ("name=value\0name=value\0…"), NOT a dict — passing a dict
     # raises cffi's "argument env: 'dict' object is not an instance of str",

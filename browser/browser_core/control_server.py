@@ -80,6 +80,7 @@ from browser_core.workflows import (
     action_index,
     elements_js,
     fingerprint_js,
+    normalize_generated_steps,
     resolve_index,
     step_record,
 )
@@ -138,6 +139,10 @@ _ROUTES = (
     ("GET  /workflows/list", "saved workflows + recorder status (JSON)"),
     ("POST /workflow/record", '{"name": "…"} — start recording /navigate + /act traffic'),
     ("POST /workflow/stop", "stop recording and save the workflow"),
+    (
+        "POST /workflow/generate",
+        '{"name": "…", "description": "…"} — AI-generate a saved workflow from plain English',
+    ),
     ("POST /workflow/replay", '{"name": "…"} — replay with self-healing element match'),
     ("POST /workflow/delete", '{"name": "…"}'),
     (
@@ -610,7 +615,17 @@ def make_handler(
                     if not question:
                         return self._send(400, {"ok": False, "error": "question required"})
                     provider = str(body.get("provider", "")).strip() or None
-                    return self._ok(answer=backend.ask(question, provider))
+                    # Optional page mode: true/false forces page context;
+                    # omitted = auto (page text only for page questions).
+                    use_page = body.get("use_page")
+                    if not isinstance(use_page, bool):
+                        use_page = None
+                    try:
+                        answer = backend.ask(question, provider, use_page)
+                    except TypeError:
+                        # Older/custom backends with the 2-arg ask().
+                        answer = backend.ask(question, provider)
+                    return self._ok(answer=answer)
                 if path == "/workflow/record":
                     name = str(body.get("name", "")).strip()
                     if not name:
@@ -628,6 +643,13 @@ def make_handler(
                     if not name:
                         return self._send(400, {"ok": False, "error": "name required"})
                     return self._ok(deleted=backend.delete_workflow(name))
+                if path == "/workflow/generate":
+                    description = str(body.get("description", "")).strip()
+                    if not description:
+                        return self._send(400, {"ok": False, "error": "description required"})
+                    name = str(body.get("name", "")).strip()
+                    provider = str(body.get("provider", "")).strip() or None
+                    return self._ok(**backend.generate_workflow(name, description, provider))
                 if path == "/schedule":
                     name = str(body.get("name", "")).strip()
                     if not name:
@@ -763,6 +785,70 @@ _ASK_SYSTEM = (
     "You answer questions about a web page the user has open. Ground every "
     "answer in the provided page excerpt; say plainly when the answer is not "
     "on the page. Be concise."
+)
+
+# Ask Lucky (dashboard) is a general assistant first (10.7.6). It used to
+# snapshot whatever tab was active — on the homepage that is the new-tab
+# page itself — and force every answer through the page-QA prompt, so
+# general questions got a homepage reading instead of an answer. Page
+# context is now attached only for page-referential questions (or when
+# the caller explicitly asks for it).
+_ASK_GENERAL_SYSTEM = (
+    "You are Lucky, a helpful AI assistant inside the LuckyD browser. "
+    "Answer the user's question directly and concisely. Use Markdown "
+    "when it helps (short bullets, fenced code blocks for code). If you "
+    "do not know something, say so plainly instead of guessing."
+)
+
+_PAGE_REF_PHRASES = (
+    "this page",
+    "this site",
+    "this website",
+    "this article",
+    "this tab",
+    "the page",
+    "the article",
+    "summarize",
+    "summarise",
+    "summary of",
+    "what does it say",
+    "what is this about",
+    "on screen",
+    "current page",
+    "open page",
+    "read this",
+    "translate this",
+)
+
+
+def _ask_needs_page(question: str) -> bool:
+    """True when a question is about the open page and needs its text."""
+    q = f" {(question or '').lower()} "
+    return any(phrase in q for phrase in _PAGE_REF_PHRASES)
+
+
+# "Generate with AI" for the Workflows page (10.7.6). Turns a plain-English
+# description into replayable workflow steps — same free-model chain as Ask
+# Lucky (the bridge's keyless locals → Cline gateways → keyed clouds), so it
+# works with no key at all.
+_WORKFLOW_GEN_SYSTEM = (
+    "You convert a plain-English description into a browser workflow the "
+    "LuckyD browser can replay. Respond with ONLY a JSON array of steps — "
+    "no prose, no code fences. Each step is one object:\n"
+    '  {"action": "navigate", "url": "https://full-url"}\n'
+    '  {"action": "click", "index": N, "target": {"tag": "button", "text": "its visible label"}}\n'
+    '  {"action": "type", "index": N, "text": "text to type", "target": {"tag": "input", "text": "field label"}}\n'
+    '  {"action": "select", "index": N, "text": "option value"}\n'
+    '  {"action": "press", "text": "Enter"}\n'
+    '  {"action": "scroll", "text": "down"}\n'
+    '  {"action": "wait", "text": "2"}\n'
+    '  {"action": "back"}\n'
+    "Rules: always use full https:// URLs for navigate. N is the element's "
+    "index on the page — use 0 when unknown. Include the optional "
+    '"target" fingerprint (tag + visible text/label) on click/type/select '
+    "steps whenever you know it: replay re-resolves the real element by "
+    "that fingerprint even if the page re-rendered (self-healing). One step "
+    "per user action, in order, as few steps as possible."
 )
 
 
@@ -1278,10 +1364,21 @@ class QtBrowserBackend:
 
         return asyncio.run(capture_b64(url))
 
-    def ask(self, question: str, provider: str | None = None) -> str:
+    def ask(self, question: str, provider: str | None = None, use_page: bool | None = None) -> str:
+        """Answer a question — general QA by default, page QA on request.
+
+        ``use_page=None`` (the dashboard default) attaches the active
+        tab's text only when the question refers to the page ("summarize
+        this page", "what does this article say", …). General questions
+        never snapshot the tab: on the homepage the snapshot is just the
+        new-tab page, which made Ask Lucky read the homepage back at the
+        user. ``use_page=True/False`` forces the mode explicitly.
+        """
+        want_page = _ask_needs_page(question) if use_page is None else bool(use_page)
         snap: dict = {}
-        with contextlib.suppress(Exception):
-            snap = self.snapshot()  # page context is best-effort
+        if want_page:
+            with contextlib.suppress(Exception):
+                snap = self.snapshot()  # page context is best-effort
         from browser_core.ai_bridge import AIBridge
 
         # Rebuild the bridge when nothing usable is cached: keys added or a
@@ -1291,8 +1388,8 @@ class QtBrowserBackend:
         elif not self._ai.providers() or (provider is None and self._ai.default_provider() is None):
             with contextlib.suppress(Exception):
                 self._ai = AIBridge()
-        messages = [{"role": "system", "content": _ASK_SYSTEM}]
         if snap:
+            messages = [{"role": "system", "content": _ASK_SYSTEM}]
             messages.append(
                 {
                     "role": "user",
@@ -1302,8 +1399,15 @@ class QtBrowserBackend:
                     ),
                 }
             )
+        else:
+            messages = [{"role": "system", "content": _ASK_GENERAL_SYSTEM}]
         messages.append({"role": "user", "content": question})
         text, _used = asyncio.run(self._ai.chat(messages, provider=provider))
+        if not (text or "").strip():
+            raise RuntimeError(
+                "The AI model returned an empty answer. Try again, or pick "
+                "another free model in Settings → Models."
+            )
         return text
 
     # ── workflows: record / replay with self-healing ───────────────────
@@ -1323,6 +1427,38 @@ class QtBrowserBackend:
 
     def delete_workflow(self, name: str) -> bool:
         return self._wf_store.delete(name)
+
+    def generate_workflow(self, name: str, description: str, provider: str | None = None) -> dict:
+        """AI-generate a saved workflow from plain English (10.7.6).
+
+        Rides the same free-model chain as Ask Lucky (the bridge's keyless
+        locals → Cline gateways → keyed clouds) — no key required. The
+        model's step list goes through ``normalize_generated_steps`` (same
+        validity rules as recorded steps), so generated workflows replay,
+        self-heal and schedule exactly like recorded ones. The stored name
+        slug is returned; ``preview`` holds the first steps for the UI log.
+        """
+        from browser_core.ai_bridge import AIBridge
+
+        if self._ai is None:
+            self._ai = AIBridge()
+        elif not self._ai.providers() or (provider is None and self._ai.default_provider() is None):
+            with contextlib.suppress(Exception):
+                self._ai = AIBridge()
+        messages = [
+            {"role": "system", "content": _WORKFLOW_GEN_SYSTEM},
+            {"role": "user", "content": description},
+        ]
+        text, _used = asyncio.run(self._ai.chat(messages, provider=provider))
+        steps = normalize_generated_steps(parse_json_loose(text or ""))
+        if not steps:
+            raise RuntimeError(
+                "the AI did not return usable workflow steps — rephrase the "
+                "description (one action per step, full https:// URLs) and "
+                "try again, or switch free model in Settings → Models"
+            )
+        slug = self._wf_store.save(name or f"ai-workflow-{int(time.time())}", steps)
+        return {"saved": True, "name": slug, "steps": len(steps), "preview": steps[:20]}
 
     def replay_workflow(self, name: str) -> dict:
         """Replay a saved workflow against the live tab.

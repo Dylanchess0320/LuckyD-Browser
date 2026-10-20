@@ -1,7 +1,10 @@
 // ai.js
 // ---------------------------------------------------------------
 // Free LLM access + deck generator for LuckyD videos.
-// Gemini primary, Cline free-tier fallback, OpenRouter :free last resort.
+// 10.7.6: one free-first cascade — Cline free tier -> Gemini free
+// tier -> OpenRouter :free — the same "best free first" order as
+// core/free_rotation.py, with model defaults straight from the
+// verified $0 catalog (browser/models/FREE_MODELS_CATALOG.md).
 // Reads .env next to this file. No dependencies.
 //
 // CLI:
@@ -34,7 +37,7 @@ async function askGemini(prompt, { model } = {}) {
     // GOOGLE_API_KEY from its own .env at startup) so no secret ships here.
     const key = env.GOOGLE_API_KEY || process.env.GOOGLE_API_KEY;
     if (!key) throw new Error("GOOGLE_API_KEY not set in .env or environment");
-    const chosen = model || env.GOOGLE_MODEL || process.env.GOOGLE_MODEL || "gemini-3-flash-preview";
+    const chosen = model || env.GOOGLE_MODEL || process.env.GOOGLE_MODEL || "gemini-2.5-flash";
     const res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${chosen}:generateContent?key=${key}`,
         {
@@ -57,7 +60,7 @@ async function askOpenRouter(prompt, { model } = {}) {
     const env = loadEnv();
     const key = env.OPENROUTER_API_KEY;
     if (!key) throw new Error("OPENROUTER_API_KEY not set in .env");
-    const chosen = model || env.OPENROUTER_FREE_MODEL || "nvidia/nemotron-3-ultra-550b-a55b:free";
+    const chosen = model || env.OPENROUTER_FREE_MODEL || "openrouter/free";
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -132,30 +135,32 @@ async function askCline(prompt, { model } = {}) {
     return text;
 }
 
-// Cascade: primary provider first, fallback on failure.
-async function ask(prompt, opts = {}) {
-    try {
-        return await askGemini(prompt, opts);
-    } catch (err) {
-        console.error(`[ai] Gemini failed (${err.message}) — falling back to Cline...`);
-        return await askCline(prompt, opts);
-    }
-}
+// One free-first cascade (10.7.6): every route is $0 — a logged-in Cline
+// session, a free-tier Gemini key, or an OpenRouter :free key. Providers
+// are tried in order and the next one takes over on failure; ask() and
+// askWithFullFallback() are the same full cascade (kept as aliases).
+const CASCADE = [
+    ["cline", askCline],
+    ["gemini", askGemini],
+    ["openrouter", askOpenRouter],
+];
 
 async function askWithFullFallback(prompt, opts = {}) {
-    for (const [name, fn] of [
-        ["gemini", askGemini],
-        ["cline", askCline],
-        ["openrouter", askOpenRouter],
-    ]) {
+    for (const [name, fn] of CASCADE) {
         try {
             return await fn(prompt, opts);
         } catch (err) {
             console.error(`[ai] ${name} failed (${err.message}) — trying next...`);
         }
     }
-    throw new Error("All providers failed");
+    throw new Error(
+        "All free AI routes failed — any ONE of these is enough: " +
+        "run `cline auth` once (Cline free tier), set GOOGLE_API_KEY " +
+        "(Gemini free tier), or set OPENROUTER_API_KEY (:free models)."
+    );
 }
+
+const ask = askWithFullFallback;
 
 // ── Deck generation ────────────────────────────────────────────────
 
