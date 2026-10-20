@@ -17,6 +17,7 @@ through the agent's shell tools, so it must never be exposed off-loopback.
 
 from __future__ import annotations
 
+import collections
 import contextlib
 import hmac
 import json
@@ -816,6 +817,62 @@ def poll_delay_seconds(idle_streak: int) -> float:
     return min(_POLL_MAX_SEC, _POLL_BASE_SEC * (2**streak))
 
 
+# ── Crash guards ──────────────────────────────────────────────────────
+# Every mesh pane / terminal tab hosts a full agent CLI on a ConPTY
+# inside the browser process, and sessions used to multiply without any
+# limit: a mesh page (4 panes) plus a few terminal tabs could stack a
+# dozen heavyweight CLI process trees (Node runtimes, language servers,
+# builds) until the machine thrashed and the browser died with them.
+# Cap concurrent sessions per server; extra panes get a clear "close a
+# pane" message instead of a spawn that pushes the machine over.
+_MAX_SESSIONS_DEFAULT = 6
+
+
+def _max_sessions() -> int:
+    """Concurrent PTY session cap (env LUCKYD_TERMINAL_MAX_SESSIONS)."""
+    raw = os.environ.get("LUCKYD_TERMINAL_MAX_SESSIONS", "").strip()
+    try:
+        return max(1, int(raw)) if raw else _MAX_SESSIONS_DEFAULT
+    except ValueError:
+        return _MAX_SESSIONS_DEFAULT
+
+
+# Output flood guard: one CLI printing at full speed (build logs, a
+# recursive find, a runaway loop) used to stream into the renderer as
+# fast as the pump could read — pegging CPU here and in the WebEngine
+# view until the app fell over. Sustained output per session is capped
+# (with a free burst for normal TUI redraws); the pump waits out the
+# window, which back-pressures the ConPTY and the child exactly like a
+# real terminal's flow control.
+_OUT_RATE_BYTES = 512 * 1024  # sustained bytes/sec per session
+_OUT_BURST_BYTES = 256 * 1024  # free burst on top of the rate
+
+
+class _RateWindow:
+    """Rolling 1-second byte window for one session's output throttle."""
+
+    def __init__(self, rate: int = _OUT_RATE_BYTES, burst: int = _OUT_BURST_BYTES):
+        self._allowance = rate + burst
+        self._events: collections.deque[tuple[float, int]] = collections.deque()
+
+    def _prune(self, now: float) -> None:
+        cutoff = now - 1.0
+        while self._events and self._events[0][0] <= cutoff:
+            self._events.popleft()
+
+    def wait_for(self, nbytes: int, now: float) -> float:
+        """Seconds to wait before sending nbytes (0 when it fits)."""
+        self._prune(now)
+        total = sum(b for _, b in self._events)
+        if total + nbytes <= self._allowance or not self._events:
+            return 0.0
+        return max(0.0, self._events[0][0] + 1.0 - now)
+
+    def record(self, nbytes: int, now: float) -> None:
+        self._prune(now)
+        self._events.append((now, nbytes))
+
+
 def _wsl_muse_command() -> list[str]:
     """Spawn command for native Muse Code inside WSL Ubuntu."""
     raw = _find_wsl_exe()
@@ -1001,6 +1058,19 @@ class TerminalServer:
             with contextlib.suppress(Exception):
                 ws.close(code=1008, reason="terminal authentication required")
             return
+        # Crash guard: refuse to spawn once the session cap is reached —
+        # each session is a full agent CLI process tree hosted here, and
+        # unbounded panes are what used to take the browser down.
+        with self._lock:
+            at_cap = len(self._clients) >= _max_sessions()
+        if at_cap:
+            with contextlib.suppress(Exception):
+                ws.send(
+                    "\r\n\x1b[31m[terminal busy — too many live sessions; "
+                    "close a terminal pane and retry]\x1b[0m\r\n"
+                )
+                ws.close()
+            return
         try:
             cols, rows, shell = _client_options(ws)
             pty = _spawn_pty(
@@ -1036,6 +1106,7 @@ class TerminalServer:
             buffered = 0
             first_at: float | None = None
             idle_streak = 0
+            rate = _RateWindow()
 
             def _flush() -> bool:
                 """Send buffered output; False when the client is gone."""
@@ -1046,6 +1117,16 @@ class TerminalServer:
                 chunks.clear()
                 buffered = 0
                 first_at = None
+                # Flood guard: wait out the rate window (stop-aware) so
+                # one CLI printing at full speed can't saturate this
+                # process or the renderer; the ConPTY buffer applies
+                # back-pressure to the child while we wait.
+                while not stop.is_set():
+                    delay = rate.wait_for(len(payload), time.monotonic())
+                    if delay <= 0:
+                        break
+                    stop.wait(min(delay, 0.05))
+                rate.record(len(payload), time.monotonic())
                 try:
                     # Slicing works for both str and bytes payloads.
                     for i in range(0, len(payload), 8192):
