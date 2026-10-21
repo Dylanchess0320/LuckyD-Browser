@@ -44,6 +44,16 @@ except Exception:  # pragma: no cover - import guard
     _core_cline_exhausted = None
     _core_cline_record = None
 
+# LiteLLM model router (browser_core/model_router.py) — optional, like the
+# two seams above. When litellm is installed and the router is enabled,
+# auto-mode chat tries its config-driven tier chain (free -> cheap -> local)
+# first; any router failure falls back to this bridge's httpx chain, so a
+# missing/broken router can never take chat down.
+try:
+    from browser_core import model_router as _model_router
+except Exception:  # pragma: no cover - import guard
+    _model_router = None
+
 
 def _cline_state_path() -> Path:
     """Marker file location, shared by the core and fallback paths."""
@@ -451,6 +461,9 @@ class AIBridge:
             opencode_base = env.get("OPENCODE_BASE_URL", "").strip() or _OPENCODE_ZEN_BASE
             opencode_model = env.get("OPENCODE_MODEL", "").strip() or _OPENCODE_ZEN_DEFAULT
             self._configs["opencode"] = (opencode_model, opencode_base, opencode_key, "openai")
+        # LiteLLM router over the providers registered above (never raises;
+        # None when the router module or the feature is unavailable).
+        self._router = self._build_router(env)
 
     def _detect_clinepass(self, env) -> None:
         """Register ClinePass subscription + Cline Usage (credit-billed/free tier).
@@ -740,6 +753,102 @@ class AIBridge:
             with contextlib.suppress(RuntimeError):
                 api_key = cline_session.fresh_token()
         return {"model": model, "base_url": base_url, "api_key": api_key, "kind": kind}
+
+    # ── LiteLLM model router ─────────────────────────────────────────
+    # Providers that count as the "free" tier of the router chain; local
+    # keyless servers form the "local" tier; every other registered
+    # provider is "cheap". Mirrors default_provider()'s priority notion.
+    _ROUTER_FREE_PROVIDERS = frozenset({"cline-usage", "google", "openrouter", "groq"})
+
+    def _build_router(self, env) -> Any:
+        """Assemble the LiteLLM ModelRouter from config + registered providers.
+
+        Never raises and never requires litellm: the router object is cheap
+        to build, and its chat() raises RouterUnavailableError when litellm is
+        absent, which chat() treats as "use the legacy chain".
+        """
+        if _model_router is None:
+            return None
+        try:
+            config = _model_router.RouterConfig.from_env(env)
+            if not config.enabled:
+                return None
+            entries = config.explicit_entries()
+            for name in self._configs:
+                entry = self._router_entry_for(name)
+                if entry is not None:
+                    entries.append(entry)
+            return _model_router.ModelRouter(entries=entries, config=config)
+        except Exception:
+            return None
+
+    def _router_entry_for(self, name: str) -> Any:
+        """Translate one registered provider into a litellm RouteEntry.
+
+        Returns None for providers the router must not touch: session-based
+        Cline auth (its token refresh lifecycle lives in the legacy path)
+        and kinds with no litellm mapping.
+        """
+        info = self._configs.get(name)
+        if info is None or _model_router is None:
+            return None
+        if name in ("clinepass", "cline-usage") and self._clinepass_from_session:
+            return None
+        model, base_url, api_key, kind = info
+        tier = (
+            _model_router.TIER_LOCAL
+            if name in self._local_names
+            else _model_router.TIER_FREE
+            if name in self._ROUTER_FREE_PROVIDERS
+            else _model_router.TIER_CHEAP
+        )
+        if name == "ollama":
+            # litellm's ollama provider wants the server root, not the
+            # OpenAI-compatible /v1 base the bridge registers.
+            root = base_url.removesuffix("/v1")
+            return _model_router.RouteEntry(
+                name=name, model=f"ollama/{model}", tier=tier, api_base=root
+            )
+        if name == "google":
+            return _model_router.RouteEntry(
+                name=name, model=f"gemini/{model}", tier=tier, api_key=api_key
+            )
+        if name == "anthropic":
+            return _model_router.RouteEntry(
+                name=name, model=f"anthropic/{model}", tier=tier, api_key=api_key
+            )
+        if name == "deepseek":
+            return _model_router.RouteEntry(
+                name=name, model=f"deepseek/{model}", tier=tier, api_key=api_key
+            )
+        if name in ("groq", "openrouter"):
+            # The configured model id already carries litellm's provider
+            # prefix (e.g. "groq/compound-mini", "openrouter/free").
+            return _model_router.RouteEntry(name=name, model=model, tier=tier, api_key=api_key)
+        if kind == "openai":
+            # Generic OpenAI-compatible endpoint (Cline gateways, Zen, Z.ai,
+            # xAI, Moonshot, Meta, Mistral, LM Studio, OpenAI itself).
+            return _model_router.RouteEntry(
+                name=name,
+                model=f"openai/{model}",
+                tier=tier,
+                api_base=base_url,
+                api_key=api_key,
+            )
+        return None
+
+    def router_status(self) -> dict[str, Any]:
+        """Queryable LiteLLM-router state for the future provider dashboard:
+        enabled flag, ordered chain, per-provider health/cooldown snapshot.
+        Safe to call when the router is unavailable (reports disabled)."""
+        if getattr(self, "_router", None) is None:
+            return {
+                "enabled": False,
+                "litellm_available": bool(_model_router and _model_router.litellm_available()),
+                "chain": [],
+                "health": {},
+            }
+        return self._router.status()
 
     def call_sync(
         self,
@@ -1046,6 +1155,20 @@ class AIBridge:
         # the generic fallback has nothing left to try — otherwise it was
         # swallowed and replaced by a misleading "no AI providers configured".
         last_err: Exception | None = None
+        if is_auto and routed is None and getattr(self, "_router", None) is not None:
+            # LiteLLM router (optional): config-driven tier chain
+            # (free -> cheap -> local) with per-provider cooldowns. Any
+            # failure — litellm missing, router disabled, whole chain
+            # down — lands here and the legacy chain below runs unchanged.
+            # The router's error is deliberately NOT seeded into last_err:
+            # the legacy chain owns the final verdict, so "no AI providers
+            # configured" stays honest when nothing was ever viable (the
+            # router's failures remain visible via router_status()).
+            try:
+                text, used = await self._router.chat(messages, on_token)
+                return text, used
+            except Exception:
+                pass
         if is_auto and routed is None:
             fast_path_ran = True
             # Prefer free unlimited pool (locals) before falling back to

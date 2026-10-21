@@ -35,4 +35,9 @@ click==8.4.2
 # ── Browser Tools (optional: pip install .[browser]) ────────────────
 # playwright>=1.42,<2.0
 # pillow>=10.0,<11.0
+
+# ── LiteLLM model router (optional: pip install .[router]) ──────────
+# Exact pin: 1.82.7/1.82.8 were compromised in the March 2026 PyPI
+# supply-chain incident; 1.83.14 is the first clean line's final patch.
+# litellm==1.83.14
 nest_asyncio

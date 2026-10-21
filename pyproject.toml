@@ -71,6 +71,15 @@ browser = [
     "playwright>=1.42,<2.0",
     "pillow>=10.0,<11.0",
 ]
+# LiteLLM model router (browser/browser_core/model_router.py). Optional:
+# without it the AI bridge uses its built-in httpx fallback chain unchanged.
+# PINNED EXACTLY on purpose: litellm 1.82.7/1.82.8 were compromised in the
+# March 2026 PyPI supply-chain incident and pulled from PyPI (the index now
+# jumps 1.82.6 -> 1.83.0). 1.83.14 is the final patch of the first clean
+# post-incident release line. Do not loosen this pin without re-auditing.
+router = [
+    "litellm==1.83.14",
+]
 all = [
     "luckyd-code[dev,onnx,browser]",
 ]
