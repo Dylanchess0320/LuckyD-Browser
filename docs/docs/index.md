@@ -5,7 +5,7 @@
 <p class="tagline">The AI browser that runs <em>your</em> models — local, unlimited, offline — plus a full coding agent and real terminals in one window.</p>
 
 <div class="cta-row" markdown>
-[⬇ Download v10.7.6](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.7.6/LuckyDBrowserSetup-10.7.6.exe){ .luckyd-btn }
+[⬇ Download v10.7.7](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.7.7/LuckyDBrowserSetup-10.7.7.exe){ .luckyd-btn }
 [Getting started](getting-started.md){ .luckyd-btn-ghost }
 [What's new](release-notes.md){ .luckyd-btn-ghost }
 </div>
@@ -76,12 +76,12 @@
 
 ## Install in 10 seconds
 
-1. Get [**LuckyDBrowserSetup-10.7.6.exe**](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.7.6/LuckyDBrowserSetup-10.7.6.exe)
+1. Get [**LuckyDBrowserSetup-10.7.7.exe**](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.7.7/LuckyDBrowserSetup-10.7.7.exe)
 2. Run it — per-user, **no admin**, installs to `%LOCALAPPDATA%\Programs\LuckyDBrowser`
 3. Optional: run `ollama_setup.ps1` from the install folder → Ollama + `llama3.2:3b` (~2 GB, one time)
 4. `Ctrl+Shift+A` → chat offline. Or bring your own keys (Gemini, Groq, DeepSeek, OpenAI, Anthropic, Z.ai, OpenRouter, Cline, OpenCode)
 
-Windows 10/11 x64 only. Silent install: `LuckyDBrowserSetup-10.7.6.exe /VERYSILENT /NORESTART`
+Windows 10/11 x64 only. Silent install: `LuckyDBrowserSetup-10.7.7.exe /VERYSILENT /NORESTART`
 
 ## Why LuckyD
 
@@ -222,6 +222,6 @@ A hardened foundation: every local service now authenticates with HttpOnly sessi
 
 <p align="center">
   <b>MIT © LuckyD</b> · Chromium · Ollama · Qt · xterm.js · pywinpty · PyInstaller · Inno Setup<br>
-  <a href="https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.7.6/LuckyDBrowserSetup-10.7.6.exe">Download v10.7.6</a>
+  <a href="https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.7.7/LuckyDBrowserSetup-10.7.7.exe">Download v10.7.7</a>
   · <a href="https://www.youtube.com/@LuckyDYoutube">YouTube</a>
 </p>

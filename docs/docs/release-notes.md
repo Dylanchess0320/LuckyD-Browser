@@ -1,3 +1,13 @@
+## [10.7.7] — LiteLLM model router & terminal crash guards — 2026-10-21
+
+**[`LuckyDBrowserSetup-10.7.7.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.7.7/LuckyDBrowserSetup-10.7.7.exe)** — Windows 10/11 x64 · per-user install · no admin needed
+
+**[`LuckyDBrowser-Portable-10.7.7.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.7.7/LuckyDBrowser-Portable-10.7.7.zip)** — unzip and run
+
+- **Added** — a **LiteLLM model router** for the AI bridge: one config-driven fallback chain (free tier models → cheap models → local Ollama) with per-provider health tracking and automatic cooldowns. Tier order and model lists are settings, not code; free-first remains the default, and without the optional LiteLLM install the bridge behaves exactly as before.
+- **Fixed** — terminal/agent-mesh **crash guards**: a session cap (6) and an output flood throttle (512KB/s, 256KB burst) keep a runaway agent session from freezing the browser.
+
+
 ## [10.7.6] — MiniMax Media, Agent 2, Ask Lucky & free-model apps — 2026-10-20
 
 **[`LuckyDBrowserSetup-10.7.6.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.7.6/LuckyDBrowserSetup-10.7.6.exe)** — Windows 10/11 x64 · per-user install · no admin needed

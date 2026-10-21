@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [10.7.7] - 2026-10-21
+
+Model-routing + stability release: a LiteLLM-powered router gives the AI bridge one config-driven fallback chain (free → cheap → local) with provider health and cooldowns, and the terminal/agent mesh gains crash guards.
+
+### Added
+- **LiteLLM model router** (`browser/browser_core/model_router.py`): when the optional `router` extra is installed, auto-mode chat in the AI bridge tries a config-driven tier chain — free tier models → cheap models → local Ollama — ahead of the built-in httpx chain. Tier order, per-tier model lists, and the failure cooldown are settings (`LUCKYD_MODEL_ROUTER`, `LUCKYD_ROUTER_CHAIN`, `LUCKYD_ROUTER_{FREE,CHEAP,LOCAL}_MODELS`, `LUCKYD_ROUTER_COOLDOWN_SEC`), not hardcoded logic; the free-first rotation remains the default. litellm is pinned exactly (`litellm==1.83.14`): the March 2026 PyPI supply-chain incident versions (1.82.7/1.82.8) were compromised and pulled, and 1.83.14 is the final patch of the first clean line. Without litellm, behavior is exactly the old bridge.
+- **Provider health state**: the router records per-provider successes, failures, consecutive failures, last error/latency, and cooldown deadlines (exponential backoff, capped at 15 minutes; a chain whose providers are all cooling down fails open). Exposed via `AIBridge.router_status()` as the seed for a future provider dashboard.
+
+### Fixed
+- **Terminal/agent-mesh crash guards**: terminal sessions are capped at 6 (`LUCKYD_TERMINAL_MAX_SESSIONS`) and PTY output is flood-throttled (512KB/s sustained, 256KB burst) in `terminal_server.py`, so a runaway agent session can no longer freeze the browser.
+
 ## [10.7.6] - 2026-10-20
 
 Bug-fix + simplification release: MiniMax Media works in the Agent Mesh, Agent 2 boots everywhere, Ask Lucky answers general questions, HQ never goes blank, and the built-in apps (Deep Researcher, Workflows, Deck Studio) run on the best free models.
