@@ -128,6 +128,13 @@ def main() -> None:
     plan_sub(
         "browser/browser_core/ai_bridge.py", f"LuckyDBrowser/{old_mm}", f"LuckyDBrowser/{new_mm}"
     )
+    # Standalone fallbacks (used when browser.__version__ cannot be imported).
+    plan_sub(
+        "browser/browser_core/terminal_page.py",
+        f'_APP_VERSION = "{old}"',
+        f'_APP_VERSION = "{new}"',
+    )
+    plan_sub("web_server.py", f'_HARNESS_VERSION = "{old}"', f'_HARNESS_VERSION = "{new}"')
     for f in ("main.py", "ui.py", "acp_server.py", "browser/browser_core/terminal_server.py"):
         plan_sub(f, f"v{old}", f"v{new}")
     # HQ dashboard agent-tab labels ("Agent 1 (v10.6.1)"). terminal_page.py

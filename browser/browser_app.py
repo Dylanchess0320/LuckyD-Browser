@@ -89,6 +89,7 @@ class BrowserApp:
         self.install_local_auth_cookies(self.profile)
         self.qapp.aboutToQuit.connect(self.stop_control_server)
         self.qapp.aboutToQuit.connect(self.stop_terminal_server)
+        self.qapp.aboutToQuit.connect(self.stop_harness)
 
         # Workflow schedules: a 30s tick replays whatever is due (in a worker
         # thread — replays drive the GUI through the backend's invoker).
@@ -269,6 +270,11 @@ class BrowserApp:
 
     # ── Harness (coding-agent backend) ────────────────────────────────
 
+    def stop_harness(self) -> None:
+        """Stop the harness this app spawned; never leave an orphan holding port 8000."""
+        with contextlib.suppress(Exception):
+            self.harness.stop_blocking()
+
     def boot_harness_async(self) -> None:
         """Start luckyd-code.exe in a daemon thread; toast via the app bus."""
 
@@ -291,6 +297,11 @@ class BrowserApp:
             kind = "warn"
         for win in list(self.windows):
             try:
+                # First boot creates .luckyd-code/hq_token *after* the app's
+                # initial cookie seeding, so refresh the HQ cookie now. Without
+                # this the first HQ visit 401s until the next restart.
+                if ok:
+                    self.install_local_auth_cookies(win.profile)
                 win.toasts.show(msg, kind=kind)
                 win.ai_sidebar.refresh_harness_status()
             except Exception:

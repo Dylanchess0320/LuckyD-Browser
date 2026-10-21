@@ -17,6 +17,7 @@ llm_calls=0.
 from __future__ import annotations
 
 import asyncio
+import threading
 from typing import TypedDict
 
 from .models.router import get_llm
@@ -41,6 +42,10 @@ from .workers.synthesizer import run_synthesizer
 from .workers.verifier import run_verify
 
 
+class ResearchCancelledError(RuntimeError):
+    """Raised at a stage boundary when the UI cancels the run."""
+
+
 class SwarmState(TypedDict, total=False):
     query: str
     plan: ResearchPlan | None
@@ -53,7 +58,12 @@ class SwarmState(TypedDict, total=False):
     iterations: int
 
 
-def build_graph(llm: LLMProvider, store: RunStore, display=None):
+def build_graph(
+    llm: LLMProvider,
+    store: RunStore,
+    display=None,
+    cancel_event: threading.Event | None = None,
+):
     """Build and compile the swarm graph. Returns a CompiledGraph.
 
     Raises RuntimeError with a frozen-bundle hint when langgraph (or its
@@ -72,22 +82,30 @@ def build_graph(llm: LLMProvider, store: RunStore, display=None):
             "fallback pipeline."
         ) from e
 
+    def _check_cancel() -> None:
+        if cancel_event is not None and cancel_event.is_set():
+            raise ResearchCancelledError("research cancelled by user")
+
     def init_node(state: SwarmState) -> dict:
+        _check_cancel()
         store.emit("init", f"starting research: {state['query'][:60]}")
         return {"iterations": 0, "evidence": [], "results": []}
 
     def planner_node(state: SwarmState) -> dict:
+        _check_cancel()
         plan = run_planner(llm, state["query"], store)
         if display is not None:
             display.attach_plan(plan)
         return {"plan": plan}
 
     async def research_node(state: SwarmState) -> dict:
+        _check_cancel()
         plan: ResearchPlan = state["plan"]  # type: ignore[assignment]
         results = await run_research(llm, plan.tasks, store)
         return {"results": results}
 
     def synthesize_node(state: SwarmState) -> dict:
+        _check_cancel()
         from .runtime.budget import BudgetExhausted
 
         prev = ""
@@ -140,6 +158,7 @@ def build_graph(llm: LLMProvider, store: RunStore, display=None):
         }
 
     def critique_node(state: SwarmState) -> dict:
+        _check_cancel()
         from .runtime.budget import BudgetExhausted
 
         try:
@@ -162,6 +181,7 @@ def build_graph(llm: LLMProvider, store: RunStore, display=None):
         return {"critique": critique}
 
     def verify_node(state: SwarmState) -> dict:
+        _check_cancel()
         from .runtime.budget import BudgetExhausted
 
         try:
@@ -208,6 +228,7 @@ def build_graph(llm: LLMProvider, store: RunStore, display=None):
         return out
 
     def finalize_node(state: SwarmState) -> dict:
+        _check_cancel()
         report: ResearchReport = state["report"]  # type: ignore[assignment]
         audit = state.get("citation_audit")
         md = run_finalizer(state["query"], report, state["evidence"], store, audit)
@@ -272,6 +293,7 @@ async def run_swarm_sequential(
     llm: LLMProvider,
     store: RunStore,
     display=None,
+    cancel_event: threading.Event | None = None,
 ) -> str:
     """Fallback pipeline with identical node semantics, no langgraph needed.
 
@@ -281,6 +303,11 @@ async def run_swarm_sequential(
     """
     from .config import settings
 
+    def _check_cancel() -> None:
+        if cancel_event is not None and cancel_event.is_set():
+            raise ResearchCancelledError("research cancelled by user")
+
+    _check_cancel()
     store.emit("init", f"starting research: {query[:60]}")
     state: SwarmState = {"query": query, "iterations": 0, "evidence": [], "results": []}
 
@@ -289,11 +316,13 @@ async def run_swarm_sequential(
         display.attach_plan(plan)
     state["plan"] = plan
 
+    _check_cancel()
     state["results"] = await run_research(llm, plan.tasks, store)
 
     max_iters = settings.max_iterations
     critique = None
     for _ in range(max(1, max_iters)):
+        _check_cancel()
         prev = ""
         if critique is not None and critique.suggested_fixes:
             prev = "\n".join(f"- {f}" for f in critique.suggested_fixes)
@@ -364,6 +393,7 @@ async def run_swarm_sequential(
                 )
             break
         # revise loop continues; verify runs once on the accepted draft
+    _check_cancel()
     try:
         audit = run_verify(llm, state["report"], state.get("evidence", []), store)
     except Exception as e:
@@ -396,11 +426,17 @@ async def run_swarm(
     provider: str | None = None,
     llm: LLMProvider | None = None,
     emitter: EventEmitter | None = None,
+    cancel_event: threading.Event | None = None,
 ) -> str:
     """Convenience entrypoint: build graph, run, return final markdown."""
     from .runtime.budget import reset_budget
     from .tools.cache import reset_cache
 
+    def _check_cancel() -> None:
+        if cancel_event is not None and cancel_event.is_set():
+            raise ResearchCancelledError("research cancelled by user")
+
+    _check_cancel()
     reset_budget()  # fresh budget per run
     reset_cache()  # pick up --no-cache / settings changes
 
@@ -423,31 +459,47 @@ async def run_swarm(
         display.start()
     try:
         try:
-            graph = build_graph(active_llm, store, display=display)
+            graph = build_graph(active_llm, store, display=display, cancel_event=cancel_event)
         except Exception as e:
             # langgraph (or its uuid_utils/langchain_core natives) missing in
-            # this environment — run the dependency-free sequential pipeline.
+            # this environment -> run the dependency-free sequential pipeline.
             # Catch ALL exceptions here (not just RuntimeError): PyInstaller
             # frozen imports surface as ModuleNotFoundError/ImportError with
             # messages like "module 'langchain_core.runnables'.'base' not
             # found (No module named 'uuid_utils._uuid_utils')".
             store.emit("init", f"graph unavailable, using sequential pipeline: {e}", level="warn")
-            return await run_swarm_sequential(query, active_llm, store, display=display)
+            return await run_swarm_sequential(
+                query, active_llm, store, display=display, cancel_event=cancel_event
+            )
         try:
             final_state = await graph.ainvoke({"query": query})
+        except ResearchCancelledError:
+            raise
         except Exception as e:
-            # Frozen bundle died mid-run on a lazy langchain_core import —
-            # fall back instead of failing with llm_calls=0.
-            # Catch ALL exceptions here (not just ImportError): PyInstaller
-            # surfaces the uuid_utils failure with odd wrappers like
-            # "module ''langchain_core.runnables'.'base'' not found".
+            _check_cancel()
+            # Only a missing/incompatible langgraph runtime justifies rerunning
+            # the whole swarm sequentially. Re-running on an LLM/network error
+            # duplicated every call and hid the real failure.
+            text = str(e).lower()
+            bundle_import = isinstance(e, (ImportError, ModuleNotFoundError)) or (
+                "no module named" in text or "module '" in text
+            )
+            if not bundle_import:
+                store.emit(
+                    "init",
+                    f"graph execution failed ({type(e).__name__}: {e})",
+                    level="error",
+                )
+                raise
             store.emit(
                 "init",
-                f"graph execution failed ({type(e).__name__}: {e}); "
+                f"graph runtime import failed ({type(e).__name__}: {e}); "
                 "continuing with sequential pipeline",
                 level="warn",
             )
-            return await run_swarm_sequential(query, active_llm, store, display=display)
+            return await run_swarm_sequential(
+                query, active_llm, store, display=display, cancel_event=cancel_event
+            )
         return final_state.get("final_markdown") or ""
     finally:
         if display is not None:

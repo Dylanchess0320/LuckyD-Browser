@@ -106,6 +106,10 @@ class Cache:
             ).fetchone()
         if row is None or self._expired(row["fetched_at"]):
             return None
+        # A failed fetch (timeout, 403, empty extraction) is retried after an
+        # hour instead of being trusted for the full multi-day document TTL.
+        if not bool(row["fetch_ok"]) and (time.time() - row["fetched_at"]) > 3600:
+            return None
         return row["title"], row["text"], row["url"], bool(row["fetch_ok"])
 
     def put_document(self, url: str, title: str, text: str, fetch_ok: bool) -> None:

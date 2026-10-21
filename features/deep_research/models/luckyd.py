@@ -23,6 +23,7 @@ import json
 import re
 import time
 from typing import TypeVar
+from urllib.parse import quote
 
 from pydantic import BaseModel, ValidationError
 
@@ -111,7 +112,22 @@ class LuckyDProvider(LLMProvider):
         from ..runtime.budget import get_budget
 
         cfg = self._cfg()
+        get_budget().record_llm()
+        provider = str(cfg.get("provider", "")).lower()
         base = str(cfg.get("base_url", "")).rstrip("/")
+        # OpenAI-compatible /chat/completions is not universal: Google's
+        # generateContent and Anthropic's Messages API have different paths,
+        # auth headers and payloads. Appending /chat/completions to either
+        # base used to produce 404s that looked like "the researcher is broken".
+        if provider in ("google", "gemini") or "generativelanguage.googleapis.com" in base:
+            return self._chat_google(cfg, messages, temperature, json_mode)
+        if (
+            provider == "anthropic"
+            or provider == "minimax"
+            or "api.anthropic.com" in base
+            or base.endswith("/anthropic")
+        ):
+            return self._chat_anthropic(cfg, messages, temperature)
         url = f"{base}/chat/completions"
         headers = {"Content-Type": "application/json"}
         key = str(cfg.get("api_key", "") or "").strip()
@@ -127,7 +143,6 @@ class LuckyDProvider(LLMProvider):
         if json_mode:
             payload["response_format"] = {"type": "json_object"}
 
-        get_budget().record_llm()
         last_err: Exception | None = None
         try:
             import httpx
@@ -170,6 +185,97 @@ class LuckyDProvider(LLMProvider):
         raise RuntimeError(
             f"LuckyDProvider chat failed (provider={cfg.get('provider')} "
             f"model={cfg.get('model')}): {last_err}"
+        )
+
+    # -- native protocols ------------------------------------------------
+    @staticmethod
+    def _split(messages: list[dict]) -> tuple[str, str]:
+        system = "\n".join(
+            str(m.get("content") or "") for m in messages if m.get("role") == "system"
+        ).strip()
+        user = "\n".join(str(m.get("content") or "") for m in messages if m.get("role") != "system")
+        return system, user
+
+    @staticmethod
+    def _post_json(url: str, headers: dict, payload: dict, label: str) -> dict:
+        import httpx
+
+        last_err: Exception | None = None
+        for attempt in range(3):
+            try:
+                with httpx.Client(timeout=120.0) as client:
+                    resp = client.post(url, headers=headers, json=payload)
+                if resp.status_code in (429, 500, 502, 503, 504) and attempt < 2:
+                    time.sleep(min(2**attempt + 0.5, 10.0))
+                    continue
+                resp.raise_for_status()
+                return resp.json()
+            except Exception as e:
+                last_err = e
+                status = getattr(getattr(e, "response", None), "status_code", 0)
+                if isinstance(status, int) and _is_retryable_status(status) and attempt < 2:
+                    time.sleep(min(2**attempt + 0.5, 10.0))
+                    continue
+                if attempt < 2 and "connect" in str(e).lower():
+                    time.sleep(1.0)
+                    continue
+                break
+        raise RuntimeError(f"{label} request failed: {last_err}")
+
+    def _chat_google(
+        self, cfg: dict, messages: list[dict], temperature: float, json_mode: bool
+    ) -> str:
+        key = str(cfg.get("api_key", "") or "").strip()
+        if not key:
+            raise RuntimeError(
+                "Google Gemini needs GOOGLE_API_KEY (or a Cline/Gemini key) for Deep Research"
+            )
+        model = str(cfg.get("model", "")).strip()
+        base = str(cfg.get("base_url", "")).rstrip("/")
+        system, user = self._split(messages)
+        payload: dict = {
+            "contents": [{"role": "user", "parts": [{"text": user}]}],
+            "generationConfig": {"temperature": temperature},
+        }
+        if system:
+            payload["systemInstruction"] = {"parts": [{"text": system}]}
+        if json_mode:
+            payload["generationConfig"]["responseMimeType"] = "application/json"
+        url = f"{base}/models/{quote(model, safe='')}:generateContent?key={quote(key, safe='')}"
+        data = self._post_json(url, {"Content-Type": "application/json"}, payload, "Gemini")
+        candidates = data.get("candidates", [])
+        if not candidates:
+            blocked = (data.get("promptFeedback") or {}).get("blockReason", "no candidates")
+            raise RuntimeError(f"Gemini returned no candidates ({blocked})")
+        parts = (candidates[0].get("content") or {}).get("parts", [])
+        return "".join(str(p.get("text") or "") for p in parts if isinstance(p, dict))
+
+    def _chat_anthropic(self, cfg: dict, messages: list[dict], temperature: float) -> str:
+        key = str(cfg.get("api_key", "") or "").strip()
+        if not key:
+            raise RuntimeError(
+                "Anthropic needs ANTHROPIC_API_KEY (or a compatible gateway key) for Deep Research"
+            )
+        base = str(cfg.get("base_url", "")).rstrip("/")
+        system, user = self._split(messages)
+        payload = {
+            "model": cfg.get("model", ""),
+            "max_tokens": 4096,
+            "temperature": temperature,
+            "messages": [{"role": "user", "content": user}],
+        }
+        if system:
+            payload["system"] = system
+        headers = {
+            "Content-Type": "application/json",
+            "x-api-key": key,
+            "anthropic-version": "2023-06-01",
+        }
+        data = self._post_json(f"{base}/messages", headers, payload, "Anthropic")
+        return "".join(
+            str(block.get("text") or "")
+            for block in data.get("content", [])
+            if isinstance(block, dict) and block.get("type") == "text"
         )
 
     # -- LLMProvider API -------------------------------------------------

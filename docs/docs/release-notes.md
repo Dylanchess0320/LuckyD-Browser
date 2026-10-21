@@ -21,6 +21,26 @@
 
 # LuckyD Browser — Release Notes
 
+## [10.7.8] — Polished UI + reliable HQ — 2026-10-21
+
+**[`LuckyDBrowserSetup-10.7.8.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.7.8/LuckyDBrowserSetup-10.7.8.exe)** — Windows 10/11 x64 · per-user install · no admin needed.
+**[`LuckyDBrowser-Portable-10.7.8.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.7.8/LuckyDBrowser-Portable-10.7.8.zip)** — unzip and run, for locked-down PCs.
+
+- **Theme-matched native header**: the Windows title bar now follows the app's dark/light palette (DWM dark mode + caption/text/border colors), including after live theme changes.
+- **Visible tab close buttons**: every tab shows a dedicated close button that is always readable, with danger-red hover styling instead of a hidden/white default glyph.
+- **LuckyD HQ startup and stale backends**: `/health` now reports the harness version, PID, and start time. The browser rejects a harness left behind by an older version with an actionable message instead of silently talking to it, re-seeds the HQ auth cookie after first boot, and stops only the harness it spawned when the app quits.
+- **Empty HQ replies at the turn limit**: the agent loop now names the provider/model and the turn-limit cause instead of returning an empty final answer.
+- **Deep Researcher cancellation**: cancel requests are honored at every stage boundary, and a new run starts after a short grace period instead of blocking for 10+ seconds. Completed runs opened from history now load their saved report even when no run is active.
+- **Deep Researcher provider calls**: Gemini and Anthropic/MiniMax use their native APIs, DDG redirect links are resolved to real URLs, and failed fetches expire from the cache after one hour instead of poisoning results for the full TTL.
+- **Dead model ids**: removed `deepseek/deepseek-v4-flash` and `cline-free/longcat-2.0` from the Cline usage catalog (both return a real 403 on that gateway), refreshed the stale paid fallback catalog, and changed the OpenRouter default to `openrouter/free`.
+- **Agent terminal CLI selection**: a packaged browser now always launches the `luckyd-cli.exe` shipped with its own build instead of an older one left on the Desktop; source checkouts prefer the current `main.py` over stale repo-root executables.
+
+- **Google web search removed**: Google is no longer a search provider. Saved Google preferences migrate to DuckDuckGo automatically; the web view's sorry-page guidance now lists DuckDuckGo, Bing, Startpage, and Brave.
+
+- Google from the built-in web search provider list (Gemini AI models remain supported).
+
+On top of everything from 10.7.7 below.
+
 ## [10.7.4] — Agent Mesh Doctor, reversible tab undo & one-click Ollama — 2026-10-19
 
 **[`LuckyDBrowserSetup-10.7.4.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.7.4/LuckyDBrowserSetup-10.7.4.exe)** — Windows 10/11 x64 · per-user install · no admin needed.

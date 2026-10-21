@@ -82,12 +82,20 @@ def test_search_url_for_builds_ddg_url(tmp_path: Path) -> None:
     assert "hello+world" in url
 
 
-def test_google_template_still_resolvable(tmp_path: Path) -> None:
+def test_google_is_not_a_search_provider(tmp_path: Path) -> None:
+    assert "Google" not in SEARCH_ENGINES
     s = SettingsStore(tmp_path / "settings.json")
     s.set("search_engine", "Google")
-    url = s.search_url_for("captcha test")
-    assert url.startswith("https://www.google.com/search?q=")
-    assert SEARCH_ENGINES["Google"] == "https://www.google.com/search?q={query}"
+    assert s.search_url_for("captcha test").startswith("https://duckduckgo.com/?q=")
+
+
+def test_saved_google_setting_migrates_to_ddg(tmp_path: Path) -> None:
+    path = tmp_path / "settings.json"
+    s = SettingsStore(path)
+    s.set("search_engine", "Google")
+    s.save()
+    reloaded = SettingsStore(path)
+    assert reloaded.get("search_engine") == "DuckDuckGo"
 
 
 def test_unknown_engine_falls_back_to_ddg(tmp_path: Path) -> None:

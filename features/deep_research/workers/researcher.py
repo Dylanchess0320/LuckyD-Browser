@@ -57,7 +57,11 @@ def _collect_urls_via_grounding(llm: LLMProvider, query: str, worker_id: str) ->
     from ..tools.cache import get_cache
 
     cache = get_cache()
-    cached = cache.get_search(query, "gemini")
+    is_mock = bool(getattr(llm, "_is_mock", False))
+    # Mock/dry-run cards are fixtures, not web results: never persist them in
+    # the real search cache where a later live run would treat them as sourced
+    # evidence.
+    cached = None if is_mock else cache.get_search(query, "gemini")
     if cached:
         try:
             return [EvidenceCard.model_validate(d) for d in json.loads(cached)]
@@ -77,8 +81,9 @@ def _collect_urls_via_grounding(llm: LLMProvider, query: str, worker_id: str) ->
         return []
     for e in ev:
         e.source_query = query[:120]
-    with contextlib.suppress(Exception):
-        cache.put_search(query, "gemini", json.dumps([e.model_dump() for e in ev]))
+    if not is_mock:
+        with contextlib.suppress(Exception):
+            cache.put_search(query, "gemini", json.dumps([e.model_dump() for e in ev]))
     return ev
 
 

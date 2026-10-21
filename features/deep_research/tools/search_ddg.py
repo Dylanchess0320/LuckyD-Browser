@@ -20,6 +20,32 @@ from ..schemas import EvidenceCard
 from .search_base import SearchProvider
 
 
+def _real_url(href: str) -> str:
+    """Unwrap DuckDuckGo's ``/l/?uddg=...`` redirect links.
+
+    The HTML endpoint (and some ddgs versions) return click-tracker URLs, not
+    the publisher URL. Caching/fetching the tracker produces a redirect page
+    with no article text, so every result looked like a dead source.
+    """
+    raw = _html.unescape((href or "").strip())
+    if not raw:
+        return ""
+    try:
+        parsed = _urlparse.urlparse(raw)
+        qs = _urlparse.parse_qs(parsed.query)
+        target = (qs.get("uddg") or [""])[0]
+        if target:
+            return _html.unescape(_urlparse.unquote(target))
+        if parsed.netloc.endswith("duckduckgo.com") and parsed.path.startswith("/l/"):
+            # Some variants encode the target in the path.
+            return _html.unescape(_urlparse.unquote(parsed.path[3:]))
+    except Exception:
+        pass
+    if raw.startswith("//"):
+        return "https:" + raw
+    return raw
+
+
 def _load_ddgs():
     # Prefer the modern `ddgs` package, fall back to the legacy shim name.
     # importlib (not repeated from-imports) keeps mypy happy: no redefinition.
@@ -66,7 +92,7 @@ def _ddg_html_fallback(query: str, max_results: int = 8) -> list[EvidenceCard]:
         out.append(
             EvidenceCard(
                 id=f"e{i}",
-                url=_html.unescape(href),
+                url=_real_url(href),
                 title=_html.unescape(title)[:300],
                 snippet=_html.unescape(snippet)[:600],
                 source_query=query,
@@ -88,7 +114,7 @@ class DDGSearch(SearchProvider):
                         results.append(
                             EvidenceCard(
                                 id=f"e{i}",
-                                url=r.get("href") or r.get("url") or "",
+                                url=_real_url(r.get("href") or r.get("url") or ""),
                                 title=r.get("title") or "",
                                 snippet=(r.get("body") or "")[:600],
                                 source_query=query,

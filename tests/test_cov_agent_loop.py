@@ -1083,7 +1083,9 @@ class TestRunLoop:
             ]
         )
         result = await ag.run("work", max_turns=1)
-        assert result == ""
+        assert result
+        assert "turn limit" in result
+        assert result != "(no reply)"
 
     @pytest.mark.asyncio
     async def test_tool_call_with_invalid_json_args(self, tool_registry):

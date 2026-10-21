@@ -82,7 +82,7 @@ LuckyD also works with cloud providers if you prefer: Gemini, Groq, DeepSeek, Op
 
 ## What's new
 
-**v10.7.7** — One router for every model: the AI bridge now runs on a **LiteLLM model router** — a config-driven fallback chain (free tier models → cheap models → local Ollama) with provider health tracking and automatic cooldowns, so switching models is a setting, not surgery. Plus **terminal crash guards** (session cap + output flood throttle) that keep a runaway agent session from freezing the browser — on top of everything from v10.7.6 (MiniMax Media mesh, Agent 2 terminal, Ask Lucky, Workflows: Generate with AI).
+**v10.7.8** — Theme-matched native header, visible tab close buttons, Google search removed, HQ stale-harness handshake, reliable Deep Researcher cancellation, and dead free-model cleanup
 
 **v10.7.5** — Free-model cleanup: dead model ids pruned, every auto-selected model is a verified $0 route (local Ollama / free tiers), and LuckyD Code falls back to the free rotation on any setting instead of failing on a stale paid pick. Paid providers remain explicit opt-ins with your own key.
 

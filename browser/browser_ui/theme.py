@@ -271,11 +271,33 @@ QTabBar::close-button:hover { background: $danger; color: #ffffff; }
 QTabBar QToolButton {
     background: transparent;
     border: none;
-    border-radius: 4px;
-    padding: 2px;
+    border-radius: 6px;
+    padding: 1px;
+    color: $muted;
 }
 QTabBar QToolButton:hover {
     background: $card;
+    color: $text;
+}
+/* Always-visible per-tab close control. The native close-button is blanked
+   by the rule above, so this is the only affordance shown. */
+QTabBar QToolButton#tab_close {
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    color: $muted;
+    font-size: 11px;
+    font-weight: 700;
+    margin: 0 2px 0 3px;
+    padding: 0;
+}
+QTabBar QToolButton#tab_close:hover {
+    background: $danger;
+    color: #ffffff;
+}
+QTabBar QToolButton#tab_close:pressed {
+    background: $accent;
+    color: #ffffff;
 }
 
 /* ── omnibox / inputs ─────────────────────────────────────────────── */

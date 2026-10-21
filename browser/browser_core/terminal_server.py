@@ -70,7 +70,7 @@ def _desktop_exe() -> Path | None:
 
         buf = ctypes.create_unicode_buffer(520)
         # SHGetFolderPathW(hwnd, csidl=0x0010 DESKTOPDIRECTORY, token, flags, path)
-        if ctypes.windll.shell32.SHGetFolderPathW(None, 0x0010, None, 0, buf) == 0 and buf.value:  # type: ignore[attr-defined]
+        if ctypes.windll.shell32.SHGetFolderPathW(None, 0x0010, None, 0, buf) == 0 and buf.value:
             candidates.append(Path(buf.value) / "luckyd-cli.exe")
     except Exception:
         pass
@@ -153,46 +153,43 @@ def _cli_command(cli_path: str = "") -> list[str]:
                 )
             return [interp, str(p)]
         return [str(p)]
-    desktop = _desktop_exe()
-    if desktop is not None:
-        return [str(desktop)]
-    for n_cand in (
-        _REPO_ROOT / "luckyd-code-v10.4.exe",
-        _REPO_ROOT / "luckyd-code-v10.2.exe",
-        _REPO_ROOT / "luckyd-code-v9.7.exe",
-        _REPO_ROOT / "luckyd-cli-nuitka.exe",
-        _REPO_ROOT / "dist" / "luckyd-code-v10.4.exe",
-        _REPO_ROOT / "dist" / "luckyd-code-v10.2.exe",
-        _REPO_ROOT / "dist" / "luckyd-code-v9.7.exe",
-        _REPO_ROOT / "dist" / "luckyd-cli-nuitka.exe",
-        _REPO_ROOT / "build" / "luckyd-code.dist" / "luckyd-cli.exe",
-        _REPO_ROOT / "luckyd-cli.exe",
-    ):
-        if n_cand.exists():
-            return [str(n_cand)]
     if getattr(sys, "frozen", False):
-        # PyInstaller extracts to _internal/ beside the running exe.
+        # The packaged browser must use the CLI shipped in ITS OWN build, not
+        # a stale luckyd-cli.exe left on the Desktop by an older release.
         base_dir = Path(sys.executable).resolve().parent
         for cand in (
-            base_dir / "luckyd-code-v10.4.exe",
-            base_dir / "luckyd-code-v10.2.exe",
-            base_dir / "luckyd-code-v9.7.exe",
             base_dir / "luckyd-cli.exe",
-            base_dir / "_internal" / "luckyd-code-v10.4.exe",
-            base_dir / "_internal" / "luckyd-code-v10.2.exe",
-            base_dir / "_internal" / "luckyd-code-v9.7.exe",
             base_dir / "_internal" / "luckyd-cli.exe",
         ):
             if cand.exists():
                 return [str(cand)]
+    else:
+        # Live checkout: current source beats every old exe (the repo-root
+        # luckyd-cli.exe was routinely months behind main.py).
+        live = _REPO_ROOT / "main.py"
+        if live.exists():
+            interp = _python_for_scripts()
+            if interp is not None:
+                return [interp, str(live)]
+    desktop = _desktop_exe()
+    if desktop is not None:
+        return [str(desktop)]
+    for n_cand in (
+        _REPO_ROOT / "luckyd-cli.exe",
+        _REPO_ROOT / "dist" / "luckyd-cli.exe",
+        _REPO_ROOT / "build" / "luckyd-code.dist" / "luckyd-cli.exe",
+    ):
+        if n_cand.exists():
+            return [str(n_cand)]
+    # Last resort in a source checkout without main.py resolution.
     live = _REPO_ROOT / "main.py"
     if live.exists():
         interp = _python_for_scripts()
         if interp is not None:
             return [interp, str(live)]
     raise FileNotFoundError(
-        "no LuckyD Code CLI found — set the browser's terminal_cli setting "
-        "(or the LUCKYD_CLI env var) to luckyd-code-v10.4.exe, luckyd-cli.exe, or main.py, "
+        "no LuckyD Code CLI found - set the browser's terminal_cli setting "
+        "(or the LUCKYD_CLI env var) to luckyd-cli.exe or main.py, "
         "or put luckyd-cli.exe back on the Desktop"
     )
 
@@ -211,7 +208,7 @@ def _agent2_dir() -> Path | None:
 
         buf = ctypes.create_unicode_buffer(520)
         # SHGetFolderPathW(hwnd, csidl=0x0010 DESKTOPDIRECTORY, token, flags, path)
-        if ctypes.windll.shell32.SHGetFolderPathW(None, 0x0010, None, 0, buf) == 0 and buf.value:  # type: ignore[attr-defined]
+        if ctypes.windll.shell32.SHGetFolderPathW(None, 0x0010, None, 0, buf) == 0 and buf.value:
             candidates.append(Path(buf.value) / "coding-agent")
     except Exception:
         pass
@@ -995,11 +992,11 @@ def _spawn_pty(
     if shell == "agent":
         env["LUCKYD_AGENT_SLOT"] = "1"
         env["LUCKYD_AGENT_NAME"] = "Agent 1"
-        env["LUCKYD_AGENT_VERSION"] = "v10.7.7"
+        env["LUCKYD_AGENT_VERSION"] = "v10.7.8"
     elif shell == "agent2":
         env["LUCKYD_AGENT_SLOT"] = "2"
         env["LUCKYD_AGENT_NAME"] = "Agent 2"
-        env["LUCKYD_AGENT_VERSION"] = "v10.7.7"
+        env["LUCKYD_AGENT_VERSION"] = "v10.7.8"
     # pywinpty's PTY.spawn() expects the environment as a NUL-joined block
     # string ("name=value\0name=value\0…"), NOT a dict — passing a dict
     # raises cffi's "argument env: 'dict' object is not an instance of str",

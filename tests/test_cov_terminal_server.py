@@ -208,10 +208,14 @@ def test_cli_command_env_var_override(monkeypatch, tmp_path) -> None:
 
 
 def test_cli_command_desktop_exe(monkeypatch, tmp_path) -> None:
+    # Source checkouts prefer the live main.py; the Desktop exe is the
+    # fallback when no checkout is available (e.g. an installed browser).
     exe = tmp_path / "luckyd-cli.exe"
     exe.touch()
     monkeypatch.setattr(ts, "_desktop_exe", lambda: exe)
+    monkeypatch.setattr(ts, "_REPO_ROOT", tmp_path / "no-checkout")
     monkeypatch.delenv("LUCKYD_CLI", raising=False)
+    monkeypatch.setattr(ts, "_python_for_scripts", lambda: None)
     assert _cli_command("") == [str(exe)]
 
 
@@ -692,7 +696,7 @@ def test_spawn_pty_agent_gets_workspace_cwd_and_env(monkeypatch, tmp_path) -> No
     parts = _env_parts(kw["env"])
     assert "LUCKYD_AGENT_SLOT=1" in parts
     assert "LUCKYD_AGENT_NAME=Agent 1" in parts
-    assert "LUCKYD_AGENT_VERSION=v10.7.7" in parts
+    assert "LUCKYD_AGENT_VERSION=v10.7.8" in parts
 
 
 def test_spawn_pty_agent2_gets_slot2_env(monkeypatch, tmp_path) -> None:
@@ -707,7 +711,7 @@ def test_spawn_pty_agent2_gets_slot2_env(monkeypatch, tmp_path) -> None:
     parts = _env_parts(kw["env"])
     assert "LUCKYD_AGENT_SLOT=2" in parts
     assert "LUCKYD_AGENT_NAME=Agent 2" in parts
-    assert "LUCKYD_AGENT_VERSION=v10.7.7" in parts
+    assert "LUCKYD_AGENT_VERSION=v10.7.8" in parts
 
 
 def test_spawn_pty_env_block_sanitizes_bad_entries(monkeypatch) -> None:

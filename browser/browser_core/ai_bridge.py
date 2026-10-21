@@ -369,7 +369,6 @@ _CLINE_GATEWAY_TOP_MODELS = [
     "deepseek/deepseek-chat",
     "minimax/minimax-m2.5",
     "qwen/qwen3-8b",
-    "deepseek/deepseek-v4-flash",
     "kwaipilot/kat-coder-pro",
     "z-ai/glm-5.3-flash",
     "cline-pass/deepseek-v4-flash",
@@ -382,8 +381,10 @@ _CLINE_GATEWAY_TOP_MODELS_SET = set(_CLINE_GATEWAY_TOP_MODELS)
 # Cline Usage (credit-billed / free tier) — same gateway, usage-based billing.
 # Free-tier models work at $0.00 but are rate-limited; credit models deduct
 # from your Cline Credits balance.   Sources: Cline API docs, 2026-09 (v9.1:
-# added kat-coder-pro, glm-5, deepseek-v4-flash, glm-5.3-flash,
-# laguna-s-2.1:free, longcat-2.0 — all FREE in CLI/IDE).
+# added kat-coder-pro, glm-5, glm-5.3-flash, laguna-s-2.1:free.
+# 10.7.8: removed deepseek/deepseek-v4-flash and cline-free/longcat-2.0 from
+# the usage gateway (real 403: "available only via Cline product surfaces");
+# they are ClinePass/IDE-only ids, so the picker must not offer them here.
 _CLINE_USAGE_MODEL = "deepseek/deepseek-chat"
 _CLINE_USAGE_CATALOG = [
     # ── Free tier (rate-limited, $0.00 — needs non-negative credit balance)
@@ -391,14 +392,12 @@ _CLINE_USAGE_CATALOG = [
     "deepseek/deepseek-chat",  # DeepSeek V3 — fast general model
     "deepseek/deepseek-r1",  # DeepSeek R1 — reasoning model
     "meta-llama/llama-3.2-3b-instruct",  # Small Llama, quick responses
-    "google/gemini-2.0-flash",  # Google Gemini free tier
+    "google/gemini-2.5-flash",  # Google Gemini free tier
     "qwen/qwen3-8b",  # Qwen 3 small, CPU-friendly
     "kwaipilot/kat-coder-pro",  # free coding model
     "z-ai/glm-5",  # Z-AI free tier
-    "deepseek/deepseek-v4-flash",  # fast DeepSeek free
     "z-ai/glm-5.3-flash",  # Z-AI flash free
     "poolside/laguna-s-2.1:free",  # poolside free
-    "cline-free/longcat-2.0",  # Cline promo free
 ]
 # 10.7.5: credit-billed ids (gemini-2.5-pro, claude-sonnet-4-6, gpt-4o, ...)
 # were removed from this catalog — the picker presented them next to the $0

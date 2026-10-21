@@ -162,14 +162,12 @@ _CLINE_USAGE_CATALOG = [
     "deepseek/deepseek-chat",
     "deepseek/deepseek-r1",
     "meta-llama/llama-3.2-3b-instruct",
-    "google/gemini-2.0-flash",
+    "google/gemini-2.5-flash",
     "qwen/qwen3-8b",
     "kwaipilot/kat-coder-pro",
     "z-ai/glm-5",
-    "deepseek/deepseek-v4-flash",
     "z-ai/glm-5.3-flash",
     "poolside/laguna-s-2.1:free",
-    "cline-free/longcat-2.0",
     # ── Credit-billed — deduct from Cline Credits balance
     "google/gemini-2.5-pro",
     "anthropic/claude-sonnet-4-6",
@@ -178,7 +176,7 @@ _CLINE_USAGE_CATALOG = [
     "mistral/mistral-large",
 ]
 
-_CLINE_USAGE_FREE_TIER = frozenset(_CLINE_USAGE_CATALOG[:12])
+_CLINE_USAGE_FREE_TIER = frozenset(_CLINE_USAGE_CATALOG[:10])
 
 # ClinePass has no free-tier model — every ClinePass model counts against the
 # flat-subscription quota.
@@ -319,40 +317,30 @@ def _build_paid_groups(cline_paid: list[str], clinepass_paid: list[str]) -> list
     return [
         {
             "provider": "OpenAI",
-            "models": ["gpt-4o", "gpt-4o-mini", "o1-preview", "o1-mini"],
+            "models": ["gpt-6-sol", "gpt-6-astra"],
         },
         {
             "provider": "Anthropic",
-            "models": [
-                "claude-sonnet-4-20250514",
-                "claude-opus-4-20250514",
-                "claude-3-5-haiku-20241022",
-            ],
+            "models": ["claude-opus-5-5", "claude-fable-5-1", "claude-sonnet-5"],
         },
         {
             "provider": "Google Gemini",
             "models": [
+                "gemini-3.8-flash",
+                "gemini-3.5-flash",
+                "gemini-3.5-flash-lite",
                 "gemini-2.5-flash",
                 "gemini-2.5-flash-lite",
-                "gemini-2.0-flash",
-                "gemini-3.5-flash-lite",
-                "gemini-3.5-flash",
-                "gemini-1.5-pro",
-                "gemini-1.5-flash",
             ],
         },
         {
             "provider": "DeepSeek",
-            "models": ["deepseek-chat", "deepseek-reasoner", "deepseek-coder"],
+            "models": ["deepseek-v4", "deepseek-v4-flash", "deepseek-v4-pro"],
         },
-        {"provider": "Z.ai", "models": ["glm-4.6", "glm-4.5", "glm-4.5-air"]},
+        {"provider": "Z.ai", "models": ["glm-5.3", "glm-5.3-flash", "glm-5.2"]},
         {
             "provider": "OpenRouter",
-            "models": [
-                "deepseek/deepseek-chat-v3.1",
-                "anthropic/claude-sonnet-4",
-                "google/gemini-2.0-flash-001",
-            ],
+            "models": ["openrouter/free"],
         },
         {
             "provider": "Cline Usage (Muse Spark)",
@@ -1303,7 +1291,7 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
             ui.warn("MCP not configured or no servers connected")
 
     elif cmd == "version":
-        agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v10.7.7")
+        agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v10.7.8")
         agent_name = os.environ.get("LUCKYD_AGENT_NAME", "Agent 1")
         ui.info(f"LuckyD Code {agent_version} ({agent_name})")
 
@@ -2302,7 +2290,7 @@ def _dispatch_early_subcommands(args: list[str]) -> bool:
 
 def _print_version() -> None:
     """Print the LuckyD Code version line (fast path: no config needed)."""
-    agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v10.7.7")
+    agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v10.7.8")
     agent_name = os.environ.get("LUCKYD_AGENT_NAME", "")
     label = f"LuckyD Code {agent_version}" + (f" ({agent_name})" if agent_name else "")
     print(label)
@@ -2315,8 +2303,8 @@ def _print_help() -> None:
 LuckyD Code — AI Coding Agent
 
 Usage:
-  lucky-code                       Interactive REPL (Agent 1 · v10.7.7)
-  lucky-code --agent 2             Interactive REPL (Agent 2 · v10.7.7)
+  lucky-code                       Interactive REPL (Agent 1 · v10.7.8)
+  lucky-code --agent 2             Interactive REPL (Agent 2 · v10.7.8)
   lucky-code providers           List AI providers — status, cost tier, current
   lucky-code doctor [--json]     Check provider & Agent Mesh backend health + tiers
   lucky-code model <name>        Switch model (fuzzy Cline-style picker)
@@ -2328,7 +2316,7 @@ Usage:
   lucky-code --resume <id>         Resume specific session
 
 Options:
-  --agent 1|2        Select agent slot (1 = v10.7.7 Nuitka, 2 = v10.7.7)
+  --agent 1|2        Select agent slot (1 = v10.7.8 Nuitka, 2 = v10.7.8)
   --model NAME       Model: auto (default), flash, pro, or specific name
   --provider NAME    Set provider (see: lucky-code providers): ollama, clinepass,
                      cline-usage, openrouter, groq, deepseek,
@@ -2433,11 +2421,11 @@ def _parse_agent_args(args: list[str], cfg: dict) -> tuple[dict, str, float, str
             if slot == "2":
                 os.environ["LUCKYD_AGENT_SLOT"] = "2"
                 os.environ["LUCKYD_AGENT_NAME"] = "Agent 2"
-                os.environ["LUCKYD_AGENT_VERSION"] = "v10.7.7"
+                os.environ["LUCKYD_AGENT_VERSION"] = "v10.7.8"
             else:
                 os.environ["LUCKYD_AGENT_SLOT"] = "1"
                 os.environ["LUCKYD_AGENT_NAME"] = "Agent 1"
-                os.environ["LUCKYD_AGENT_VERSION"] = "v10.7.7"
+                os.environ["LUCKYD_AGENT_VERSION"] = "v10.7.8"
             i += 2
         elif args[i] in ("-v", "--version"):
             _print_version()

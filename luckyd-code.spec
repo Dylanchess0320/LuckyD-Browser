@@ -93,6 +93,9 @@ a = Analysis(
         # Bundle the Cline session reader so the frozen exe can use ClinePass
         # (reads ~/.cline/data/settings/providers.json) with no API key.
         ('browser/browser_core/cline_session.py', '.'),
+        # Build identity for /health (stale-harness rejection). Only the tiny
+        # __init__ module is bundled; the rest of the browser is not imported.
+        ('browser/__init__.py', 'browser'),
         # Never embed a developer's real .env/API keys in a distributable harness.
         ('.env.example', '.env.example'),
     ] + _swarm_datas + _pd_datas,

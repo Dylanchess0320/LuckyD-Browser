@@ -1,6 +1,6 @@
 # LuckyD Browser — Free Models Catalog
 
-Synced with the wired provider catalogs on **October 19, 2026** (10.7.5).
+Synced with the wired provider catalogs on **October 21, 2026** (10.7.8).
 `free_models` below means **$0 per token** on that provider — local models,
 free-tier quotas, or `:free` catalog ids. Anything that bills per token or
 needs a paid subscription is listed as paid, never as free.
@@ -16,8 +16,7 @@ needs a paid subscription is listed as paid, never as free.
   `minimax/minimax-m2.5`, `deepseek/deepseek-chat`, `deepseek/deepseek-r1`,
   `meta-llama/llama-3.2-3b-instruct`, `google/gemini-2.5-flash`,
   `qwen/qwen3-8b`, `kwaipilot/kat-coder-pro`, `z-ai/glm-5`,
-  `deepseek/deepseek-v4-flash`, `z-ai/glm-5.3-flash`,
-  `poolside/laguna-s-2.1:free`, `cline-free/longcat-2.0`
+  `z-ai/glm-5.3-flash`, `poolside/laguna-s-2.1:free`
 - **Google Gemini** (free-tier key): `gemini-2.5-flash`,
   `gemini-2.5-flash-lite`, `gemini-3.5-flash-lite`, `gemini-3.5-flash`,
   `gemini-3.8-flash`, `gemma-4-26b-a4b-it`, `gemma-4-31b-it`

@@ -29,7 +29,6 @@ DATA_DIR = _data_dir()
 SETTINGS_PATH = DATA_DIR / "settings.json"
 
 SEARCH_ENGINES = {
-    "Google": "https://www.google.com/search?q={query}",
     "Bing": "https://www.bing.com/search?q={query}",
     "DuckDuckGo": "https://duckduckgo.com/?q={query}",
     "Brave": "https://search.brave.com/search?q={query}",
@@ -143,10 +142,25 @@ class SettingsStore:
                     raise exc
                 if isinstance(loaded, dict):
                     self._data.update(loaded)
-                    if self._migrate_legacy_terminal_cli():
+                    changed = self._migrate_legacy_terminal_cli()
+                    changed = self._migrate_retired_search_engine() or changed
+                    if changed:
                         self.save()
         except Exception:
             pass  # corrupted settings fall back to defaults
+
+    def _migrate_retired_search_engine(self) -> bool:
+        """Move users off search engines we no longer offer.
+
+        Google was removed as a built-in provider: its bot challenge turns a
+        meaningful share of searches into a dead end. Users who had it saved
+        fall back to the DuckDuckGo default instead of a blank picker entry.
+        """
+        raw = str(self._data.get("search_engine", "") or "").strip()
+        if raw.casefold() != "google":
+            return False
+        self._data["search_engine"] = DEFAULTS["search_engine"]
+        return True
 
     def _migrate_legacy_terminal_cli(self) -> bool:
         """Repair the old terminal setting that targeted the HQ web server.

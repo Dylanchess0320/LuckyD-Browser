@@ -291,6 +291,7 @@ class BrowserTabWidget(QTabWidget):
         view._ld_pending_url = ""
         view._ld_pending_title = ""
         index = self.addTab(view, "New Tab")
+        self._apply_close_button(index, True)
         self._wire(view)
         if url is not None and defer_load and not make_current:
             # Lazy restore: keep the URL/title without starting a renderer.
@@ -401,9 +402,15 @@ class BrowserTabWidget(QTabWidget):
         # Note: setTabButton/tabButton live on QTabBar in Qt6 (the QTabWidget
         # forwarding API is gone in PySide6) — always go through tabBar().
         if closable:
-            btn = QToolButton(self)
-            btn.setText("✕")
+            btn = QToolButton(self.tabBar())
+            btn.setObjectName("tab_close")
+            btn.setText("\u2715")
             btn.setAutoRaise(True)
+            btn.setFixedSize(18, 18)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+            btn.setToolTip("Close tab (Ctrl+W)")
+            btn.setAccessibleName("Close tab")
             btn.clicked.connect(lambda _=False, b=btn: self._close_for_button(b))
             self.tabBar().setTabButton(index, QTabBar.ButtonPosition.RightSide, btn)
         else:

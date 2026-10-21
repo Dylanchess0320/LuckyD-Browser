@@ -1857,7 +1857,13 @@ class CodingAgent:
                 )
                 summary = await self.llm_client.chat_stream(self.messages)
                 if summary:
-                    final_text = summary.get("content", "(timeout)")
+                    final_text = str(summary.get("content") or "").strip()
+                if not final_text:
+                    final_text = (
+                        f"[ERR] The {self.provider_name} model ({self.model}) reached "
+                        "the turn limit without producing a final answer. Try again, "
+                        "raise the turn limit, or use /model to switch models."
+                    )
 
         # 9.8: queued follow-ups become the next user turn. Any queued text
         # is appended as a user message and recorded on final_text so the

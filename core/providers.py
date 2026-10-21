@@ -157,7 +157,7 @@ PROVIDER_DEFAULTS: dict[str, ProviderDefaults] = {
         "env_base": "OPENROUTER_BASE_URL",
         "env_model": "OPENROUTER_MODEL",
         "default_base": "https://openrouter.ai/api/v1",
-        "default_model": "deepseek/deepseek-chat-v3.1",
+        "default_model": "openrouter/free",
     },
     # OpenCode Zen (opencode.ai gateway) — OpenAI-compatible.
     # Key comes from OPENCODE_API_KEY. The old $0 "-free" tier died in

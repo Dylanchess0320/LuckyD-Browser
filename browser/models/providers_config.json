@@ -29,10 +29,8 @@
         "qwen/qwen3-8b",
         "kwaipilot/kat-coder-pro",
         "z-ai/glm-5",
-        "deepseek/deepseek-v4-flash",
         "z-ai/glm-5.3-flash",
-        "poolside/laguna-s-2.1:free",
-        "cline-free/longcat-2.0"
+        "poolside/laguna-s-2.1:free"
       ],
       "free_tier": true,
       "name": "Cline (usage)",

@@ -47,6 +47,7 @@ class SwarmManager:
         self._lock = threading.Lock()
         self._active_run: dict[str, Any] | None = None
         self._cancel_requested = False
+        self._cancel_event = threading.Event()
         self._thread: threading.Thread | None = None
         self._thread_run_id: str | None = None
         # Set when the background worker finishes (completed or failed), so
@@ -269,18 +270,22 @@ class SwarmManager:
         with self._lock:
             active = self._active_run
             if active and active.get("status") == "running":
-                raise RuntimeError("Research is already running — check the live activity panel")
+                raise RuntimeError("Research is already running - check the live activity panel")
             old_thread = self._thread
+            old_cancelled = self._cancel_requested
             if old_thread is not None and not old_thread.is_alive():
                 old_thread = None
 
-        # Honest cancel: never overlap a still-live worker thread. Join
-        # outside the lock so the worker's own lock use can proceed.
+        # Cancel is cooperative and stage-boundary based: a just-cancelled
+        # worker gets a short grace period, then the next run starts anyway.
+        # Unique run ids keep the old worker's events out of the new run, and
+        # the settings restore is already run-id guarded. The old thread can
+        # no longer make the UI say "still stopping" for 10+ seconds.
         if old_thread is not None and old_thread.is_alive():
-            old_thread.join(timeout=10.0)
-            if old_thread.is_alive():
+            old_thread.join(timeout=2.0 if old_cancelled else 10.0)
+            if old_thread.is_alive() and not old_cancelled:
                 raise RuntimeError(
-                    "The previous research run is still stopping — wait a few seconds and try again"
+                    "The previous research run is still stopping - wait a few seconds and try again"
                 )
 
         with self._lock:
@@ -288,6 +293,8 @@ class SwarmManager:
             # share an id, or stale worker events route into the new run.
             run_id = f"run-{time.strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:8]}"
             self._cancel_requested = False
+            cancel_event = threading.Event()
+            self._cancel_event = cancel_event
             self._done.clear()  # a new run is starting
             self._active_run = {
                 "id": run_id,
@@ -376,6 +383,7 @@ class SwarmManager:
                         no_tui=True,
                         provider=provider if provider != "auto" else None,
                         emitter=emitter,
+                        cancel_event=cancel_event,
                     )
                 )
 
@@ -455,6 +463,7 @@ class SwarmManager:
             if not self._active_run or self._active_run.get("status") != "running":
                 return False
             self._cancel_requested = True
+            self._cancel_event.set()
             self._active_run["status"] = "cancelled"
             self._active_run["stage"] = "cancelled"
             self._active_run["end_time"] = time.time()
@@ -472,16 +481,19 @@ class SwarmManager:
 
     def get_status(self, run_id: str | None = None) -> dict[str, Any]:
         with self._lock:
-            if not self._active_run:
-                return {"status": "idle", "active": False}
-            if run_id and self._active_run.get("id") != run_id:
-                # Maybe a past run
+            active = self._active_run
+            if run_id and (active is None or active.get("id") != run_id):
+                # Past-run lookup must work after the live run has gone idle;
+                # otherwise opening a completed run from history returned
+                # {"status": "idle"} and the report panel stayed blank.
                 past = self.get_run(run_id)
                 if past.get("ok"):
                     return {"status": "completed", "active": False, **past}
+            if not active:
+                return {"status": "idle", "active": False}
             return {
-                "active": self._active_run.get("status") == "running",
-                **self._active_run,
+                "active": active.get("status") == "running",
+                **active,
             }
 
     def list_runs(self) -> list[dict[str, Any]]:

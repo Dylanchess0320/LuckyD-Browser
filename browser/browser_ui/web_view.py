@@ -420,7 +420,8 @@ class WebView(QWebEngineView):
         if callable(toast):
             toast(
                 "Google flagged this as automated traffic. You can switch the "
-                "default search engine in Settings (DuckDuckGo, Bing, Brave).",
+                "default search engine in Settings (DuckDuckGo, Bing, Brave, "
+                "Startpage).",
                 "warning",
             )
 

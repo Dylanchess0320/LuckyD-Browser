@@ -24,6 +24,7 @@ import asyncio
 import contextlib
 import hmac
 import json
+import os
 import secrets
 import threading
 import time
@@ -89,6 +90,17 @@ def _approval_hook() -> ApprovalHook | None:
 
 
 load_env()  # load .env before any agent/LLM construction
+
+# ── Build identity ───────────────────────────────────────────────────────
+# Exposed on /health so the browser can reject a stale harness that is still
+# holding the port (the classic "(no reply)" / wrong-model symptom after an
+# upgrade). The browser version is bundled into the harness build.
+try:
+    from browser import __version__ as _HARNESS_VERSION  # noqa: N812
+except Exception:  # standalone web_server.py checkout / frozen one-file build
+    _HARNESS_VERSION = "10.7.8"
+_HARNESS_STARTED = time.time()
+_HARNESS_PID = os.getpid()
 
 # ── Auth token (default-on) ──────────────────────────────────────────────
 # Anyone who can reach this port and knows the token can run the full agent
@@ -454,7 +466,15 @@ class HQHandler(BaseHTTPRequestHandler):
             return self._send_json({"error": "forbidden origin"}, code=403)
         try:
             if path == "/health":
-                return self._send_json({"status": "healthy"})
+                return self._send_json(
+                    {
+                        "status": "healthy",
+                        "service": "luckyd-harness",
+                        "version": _HARNESS_VERSION,
+                        "pid": _HARNESS_PID,
+                        "started": _HARNESS_STARTED,
+                    }
+                )
             if not self._authorized():
                 return self._send_json({"error": "unauthorized"}, code=401)
             if path in ("/", "/index.html"):
@@ -629,6 +649,13 @@ class HQHandler(BaseHTTPRequestHandler):
             self.close_connection = True
             return self._send_json({"error": str(e)}, code=413)
         try:
+            if path == "/api/shutdown":
+                # Graceful, authenticated self-stop used by a newer browser to
+                # replace a harness left behind by the previous version. The
+                # response is flushed before serve_forever() is asked to stop.
+                self._send_json({"ok": True, "stopping": _HARNESS_PID})
+                threading.Thread(target=self.server.shutdown, daemon=True).start()
+                return
             if path in ("/api/chat", "/chat", "/api/orchestrate"):
                 task = body.get("task") or body.get("message") or body.get("prompt") or ""
                 if not task:

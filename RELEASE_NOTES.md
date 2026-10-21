@@ -1,34 +1,42 @@
-# LuckyD Browser v10.7.7 — Release Notes
+# LuckyD Browser v10.7.8 — Release Notes
 
 > **The AI browser that doesn't need an API key.** Free AI built in — plus coding
 > agents, deep research, workflows, and a deck studio living in your tabs.
 
-**[⬇ Download `LuckyDBrowserSetup-10.7.7.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.7.7/LuckyDBrowserSetup-10.7.7.exe)** — Windows 10/11 x64 · per-user install · no admin needed
+**[⬇ Download `LuckyDBrowserSetup-10.7.8.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.7.8/LuckyDBrowserSetup-10.7.8.exe)** — Windows 10/11 x64 · per-user install · no admin needed
 
-Prefer no installer? **[`LuckyDBrowser-Portable-10.7.7.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.7.7/LuckyDBrowser-Portable-10.7.7.zip)** — unzip and run, best option for locked-down work PCs.
+Prefer no installer? **[`LuckyDBrowser-Portable-10.7.8.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.7.8/LuckyDBrowser-Portable-10.7.8.zip)** — unzip and run, best option for locked-down work PCs.
 
 ---
 
-## What's new in 10.7.7 — one router for every model, crash guards for the mesh
+## What's new in 10.7.8 — polished UI + reliable HQ
 
-- **LiteLLM model router** — model/provider switching is now one
-  config-driven fallback chain instead of hand-rolled logic: free tier
-  models first, then cheap models, then local Ollama — the same free-first
-  order as always, now expressed as settings (`LUCKYD_ROUTER_CHAIN`,
-  `LUCKYD_ROUTER_FREE_MODELS`, …) instead of code. Powered by LiteLLM
-  (optional install); without it, the bridge uses its built-in chain
-  exactly as before.
-- **Provider health + cooldowns** — every routed call records per-provider
-  success/failure, and a failing provider is parked on an exponentially
-  backed-off cooldown instead of being retried every message. The state
-  is queryable (`AIBridge.router_status()`), seeding a provider dashboard.
-- **Terminal / agent-mesh crash guards** — terminal sessions are capped
-  (6 by default, `LUCKYD_TERMINAL_MAX_SESSIONS`) and PTY output is
-  flood-throttled (512KB/s, 256KB burst), so a runaway agent session can
-  no longer freeze the browser.
+- **Theme-matched native header** — the Windows title bar follows the app's
+  dark/light palette (DWM dark mode plus caption/text/border colors), including
+  after live theme changes.
+- **Visible tab close buttons** — every tab has a dedicated close button that is
+  always readable, with danger-red hover styling instead of a hidden default glyph.
+- **Google web search removed** — Google is no longer a search provider; saved
+  Google preferences migrate to DuckDuckGo automatically. Gemini AI models remain.
+- **HQ stale-harness handshake** — `/health` now reports version, PID, and start
+  time. The browser rejects a leftover harness from an older build with an
+  actionable message, re-seeds the auth cookie after first boot, and stops the
+  harness it spawned when the app quits.
+- **Deep Researcher cancellation** — cancel is honored at every stage boundary,
+  and a new run starts after a short grace period instead of blocking 10+ seconds.
+  Completed runs opened from history load their saved report.
+- **Native provider calls** — Gemini and Anthropic/MiniMax use their real APIs;
+  DDG redirect links resolve to the target URL; failed fetches expire from the
+  cache after one hour.
+- **Dead free models removed** — `deepseek/deepseek-v4-flash` and
+  `cline-free/longcat-2.0` are gone from the Cline usage catalog (both 403 on
+  that gateway), and the OpenRouter default is now `openrouter/free`.
+- **Agent CLI selection fixed** — packaged installs use the `luckyd-cli.exe`
+  shipped with their own build, not a stale one left on the Desktop; source
+  checkouts prefer the current `main.py`.
 
-On top of everything from 10.7.6 (MiniMax Media mesh, Agent 2 terminal
-fallback, Ask Lucky answers, HQ no-reply fix, Workflows: Generate with AI).
+On top of everything from 10.7.7 (LiteLLM router, provider cooldowns,
+terminal/agent-mesh crash guards).
 
 ---
 

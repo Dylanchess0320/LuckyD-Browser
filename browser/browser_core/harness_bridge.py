@@ -25,6 +25,7 @@ Robustness notes:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import os
 import shutil
@@ -38,6 +39,42 @@ import httpx
 
 _HOST = os.environ.get("LUCKYDHOST", "127.0.0.1")
 _PORT = int(os.environ.get("LUCKYDPORT", "8000") or 8000)
+
+
+def _app_version() -> str:
+    """Current browser/agent version, used to reject stale harness servers."""
+    try:
+        from browser import __version__
+
+        return str(__version__)
+    except Exception:
+        return ""
+
+
+def _is_stale(server_version: str) -> bool:
+    """True when a reachable harness must be rejected instead of adopted.
+
+    A ``/health`` answer with no ``version`` field is a harness left behind by
+    an older release (pre-10.7.8 never reported one) — reject it exactly like
+    a version mismatch instead of silently talking to it.
+    """
+    if not server_version:
+        return True
+    expected = _app_version()
+    return bool(expected and server_version != expected)
+
+
+def _stale_message(base: str, server_version: str, server_pid: int) -> str:
+    """Actionable rejection text for a stale/legacy harness holding the port."""
+    if server_version:
+        who = f"a stale LuckyD HQ backend (v{server_version}, PID {server_pid or '?'})"
+    else:
+        who = "a LuckyD HQ backend left behind by an older LuckyD version"
+    return (
+        f"{who} is already using {base}. "
+        "Close the old LuckyD Browser/harness process (or reboot) and retry."
+    )
+
 
 # One exe per machine — guards Popen across threads/workers.
 _SPAWN_LOCK = threading.Lock()
@@ -58,16 +95,20 @@ def _find_exe() -> Path | None:
         candidates.append(Path(override))
     # Repo root: browser/browser_core/harness_bridge.py → ../../..
     repo_root = Path(__file__).resolve().parent.parent.parent
-    # Prefer the self-contained frozen exe; fall back to the live-source launcher.
-    candidates.append(repo_root / "luckyd-code.exe")
-    candidates.append(repo_root / "luckyd-harness.py")
-    if getattr(sys, "frozen", False):
-        # PyInstaller extracts to _internal/ beside the exe.
+    frozen = getattr(sys, "frozen", False)
+    if frozen:
+        # PyInstaller extracts to _internal/ beside the exe; prefer the exe
+        # shipped with THIS browser build over any leftover file beside it.
         base_dir = Path(sys.executable).resolve().parent
         candidates.append(base_dir / "luckyd-code.exe")
         candidates.append(base_dir / "luckyd-harness.py")
         candidates.append(base_dir / "_internal" / "luckyd-code.exe")
         candidates.append(base_dir / "_internal" / "luckyd-harness.py")
+    else:
+        # Live checkout: run current source, never a stale repo-root exe left
+        # behind by an older build.
+        candidates.append(repo_root / "luckyd-harness.py")
+        candidates.append(repo_root / "luckyd-code.exe")
     for path in candidates:
         if path.exists():
             return path
@@ -146,6 +187,9 @@ class HarnessBridge:
         self.base = f"http://{self.host}:{self.port}"
         self._harness_proc: subprocess.Popen | None = None
         self._connected = False
+        self.server_version = ""
+        self.server_pid = 0
+        self.stale = False
 
     @property
     def connected(self) -> bool:
@@ -153,20 +197,29 @@ class HarnessBridge:
 
     # ── lifecycle ─────────────────────────────────────────────────────
     async def connect(self, timeout: float = 10.0) -> bool:
-        """Check whether the harness is reachable; True when it answers /health."""
+        """Check reachability and whether the responding harness matches this build."""
         try:
             async with httpx.AsyncClient() as client:
                 r = await client.get(f"{self.base}/health", timeout=min(3.0, timeout))
                 r.raise_for_status()
+                info = r.json() if "application/json" in r.headers.get("content-type", "") else {}
             self._connected = True
+            self.server_version = str(info.get("version") or "") if isinstance(info, dict) else ""
+            self.server_pid = int(info.get("pid") or 0) if isinstance(info, dict) else 0
+            self.stale = _is_stale(self.server_version)
         except Exception:
             self._connected = False
+            self.server_version = ""
+            self.server_pid = 0
+            self.stale = False
         return self._connected
 
     async def start(self, wait: bool = True, timeout: float = 20.0) -> bool:
         """Launch the harness exe if it isn't already serving. True when up."""
         if await self.connect(timeout=3.0):
-            return True
+            if not self.stale:
+                return True
+            raise RuntimeError(_stale_message(self.base, self.server_version, self.server_pid))
         exe = _find_exe()
         if exe is None:
             raise FileNotFoundError(
@@ -176,7 +229,9 @@ class HarnessBridge:
         with _SPAWN_LOCK:
             # Re-check inside the lock: another worker may have started it.
             if await self.connect(timeout=1.5):
-                return True
+                if not self.stale:
+                    return True
+                raise RuntimeError(_stale_message(self.base, self.server_version, self.server_pid))
             flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) if sys.platform == "win32" else 0
             # A .py launcher must be run through the Python interpreter; a
             # frozen .exe runs directly. Under a frozen browser,
@@ -209,6 +264,15 @@ class HarnessBridge:
                 self._harness_proc.kill()
             self._harness_proc = None
         self._connected = False
+
+    async def shutdown_server(self) -> bool:
+        """Ask a harness we did not spawn to stop gracefully (new versions only)."""
+        try:
+            await self._post("/api/shutdown", timeout=3.0)
+            self._connected = False
+            return True
+        except Exception:
+            return False
 
     async def close(self) -> None:
         await self.stop()
@@ -353,6 +417,9 @@ class HarnessSupervisor:
             "starting": False,
             "error": None,
             "tools": None,
+            "version": "",
+            "pid": 0,
+            "stale": False,
         }
         self._start_lock = threading.Lock()
 
@@ -364,12 +431,25 @@ class HarnessSupervisor:
     def probe(self, timeout: float = 1.2) -> dict:
         """Quick /health probe; refreshes the cached status and returns it."""
         up = False
+        info: dict = {}
         try:
             r = httpx.get(f"{self.url}/health", timeout=timeout)
             up = r.status_code == 200
+            if up:
+                try:
+                    parsed = r.json()
+                except Exception:
+                    parsed = None
+                info = parsed if isinstance(parsed, dict) else {}
         except Exception:
             up = False
         self.last["up"] = up
+        self.bridge.server_version = str(info.get("version") or "")
+        self.bridge.server_pid = int(info.get("pid") or 0)
+        self.bridge.stale = up and _is_stale(self.bridge.server_version)
+        self.last["version"] = self.bridge.server_version
+        self.last["pid"] = self.bridge.server_pid
+        self.last["stale"] = self.bridge.stale
         if not up:
             self.last["tools"] = None
         return self.status()
@@ -390,6 +470,9 @@ class HarnessSupervisor:
             self.last["error"] = None
             try:
                 ok = asyncio.run(self.bridge.start(timeout=timeout))
+                self.last["version"] = self.bridge.server_version
+                self.last["pid"] = self.bridge.server_pid
+                self.last["stale"] = self.bridge.stale
                 if ok:
                     self.last["up"] = True
                     try:
@@ -404,6 +487,11 @@ class HarnessSupervisor:
                         f"/health on {self.url} within {int(timeout)}s"
                     )
                 return ok, (self.last["error"] or "")
+            except RuntimeError as exc:
+                self.last["up"] = False
+                self.last["stale"] = True
+                self.last["error"] = str(exc)
+                return False, str(exc)
             except FileNotFoundError as exc:
                 self.last["up"] = False
                 self.last["error"] = str(exc)
@@ -414,6 +502,15 @@ class HarnessSupervisor:
                 return False, self.last["error"]
             finally:
                 self.last["starting"] = False
+
+    def stop_blocking(self) -> None:
+        """Terminate the harness if this app spawned it (called on app quit)."""
+        with self._start_lock:
+            with contextlib.suppress(Exception):
+                asyncio.run(self.bridge.stop())
+            self.last["up"] = False
+            self.last["starting"] = False
+            self.last["tools"] = None
 
     def ensure_started(self, timeout: float = 25.0, force: bool = False) -> None:
         """Kick off a background start (idempotent — returns immediately).

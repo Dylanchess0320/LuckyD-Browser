@@ -509,7 +509,7 @@ class BrowserEmulateTool(ToolBase):
             if device and device.lower() != "desktop":
                 import playwright.async_api as _pw_api
 
-                pw_devices = _pw_api.devices
+                pw_devices = getattr(_pw_api, "devices", {})
 
                 device_name = None
                 # Try exact match first

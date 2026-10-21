@@ -62,6 +62,7 @@ from .omnibox import Omnibox
 from .palette import CommandPalette
 from .tab_widget import BrowserTabWidget
 from .theme import apply_to_app
+from .titlebar import apply_titlebar_theme
 from .toasts import ToastManager
 from .vertical_tabs import VerticalTabsDock
 
@@ -163,10 +164,20 @@ class MainWindow(QMainWindow):
     def _apply_theme(self) -> None:
         """Apply the current theme (called on startup and when theme changes)."""
         apply_to_app(self._app.qapp, self.settings)
+        # The Windows caption lives outside Qt's client area; paint it with the
+        # same palette so the header reads as part of the browser.
+        with contextlib.suppress(Exception):
+            apply_titlebar_theme(self, self.settings)
         # Keep the AI sidebar's chat bubbles/code in step with the new palette.
         sidebar = getattr(self, "ai_sidebar", None)
         if sidebar is not None:
             sidebar._apply_theme()
+
+    def showEvent(self, event) -> None:  # noqa: N802 (Qt API name)
+        """Re-assert native title-bar colours once the HWND is on screen."""
+        super().showEvent(event)
+        with contextlib.suppress(Exception):
+            apply_titlebar_theme(self, self.settings)
 
     def toast(self, message: str, kind: str = "info") -> None:
         """Show a transient toast notification (if the toast manager is up)."""

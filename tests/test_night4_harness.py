@@ -156,6 +156,85 @@ async def test_connect_failure_sets_disconnected(monkeypatch) -> None:
     assert b.connected is False
 
 
+# ── stale-harness handshake (10.7.8) ─────────────────────────────────
+
+
+@pytest.mark.asyncio()
+async def test_connect_legacy_versionless_harness_is_stale(monkeypatch) -> None:
+    """10.7.7 /health reports no version — never silently adopted."""
+    c = _Client(get_map={"http://127.0.0.1:8000/health": _Resp({"status": "healthy"})})
+    _patch_client(monkeypatch, c)
+    b = HarnessBridge()
+    assert await b.connect() is True
+    assert b.server_version == ""
+    assert b.stale is True
+
+
+@pytest.mark.asyncio()
+async def test_connect_mismatched_version_is_stale(monkeypatch) -> None:
+    c = _Client(
+        get_map={
+            "http://127.0.0.1:8000/health": _Resp(
+                {"status": "healthy", "version": "10.7.7", "pid": 4321}
+            )
+        }
+    )
+    _patch_client(monkeypatch, c)
+    monkeypatch.setattr(hb, "_app_version", lambda: "10.7.8")
+    b = HarnessBridge()
+    assert await b.connect() is True
+    assert b.server_version == "10.7.7"
+    assert b.server_pid == 4321
+    assert b.stale is True
+
+
+@pytest.mark.asyncio()
+async def test_connect_matching_version_not_stale(monkeypatch) -> None:
+    c = _Client(
+        get_map={
+            "http://127.0.0.1:8000/health": _Resp(
+                {"status": "healthy", "version": "10.7.8", "pid": 4321}
+            )
+        }
+    )
+    _patch_client(monkeypatch, c)
+    monkeypatch.setattr(hb, "_app_version", lambda: "10.7.8")
+    b = HarnessBridge()
+    assert await b.connect() is True
+    assert b.stale is False
+
+
+@pytest.mark.asyncio()
+async def test_start_rejects_legacy_harness_with_actionable_message() -> None:
+    b = HarnessBridge()
+
+    async def _connect(timeout=10.0):
+        b.server_version = ""
+        b.server_pid = 0
+        b.stale = True
+        return True
+
+    b.connect = _connect
+    with pytest.raises(RuntimeError, match="older LuckyD version") as exc:
+        await b.start()
+    assert "Close the old LuckyD Browser/harness process (or reboot) and retry." in str(exc.value)
+
+
+@pytest.mark.asyncio()
+async def test_start_rejects_version_mismatch_with_version_and_pid() -> None:
+    b = HarnessBridge()
+
+    async def _connect(timeout=10.0):
+        b.server_version = "10.7.7"
+        b.server_pid = 4321
+        b.stale = True
+        return True
+
+    b.connect = _connect
+    with pytest.raises(RuntimeError, match=r"v10\.7\.7.*PID 4321"):
+        await b.start()
+
+
 @pytest.mark.asyncio()
 async def test_get_returns_json_for_json_content_type(monkeypatch) -> None:
     c = _Client(get_map={"http://127.0.0.1:8000/api/models": _Resp({"models": ["a"]})})
@@ -424,6 +503,38 @@ def test_supervisor_probe_up(monkeypatch) -> None:
     assert st["up"] is True
     assert st["url"] == "http://127.0.0.1:8000"
     assert st["tools"] is None
+
+
+def test_supervisor_probe_flags_legacy_harness(monkeypatch) -> None:
+    """A reachable but versionless harness is up AND stale (10.7.8 handshake)."""
+
+    class _R:
+        status_code = 200
+
+        def json(self):
+            return {"status": "healthy"}
+
+    monkeypatch.setattr(hb.httpx, "get", lambda url, timeout=None: _R())
+    s = HarnessSupervisor()
+    st = s.probe()
+    assert st["up"] is True
+    assert st["stale"] is True
+    assert st["version"] == ""
+
+
+def test_supervisor_probe_matching_version_not_stale(monkeypatch) -> None:
+    class _R:
+        status_code = 200
+
+        def json(self):
+            return {"status": "healthy", "version": hb._app_version(), "pid": 4321}
+
+    monkeypatch.setattr(hb.httpx, "get", lambda url, timeout=None: _R())
+    s = HarnessSupervisor()
+    st = s.probe()
+    assert st["up"] is True
+    assert st["stale"] is False
+    assert st["pid"] == 4321
 
 
 def test_supervisor_probe_down_clears_tools(monkeypatch) -> None:

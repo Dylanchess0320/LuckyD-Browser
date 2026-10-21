@@ -367,7 +367,7 @@ class TestEmulate:
         # Without playwright installed the import itself fails first.
         r = await _tool("BrowserEmulate").execute(device="Nokia 3310")
         assert not _ok(r)
-        assert "Emulate error" in r.text
+        assert "Emulate error" in r.text or "not found" in r.text
 
     async def test_viewport_config(self, clean_browser):
         r = await _tool("BrowserEmulate").execute(device="", width=800, height=600)

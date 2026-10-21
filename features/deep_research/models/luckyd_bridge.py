@@ -74,8 +74,16 @@ class LuckyDBridgeProvider(LuckyDProvider):
         cfg = self._bridge.provider_config(self._bridge_provider or "")
         if cfg is None:
             raise RuntimeError(
-                "no AI provider available for deep research — set up the AI "
+                "no AI provider available for deep research - set up the AI "
                 "assistant (locals, a Cline session, or a provider key in .env)"
+            )
+        kind = str(cfg.get("kind", ""))
+        if kind != "openai" and self._bridge_provider != "google":
+            # Fail at selection time so router._auto_llm() can fall through to
+            # OpenRouter/Ollama instead of dying on the first planner call.
+            raise RuntimeError(
+                f"provider {self._bridge_provider!r} ({kind}) is not "
+                "OpenAI-compatible; deep research can't use it directly"
             )
         # Rotation hint for roles without an explicit override: stay on the
         # assistant's configured model unless the caller forces one.
