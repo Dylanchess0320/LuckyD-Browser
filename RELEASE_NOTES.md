@@ -1,28 +1,25 @@
-# LuckyD Browser v10.8.0 — Release Notes
+# LuckyD Browser v10.8.1 — Release Notes
 
-> **The AI browser that doesn't need an API key.** Free AI built in — a cleaner,
-> faster browser with an AI Assistant that does the work and reports back.
+> **The AI browser that doesn't need an API key.** Free AI built in — now with
+> LuckyD Chat in the browser, and a polish pass over everything you touched.
 
-**[⬇ Download `LuckyDBrowserSetup-10.8.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.0/LuckyDBrowserSetup-10.8.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed
+**[⬇ Download `LuckyDBrowserSetup-10.8.1.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.1/LuckyDBrowserSetup-10.8.1.exe)** — Windows 10/11 x64 · per-user install · no admin needed
 
 ---
 
-## What's new in 10.8.0 — the big cleanup
+## What's new in 10.8.1 — the polish pass
 
-- **Tabs on top** — the tab strip sits above the address bar, where your eyes expect it.
-- **One menu button** — File, History, Bookmarks, View, Tools, and Help in a single ☰ dropdown at the top right. The old menu-bar row and the update arrow are gone; updates still live under Help → Check for Updates.
-- **AI Assistant, rebuilt** — one input bar for questions and agent tasks. The coding agent, page context, and vision are simply on (no more checkboxes), and **every agent run ends with a findings summary**: pages visited and what it found. No more silent, empty runs.
-- **Retired tools hidden** — LuckyD HQ, Workflows, Deep Researcher, and Deck Studio are out of the UI. Nothing was deleted — Settings → General → "Show retired tools" brings them back.
-- **Google search removed** — Google is no longer a web/search provider anywhere; DuckDuckGo is the default and saved Google choices migrate automatically. (Gmail, Calendar, and Gemini AI models are untouched.)
-- **Gmail sign-in fixed** — Google sign-in pages get a consistent, current Chrome identity, ending the "browser may not be secure" block.
-- **Focus Mode fixed** — Ctrl+Shift+F toggles it off as well as on.
-- **Cleaner homepage** — status pills and the clock are gone, one search form, 35% lighter, and the internal address no longer shows in the address bar. Plus a regenerated transparent logo and a decluttered interface throughout (no more tip popups or green status dots).
-- **Name your browser** — Settings → Appearance → Browser name: call it whatever you want (default: LuckyD Browser).
-- **Settings that fit** — the Settings window now shrinks to 360×300 with scrollable pages, and Arctic Light is readable everywhere, including homepage tiles and the shortcuts dialog.
+- **LuckyD Chat, built in** — your Hub chat and your Claw tasks now live inside the browser: send a job, watch it run, read the receipt when it lands. Paste your Hub and Claw tokens once in Settings → Connections; nothing is baked in.
+- **AI Assistant, finished properly** — an **Ask ⇄ Agent toggle** sits beside the input, and **Enter sends** in whichever mode is lit (Shift+Enter for a newline). "Thinking…" and "answered by …" appear **inside the chat**, where you're looking — and agent runs can no longer end in silence: every run closes with its findings summary.
+- **Animated homepage themes** — **Aurora Glow**, **Particle Drift**, and **Gentle Parallax** react to your mouse cursor. Pick one — or Off — in Settings → Appearance. GPU-light, pauses when hidden, theme-true colors.
+- **Multi Agent Terminal** — the Agent Mesh, renamed and rebuilt to read: balanced panes, per-pane scrolling, one-click focus. (`/mesh` still works.)
+- **Shortcuts page rebuilt** — capped to your screen, scrollable, compact, and colored by your actual theme — Arctic Light included.
+- **Truly transparent logo** — chroma-keyed across the whole image with the icon set rebuilt: no square plate on any surface.
+- **Decluttered again** — homepage tips gone, shortcut tiles uniform, the blank strip above the homepage closed, dropdown-arrow decoration removed, and the **+ button sits beside your last tab**, where it belongs.
 
-On top of everything from 10.7.8 (theme-matched header, LiteLLM model router, terminal crash guards).
+On top of everything from 10.8.0 (tabs on top, one menu button, rebuilt AI Assistant, Google search removed, Gmail sign-in fix, name-your-browser).
 
-3,492 tests passing · coverage 89% · full CI green.
+3,514 tests passing · coverage 89% · full CI green.
 
 ---
 

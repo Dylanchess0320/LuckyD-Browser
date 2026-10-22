@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [10.8.1] - 2026-10-22
+
+The polish pass: every finding from real-world testing of 10.8.0 fixed, plus cursor-reactive homepage animation themes and LuckyD Chat built into the browser.
+
+### Added
+- **LuckyD Chat built into the browser**: Hub chat and Claw tasks in one built-in surface — submit a job (project, prompt, profile), watch live status, read the result receipt, cancel a run. Hub and Claw tokens are entered once in Settings → Connections; nothing is baked into the app.
+- **Homepage animation themes**: Settings → Appearance → Homepage animation — Aurora Glow, Particle Drift, Gentle Parallax, or Off. The effects react to the mouse cursor, are GPU-light, pause while the window is hidden, respect reduced-motion, and take their colors from the active theme.
+- **Ask/Agent toggle** beside the AI Assistant input: one visible mode switch; Enter sends in whichever mode is active.
+
+### Changed
+- **Agent Mesh renamed to Multi Agent Terminal** (the `/mesh` command still works): balanced 2×2 panes, per-pane scrolling, and a focus mode that enlarges one pane and restores the grid.
+- **AI Assistant status lives in the transcript**: "thinking…" and the "answered by …" attribution render inside the chat area, never in a strip below the input.
+- **Homepage shortcut tiles are uniform**: one neutral, theme-consistent treatment — the per-button accent colors are gone.
+- Dropdown-arrow decoration removed from the AI Assistant actions and the Settings window (all actions remain reachable).
+
+### Removed
+- **Homepage tips**: all tip/hint text is off the homepage; guidance lives in the keyboard shortcuts page and Help.
+
+### Fixed
+- **Agent runs ending in silence**: "Run as agent task" could finish with no visible output; the run now falls back on every exit path and always ends with the findings summary in the transcript.
+- **Enter-to-send** in the AI Assistant input bar (Shift+Enter inserts a newline).
+- **Keyboard shortcuts dialog**: capped to ~90% of the screen with a scrollable, compact layout; colors fully theme-derived — readable on Arctic Light.
+- **Logo square plate**: the icon's background is now chroma-keyed across the whole image with edge defringe and the .ico set rebuilt — verified transparent on every surface (window, taskbar, homepage, About, installer).
+- **Blank strip** between the homepage content and the search bar (leftover spacing from the removed header row).
+- **New-tab (+) button** now sits immediately beside the last open tab in both layouts instead of the far side of the window.
+
 ## [10.8.0] - 2026-10-22
 
 The big cleanup release: a rebuilt browser chrome and AI Assistant, with the broken and duplicate surfaces retired from view.

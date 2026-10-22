@@ -1,5 +1,15 @@
 # LuckyD Browser — Release Notes
 
+## [10.8.1] — The polish pass + LuckyD Chat built in — 2026-10-22
+
+**[`LuckyDBrowserSetup-10.8.1.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.1/LuckyDBrowserSetup-10.8.1.exe)** — Windows 10/11 x64 · per-user install · no admin needed.
+
+- **LuckyD Chat built into the browser**: Hub chat + Claw tasks (submit, watch, read receipts, cancel) in one surface; tokens entered once in Settings → Connections.
+- **AI Assistant finished**: Ask ⇄ Agent toggle by the input, Enter sends in the active mode, status/attribution inside the transcript, and agent runs always end with their findings — no silent runs.
+- **Animated homepage themes**: Aurora Glow, Particle Drift, Gentle Parallax — cursor-reactive, theme-true, with an Off switch in Settings → Appearance.
+- **Multi Agent Terminal** (formerly Agent Mesh): readable panes, per-pane scrolling, focus mode; `/mesh` still works.
+- **Shortcuts dialog rebuilt** (capped, scrollable, theme-true on Arctic Light); **logo truly transparent**; homepage tips removed; tiles uniform; blank strip closed; + button beside the last tab; dropdown arrows gone.
+
 ## [10.8.0] — The big cleanup: rebuilt UI + AI Assistant — 2026-10-22
 
 **[`LuckyDBrowserSetup-10.8.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.0/LuckyDBrowserSetup-10.8.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed.
