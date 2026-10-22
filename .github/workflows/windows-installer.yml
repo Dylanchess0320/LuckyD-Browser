@@ -69,5 +69,4 @@ jobs:
           tag_name: ${{ inputs.tag || github.ref_name }}
           files: |
             browser/installer/output/LuckyDBrowserSetup-*.exe
-            browser/installer/output/LuckyDBrowser-Portable-*.zip
           fail_on_unmatched_files: true
