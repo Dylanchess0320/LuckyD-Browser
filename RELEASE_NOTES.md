@@ -1,42 +1,28 @@
-# LuckyD Browser v10.7.8 — Release Notes
+# LuckyD Browser v10.8.0 — Release Notes
 
-> **The AI browser that doesn't need an API key.** Free AI built in — plus coding
-> agents, deep research, workflows, and a deck studio living in your tabs.
+> **The AI browser that doesn't need an API key.** Free AI built in — a cleaner,
+> faster browser with an AI Assistant that does the work and reports back.
 
-**[⬇ Download `LuckyDBrowserSetup-10.7.8.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.7.8/LuckyDBrowserSetup-10.7.8.exe)** — Windows 10/11 x64 · per-user install · no admin needed
-
-Prefer no installer? **[`LuckyDBrowser-Portable-10.7.8.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.7.8/LuckyDBrowser-Portable-10.7.8.zip)** — unzip and run, best option for locked-down work PCs.
+**[⬇ Download `LuckyDBrowserSetup-10.8.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.0/LuckyDBrowserSetup-10.8.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed
 
 ---
 
-## What's new in 10.7.8 — polished UI + reliable HQ
+## What's new in 10.8.0 — the big cleanup
 
-- **Theme-matched native header** — the Windows title bar follows the app's
-  dark/light palette (DWM dark mode plus caption/text/border colors), including
-  after live theme changes.
-- **Visible tab close buttons** — every tab has a dedicated close button that is
-  always readable, with danger-red hover styling instead of a hidden default glyph.
-- **Google web search removed** — Google is no longer a search provider; saved
-  Google preferences migrate to DuckDuckGo automatically. Gemini AI models remain.
-- **HQ stale-harness handshake** — `/health` now reports version, PID, and start
-  time. The browser rejects a leftover harness from an older build with an
-  actionable message, re-seeds the auth cookie after first boot, and stops the
-  harness it spawned when the app quits.
-- **Deep Researcher cancellation** — cancel is honored at every stage boundary,
-  and a new run starts after a short grace period instead of blocking 10+ seconds.
-  Completed runs opened from history load their saved report.
-- **Native provider calls** — Gemini and Anthropic/MiniMax use their real APIs;
-  DDG redirect links resolve to the target URL; failed fetches expire from the
-  cache after one hour.
-- **Dead free models removed** — `deepseek/deepseek-v4-flash` and
-  `cline-free/longcat-2.0` are gone from the Cline usage catalog (both 403 on
-  that gateway), and the OpenRouter default is now `openrouter/free`.
-- **Agent CLI selection fixed** — packaged installs use the `luckyd-cli.exe`
-  shipped with their own build, not a stale one left on the Desktop; source
-  checkouts prefer the current `main.py`.
+- **Tabs on top** — the tab strip sits above the address bar, where your eyes expect it.
+- **One menu button** — File, History, Bookmarks, View, Tools, and Help in a single ☰ dropdown at the top right. The old menu-bar row and the update arrow are gone; updates still live under Help → Check for Updates.
+- **AI Assistant, rebuilt** — one input bar for questions and agent tasks. The coding agent, page context, and vision are simply on (no more checkboxes), and **every agent run ends with a findings summary**: pages visited and what it found. No more silent, empty runs.
+- **Retired tools hidden** — LuckyD HQ, Workflows, Deep Researcher, and Deck Studio are out of the UI. Nothing was deleted — Settings → General → "Show retired tools" brings them back.
+- **Google search removed** — Google is no longer a web/search provider anywhere; DuckDuckGo is the default and saved Google choices migrate automatically. (Gmail, Calendar, and Gemini AI models are untouched.)
+- **Gmail sign-in fixed** — Google sign-in pages get a consistent, current Chrome identity, ending the "browser may not be secure" block.
+- **Focus Mode fixed** — Ctrl+Shift+F toggles it off as well as on.
+- **Cleaner homepage** — status pills and the clock are gone, one search form, 35% lighter, and the internal address no longer shows in the address bar. Plus a regenerated transparent logo and a decluttered interface throughout (no more tip popups or green status dots).
+- **Name your browser** — Settings → Appearance → Browser name: call it whatever you want (default: LuckyD Browser).
+- **Settings that fit** — the Settings window now shrinks to 360×300 with scrollable pages, and Arctic Light is readable everywhere, including homepage tiles and the shortcuts dialog.
 
-On top of everything from 10.7.7 (LiteLLM router, provider cooldowns,
-terminal/agent-mesh crash guards).
+On top of everything from 10.7.8 (theme-matched header, LiteLLM model router, terminal crash guards).
+
+3,492 tests passing · coverage 89% · full CI green.
 
 ---
 

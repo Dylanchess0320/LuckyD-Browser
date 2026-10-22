@@ -82,6 +82,8 @@ LuckyD also works with cloud providers if you prefer: Gemini, Groq, DeepSeek, Op
 
 ## What's new
 
+**v10.8.0** — The big cleanup: tabs on top, one menu button, rebuilt AI Assistant with findings summaries, retired tools hidden behind one switch, Google search removed everywhere, Gmail sign-in fixed, cleaner homepage, rename-your-browser setting
+
 **v10.7.8** — Theme-matched native header, visible tab close buttons, Google search removed, HQ stale-harness handshake, reliable Deep Researcher cancellation, and dead free-model cleanup
 
 **v10.7.5** — Free-model cleanup: dead model ids pruned, every auto-selected model is a verified $0 route (local Ollama / free tiers), and LuckyD Code falls back to the free rotation on any setting instead of failing on a stale paid pick. Paid providers remain explicit opt-ins with your own key.

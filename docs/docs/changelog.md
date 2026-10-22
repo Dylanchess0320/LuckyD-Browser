@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [10.8.0] - 2026-10-22
+
+The big cleanup release: a rebuilt browser chrome and AI Assistant, with the broken and duplicate surfaces retired from view.
+
+### Added
+- **Custom browser name**: Settings → Appearance → Browser name renames the browser in-app (window title, homepage, About); defaults to "LuckyD Browser".
+- **AI Assistant findings summaries**: every autonomous agent run now ends with a visible summary of the pages visited and what it found — on every exit path (done, stopped, error, step limit).
+
+### Changed
+- **Tabs on top**: the tab strip now sits above the address bar.
+- **One menu button**: File, History, Bookmarks, View, Tools, and Help live in a single ☰ menu at the top right; the menu-bar row and the update arrow are gone (updates stay under Help → Check for Updates).
+- **AI Assistant simplified**: one input bar for questions and agent tasks; the full coding agent, page context, and vision are always on — the checkboxes and the Research button are gone; the remaining actions live in one Actions dropdown; an empty chat is truly empty.
+- **Homepage decluttered**: status pills and the clock removed, a single search form, 35% lighter; the internal control-server address no longer shows in the address bar on the home page.
+- **Settings window** now resizes down to 360×300 with scrollable pages.
+- **Arctic Light fixes**: homepage tiles and the keyboard-shortcuts dialog now use theme-derived colors instead of hardcoded dark-theme values.
+- **Logo regenerated** with a true transparent background (app icon set rebuilt).
+
+### Removed
+- **Retired tools hidden**: LuckyD HQ, Workflows, Deep Researcher, and Deck Studio no longer appear in the UI (menus, palette, dashboard). The code stays in the build; one switch (Settings → General → "Show retired tools") brings them back.
+- **Google as a web/search provider**: removed everywhere; saved Google choices migrate to DuckDuckGo (already the default). Gmail, Google Calendar, and Gemini AI models are untouched.
+- Notification tip toasts and the green status dots/pills (homepage + AI Assistant).
+
+### Fixed
+- **Focus Mode toggle**: Ctrl+Shift+F now turns focus mode off as well as on (window-level shortcut).
+- **Gmail sign-in**: Google sign-in pages now receive a consistent, current Chrome identity (user agent + Client Hints pinned on accounts.google.com), fixing the "browser may not be secure" block.
+- **Silent agent runs**: the autonomous agent no longer returns blank results (see findings summaries above).
+
 ## [10.7.8] - 2026-10-21
 
 Theme-matched native header, visible tab close buttons, Google search removed, HQ stale-harness handshake, reliable Deep Researcher cancellation, and dead free-model cleanup.

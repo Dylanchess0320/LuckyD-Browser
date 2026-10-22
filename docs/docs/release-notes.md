@@ -1,8 +1,20 @@
+# LuckyD Browser — Release Notes
+
+## [10.8.0] — The big cleanup: rebuilt UI + AI Assistant — 2026-10-22
+
+**[`LuckyDBrowserSetup-10.8.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.0/LuckyDBrowserSetup-10.8.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed.
+
+- **Tabs on top**, and File/History/Bookmarks/View/Tools/Help in **one ☰ menu button**; the menu-bar row and update arrow are gone.
+- **AI Assistant rebuilt**: one input bar; coding agent, page context, and vision always on; every agent run ends with a **findings summary**.
+- **Retired tools hidden** (HQ, Workflows, Deep Researcher, Deck Studio) behind one Settings switch — code kept, recoverable.
+- **Google removed as a web/search provider** everywhere; DuckDuckGo default (Gmail/Calendar/Gemini untouched).
+- **Gmail sign-in fixed** (consistent Chrome identity on Google sign-in pages); **Focus Mode** toggles both ways.
+- Homepage decluttered (no clock, no status pills, 35% lighter), transparent logo, customizable browser name, resizable Settings, Arctic Light contrast fixes.
+
 ## [10.7.7] — LiteLLM model router & terminal crash guards — 2026-10-21
 
 **[`LuckyDBrowserSetup-10.7.7.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.7.7/LuckyDBrowserSetup-10.7.7.exe)** — Windows 10/11 x64 · per-user install · no admin needed
 
-**[`LuckyDBrowser-Portable-10.7.7.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.7.7/LuckyDBrowser-Portable-10.7.7.zip)** — unzip and run
 
 - **Added** — a **LiteLLM model router** for the AI bridge: one config-driven fallback chain (free tier models → cheap models → local Ollama) with per-provider health tracking and automatic cooldowns. Tier order and model lists are settings, not code; free-first remains the default, and without the optional LiteLLM install the bridge behaves exactly as before.
 - **Fixed** — terminal/agent-mesh **crash guards**: a session cap (6) and an output flood throttle (512KB/s, 256KB burst) keep a runaway agent session from freezing the browser.
@@ -12,7 +24,6 @@
 
 **[`LuckyDBrowserSetup-10.7.6.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.7.6/LuckyDBrowserSetup-10.7.6.exe)** — Windows 10/11 x64 · per-user install · no admin needed
 
-**[`LuckyDBrowser-Portable-10.7.6.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.7.6/LuckyDBrowser-Portable-10.7.6.zip)** — unzip and run
 
 - **Fixed** — MiniMax Media (`mmx`) is found in the Agent Mesh even with a stale PATH (npm global probe; install hint corrected to `npm i -g mmx-cli`); Agent 2 boots in the terminal everywhere (falls back to the Agent 1 CLI as `--agent 2`); the homepage **Ask Lucky** button answers general questions instead of reading the homepage back at you; LuckyD HQ never returns a bare "(no reply)" — an empty model reply names the cause and the fix.
 - **Added** — Workflows: **Generate with AI**. Describe an automation in plain English and your best free AI model turns it into a saved workflow that replays, self-heals drifted element targets, and runs on a schedule (`POST /workflow/generate`).
@@ -24,7 +35,6 @@
 ## [10.7.8] — Polished UI + reliable HQ — 2026-10-21
 
 **[`LuckyDBrowserSetup-10.7.8.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.7.8/LuckyDBrowserSetup-10.7.8.exe)** — Windows 10/11 x64 · per-user install · no admin needed.
-**[`LuckyDBrowser-Portable-10.7.8.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.7.8/LuckyDBrowser-Portable-10.7.8.zip)** — unzip and run, for locked-down PCs.
 
 - **Theme-matched native header**: the Windows title bar now follows the app's dark/light palette (DWM dark mode + caption/text/border colors), including after live theme changes.
 - **Visible tab close buttons**: every tab shows a dedicated close button that is always readable, with danger-red hover styling instead of a hidden/white default glyph.
@@ -44,7 +54,6 @@ On top of everything from 10.7.7 below.
 ## [10.7.4] — Agent Mesh Doctor, reversible tab undo & one-click Ollama — 2026-10-19
 
 **[`LuckyDBrowserSetup-10.7.4.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.7.4/LuckyDBrowserSetup-10.7.4.exe)** — Windows 10/11 x64 · per-user install · no admin needed.
-**[`LuckyDBrowser-Portable-10.7.4.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.7.4/LuckyDBrowser-Portable-10.7.4.zip)** — unzip and run, for locked-down PCs.
 
 - **Agent Mesh Doctor & tier badges** — `lucky-code mesh --doctor` inspects all 19 mesh agents, local/cloud providers, and Jules quota readiness (`--json` for scripts, `--recommend "<task>"` for auto-routing), with `[Free]` / `[Local]` / `[Paid]` / `[Cloud]` / `[Media]` badges in the terminal and UI.
 - **Reversible tab action undo** — undo pin/unpin, mute/unmute, group/ungroup, close, move, and duplicate actions via `Ctrl+Alt+Z` or `POST /tabs/undo` on the Control API.
@@ -54,7 +63,6 @@ On top of everything from 10.7.7 below.
 ## [10.7.3] — Lazy session restore, smoother terminal, stable tabs — 2026-10-17
 
 **[`LuckyDBrowserSetup-10.7.3.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.7.3/LuckyDBrowserSetup-10.7.3.exe)** — Windows 10/11 x64 · per-user install · no admin needed.
-**[`LuckyDBrowser-Portable-10.7.3.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.7.3/LuckyDBrowser-Portable-10.7.3.zip)** — unzip and run, for locked-down PCs.
 
 - **Lazy session restore** — restoring a saved session loads only the active tab's page; background tabs stay deferred without spawning Chromium renderers until clicked, while preserving URLs, titles, pin states, and tab groups across restarts.
 - **Faster storage & settings** — SQLite history/bookmarks now run in WAL mode (`synchronous=NORMAL`, 5s busy timeout), and session/settings writes coalesce unchanged snapshots to eliminate redundant disk I/O.
@@ -64,7 +72,6 @@ On top of everything from 10.7.7 below.
 ## [10.6.1] — Google bot-detection auto-fallback — 2026-09-24
 
 **[`LuckyDBrowserSetup-10.6.1.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.6.1/LuckyDBrowserSetup-10.6.1.exe)** — Windows 10/11 x64 · per-user install · no admin needed.
-**[`LuckyDBrowser-Portable-10.6.1.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.6.1/LuckyDBrowser-Portable-10.6.1.zip)** — unzip and run, for locked-down PCs.
 
 When Google serves its "unusual traffic" sorry page on a search, the tab now
 re-runs the same query on your configured non-Google engine — or
@@ -76,7 +83,6 @@ Nothing else changed since 10.6.0.
 ## [10.6.0] — Latest AI tools — 2026-09-24
 
 **[`LuckyDBrowserSetup-10.6.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.6.0/LuckyDBrowserSetup-10.6.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed.
-**[`LuckyDBrowser-Portable-10.6.0.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.6.0/LuckyDBrowser-Portable-10.6.0.zip)** — unzip and run, for locked-down PCs.
 
 - **xAI (Grok 4.7)** — keyed provider (`XAI_API_KEY`), OpenAI-compatible
   endpoint, xAI's current flagship for coding and long agentic runs.
@@ -102,7 +108,6 @@ On top of everything from 10.5.0 below.
 ## [10.5.0] — Provider/model switching polish — 2026-09-24
 
 **[`LuckyDBrowserSetup-10.5.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.5.0/LuckyDBrowserSetup-10.5.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed.
-**[`LuckyDBrowser-Portable-10.5.0.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.5.0/LuckyDBrowser-Portable-10.5.0.zip)** — unzip and run, for locked-down PCs.
 
 - **Provider/model switching polish** — HQ Models view shows per-provider health
   badges (Ready / Needs key / Exhausted) with rotation order, a one-click
@@ -117,7 +122,6 @@ On top of everything from 10.4.0 below.
 ## [10.4.0] — Provider-credit honesty — 2026-09-24
 
 **[`LuckyDBrowserSetup-10.4.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.4.0/LuckyDBrowserSetup-10.4.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed.
-**[`LuckyDBrowser-Portable-10.4.0.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.4.0/LuckyDBrowser-Portable-10.4.0.zip)** — unzip and run, for locked-down PCs.
 
 - **Cline credit honesty** — a Cline HTTP 402 (insufficient credits) records `~/.luckyd/cline_credit_state.json` (24-hour TTL). While valid, provider auto-selection skips Cline and the provider list shows an exhausted indicator; `lucky-code providers --clear-credit-state` clears the marker after topping up. No balance API — the 402 is the only trigger.
 - **Version unification** — everything reports 10.4.0.
@@ -127,7 +131,6 @@ On top of everything from 10.2.3 below.
 ## [10.2.3] — Smarter-agent edition + 402 failover — 2026-09-23
 
 **[`LuckyDBrowserSetup-10.2.3.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.2.3/LuckyDBrowserSetup-10.2.3.exe)** — Windows 10/11 x64 · per-user install · no admin needed.
-**[`LuckyDBrowser-Portable-10.2.3.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.2.3/LuckyDBrowser-Portable-10.2.3.zip)** — unzip and run, for locked-down PCs.
 
 - **Smarter agent** — live goals in the prompt, enforced plan mode, MCP in one-shot mode, opt-in `--verify`, token-aware compaction, task tool pruning, `FindRelevantFiles` retrieval.
 - **402 failover** — exhausted Cline Credits balance escapes to ClinePass, then local Ollama, instead of dead-ending.
@@ -138,7 +141,6 @@ On top of everything from 10.2.1 below.
 ## [10.2.1] — Dashboard cleanup + HQ auto-rotation — 2026-09-23
 
 **[`LuckyDBrowserSetup-10.2.1.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.2.1/LuckyDBrowserSetup-10.2.1.exe)** — Windows 10/11 x64 · per-user install · no admin needed.
-**[`LuckyDBrowser-Portable-10.2.1.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.2.1/LuckyDBrowser-Portable-10.2.1.zip)** — unzip and run, for locked-down PCs.
 
 - **Cleaner home dashboard** — the four AI preset chips are gone.
 - **Ask Lucky reliability** — real error messages, no double-fires, picks up new keys without a restart.
@@ -149,7 +151,6 @@ On top of everything from 10.2.0 below.
 ## [10.2.0] — Performance + hardening edition — 2026-09-23
 
 **[`LuckyDBrowserSetup-10.2.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.2.0/LuckyDBrowserSetup-10.2.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed.
-**[`LuckyDBrowser-Portable-10.2.0.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.2.0/LuckyDBrowser-Portable-10.2.0.zip)** — unzip and run, for locked-down PCs.
 
 - **Faster agent loop** — grep, file read/edit, CSV, LSP rename, secrets, file watching, and memory compression off the event loop; batched memory-decay SQL.
 - **Safer + Windows-correct `ProcessTool`** — command-injection hardening plus `shell=True` behind the blocklist gate for builtins, pipes, and redirects.
@@ -161,7 +162,6 @@ On top of everything from 10.1.0 below.
 ## [10.1.0] — Google AI Pro edition — 2026-09-21
 
 **[`LuckyDBrowserSetup-10.1.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.1.0/LuckyDBrowserSetup-10.1.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed.
-**[`LuckyDBrowser-Portable-10.1.0.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.1.0/LuckyDBrowser-Portable-10.1.0.zip)** — unzip and run, for locked-down PCs.
 
 - **OpenCode restored** — `mesh-opencode` is back in the Agent Mesh, keyed via `OPENCODE_API_KEY`, alongside MiniMax and Cline. (Old free tier is gone; keyed only.)
 - **Gemini refreshed** — 2.5 Pro/Flash defaults, 3 previews in the model list.
@@ -172,7 +172,6 @@ On top of everything from 10.1.0 below.
 ## [9.9.0] — Anti-block hardening + portable ZIP — 2026-09-21
 
 **[`LuckyDBrowserSetup-9.9.0.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.9.0/LuckyDBrowserSetup-9.9.0.exe)** — Windows 10/11 x64 · per-user install · no admin needed.
-**[`LuckyDBrowser-Portable-9.9.0.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v9.9.0/LuckyDBrowser-Portable-9.9.0.zip)** — unzip and run, for locked-down PCs.
 
 - **Anti-block hardening** — no `-ExecutionPolicy Bypass` anywhere in the installer; the Ollama bootstrap no longer auto-runs post-install (manual opt-in only).
 - **Portable ZIP** on every release — no installer heuristics fire at all.
