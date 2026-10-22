@@ -6,6 +6,7 @@ import html
 import time
 from pathlib import Path
 
+from browser_core.dashboard import ANIMATION_CHOICES
 from browser_core.settings import SEARCH_ENGINES
 from browser_ui.theme import THEMES
 from PySide6.QtCore import Qt, QUrl
@@ -370,6 +371,21 @@ class SettingsDialog(QDialog):
         )
         aform.addRow("Browser name", self.display_name)
 
+        self.home_anim = QComboBox(self)
+        for _anim_key, _anim_label in ANIMATION_CHOICES:
+            self.home_anim.addItem(_anim_label, _anim_key)
+        _anim_keys = [k for k, _ in ANIMATION_CHOICES]
+        _current_anim = settings.get("homepage_animation", "aurora")
+        self.home_anim.setCurrentIndex(
+            _anim_keys.index(_current_anim) if _current_anim in _anim_keys else 0
+        )
+        self.home_anim.setToolTip(
+            "Ambient homepage animation that reacts to the mouse.\n"
+            "Off removes it completely. Honors reduced-motion settings\n"
+            "and pauses while the window is hidden."
+        )
+        aform.addRow("Homepage animation", self.home_anim)
+
         self.theme_box = QComboBox(self)
         self.theme_box.addItems([THEMES[k]["label"] for k in THEMES])
         current_theme = settings.get("theme", "neon")
@@ -400,6 +416,28 @@ class SettingsDialog(QDialog):
         aform.addRow(self.zoom_memory)
 
         tabs.addTab(_scrollable(appearance), "Appearance")
+
+        # ── Connections (LuckyD Chat: Hub + Claw on Dylan's PC) ────
+        connections = QWidget(tabs)
+        cform = QFormLayout(connections)
+
+        self.hub_url = QLineEdit(settings.get("hub_url", ""))
+        self.hub_url.setPlaceholderText("http://100.96.167.54:18790")
+        cform.addRow("Hub address", self.hub_url)
+        self.hub_token = QLineEdit(settings.get("hub_token", ""))
+        self.hub_token.setEchoMode(QLineEdit.EchoMode.Password)
+        self.hub_token.setPlaceholderText("Hub token")
+        cform.addRow("Hub token", self.hub_token)
+
+        self.claw_url = QLineEdit(settings.get("claw_url", ""))
+        self.claw_url.setPlaceholderText("http://100.96.167.54:18791")
+        cform.addRow("Claw address", self.claw_url)
+        self.claw_token = QLineEdit(settings.get("claw_token", ""))
+        self.claw_token.setEchoMode(QLineEdit.EchoMode.Password)
+        self.claw_token.setPlaceholderText("Claw token")
+        cform.addRow("Claw token", self.claw_token)
+
+        tabs.addTab(_scrollable(connections), "Connections")
 
         # ── Updates ───────────────────────────────────────────────
         updates = QWidget(tabs)
@@ -463,6 +501,11 @@ class SettingsDialog(QDialog):
         self._settings.set("zoom_remember", self.zoom_memory.isChecked())
         self._settings.set("update_auto_check", self.auto_update.isChecked())
         self._settings.set("browser_display_name", self.display_name.text().strip())
+        self._settings.set("homepage_animation", self.home_anim.currentData() or "off")
+        self._settings.set("hub_url", self.hub_url.text().strip())
+        self._settings.set("hub_token", self.hub_token.text().strip())
+        self._settings.set("claw_url", self.claw_url.text().strip())
+        self._settings.set("claw_token", self.claw_token.text().strip())
         # Theme: find the key for the selected label
         selected_label = self.theme_box.currentText()
         for k, v in THEMES.items():

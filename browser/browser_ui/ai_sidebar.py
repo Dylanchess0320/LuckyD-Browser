@@ -132,6 +132,14 @@ def _bubble(role: str, content_html: str) -> str:
     )
 
 
+# Harness result prefixes that mean "the coding-agent backend never
+# accepted the task" (see _HarnessWorker._flow) — safe to re-run the task
+# on the built-in tab agent; anything else means the task may have run.
+_HARNESS_DEAD_ENDS = (
+    "Coding-agent server isn't responding",
+    "Coding-agent backend not found",
+)
+
 # Appended to harness-mode tasks when the Browser Control API is live, so the
 # exe's agent (Bash + WebFetch tools) can drive the REAL open tabs - the
 # "exe brain, browser hands" loop. Keep it copy-paste runnable on Windows.
@@ -319,11 +327,11 @@ class AiSidebar(QDockWidget):
             warn.linkActivated.connect(lambda href: self._open_link(QUrl(href)))
             layout.addWidget(warn)
 
-        # Every assistant action lives behind ONE dropdown (2026-10-22:
-        # the two button rows and all checkboxes were removed — the full
-        # coding agent is simply how agent tasks run now, page context and
-        # vision steps are always on, and the Research button is gone with
-        # the retired Deep Researcher).
+        # Assistant actions (2026-10-22, Dylan): NO dropdown-arrow
+        # clutter. "Actions" is a plain button opening the quick-actions
+        # menu; agent runs start from the Ask/Agent mode toggle beside the
+        # input (not a menu item); Stop and Undo are plain contextual
+        # buttons that appear only when they apply.
         self._agent_running = False
         actions_menu = QMenu(body)
         for label, tip, slot in (
@@ -341,31 +349,23 @@ class AiSidebar(QDockWidget):
             act.setToolTip(tip)
             act.triggered.connect(slot)
         actions_menu.addSeparator()
-        self._act_run_agent = actions_menu.addAction("▶ Run as agent task")
-        self._act_run_agent.setToolTip(
-            "Run the text in the input below as an autonomous task — "
-            "the full coding agent drives your open tabs and reports back"
-        )
-        self._act_run_agent.triggered.connect(self._start_agent)
-        self._act_stop_agent = actions_menu.addAction("⏹ Stop agent")
-        self._act_stop_agent.setToolTip("Stop the running task")
-        self._act_stop_agent.triggered.connect(self._stop_agent)
-        self._act_undo_agent = actions_menu.addAction("↩ Undo agent step")
-        self._act_undo_agent.setToolTip(
-            "Undo the last reversible browser action taken by the agent"
-        )
-        self._act_undo_agent.triggered.connect(self._undo_agent_step)
-        actions_menu.addSeparator()
         clear_act = actions_menu.addAction("Clear conversation")
         clear_act.setToolTip("Clear this conversation")
         clear_act.triggered.connect(self._clear_chat)
-        self.actions_btn = QToolButton(body)
-        self.actions_btn.setText("Actions ▾")
+        self._actions_menu = actions_menu
+        self.actions_btn = QPushButton("Actions", body)
         self.actions_btn.setToolTip("Assistant actions")
-        self.actions_btn.setMenu(actions_menu)
-        self.actions_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.actions_btn.clicked.connect(self._show_actions_menu)
+        self.stop_btn = QPushButton("⏹ Stop", body)
+        self.stop_btn.setToolTip("Stop the running agent task")
+        self.stop_btn.clicked.connect(self._stop_agent)
+        self.undo_btn = QPushButton("↩ Undo", body)
+        self.undo_btn.setToolTip("Undo the last reversible browser action taken by the agent")
+        self.undo_btn.clicked.connect(self._undo_agent_step)
         actions_row = QHBoxLayout()
         actions_row.addWidget(self.actions_btn)
+        actions_row.addWidget(self.stop_btn)
+        actions_row.addWidget(self.undo_btn)
         actions_row.addStretch(1)
         layout.addLayout(actions_row)
         self._sync_agent_actions()
@@ -389,28 +389,41 @@ class AiSidebar(QDockWidget):
         self._set_skill_chips_visible(False)
         layout.addLayout(self._skill_row)
 
-        # ONE input bar (2026-10-22): questions go to chat (page context
-        # always included); autonomous runs start from the same text via
-        # Actions ▾ → "Run as agent task". Vision steps are always on for
+        # ONE input bar with an Ask/Agent mode toggle (2026-10-22,
+        # Dylan): Enter submits in whichever mode is active — Ask sends a
+        # chat question (page context always included); Agent runs the
+        # text as an autonomous task. Vision steps are always on for
         # vision-capable models — no checkboxes anywhere in this panel.
+        # Status/attribution render INSIDE the transcript (see
+        # _set_status/_chat_done) — nothing renders below the input bar.
+        self._mode = "ask"
+        self._status_block: dict | None = None
         row = QHBoxLayout()
+        self.ask_btn = QToolButton(body)
+        self.ask_btn.setText("Ask")
+        self.ask_btn.setCheckable(True)
+        self.ask_btn.setToolTip("Ask mode — Enter asks a question about this page or anything")
+        self.ask_btn.clicked.connect(lambda: self._set_mode("ask"))
+        self.agent_btn = QToolButton(body)
+        self.agent_btn.setText("Agent")
+        self.agent_btn.setCheckable(True)
+        self.agent_btn.setToolTip(
+            "Agent mode — Enter runs the text as an autonomous task: the "
+            "agent drives your open tabs and reports its findings back here"
+        )
+        self.agent_btn.clicked.connect(lambda: self._set_mode("agent"))
+        row.addWidget(self.ask_btn)
+        row.addWidget(self.agent_btn)
         self.input = QLineEdit(body)
         self.input.textChanged.connect(self._update_skill_chips)
-        self.input.setPlaceholderText("Ask about this page or anything…")
-        self.input.setToolTip(
-            "Enter to ask (the current page is always included as context). "
-            "For an autonomous task, use Actions ▾ → Run as agent task."
-        )
+        self.input.returnPressed.connect(self._submit)
         self.send_btn = QPushButton("Send", body)
-        self.send_btn.setToolTip("Send to AI (Enter)")
-        self.send_btn.clicked.connect(self._send)
+        self.send_btn.setToolTip("Send (Enter)")
+        self.send_btn.clicked.connect(self._submit)
         row.addWidget(self.input, 1)
         row.addWidget(self.send_btn)
         layout.addLayout(row)
-
-        self.status = QLabel("", body)
-        self.status.setStyleSheet(f"color: {_tok('muted')}; font-size: 12px;")
-        layout.addWidget(self.status)
+        self._sync_mode()
 
         self.setWidget(body)
         self._restore_provider()
@@ -420,11 +433,75 @@ class AiSidebar(QDockWidget):
         """Adopt the active theme's tokens and re-render the chat with them."""
         global _P
         _P = dict(_brand_tokens(getattr(self._mw, "settings", None)))
-        muted = _tok("muted")
-        if hasattr(self, "status"):
-            self.status.setStyleSheet(f"color: {muted}; font-size: 12px;")
+        if hasattr(self, "ask_btn"):
+            self._sync_mode()
         if hasattr(self, "_blocks") and self._blocks:
             self._render()
+
+    # ── mode toggle + submit ─────────────────────────────────────────
+
+    def _set_mode(self, mode: str) -> None:
+        """Switch the input between Ask and Agent mode (session-scoped)."""
+        self._mode = "agent" if mode == "agent" else "ask"
+        self._sync_mode()
+
+    def _sync_mode(self) -> None:
+        """Render the toggle's selected state + the input's mode hints."""
+        agent = getattr(self, "_mode", "ask") == "agent"
+        for btn, active in ((self.ask_btn, not agent), (self.agent_btn, agent)):
+            btn.setChecked(active)
+            btn.setStyleSheet(
+                f"background:{_tok('accent')};color:#ffffff;font-weight:700;" if active else ""
+            )
+        if agent:
+            self.input.setPlaceholderText("Describe a task for the agent…")
+            self.input.setToolTip(
+                "Agent mode: Enter runs this as an autonomous task — the "
+                "agent drives your open tabs and reports its findings here."
+            )
+        else:
+            self.input.setPlaceholderText("Ask about this page or anything…")
+            self.input.setToolTip(
+                "Ask mode: Enter to ask (the current page is always included "
+                "as context). Switch to Agent for an autonomous task."
+            )
+
+    def _submit(self) -> None:
+        """Enter / Send: dispatch to chat or the agent by the active mode."""
+        if getattr(self, "_mode", "ask") == "agent":
+            self._start_agent()
+        else:
+            self._send()
+
+    def _show_actions_menu(self) -> None:
+        """Open the quick-actions menu from the plain Actions button."""
+        self._actions_menu.exec(self.actions_btn.mapToGlobal(self.actions_btn.rect().bottomLeft()))
+
+    # ── transcript status (Bug: status used to hide below the input) ──
+
+    def _set_status(self, text: str) -> None:
+        """Show a transient status line INSIDE the transcript.
+
+        One mutable status block lives in the conversation flow (attached
+        to the current turn); updates rewrite it in place."""
+        if self._status_block is not None and self._status_block in self._blocks:
+            self._status_block["text"] = text
+        else:
+            self._status_block = {"role": "status", "text": text}
+            self._blocks.append(self._status_block)
+        self._render()
+
+    def _clear_status(self) -> None:
+        if self._status_block is not None and self._status_block in self._blocks:
+            self._blocks.remove(self._status_block)
+        self._status_block = None
+        self._render()
+
+    def _last_assistant_block(self) -> dict | None:
+        for block in reversed(self._blocks):
+            if block.get("role") == "assistant":
+                return block
+        return None
 
     def _setup_hint_html(self) -> str:
         """Actionable next step when no AI backend is configured.
@@ -503,6 +580,7 @@ class AiSidebar(QDockWidget):
         # blank output area. (The no-provider setup hint above the chat is a
         # separate widget and stays: it's a genuine setup blocker.)
         self._blocks = []
+        self._status_block = None
         self._render()
 
     def _render_block(self, block: dict) -> str:
@@ -510,10 +588,24 @@ class AiSidebar(QDockWidget):
         text = block.get("text", "")
         if role == "raw":
             return text
+        if role == "status":
+            # Transient in-transcript status line ("Thinking…", progress).
+            return (
+                f"<div style='color:{_tok('muted')};font-size:11px;"
+                f"margin:2px 0 2px 2px'><i>{html.escape(text)}</i></div>"
+            )
         if role == "user":
             return _bubble("user", html.escape(text))
         if role == "assistant":
-            return _bubble("assistant", _md_lite(text))
+            content = _md_lite(text)
+            meta = str(block.get("meta") or "")
+            if meta:
+                # Provider attribution rides ON the message, in the flow.
+                content += (
+                    f"<div style='color:{_tok('muted')};font-size:11px;"
+                    f"margin-top:3px'>{html.escape(meta)}</div>"
+                )
+            return _bubble("assistant", content)
         if role == "error":
             return _bubble("error", html.escape(text))
         return html.escape(text)
@@ -553,10 +645,13 @@ class AiSidebar(QDockWidget):
 
     def _on_token(self, token: str) -> None:
         self._stream_count += 1
-        if self._blocks and self._blocks[-1].get("role") == "assistant":
-            self._blocks[-1]["text"] += token
-        else:
-            self._blocks.append({"role": "assistant", "text": token})
+        # Tokens belong to the in-flight assistant block — which may no
+        # longer be the last block once a status line sits under it.
+        block = self._last_assistant_block()
+        if block is None:
+            block = {"role": "assistant", "text": ""}
+            self._blocks.append(block)
+        block["text"] += token
         self._schedule_render()
 
     def _open_link(self, url) -> None:
@@ -572,14 +667,14 @@ class AiSidebar(QDockWidget):
         """Trigger a background `ollama pull` from the setup hint."""
         res = self.bridge.start_ollama_pull(model)
         if res.get("started"):
-            self.status.setText(f"Pulling {model} via Ollama (PID {res.get('pid')})…")
+            self._set_status(f"Pulling {model} via Ollama (PID {res.get('pid')})…")
             self._append(
                 f"<i style='color:{_tok('accent')}'>Started <code>{html.escape(res.get('command', ''))}</code> "
                 "in the background. Re-select Ollama once the download completes.</i>"
             )
         else:
             err = html.escape(str(res.get("error", "could not start ollama pull")))
-            self.status.setText(f"Ollama pull failed: {err}")
+            self._set_status(f"Ollama pull failed: {err}")
 
     def _vision_capable(self) -> bool:
         """Vision steps are always on when the selected model accepts
@@ -588,16 +683,13 @@ class AiSidebar(QDockWidget):
         return bool(provider) and self.bridge.supports_vision(provider)
 
     def _sync_agent_actions(self) -> None:
-        """Enable/disable the agent entries in the Actions dropdown."""
+        """Show the contextual agent buttons only when they apply:
+        Stop while a run is live, Undo once the agent has acted."""
         running = bool(getattr(self, "_agent_running", False))
-        for attr, enabled in (
-            ("_act_run_agent", not running),
-            ("_act_stop_agent", running),
-            ("_act_undo_agent", len(self._undo_stack) > 0),
-        ):
-            act = getattr(self, attr, None)
-            if act is not None:
-                act.setEnabled(enabled)
+        if hasattr(self, "stop_btn"):
+            self.stop_btn.setVisible(running)
+        if hasattr(self, "undo_btn"):
+            self.undo_btn.setVisible(not running and len(self._undo_stack) > 0)
 
     # ── chat ─────────────────────────────────────────────────────────
 
@@ -631,7 +723,7 @@ class AiSidebar(QDockWidget):
             self.model_box.addItem("No models found", None)
             self.model_box.blockSignals(False)
             self.model_box.setEnabled(False)
-            self.status.setText(
+            self._set_status(
                 f"No models on {self._provider_label(provider)} — "
                 "install one, then reselect the provider"
             )
@@ -709,7 +801,7 @@ class AiSidebar(QDockWidget):
             saved = {}
         saved[provider] = model
         self._mw.settings.set("ai_model_overrides", saved)
-        self.status.setText(f"{self._provider_label(provider)} model → {model}")
+        self._set_status(f"{self._provider_label(provider)} model → {model}")
 
     def _send(self) -> None:
         text = self.input.text().strip()
@@ -749,7 +841,7 @@ class AiSidebar(QDockWidget):
             )
         messages.extend(self._history[-8:])
         self._begin_assistant()
-        self.status.setText("Thinking…")
+        self._set_status("Thinking…")
         self._chat_worker = _ChatWorker(self.bridge, messages, self._selected_provider(), self)
         self._chat_worker.token.connect(self._on_token)
         self._chat_worker.finished.connect(self._chat_done)
@@ -759,11 +851,19 @@ class AiSidebar(QDockWidget):
     def _chat_done(self, text: str, provider: str) -> None:
         if self._stream_count == 0 and text:
             self._on_token(text)
-        if self._blocks and self._blocks[-1].get("role") == "assistant":
-            self._blocks[-1]["text"] = text or self._blocks[-1]["text"]
+        block = self._last_assistant_block()
+        if block is not None:
+            block["text"] = text or block["text"]
+            # Attribution rides on the completed message itself — the
+            # real provider (and model, when known) that answered.
+            label = self._provider_label(provider)
+            model = ""
+            with contextlib.suppress(Exception):
+                model = str(self.bridge.model_for(provider) or "")
+            block["meta"] = f"Answered by {label}" + (f" · {model}" if model else "")
+        self._clear_status()
         self._render()  # final, unthrottled render
         self._history.append({"role": "assistant", "content": text})
-        self.status.setText(f"Answered by {self._provider_label(provider)}")
         self._chat_worker = None
 
     def _friendly_chat_error(self, error: str) -> str:
@@ -814,15 +914,12 @@ class AiSidebar(QDockWidget):
 
     def _chat_failed(self, error: str) -> None:
         # Drop the empty assistant placeholder left by _begin_assistant.
-        if (
-            self._blocks
-            and self._blocks[-1].get("role") == "assistant"
-            and not self._blocks[-1].get("text")
-        ):
-            self._blocks.pop()
+        block = self._last_assistant_block()
+        if block is not None and not block.get("text"):
+            self._blocks.remove(block)
+        self._clear_status()
         self._blocks.append({"role": "error", "text": self._friendly_chat_error(error)})
         self._render()
-        self.status.setText("Request failed")
         self._chat_worker = None
 
     # ── contextual skill chips ─────────────────────────────────────────
@@ -856,7 +953,7 @@ class AiSidebar(QDockWidget):
     def _use_skill(self, skill: Skill) -> None:
         """Chip click → normal chat flow with the skill's context attached."""
         if self._chat_worker is not None:
-            self.status.setText("Busy — wait for the current response")
+            self._set_status("Busy — wait for the current response")
             return
         if not self.input.text().strip():
             return
@@ -869,7 +966,7 @@ class AiSidebar(QDockWidget):
     def _quick(self, prompt: str) -> None:
         """Send a preset prompt about the current page."""
         if self._chat_worker is not None:
-            self.status.setText("Busy — wait for the current response")
+            self._set_status("Busy — wait for the current response")
             return
         self._user(prompt)
         self._history.append({"role": "user", "content": prompt})
@@ -886,7 +983,7 @@ class AiSidebar(QDockWidget):
     def _clear_chat(self) -> None:
         self._history = []
         self._pending_skill = None
-        self.status.setText("Conversation cleared")
+        self._set_status("Conversation cleared")
         self._greet()
 
     def _extract_data(self) -> None:
@@ -913,9 +1010,9 @@ class AiSidebar(QDockWidget):
             from PySide6.QtGui import QGuiApplication
 
             QGuiApplication.clipboard().setText(content)
-            self.status.setText("Chat copied to clipboard")
+            self._set_status("Chat copied to clipboard")
         else:
-            self.status.setText("Nothing to copy yet")
+            self._set_status("Nothing to copy yet")
 
     def ask(self, question: str) -> None:
         """Programmatic question (e.g. omnibox "?…" prefix) — into the chat."""
@@ -926,7 +1023,7 @@ class AiSidebar(QDockWidget):
     def ask_about(self, instruction: str, selected_text: str) -> None:
         """Context-menu entry: run an instruction over the selected text."""
         if self._chat_worker is not None:
-            self.status.setText("Busy — try again in a moment")
+            self._set_status("Busy — try again in a moment")
             return
         self.show()
         snippet = selected_text[:80] + ("…" if len(selected_text) > 80 else "")
@@ -942,7 +1039,7 @@ class AiSidebar(QDockWidget):
         ]
         messages.extend(self._history[-8:])
         self._begin_assistant()
-        self.status.setText("Thinking…")
+        self._set_status("Thinking…")
         self._chat_worker = _ChatWorker(self.bridge, messages, self._selected_provider(), self)
         self._chat_worker.token.connect(self._on_token)
         self._chat_worker.finished.connect(self._chat_done)
@@ -961,7 +1058,7 @@ class AiSidebar(QDockWidget):
             "Describe this page: what is it, what stands out, anything actionable?"
         )
         self.input.clear()
-        self.status.setText("Capturing screenshot…")
+        self._set_status("Capturing screenshot…")
         self._shot_worker = _ShotWorker(view.url().toString(), self)
         self._shot_worker.done.connect(self._shot_ready)
         self._shot_worker.failed.connect(self._shot_failed)
@@ -971,7 +1068,7 @@ class AiSidebar(QDockWidget):
         self._shot_worker = None
         prompt = self._shot_prompt
         self._user("📷 " + prompt)
-        self.status.setText("Asking vision model…")
+        self._set_status("Asking vision model…")
         content = [
             {"type": "text", "text": prompt},
             {
@@ -1012,20 +1109,44 @@ class AiSidebar(QDockWidget):
     def _start_agent(self) -> None:
         """Run the single input's text as an autonomous agent task.
 
-        The full coding agent (harness) is the default and only mode now —
-        the old checkbox is gone. If the harness worker cannot even be
-        constructed, fall back to the built-in tab agent so a task never
-        dead-ends."""
+        The full coding agent (harness) is tried first; the built-in tab
+        agent is the fallback so a task NEVER dead-ends: if the harness
+        worker can't be constructed, or the run ends in a backend
+        dead-end (server not running / backend missing — the task was
+        never accepted), the same task runs on the built-in agent, which
+        needs only the AI provider that already powers chat."""
         task = self.input.text().strip()
         if not task or self._agent_worker is not None or self._harness_worker is not None:
             return
         self.input.clear()
+        self._agent_task_text = task
+        self._agent_fell_back = False
         try:
             self._start_harness_agent(task)
             return
         except Exception:
             pass
         self._start_builtin_agent(task)
+
+    def _fallback_to_builtin(self, reason: str) -> bool:
+        """Take over a harness dead-end with the built-in tab agent.
+
+        Only fires once per user task, and only when the task never ran
+        on the backend — so nothing can execute twice."""
+        if getattr(self, "_agent_fell_back", False):
+            return False
+        task = getattr(self, "_agent_task_text", "")
+        if not task:
+            return False
+        self._agent_fell_back = True
+        self._harness_worker = None
+        self._append(
+            f"<i style='color:{_tok('muted')}'>The coding-agent backend "
+            f"is unavailable ({html.escape(reason)}) — running the "
+            "built-in tab agent instead.</i>"
+        )
+        self._start_builtin_agent(task)
+        return True
 
     def _start_builtin_agent(self, task: str) -> None:
         view = self._mw.tabs.current_view()
@@ -1052,7 +1173,7 @@ class AiSidebar(QDockWidget):
         self._agent_worker.finished.connect(self._agent_done)
         self._agent_running = True
         self._sync_agent_actions()
-        self.status.setText("Agent running…")
+        self._set_status("Agent running…")
         self._agent_worker.start()
 
     def _on_agent_step(self, message: str) -> None:
@@ -1062,17 +1183,17 @@ class AiSidebar(QDockWidget):
     def _stop_agent(self) -> None:
         if self._harness_worker is not None:
             self._harness_worker.stop()
-            self.status.setText("Stopping…")
+            self._set_status("Stopping…")
             return
         if self._agent_session is not None:
             self._agent_session.stop()
-            self.status.setText("Stopping…")
+            self._set_status("Stopping…")
 
     def _agent_done(self, result: str) -> None:
         self._append(f"<b style='color:{_tok('accent')}'>Done:</b> {html.escape(result)}")
         self._agent_running = False
         self._sync_agent_actions()
-        self.status.setText("Agent idle")
+        self._clear_status()
         self._agent_worker = None
         self._agent_session = None
 
@@ -1081,7 +1202,7 @@ class AiSidebar(QDockWidget):
         entry = self._undo_stack.pop()
         if entry is None:
             self._sync_agent_actions()
-            self.status.setText("Nothing to undo")
+            self._set_status("Nothing to undo")
             return
         js = ActionUndoStack.undo_js_for(entry)
         view = self._mw.tabs.current_view()
@@ -1092,7 +1213,7 @@ class AiSidebar(QDockWidget):
             f"<span style='color:{_tok('accent2')}'>↩ Undid: {html.escape(summary)}</span>"
         )
         self._sync_agent_actions()
-        self.status.setText(f"Undid {summary}")
+        self._set_status(f"Undid {summary}")
 
     # ── harness-mode agent ──────────────────────────────────────────────
 
@@ -1139,7 +1260,7 @@ class AiSidebar(QDockWidget):
             self,
             supervisor=getattr(self._mw._app, "harness", None),
         )
-        worker.progress.connect(lambda m: self.status.setText(m))
+        worker.progress.connect(self._set_status)
         worker.note.connect(
             lambda m: self._append(f"<span style='color:{_tok('muted')}'>{html.escape(m)}</span>")
         )
@@ -1148,10 +1269,17 @@ class AiSidebar(QDockWidget):
         self._harness_worker = worker
         self._agent_running = True
         self._sync_agent_actions()
-        self.status.setText("Task started…")
+        self._set_status("Task started…")
         worker.start()
 
     def _harness_done(self, result: str) -> None:
+        # Backend dead-ends arrive as ordinary results ("server isn't
+        # responding", "backend not found") — the task never ran, so hand
+        # it to the built-in agent instead of reporting a dead end.
+        if any(str(result or "").startswith(p) for p in _HARNESS_DEAD_ENDS) and (
+            self._fallback_to_builtin("not running")
+        ):
+            return
         if not str(result or "").strip():
             # A silent ending reads as a hang — say plainly that the run
             # finished without reporting findings (Dylan 2026-10-22).
@@ -1173,14 +1301,18 @@ class AiSidebar(QDockWidget):
             )
         self._agent_running = False
         self._sync_agent_actions()
-        self.status.setText("Agent idle")
+        self._clear_status()
         self._harness_worker = None
 
     def _harness_failed(self, message: str) -> None:
+        # A worker-level failure means the task never reached the backend
+        # (connect/start/orchestrate raised) — fall back like a dead-end.
+        if self._fallback_to_builtin(message):
+            return
         self._append(f"<i>That run failed — {html.escape(message)}</i>")
         self._agent_running = False
         self._sync_agent_actions()
-        self.status.setText("Agent run failed")
+        self._clear_status()
         self._harness_worker = None
 
 

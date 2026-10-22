@@ -236,7 +236,7 @@ def test_cli_doctor_json_and_text(capsys) -> None:
 
     main._cli_doctor([])
     text_out = capsys.readouterr().out
-    assert "LuckyD Code & Agent Mesh Doctor" in text_out
+    assert "LuckyD Code & Multi Agent Terminal Doctor" in text_out
     assert "credit-billed" in text_out
 
 

@@ -130,7 +130,7 @@ def _mesh_dock_html() -> str:
             f'<span class="ce">{emoji}</span>{label}</button>'
         )
     return (
-        '<div id="meshdock"><div id="meshhead"><span class="mh-t">◈ AGENT MESH</span>'
+        '<div id="meshdock"><div id="meshhead"><span class="mh-t">◈ MULTI AGENT TERMINAL</span>'
         '<span class="mh-s">pick an agent — each gets its own live PTY session · '
         "tiers: free · keyed · credit-billed</span></div>"
         '<div id="meshchips">' + "".join(chips) + "</div></div>"
@@ -226,6 +226,13 @@ _TERM_CSS = r"""  html,body{margin:0;height:100%;background:var(--ld-window);ove
   #hint{margin-left:auto;color:var(--ld-faint);font-weight:500;font-size:11px}
   #wrap{position:absolute;top:37px;left:0;right:0;bottom:0;padding:6px 4px}
   body.has-mesh #wrap{top:calc(37px + var(--dockh,110px))}
+  /* Embed mode (Multi Agent Terminal panes): the pane supplies its own
+     header, so the terminal's bar + agent dock hide and the xterm gets
+     the full pane — four readable terminals instead of four chrome
+     stacks (Dylan 2026-10-22). */
+  body.embed #bar{display:none}
+  body.embed #meshdock{display:none}
+  body.embed #wrap{top:0;padding:2px}
   #term{height:100%}
   #menu{position:fixed;z-index:99;min-width:200px;background:var(--ld-panel);
         border:1px solid var(--ld-border);border-radius:var(--ld-r-sm);padding:4px;display:none;
@@ -267,6 +274,8 @@ __MESH_DOCK__
 <script>
 const WS_URL = "__WS_URL__";
 let SHELL = "__SHELL__";
+const EMBED = new URLSearchParams(location.search).get('embed') === '1';
+if (EMBED) document.body.classList.add('embed');
 const S_CORE = {agent:'Agent 1 (__AGENT_VERSION__)', agent2:'Agent 2 (__AGENT_VERSION__)', powershell:'PowerShell', cmd:'CMD', cline:'Cline'};
 const MESH_META = __MESH_META__;
 const SHELL_LABELS = Object.assign({}, S_CORE, MESH_META);
@@ -310,7 +319,7 @@ if (dock) {
 }
 paintShell();
 const term = new Terminal({
-  cursorBlink: true, convertEol: false, fontSize: 14,
+  cursorBlink: true, convertEol: false, fontSize: EMBED ? 13 : 14,
   fontFamily: 'Cascadia Mono, Consolas, "Courier New", monospace',
   scrollback: 5000, allowProposedApi: true,
   theme: { background:'#0b0f16', foreground:'#e2e8f0', cursor:'#00e5ff',
@@ -481,8 +490,17 @@ _MESH_CSS = """  :root{color-scheme:dark}
   .dot{width:8px;height:8px;border-radius:50%;background:var(--ld-ok);
     box-shadow:0 0 10px color-mix(in srgb,var(--ld-ok) 60%,transparent)}
   .role{color:var(--ld-muted);font-weight:500;font-size:11px}
-  .open{margin-left:auto;color:var(--ld-accent);text-decoration:none;font-weight:600;font-size:11px}
+  .open{margin-left:2px;color:var(--ld-accent);text-decoration:none;font-weight:600;font-size:11px}
   .open:hover{color:var(--ld-text);text-decoration:underline}
+  .expand{margin-left:auto;background:transparent;border:1px solid var(--ld-border);
+    color:var(--ld-muted);border-radius:6px;padding:2px 8px;cursor:pointer;
+    font-size:12px;line-height:1.4;flex:none;font-family:inherit}
+  .expand:hover{color:var(--ld-text);border-color:var(--ld-accent)}
+  /* Focus mode: the chosen pane takes the main area; the other three
+     stay live in a rail — nothing is hidden, any pane can take focus. */
+  main.focused{grid-template-columns:minmax(0,1fr) 210px;grid-template-rows:repeat(3,minmax(0,1fr))}
+  main.focused section.focused{grid-column:1;grid-row:1/4}
+  main.focused section:not(.focused){grid-column:2}
   iframe{border:0;display:block;flex:1;min-height:0;width:100%;background:var(--ld-window)}
   @media(max-width:760px){header{height:48px;padding:0 11px}.sub,.key{display:none}
     main{height:calc(100% - 48px);grid-template-columns:1fr;grid-template-rows:repeat(4,minmax(220px,1fr));
@@ -490,23 +508,27 @@ _MESH_CSS = """  :root{color-scheme:dark}
 """
 
 _MESH_HTML = (
-    page_head("Agent Mesh — LuckyD", _MESH_CSS)
+    page_head("Multi Agent Terminal — LuckyD", _MESH_CSS)
     + """<body>
-<header><h1><span>🕸</span> Agent Mesh</h1><span class="sub">Four independent sessions, one workspace</span>
+<header><h1><span>🖥</span> Multi Agent Terminal</h1><span class="sub">Four independent sessions, one workspace</span>
 <span class="key" id="mesh-status">Loading harness status…</span></header>
 <main>
   <section><div class="pane-head"><i class="dot"></i>Agent 1 <span class="role">primary coding agent</span>
+    <button class="expand" type="button" title="Expand this pane — Esc or double-click restores the grid">⤢</button>
     <a class="open" href="/terminal?shell=agent" target="_blank" rel="noopener">Open tab ↗</a></div>
-    <iframe src="/terminal?shell=agent" title="Agent 1 terminal"></iframe></section>
+    <iframe src="/terminal?shell=agent&embed=1" title="Agent 1 terminal"></iframe></section>
   <section><div class="pane-head"><i class="dot"></i>Agent 2 <span class="role">independent teammate</span>
+    <button class="expand" type="button" title="Expand this pane — Esc or double-click restores the grid">⤢</button>
     <a class="open" href="/terminal?shell=agent2" target="_blank" rel="noopener">Open tab ↗</a></div>
-    <iframe src="/terminal?shell=agent2" title="Agent 2 terminal"></iframe></section>
+    <iframe src="/terminal?shell=agent2&embed=1" title="Agent 2 terminal"></iframe></section>
   <section><div class="pane-head"><i class="dot"></i>PowerShell <span class="role">system shell</span>
+    <button class="expand" type="button" title="Expand this pane — Esc or double-click restores the grid">⤢</button>
     <a class="open" href="/terminal?shell=powershell" target="_blank" rel="noopener">Open tab ↗</a></div>
-    <iframe src="/terminal?shell=powershell" title="PowerShell terminal"></iframe></section>
+    <iframe src="/terminal?shell=powershell&embed=1" title="PowerShell terminal"></iframe></section>
   <section><div class="pane-head"><i class="dot"></i>CMD <span class="role">system shell</span>
+    <button class="expand" type="button" title="Expand this pane — Esc or double-click restores the grid">⤢</button>
     <a class="open" href="/terminal?shell=cmd" target="_blank" rel="noopener">Open tab ↗</a></div>
-    <iframe src="/terminal?shell=cmd" title="Command Prompt terminal"></iframe></section>
+    <iframe src="/terminal?shell=cmd&embed=1" title="Command Prompt terminal"></iframe></section>
 </main><script>
 async function refreshMeshStatus(){
   const status = document.getElementById('mesh-status');
@@ -520,5 +542,30 @@ async function refreshMeshStatus(){
   } catch (_) { status.textContent = '4 independent sessions'; }
 }
 refreshMeshStatus(); setInterval(refreshMeshStatus, 5000);
+// Pane focus: expand one pane into the main area while the other three
+// stay live in a rail. ⤢ button, double-click on the pane head, or Esc.
+const meshMain = document.querySelector('main');
+function clearFocus(){
+  meshMain.classList.remove('focused');
+  document.querySelectorAll('section.focused').forEach(s => s.classList.remove('focused'));
+  document.querySelectorAll('.expand').forEach(b => { b.textContent = '⤢'; });
+}
+function setFocus(section){
+  const was = section.classList.contains('focused');
+  clearFocus();
+  if (was) return;
+  meshMain.classList.add('focused');
+  section.classList.add('focused');
+  section.querySelector('.expand').textContent = '✕';
+  // The embedded terminals refit themselves on iframe resize.
+}
+document.querySelectorAll('section').forEach(sec => {
+  sec.querySelector('.expand').addEventListener('click', () => setFocus(sec));
+  sec.querySelector('.pane-head').addEventListener('dblclick', ev => {
+    if (ev.target.closest('a')) return;
+    setFocus(sec);
+  });
+});
+document.addEventListener('keydown', ev => { if (ev.key === 'Escape') clearFocus(); });
 </script></body></html>"""
 )

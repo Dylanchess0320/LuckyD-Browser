@@ -157,8 +157,8 @@ def test_settings_dialog_shrinks_and_scrolls() -> None:
     assert "self.setMinimumWidth(480)" not in dialogs
     assert "self.setMinimumSize(360, 300)" in dialogs
     assert "def _scrollable(page: QWidget) -> QScrollArea:" in dialogs
-    assert dialogs.count("tabs.addTab(_scrollable(") == 4
-    for tab in ("General", "Privacy", "Appearance", "Updates"):
+    assert dialogs.count("tabs.addTab(_scrollable(") == 5
+    for tab in ("General", "Privacy", "Appearance", "Updates", "Connections"):
         assert f'"{tab}"' in dialogs
 
 
@@ -177,8 +177,13 @@ def test_sidebar_has_one_input_no_checkboxes_no_status_dot() -> None:
         "🔬 Research",
     ):
         assert gone not in sb, gone
-    assert 'self.actions_btn.setText("Actions ▾")' in sb
-    assert '"▶ Run as agent task"' in sb
+    # Pass 3 (Dylan): no dropdown-arrow glyph; "Run as agent task" became
+    # the Ask ⇄ Agent toggle beside the input instead of a menu entry.
+    assert 'self.actions_btn = QPushButton("Actions", body)' in sb
+    assert "Actions ▾" not in sb
+    assert "Run as agent task" not in sb
+    assert "self.ask_btn" in sb and "self.agent_btn" in sb
+    assert "self.input.returnPressed.connect(self._submit)" in sb
     # Empty chat stays empty: the greeting seeds no blocks anymore.
     greet = sb[sb.index("def _greet") : sb.index("def _greet") + 700]
     assert "self._blocks = []" in greet

@@ -2200,7 +2200,7 @@ lucky-code custom-provider — user-defined OpenAI-compatible providers (9.8)
 
 
 def _cli_doctor(args: list[str]) -> None:
-    """lucky-code doctor [--json] — provider & Agent Mesh per-backend health check."""
+    """lucky-code doctor [--json] — provider & Multi Agent Terminal per-backend health check."""
     from pathlib import Path as _Path
 
     from core.providers import (
@@ -2236,7 +2236,7 @@ def _cli_doctor(args: list[str]) -> None:
         print(json.dumps(payload, indent=2))
         return
 
-    print("\nLuckyD Code & Agent Mesh Doctor")
+    print("\nLuckyD Code & Multi Agent Terminal Doctor")
     print("=" * 68)
     print(f"  Active Provider : {cfg.get('provider', '?')} ({cfg.get('model', '?')})")
     print(
@@ -2245,7 +2245,7 @@ def _cli_doctor(args: list[str]) -> None:
     print(
         f"  Local Ollama    : {'READY (models installed)' if ollama_ready else 'offline / no models'}"
     )
-    print("\nAgent Mesh Backends (free vs keyed vs credit-billed):")
+    print("\nMulti Agent Terminal Backends (free vs keyed vs credit-billed):")
     print(f"  {'Backend':<18} {'Tier':<14} {'Binary':<10} {'Auth/Env':<12} Status")
     print("  " + "-" * 64)
     for r in mesh_rows:
@@ -2306,7 +2306,7 @@ Usage:
   lucky-code                       Interactive REPL (Agent 1 · v10.8.0)
   lucky-code --agent 2             Interactive REPL (Agent 2 · v10.8.0)
   lucky-code providers           List AI providers — status, cost tier, current
-  lucky-code doctor [--json]     Check provider & Agent Mesh backend health + tiers
+  lucky-code doctor [--json]     Check provider & Multi Agent Terminal backend health + tiers
   lucky-code model <name>        Switch model (fuzzy Cline-style picker)
   lucky-code plugin list --available   List/install plugins
   lucky-code custom-provider list      List user-defined providers

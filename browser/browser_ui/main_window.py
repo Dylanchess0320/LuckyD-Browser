@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import contextlib
+import html as _html
 import json
 import sys
 import threading
@@ -30,7 +31,7 @@ from browser_core.updater import (  # noqa: F401
 #: timing), so every update path below just opens this page in a tab.
 RELEASES_PAGE_URL = "https://github.com/Dylanchess0320/LuckyD-Browser/releases"
 from browser_core.zoom import clamp_zoom, origin_key, remember, zoom_for
-from PySide6.QtCore import QSize, Qt, QTimer, QUrl, Signal
+from PySide6.QtCore import QEvent, QSize, Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QAction, QGuiApplication, QIcon, QImage, QKeySequence, QShortcut
 from PySide6.QtWebEngineCore import QWebEnginePage
 from PySide6.QtWebEngineWidgets import QWebEngineView
@@ -46,6 +47,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QProgressBar,
     QPushButton,
+    QStackedWidget,
     QToolBar,
     QToolButton,
     QVBoxLayout,
@@ -231,6 +233,32 @@ class MainWindow(QMainWindow):
 
     # ── UI builders ──────────────────────────────────────────────────
 
+    def _build_tab_strip(self, parent: QWidget) -> QWidget:
+        """The tab-strip row: [tab bar][+ button][flexible space].
+
+        The bar is added WITHOUT stretch and the flexible space goes
+        after the + button, so the button hugs the last open tab and
+        travels with the tab row (Dylan 2026-10-22 — it used to sit on
+        the far side of the window). When tabs overflow, the bar takes
+        the available width and scrolls internally; the + stays pinned
+        right after it.
+        """
+        strip = QWidget(parent)
+        strip_layout = QHBoxLayout(strip)
+        strip_layout.setContentsMargins(0, 0, 0, 0)
+        strip_layout.setSpacing(0)
+        tab_bar = self.tabs.tabBar()
+        tab_bar.setParent(strip)
+        strip_layout.addWidget(tab_bar)
+        self._tab_bar = tab_bar
+        with contextlib.suppress(Exception):
+            plus = self.tabs.cornerWidget(Qt.Corner.TopRightCorner)
+            if plus is not None:
+                plus.setParent(strip)
+                strip_layout.addWidget(plus)
+        strip_layout.addStretch(1)
+        return strip
+
     def _build_central(self) -> None:
         """Central layout with the tab strip ABOVE the address bar.
 
@@ -239,38 +267,95 @@ class MainWindow(QMainWindow):
         [tab strip][nav bar][bookmark bar][tab pages]. The QTabBar is
         reparented into the strip row (the tab widget keeps managing the
         same bar object; BrowserTabBar references its widget explicitly,
-        not via parent()). Any failure falls back to the classic layout —
-        tabs as the central widget with docked toolbars — rather than
-        breaking window construction.
+        not via parent()).
+
+        The PAGES live in the tab widget's own QStackedWidget, lifted
+        into the container as a direct row. Keeping the whole tab widget
+        in the layout left a blank strip between the nav bar and the
+        page: QTabWidget reserves its (reparented-away) tab bar's height
+        inside its own frame — measured 29px of dead space (Dylan
+        2026-10-22). With the stack as a container row the content sits
+        flush under the bars, and the emptied tab-widget shell is hidden
+        (it remains the manager object every call site uses).
+
+        Any failure falls back to the classic layout — tabs as the
+        central widget with docked toolbars — rather than breaking
+        window construction.
         """
         self._tab_bar = None
         self._central_layout: QVBoxLayout | None = None
+        self._pages_stack: QStackedWidget | None = None
         try:
+            stack = self.tabs.findChild(QStackedWidget)
+            if stack is None:
+                raise RuntimeError("tab pages stack not found")
             central = QWidget(self)
             layout = QVBoxLayout(central)
             layout.setContentsMargins(0, 0, 0, 0)
             layout.setSpacing(0)
-            strip = QWidget(central)
-            strip_layout = QHBoxLayout(strip)
-            strip_layout.setContentsMargins(0, 0, 0, 0)
-            strip_layout.setSpacing(0)
-            tab_bar = self.tabs.tabBar()
-            tab_bar.setParent(strip)
-            strip_layout.addWidget(tab_bar, 1)
-            self._tab_bar = tab_bar
-            with contextlib.suppress(Exception):
-                plus = self.tabs.cornerWidget(Qt.Corner.TopRightCorner)
-                if plus is not None:
-                    plus.setParent(strip)
-                    strip_layout.addWidget(plus)
+            strip = self._build_tab_strip(central)
+            stack.setParent(central)
             layout.addWidget(strip)
-            layout.addWidget(self.tabs)
+            layout.addWidget(stack, 1)
+            self._pages_stack = stack
+            self.tabs.hide()
             self._central_layout = layout
             self.setCentralWidget(central)
         except Exception:
             self._tab_bar = None
             self._central_layout = None
+            self._pages_stack = None
             self.setCentralWidget(self.tabs)
+            self._fallback_plus_beside_tabs()
+
+    @staticmethod
+    def _plus_x(bar_left: int, last_tab_right: int, tabs_width: int, plus_width: int) -> int:
+        """X for the fallback + button: right after the last tab, capped
+        so it never leaves the tab widget's right edge."""
+        return max(0, min(last_tab_right + 2, tabs_width - plus_width - 2))
+
+    def _fallback_plus_beside_tabs(self) -> None:
+        """Classic-layout fallback only: float the + button beside the
+        last tab instead of leaving it in the far top-right corner."""
+        with contextlib.suppress(Exception):
+            plus = self.tabs.cornerWidget(Qt.Corner.TopRightCorner)
+            if plus is None:
+                return
+            self.tabs.setCornerWidget(None, Qt.Corner.TopRightCorner)
+            plus.setParent(self.tabs)
+            plus.show()
+            self._fallback_plus = plus
+            bar = self.tabs.tabBar()
+            bar.installEventFilter(self)
+            self.tabs.installEventFilter(self)
+            self.tabs.currentChanged.connect(lambda _i: self._place_fallback_plus())
+            self._place_fallback_plus()
+
+    def _place_fallback_plus(self) -> None:
+        plus = getattr(self, "_fallback_plus", None)
+        if plus is None:
+            return
+        bar = self.tabs.tabBar()
+        geo = bar.geometry()
+        if bar.count() > 0:
+            last_right = geo.left() + bar.tabRect(bar.count() - 1).right()
+        else:
+            last_right = geo.left()
+        plus.move(
+            self._plus_x(geo.left(), last_right, self.tabs.width(), plus.width()),
+            geo.top(),
+        )
+        plus.raise_()
+
+    def eventFilter(self, obj, event) -> bool:  # noqa: N802  # Qt virtual override
+        # Classic fallback only: keep the floated + button glued to the
+        # last tab when the tab widget resizes or the bar relayouts.
+        if getattr(self, "_fallback_plus", None) is not None and event.type() in (
+            QEvent.Type.Resize,
+            QEvent.Type.LayoutRequest,
+        ):
+            self._place_fallback_plus()
+        return super().eventFilter(obj, event)
 
     def _build_toolbar(self) -> None:
         bar = QToolBar("Navigation", self)
@@ -332,7 +417,7 @@ class MainWindow(QMainWindow):
         hq_act.triggered.connect(self.open_hq)
 
         mesh_act = QAction("🕸", self)
-        mesh_act.setToolTip("Agent Mesh — four parallel sessions (Ctrl+Alt+M)")
+        mesh_act.setToolTip("Multi Agent Terminal — four parallel sessions (Ctrl+Alt+M)")
         mesh_act.triggered.connect(self.open_agent_mesh)
 
         summarize_act = QAction("✨", self)
@@ -629,8 +714,12 @@ class MainWindow(QMainWindow):
         if self._show_retired_tools():
             self._add(tools_menu, "Coding Agent", self.open_hq, "Ctrl+Shift+H")
         self._add(
-            tools_menu, "Agent Mesh (4 parallel sessions)", self.open_agent_mesh, "Ctrl+Alt+M"
+            tools_menu,
+            "Multi Agent Terminal (4 parallel sessions)",
+            self.open_agent_mesh,
+            "Ctrl+Alt+M",
         )
+        self._add(tools_menu, "LuckyD Chat", self.open_luckyd_chat)
         self._add(tools_menu, "Agent 1 Terminal", lambda: self.open_terminal("agent"), "Ctrl+`")
         self._add(tools_menu, "Agent 2 Terminal", lambda: self.open_terminal("agent2"))
         self._add(
@@ -866,7 +955,7 @@ class MainWindow(QMainWindow):
             )
 
     def open_agent_mesh(self) -> None:
-        """Open the first-class Agent Mesh workspace with four live sessions."""
+        """Open the first-class Multi Agent Terminal workspace with four live sessions."""
         term = getattr(self._app, "terminal_server", None)
         if term is None or not term.running:
             starter = getattr(self._app, "start_terminal_server", None)
@@ -877,7 +966,18 @@ class MainWindow(QMainWindow):
             self.open_in_new_tab(QUrl(server.base_url + "/mesh"))
         else:
             self.toasts.show(
-                "Agent Mesh needs the Browser Control API (Tools → Browser Control API)",
+                "Multi Agent Terminal needs the Browser Control API (Tools → Browser Control API)",
+                kind="error",
+            )
+
+    def open_luckyd_chat(self) -> None:
+        """Open LuckyD Chat — Hub chat + Claw tasks in one tab."""
+        server = getattr(self._app, "control_server", None)
+        if server is not None and server.running:
+            self.open_in_new_tab(QUrl(server.base_url + "/chat"))
+        else:
+            self.toasts.show(
+                "LuckyD Chat needs the Browser Control API (Tools → Browser Control API)",
                 kind="error",
             )
 
@@ -1953,82 +2053,147 @@ class MainWindow(QMainWindow):
         if handler:
             handler()
 
+    # (section, [(keys, description), ...]) — the shortcuts reference is
+    # data, so the dialog builder below stays layout-only.
+    _SHORTCUT_SECTIONS = (
+        (
+            "Tabs & Windows",
+            (
+                ("Ctrl+T", "New tab"),
+                ("Ctrl+W", "Close tab"),
+                ("Ctrl+Tab", "Next tab"),
+                ("Ctrl+Shift+Tab", "Previous tab"),
+                ("Ctrl+1-9", "Jump to tab"),
+                ("Ctrl+Shift+T", "Reopen closed tab"),
+                ("Ctrl+N", "New window"),
+                ("Ctrl+Shift+N", "New incognito window"),
+            ),
+        ),
+        (
+            "Navigation",
+            (
+                ("Ctrl+L", "Focus address bar"),
+                ("Alt+Left", "Back"),
+                ("Alt+Right", "Forward"),
+                ("F5", "Reload"),
+                ("Esc", "Exit fullscreen / Stop loading / Close find bar"),
+            ),
+        ),
+        (
+            "View",
+            (
+                ("Ctrl+=", "Zoom in"),
+                ("Ctrl+-", "Zoom out"),
+                ("Ctrl+0", "Reset zoom"),
+                ("Ctrl+Scroll", "Zoom in / out (remembered per site)"),
+                ("F11", "Full screen"),
+                ("F12", "Developer tools"),
+                ("Ctrl+U", "View page source"),
+            ),
+        ),
+        (
+            "Features",
+            (
+                ("Ctrl+F", "Find in page"),
+                ("Ctrl+D", "Bookmark / unbookmark page"),
+                ("Ctrl+H", "History"),
+                ("Ctrl+J", "Downloads"),
+                ("Ctrl+Shift+O", "Bookmarks manager"),
+                ("Ctrl+Shift+B", "Toggle bookmarks bar"),
+                ("Ctrl+Shift+S", "Save screenshot"),
+                ("Ctrl+Alt+R", "Reader mode"),
+                ("Ctrl+Shift+L", "Read page aloud"),
+                ("Ctrl+Shift+U", "Summarize this page"),
+                ("Ctrl+Shift+F", "Focus mode (hide all chrome)"),
+                ("Ctrl+Shift+A", "AI assistant"),
+                ("Ctrl+Shift+H", "Coding agent"),
+                ("Ctrl+Alt+M", "Multi Agent Terminal (4 parallel sessions)"),
+                ("Ctrl+`", "Agent 1 terminal"),
+                ("Ctrl+Shift+`", "PowerShell terminal"),
+                ("Ctrl+K", "Command palette"),
+                ("?", "Omnibox prefix — ask the AI"),
+                ("Ctrl+,", "Settings"),
+                ("Ctrl+P", "Print"),
+                ("Ctrl+S", "Save page as"),
+                ("Ctrl+O", "Open file"),
+                ("Ctrl+Q", "Quit"),
+                ("Ctrl+/", "Show this help"),
+            ),
+        ),
+    )
+
     def show_shortcuts(self) -> None:
-        """Display a keyboard shortcuts reference dialog."""
-        # Colors come from the ACTIVE theme palette — the old hardcoded
-        # Neon values (dark-navy chips, default text) were unreadable on
-        # light themes like Arctic Light (Dylan 2026-10-22).
+        """Keyboard shortcuts reference: a sized, scrolling dialog.
+
+        The old version poured ~50 rows into QMessageBox.about — an
+        uncapped, unscrollable single column that overflowed the screen
+        (Dylan 2026-10-22). Now: a real dialog capped at 90% of the
+        available screen, two balanced columns, and a scrolling text
+        view. Every color comes from the ACTIVE theme palette — and the
+        dialog surface itself is painted from the palette, so light
+        themes (Arctic Light) get a light dialog, not the OS default.
+        """
+        from PySide6.QtWidgets import QDialog, QDialogButtonBox, QTextBrowser, QVBoxLayout
+
         pal = palette(self.settings)
-        shortcuts = f"""
+        show_retired = self._show_retired_tools()
+
+        def section_html(title: str, rows: tuple) -> str:
+            parts = [f"<tr><th colspan='2'>{_html.escape(title)}</th></tr>"]
+            for keys, desc in rows:
+                if keys == "Ctrl+Shift+H" and not show_retired:
+                    continue  # retired tool: row hidden with the tool
+                parts.append(
+                    f"<tr><td><span class='kbd'>{_html.escape(keys)}</span></td>"
+                    f"<td>{_html.escape(desc)}</td></tr>"
+                )
+            return "".join(parts)
+
+        sections = [section_html(t, r) for t, r in self._SHORTCUT_SECTIONS]
+        # Balance the columns by section (Tabs+Navigation+View | Features).
+        left = "".join(sections[:3])
+        right = "".join(sections[3:])
+        body = f"""
         <style>
-          td, th {{ padding: 3px 16px 3px 4px; text-align: left; font-size: 12px;
-                    color: {pal["text"]}; }}
+          table {{ border-collapse: collapse; }}
+          td, th {{ padding: 3px 14px 3px 4px; text-align: left; font-size: 12px;
+                    color: {pal["text"]}; vertical-align: top; }}
           th {{ color: {pal["accent"]}; font-weight: 600; font-size: 13px; padding-top: 10px; }}
           .kbd {{ background: {pal["card"]}; color: {pal["text"]};
                   border: 1px solid {pal["border"]}; border-radius: 4px;
-                  padding: 1px 7px; font-family: monospace; font-size: 11px; }}
+                  padding: 1px 7px; font-family: monospace; font-size: 11px;
+                  white-space: nowrap; }}
         </style>
-        <b>Keyboard Shortcuts</b><br><br>
-        <table>
-        <tr><th colspan='2'>Tabs &amp; Windows</th></tr>
-        <tr><td><span class='kbd'>Ctrl+T</span></td><td>New tab</td></tr>
-        <tr><td><span class='kbd'>Ctrl+W</span></td><td>Close tab</td></tr>
-        <tr><td><span class='kbd'>Ctrl+Tab</span></td><td>Next tab</td></tr>
-        <tr><td><span class='kbd'>Ctrl+Shift+Tab</span></td><td>Previous tab</td></tr>
-        <tr><td><span class='kbd'>Ctrl+1-9</span></td><td>Jump to tab</td></tr>
-        <tr><td><span class='kbd'>Ctrl+Shift+T</span></td><td>Reopen closed tab</td></tr>
-        <tr><td><span class='kbd'>Ctrl+N</span></td><td>New window</td></tr>
-        <tr><td><span class='kbd'>Ctrl+Shift+N</span></td><td>New incognito window</td></tr>
-        <tr><th colspan='2'>Navigation</th></tr>
-        <tr><td><span class='kbd'>Ctrl+L</span></td><td>Focus address bar</td></tr>
-        <tr><td><span class='kbd'>Alt+Left</span></td><td>Back</td></tr>
-        <tr><td><span class='kbd'>Alt+Right</span></td><td>Forward</td></tr>
-        <tr><td><span class='kbd'>F5</span></td><td>Reload</td></tr>
-        <tr><td><span class='kbd'>Esc</span></td><td>Exit fullscreen / Stop loading / Close find bar</td></tr>
-        <tr><th colspan='2'>View</th></tr>
-        <tr><td><span class='kbd'>Ctrl+=</span></td><td>Zoom in</td></tr>
-        <tr><td><span class='kbd'>Ctrl+-</span></td><td>Zoom out</td></tr>
-        <tr><td><span class='kbd'>Ctrl+0</span></td><td>Reset zoom</td></tr>
-        <tr><td><span class='kbd'>Ctrl+Scroll</span></td><td>Zoom in / out (remembered per site)</td></tr>
-        <tr><td><span class='kbd'>F11</span></td><td>Full screen</td></tr>
-        <tr><td><span class='kbd'>F12</span></td><td>Developer tools</td></tr>
-        <tr><td><span class='kbd'>Ctrl+U</span></td><td>View page source</td></tr>
-        <tr><th colspan='2'>Features</th></tr>
-        <tr><td><span class='kbd'>Ctrl+F</span></td><td>Find in page</td></tr>
-        <tr><td><span class='kbd'>Ctrl+D</span></td><td>Bookmark / unbookmark page</td></tr>
-        <tr><td><span class='kbd'>Ctrl+H</span></td><td>History</td></tr>
-        <tr><td><span class='kbd'>Ctrl+J</span></td><td>Downloads</td></tr>
-        <tr><td><span class='kbd'>Ctrl+Shift+O</span></td><td>Bookmarks manager</td></tr>
-        <tr><td><span class='kbd'>Ctrl+Shift+B</span></td><td>Toggle bookmarks bar</td></tr>
-        <tr><td><span class='kbd'>Ctrl+Shift+S</span></td><td>Save screenshot</td></tr>
-        <tr><td><span class='kbd'>Ctrl+Alt+R</span></td><td>Reader mode</td></tr>
-        <tr><td><span class='kbd'>Ctrl+Shift+L</span></td><td>Read page aloud</td></tr>
-        <tr><td><span class='kbd'>Ctrl+Shift+U</span></td><td>Summarize this page</td></tr>
-        <tr><td><span class='kbd'>Ctrl+Shift+F</span></td><td>Focus mode (hide all chrome)</td></tr>
-        <tr><td><span class='kbd'>Ctrl+Shift+A</span></td><td>AI assistant</td></tr>
-        <tr><td><span class='kbd'>Ctrl+Shift+H</span></td><td>Coding agent</td></tr>
-        <tr><td><span class='kbd'>Ctrl+Alt+M</span></td><td>Agent Mesh (4 parallel sessions)</td></tr>
-        <tr><td><span class='kbd'>Ctrl+`</span></td><td>Agent 1 terminal</td></tr>
-        <tr><td><span class='kbd'>Ctrl+Shift+`</span></td><td>PowerShell terminal</td></tr>
-        <tr><td><span class='kbd'>Ctrl+K</span></td><td>Command palette</td></tr>
-        <tr><td><span class='kbd'>?</span></td><td>Omnibox prefix — ask the AI</td></tr>
-        <tr><td><span class='kbd'>Ctrl+,</span></td><td>Settings</td></tr>
-        <tr><td><span class='kbd'>Ctrl+P</span></td><td>Print</td></tr>
-        <tr><td><span class='kbd'>Ctrl+S</span></td><td>Save page as</td></tr>
-        <tr><td><span class='kbd'>Ctrl+O</span></td><td>Open file</td></tr>
-        <tr><td><span class='kbd'>Ctrl+Q</span></td><td>Quit</td></tr>
-        <tr><td><span class='kbd'>Ctrl+/</span></td><td>Show this help</td></tr>
-        </table>
+        <table><tr>
+          <td style="padding:0 10px 0 0"><table>{left}</table></td>
+          <td style="padding:0 0 0 10px"><table>{right}</table></td>
+        </tr></table>
         """
-        if not self._show_retired_tools():
-            shortcuts = shortcuts.replace(
-                "<tr><td><span class='kbd'>Ctrl+Shift+H</span></td>"
-                "<td>Coding agent</td></tr>\n        ",
-                "",
-            )
-        from PySide6.QtWidgets import QMessageBox
 
-        QMessageBox.about(self, f"{self._app_display} — Shortcuts", shortcuts)
+        dlg = QDialog(self)
+        dlg.setWindowTitle(f"{self._app_display} — Shortcuts")
+        dlg.setStyleSheet(f"QDialog {{ background: {pal['window']}; color: {pal['text']}; }}")
+        lay = QVBoxLayout(dlg)
+        view = QTextBrowser(dlg)
+        view.setOpenExternalLinks(False)
+        view.setHtml(body)
+        view.setStyleSheet(
+            f"QTextBrowser {{ background: {pal['window']}; color: {pal['text']}; border: none; }}"
+        )
+        lay.addWidget(view)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close, dlg)
+        buttons.rejected.connect(dlg.reject)
+        buttons.accepted.connect(dlg.accept)
+        lay.addWidget(buttons)
+        # Cap the dialog at 90% of the available screen in both axes.
+        width, height = 940, 660
+        screen = QGuiApplication.primaryScreen()
+        if screen is not None:
+            avail = screen.availableGeometry()
+            width = min(width, int(avail.width() * 0.9))
+            height = min(height, int(avail.height() * 0.9))
+        dlg.resize(width, height)
+        dlg.exec()
 
     def show_about(self) -> None:
         from browser_core.updater import current_version

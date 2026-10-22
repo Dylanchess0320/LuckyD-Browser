@@ -429,7 +429,7 @@ def _api_checks(port: int) -> None:
         API_RESULTS.append(
             (
                 "control API /mesh",
-                "Agent Mesh" in mesh and mesh.count("<iframe") == 4,
+                "Multi Agent Terminal" in mesh and mesh.count("<iframe") == 4,
                 "",
             )
         )

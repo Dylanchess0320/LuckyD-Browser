@@ -60,6 +60,7 @@ from browser_core.agent import (
     _TYPE_JS,
     ActionUndoStack,
 )
+from browser_core.chat_page import chat_html
 from browser_core.dashboard import (
     dashboard_html,
     hq_shell_html,
@@ -68,6 +69,15 @@ from browser_core.dashboard import (
     workflows_html,
 )
 from browser_core.extract import build_messages, parse_json_loose
+from browser_core.luckyd_services import (
+    claw_cancel,
+    claw_state,
+    claw_submit,
+    claw_task,
+    claw_tasks,
+    hub_chat,
+    hub_state,
+)
 from browser_core.netmon import NetMonitor, to_har
 from browser_core.research_page import research_html, swarm_manager
 from browser_core.scheduler import INTERVALS, ScheduleStore
@@ -102,8 +112,18 @@ _ROUTES = (
     ("GET  /help", "this route list"),
     ("GET  /dashboard", "live new-tab dashboard (HTML hub of the platform)"),
     ("GET  /hq", "coding agent workspace — opens the exe UI (auto-starts if needed)"),
-    ("GET  /mesh", "Agent Mesh — four parallel terminal sessions in one workspace"),
-    ("GET  /mesh/doctor", "per-backend Agent Mesh health check + tier labels (JSON)"),
+    ("GET  /mesh", "Multi Agent Terminal — four parallel terminal sessions in one workspace"),
+    ("GET  /mesh/doctor", "per-backend Multi Agent Terminal health check + tier labels (JSON)"),
+    ("GET  /chat", "LuckyD Chat — Hub chat + Claw tasks in one page"),
+    ("GET  /chat/state", "Hub + Claw reachability and the Claw project allowlist (JSON)"),
+    ("POST /chat/send", '{"messages": [{"role", "content"}...]} — send to the Hub chat route'),
+    ("GET  /chat/tasks", "Claw task list (JSON, proxied)"),
+    (
+        "POST /chat/task",
+        '{"project": "…", "prompt": "…", "profile": "look|build"} — submit a Claw task',
+    ),
+    ("GET  /chat/task?id=", "one Claw task incl. its result receipt when finished (JSON)"),
+    ("POST /chat/task/cancel", '{"id": "…"} — cancel a queued/running Claw task'),
     ("GET  /onboarding/status", "first-run Ollama & provider onboarding status + FAQ"),
     ("POST /onboarding/ollama-pull", '{"model": "llama3.2:3b"} — pull local Ollama model'),
     (
@@ -441,6 +461,7 @@ def make_handler(
             "/dashboard",
             "/hq",
             "/mesh",
+            "/chat",
             "/terminal",
             "/workflows",
             "/network",
@@ -473,6 +494,33 @@ def make_handler(
                     return self._hq(query)
                 if path == "/mesh":
                     return self._send_html(mesh_html())
+                if path == "/chat":
+                    return self._send_html(chat_html(settings))
+                if path == "/chat/state":
+                    hub = hub_state(settings)
+                    claw = claw_state(settings)
+                    projects = list(claw.get("projects") or [])
+                    if not projects and claw.get("state") == "ok":
+                        # Older Claw builds don't publish the allowlist
+                        # on /healthz — fall back to projects seen in the
+                        # task history so the picker still works.
+                        listed = claw_tasks(settings)
+                        if listed.get("state") == "ok":
+                            projects = sorted(
+                                {
+                                    str(t.get("project"))
+                                    for t in listed.get("tasks", [])
+                                    if isinstance(t, dict) and t.get("project")
+                                }
+                            )
+                    return self._ok(hub=hub, claw=claw, projects=projects)
+                if path == "/chat/tasks":
+                    return self._send(200, claw_tasks(settings))
+                if path == "/chat/task":
+                    job_id = (query.get("id") or [""])[0]
+                    if not job_id:
+                        return self._send(400, {"ok": False, "error": "id required"})
+                    return self._send(200, claw_task(settings, job_id))
                 if path == "/mesh/doctor":
                     rows = mesh_doctor()
                     return self._ok(
@@ -554,6 +602,27 @@ def make_handler(
             path = urlparse(self.path).path
             body = self._body()
             try:
+                if path == "/chat/send":
+                    messages = body.get("messages")
+                    if not isinstance(messages, list) or not messages:
+                        return self._send(400, {"state": "error", "error": "messages required"})
+                    return self._send(200, hub_chat(settings, messages))
+                if path == "/chat/task":
+                    project = str(body.get("project", "")).strip()
+                    prompt = str(body.get("prompt", "")).strip()
+                    if not project or not prompt:
+                        return self._send(
+                            400, {"state": "error", "error": "project and prompt required"}
+                        )
+                    return self._send(
+                        200,
+                        claw_submit(settings, project, prompt, str(body.get("profile", "build"))),
+                    )
+                if path == "/chat/task/cancel":
+                    job_id = str(body.get("id", "")).strip()
+                    if not job_id:
+                        return self._send(400, {"state": "error", "error": "id required"})
+                    return self._send(200, claw_cancel(settings, job_id))
                 if path == "/navigate":
                     url = str(body.get("url", "")).strip()
                     if not url:

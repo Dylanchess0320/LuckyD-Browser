@@ -312,7 +312,10 @@ QComboBox {
     padding: 6px 10px;
 }
 QComboBox:hover { border-color: $accent; }
-QComboBox::drop-down { border: none; width: 22px; }
+/* No dropdown-arrow glyph (Dylan 2026-10-22): the arrow was pure
+   decoration — the whole field is the click target and opens the list. */
+QComboBox::drop-down { border: none; width: 0px; }
+QComboBox::down-arrow { image: none; width: 0px; height: 0px; }
 QComboBox QAbstractItemView {
     background: $panel; border: 1px solid $border; border-radius: 10px;
     padding: 4px; outline: none;

@@ -885,7 +885,7 @@ def _wsl_muse_command() -> list[str]:
     raw = _find_wsl_exe()
     if not raw:
         raise FileNotFoundError(
-            "Agent Mesh shell 'mesh-muse' needs WSL (missing: wsl.exe). "
+            "Multi Agent Terminal shell 'mesh-muse' needs WSL (missing: wsl.exe). "
             "Run in admin PowerShell: wsl --install -d Ubuntu"
         )
     exe = str(Path(raw).resolve())
@@ -908,13 +908,13 @@ def _mesh_shell_command(shell: str) -> list[str]:
     raw = _find_mesh_exe(exe_name)
     if not raw:
         raise FileNotFoundError(
-            f"Agent Mesh shell '{shell}' is not installed (missing: {exe_name})"
+            f"Multi Agent Terminal shell '{shell}' is not installed (missing: {exe_name})"
         )
     exe = str(Path(raw).resolve())
     # Validate it's a real file — mitigates PATH hijack TOCTOU where a fake
     # exe appears between availability check and spawn.
     if not Path(exe).is_file():
-        raise FileNotFoundError(f"Agent Mesh shell '{shell}' resolved to non-file: {exe}")
+        raise FileNotFoundError(f"Multi Agent Terminal shell '{shell}' resolved to non-file: {exe}")
     return [exe, *MESH_SHELL_ARGS.get(shell, [])]
 
 

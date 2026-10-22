@@ -1128,7 +1128,7 @@ def research_html() -> str:
   <span id="status-pill" class="pill">idle</span>
   <span class="sp"></span>
   <button class="btn" id="btn-runs" onclick="toggleDrawer()">📜 Past runs (<span id="runs-count">0</span>)</button>
-  <button class="btn" onclick="window.open('/mesh', '_blank')">🛸 Agent Mesh</button>
+  <button class="btn" onclick="window.open('/mesh', '_blank')">🛸 Multi Agent Terminal</button>
   <button class="btn" onclick="window.open('/hq', '_blank')">⚡ Agent HQ</button>
 </header>
 

@@ -102,8 +102,9 @@ _CSS = r"""  .search { display: flex; background: var(--card); border: 1px solid
   .tile .ico { font-size: 22px; }
   .tile img { width: 26px; height: 26px; border-radius: 6px; }
   .tile .fav { width: 26px; height: 26px; border-radius: 7px; display: inline-flex;
-    align-items: center; justify-content: center; color: #fff; font-size: 14px;
-    font-weight: 700; text-shadow: 0 1px 2px rgba(0,0,0,.35); }
+    align-items: center; justify-content: center; background: var(--hover);
+    border: 1px solid var(--border); color: var(--accent); font-size: 14px;
+    font-weight: 700; }
   .tile .tname { color: var(--text); font-size: 13px; font-weight: 700; letter-spacing: .02em; }
   .tile .del { position: absolute; top: 3px; right: 6px; color: var(--muted); font-size: 13px; opacity: 0; cursor: pointer; padding: 2px 4px; border-radius: 6px; }
   .tile .del:hover, .tile .del:focus-visible { color: var(--err); background: var(--hover); outline: none; }
@@ -124,8 +125,8 @@ _CSS = r"""  .search { display: flex; background: var(--card); border: 1px solid
 
 """
 
-# Shortcuts the dashboard itself documents (taglines in the JS below) — only
-# existing shortcuts are listed; nothing new is invented here.
+# Shortcuts wired into the dashboard's "?" overlay (the Help surface) —
+# only existing shortcuts are listed; nothing new is invented here.
 _DASH_SHORTCUTS = [
     ("Ctrl+K", "Command palette — fuzzy search over tabs, bookmarks, history, actions"),
     ("Ctrl+`", "Open an agent terminal tab"),
@@ -176,7 +177,8 @@ const ENGINES = { bing: 'https://www.bing.com/search?q=',
 const APPS = [
   ['⌘', 'Agent HQ', '/hq'],
   ['🤖', 'AI Assistant', 'luckyd://assistant'],
-  ['🕸️', 'Agent Mesh', '/mesh'],
+  ['🖥️', 'Multi Agent Terminal', '/mesh'],
+  ['💬', 'LuckyD Chat', '/chat'],
   ['🖥️', 'Agent Terminal', '/terminal'],
   ['🔬', 'Deep Research', '/research'],
   ['🎬', 'Workflows', '/workflows'],
@@ -205,10 +207,11 @@ document.getElementById('engine').value = ENGINES[_savedEngine] ? _savedEngine :
 
 // Time-aware greeting with a rotating LuckyD wink. The browser's display
 // name is injected server-side (__DISPLAY_NAME__) — Settings → Appearance.
+// Flavor only — no tips/usage advice on the homepage (Dylan 2026-10-22).
+// Guidance lives in Help → Keyboard Shortcuts, not on the new-tab page.
 const TAGLINES = [
   'your tabs missed you', 'no accounts, no keys, no worries', 'Lucky is ready when you are',
-  'press Ctrl+K for everything', 'tip: Ctrl+` opens a terminal', 'surf different',
-  'tip: Ctrl+Shift+S screenshots the page', 'workflows replay your best moves',
+  'surf different',
 ];
 (function greet() {
   const h = new Date().getHours();
@@ -263,19 +266,17 @@ function renderApps() {
     g.appendChild(a);
   });
 }
-// Letter-tile favicons — minted locally from the hostname (same hue hash as
-// the app's icons.py). No favicon service ever sees your shortcuts.
+// Letter-tile favicons — minted locally from the hostname. Every tile gets
+// the SAME uniform theme treatment (Dylan 2026-10-22: no per-site rainbow
+// colors — real apps don't color shortcut buttons per site). No favicon
+// service ever sees your shortcuts.
 function tileFor(url) {
   let host = '';
   try { host = new URL(url).hostname.replace(/^www\./, ''); } catch (e) {}
   const letter = host ? host[0].toUpperCase() : '•';
-  let hue = 0;
-  for (let i = 0; i < host.length; i++) hue = (hue + (i + 1) * host.charCodeAt(i)) % 360;
   const tile = document.createElement('span');
   tile.className = 'fav';
   tile.textContent = letter;
-  tile.style.background = 'linear-gradient(135deg, hsl(' + hue + ',53%,59%), hsl(' +
-    ((hue + 48) % 360) + ',58%,47%))';
   return tile;
 }
 function render() {
@@ -354,6 +355,120 @@ def _show_retired_tools(settings) -> bool:
         return False
 
 
+# ── Homepage animation (Feature 12, Dylan 2026-10-22) ─────────────────
+# Cursor-interactive ambient themes for the homepage. Colors come from
+# the active theme's --ld-accent/--ld-accent2 tokens at runtime (never a
+# hardcoded palette), the layer is pointer-events:none and transform /
+# canvas only (no layout changes), the loop pauses when the page or
+# window is hidden/unfocused, prefers-reduced-motion renders one static
+# frame, and "off" injects NOTHING into the page. Default: Aurora Glow —
+# the calmest variant.
+ANIMATION_CHOICES = (
+    ("aurora", "Aurora Glow"),
+    ("particles", "Particle Drift"),
+    ("parallax", "Gentle Parallax"),
+    ("off", "Off"),
+)
+HOMEPAGE_ANIMATIONS = frozenset(k for k, _ in ANIMATION_CHOICES if k != "off")
+DEFAULT_HOMEPAGE_ANIMATION = "aurora"
+
+
+def _homepage_animation(settings) -> str:
+    try:
+        mode = settings.get("homepage_animation", DEFAULT_HOMEPAGE_ANIMATION) if settings else None
+    except Exception:
+        mode = None
+    return mode if mode in dict(ANIMATION_CHOICES) else DEFAULT_HOMEPAGE_ANIMATION
+
+
+_ANIM_SNIPPET = r"""
+<div id="ld-anim" aria-hidden="true"><canvas id="ld-anim-cv"></canvas><div class="ld-blob b1"></div><div class="ld-blob b2"></div><div class="ld-blob b3"></div></div>
+<style>
+  #ld-anim{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+  #ld-anim-cv{position:absolute;inset:0;width:100%;height:100%;display:none}
+  .ld-blob{position:absolute;border-radius:50%;filter:blur(70px);opacity:0;will-change:transform}
+  header,main{position:relative;z-index:1}
+</style>
+<script>
+(function(){
+  var mode = "__ANIM_MODE__";
+  var root = document.getElementById('ld-anim'); if (!root) return;
+  var reduce = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  var cs = getComputedStyle(document.documentElement);
+  var accent = (cs.getPropertyValue('--ld-accent') || '').trim() || '#5b9dff';
+  var accent2 = (cs.getPropertyValue('--ld-accent2') || '').trim() || accent;
+  var tx = innerWidth / 2, ty = innerHeight / 3, mx = tx, my = ty;
+  addEventListener('pointermove', function(e){ tx = e.clientX; ty = e.clientY; }, {passive: true});
+  var raf = 0, running = false;
+  function loop(){ draw(performance.now()); if (running) raf = requestAnimationFrame(loop); }
+  function start(){ if (running || reduce) return; running = true; raf = requestAnimationFrame(loop); }
+  function stop(){ running = false; if (raf) cancelAnimationFrame(raf); raf = 0; }
+  document.addEventListener('visibilitychange', function(){ document.hidden ? stop() : start(); });
+  addEventListener('blur', stop); addEventListener('focus', start);
+
+  var blobs = root.querySelectorAll('.ld-blob');
+  function blob(el, size, color){ el.style.width = el.style.height = size + 'px';
+    el.style.background = 'radial-gradient(circle, ' + color + ' 0%, transparent 70%)'; }
+  var draw = function(){};
+
+  if (mode === 'aurora' || mode === 'parallax') {
+    var s = Math.max(innerWidth, innerHeight);
+    blob(blobs[0], s * 0.55, accent); blob(blobs[1], s * 0.45, accent2); blob(blobs[2], s * 0.34, accent);
+    blobs.forEach(function(b){ b.style.opacity = mode === 'aurora' ? '0.34' : '0.22'; });
+    if (mode === 'parallax') blobs[2].style.display = 'none';
+    var hero = document.querySelector('header'), main = document.querySelector('main');
+    draw = function(now){
+      mx += (tx - mx) * 0.055; my += (ty - my) * 0.055;
+      var t = now * 0.00006, dx = mx - innerWidth / 2, dy = my - innerHeight / 2;
+      blobs[0].style.transform = 'translate(' + (-s * 0.12 + Math.cos(t) * 40 + dx * 0.03) + 'px,' + (-s * 0.18 + Math.sin(t * 1.3) * 30 + dy * 0.03) + 'px)';
+      blobs[1].style.transform = 'translate(' + (innerWidth - s * 0.38 + Math.sin(t * 0.8) * 36 - dx * 0.02) + 'px,' + (innerHeight - s * 0.34 + Math.cos(t) * 26 - dy * 0.02) + 'px)';
+      if (mode === 'aurora') {
+        blobs[2].style.transform = 'translate(' + (mx - s * 0.17) + 'px,' + (my - s * 0.17) + 'px)';
+      } else {
+        if (hero) hero.style.transform = 'translate(' + dx * 0.012 + 'px,' + dy * 0.008 + 'px)';
+        if (main) main.style.transform = 'translate(' + dx * 0.006 + 'px,' + dy * 0.004 + 'px)';
+      }
+    };
+  } else if (mode === 'particles') {
+    blobs.forEach(function(b){ b.style.display = 'none'; });
+    var cv = document.getElementById('ld-anim-cv'); cv.style.display = 'block';
+    var ctx = cv.getContext('2d'), W = 0, H = 0, ps = [];
+    function size(){
+      var dpr = Math.min(devicePixelRatio || 1, 1.5);
+      W = innerWidth; H = innerHeight; cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      var n = Math.max(24, Math.min(70, Math.floor(W * H / 26000)));
+      ps = Array.from({length: n}, function(){ return { x: Math.random() * W, y: Math.random() * H,
+        vx: (Math.random() - 0.5) * 0.22, vy: (Math.random() - 0.5) * 0.22,
+        r: 1 + Math.random() * 1.6, c: Math.random() < 0.5 ? accent : accent2 }; });
+    }
+    size(); addEventListener('resize', size);
+    draw = function(){
+      ctx.clearRect(0, 0, W, H);
+      for (var i = 0; i < ps.length; i++) { var p = ps[i];
+        var ddx = p.x - mx, ddy = p.y - my, d2 = ddx * ddx + ddy * ddy;
+        if (d2 < 8100 && d2 > 0.01) { var d = Math.sqrt(d2); p.vx += ddx / d * 0.012; p.vy += ddy / d * 0.012; }
+        p.vx *= 0.995; p.vy *= 0.995; p.x += p.vx; p.y += p.vy;
+        if (p.x < -4) p.x = W + 4; if (p.x > W + 4) p.x = -4;
+        if (p.y < -4) p.y = H + 4; if (p.y > H + 4) p.y = -4;
+        ctx.globalAlpha = 0.55; ctx.fillStyle = p.c;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 6.2832); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    };
+  }
+  if (reduce) { draw(1200); } else { start(); }
+})();
+</script>
+"""
+
+
+def homepage_animation_html(mode: str) -> str:
+    """The animation layer markup for one enabled mode ("" for off)."""
+    if mode not in HOMEPAGE_ANIMATIONS:
+        return ""
+    return _ANIM_SNIPPET.replace("__ANIM_MODE__", mode)
+
+
 def dashboard_html(settings=None) -> str:
     """The dashboard with the active theme's design tokens injected, so the
     new-tab hub matches the Qt chrome, sidebar and HQ splash exactly.
@@ -394,11 +509,15 @@ def dashboard_html(settings=None) -> str:
     # The name lands inside a single-quoted JS string: escape quotes,
     # backslashes and "<" (a "</script>" in a name must never break out).
     name_js = name.replace("\\", "\\\\").replace("'", "\\'").replace("<", "\\u003c")
-    return (
+    out = (
         html.replace("__PLATFORM_TILES__", json.dumps(extra))
         .replace("__RETIRED_APPS__", json.dumps(retired))
         .replace("__DISPLAY_NAME__", name_js)
     )
+    anim = homepage_animation_html(_homepage_animation(settings))
+    if anim:
+        out = out.replace("</body>", anim + "</body>", 1)
+    return out
 
 
 _SPLASH_CSS = r"""
