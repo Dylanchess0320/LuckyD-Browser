@@ -120,7 +120,7 @@ class CommandPalette(QWidget):
                         lambda i=ws["id"]: self._mw.switch_workspace(i),
                     )
                 )
-        for label, action in [
+        actions = [
             ("New Tab", self._mw.new_tab),
             ("AI Assistant", self._mw.show_assistant),
             ("Summarize This Page", self._mw.summarize_page),
@@ -137,7 +137,17 @@ class CommandPalette(QWidget):
             ("Bookmarks", self._mw.open_bookmarks),
             ("History", self._mw.open_history),
             ("Settings", self._mw.open_settings),
-        ]:
+        ]
+        # Retired tools (HQ, Workflows, Deep Researcher) stay out of the
+        # palette unless show_retired_tools is flipped back on.
+        try:
+            show_retired = bool(self._mw.settings.get("show_retired_tools", False))
+        except Exception:
+            show_retired = False
+        if not show_retired:
+            retired = {"Deep Researcher Swarm…", "Coding Agent", "Workflows"}
+            actions = [(label, act) for label, act in actions if label not in retired]
+        for label, action in actions:
             self._items.append((label.lower(), f"▸ {label}", None, action))
 
     def show_palette(self) -> None:

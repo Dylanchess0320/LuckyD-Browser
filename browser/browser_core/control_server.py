@@ -502,7 +502,8 @@ def make_handler(
                     return self._terminal_asset(path)
                 if path == "/status":
                     # Platform heartbeat: also revive any enabled+autostart
-                    # tile services (rate-limited inside the registry).
+                    # tile services (rate-limited inside the registry, which
+                    # also keeps retired tiles off while their switch is off).
                     from browser_core import tile_registry
 
                     tile_registry.ensure_autostart()

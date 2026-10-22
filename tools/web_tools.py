@@ -300,7 +300,7 @@ class WebFetchTool(ToolBase):
 class WebSearchTool(ToolBase):
     name = "WebSearch"
     description = "Search the web and get results. Uses DuckDuckGo's free API."
-    aliases = ["Search", "Google"]
+    aliases = ["Search"]
     parameters = {
         "query": {"type": "string", "description": "The search query"},
     }

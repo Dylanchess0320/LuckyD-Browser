@@ -187,9 +187,12 @@ def test_real_tracker_still_blocked(tmp_path: Path) -> None:
 
 def test_dashboard_default_engine_is_ddg() -> None:
     text = (_BROWSER_DIR / "browser_core" / "dashboard.py").read_text(encoding="utf-8")
-    assert "localStorage.getItem('ld_engine') || 'ddg'" in text
+    # A saved engine we no longer offer falls back to DDG (see dashboard.py).
+    assert "ENGINES[_savedEngine] ? _savedEngine : 'ddg'" in text
     assert "ddg: 'https://duckduckgo.com/?q='" in text
-    assert "google: 'https://www.google.com/search?q='" in text
+    # Google is not a dashboard search provider either (2026-10-22).
+    assert "google.com/search" not in text
+    assert '<option value="google">' not in text
 
 
 class _FakeProfile:

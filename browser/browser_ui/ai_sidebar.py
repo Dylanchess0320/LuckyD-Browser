@@ -340,7 +340,7 @@ class AiSidebar(QDockWidget):
         layout.addLayout(actions)
 
         actions2 = QHBoxLayout()
-        for label, tip, slot in (
+        action2_items = [
             (
                 "📊 Extract",
                 "Pull tables, prices, and contact info into Markdown",
@@ -353,7 +353,13 @@ class AiSidebar(QDockWidget):
                 self._open_research_from_input,
             ),
             ("📋 Copy", "Copy this conversation as Markdown", self._copy_chat),
-        ):
+        ]
+        # Deep Researcher is retired from the UI (show_retired_tools brings
+        # its sidebar button back along with every other surface).
+        _settings = getattr(self._mw, "settings", None)
+        if not bool(_settings.get("show_retired_tools", False) if _settings else False):
+            action2_items = [x for x in action2_items if x[0] != "🔬 Research"]
+        for label, tip, slot in action2_items:
             btn = QPushButton(label, body)
             btn.setToolTip(tip)
             btn.clicked.connect(slot)

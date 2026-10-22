@@ -231,10 +231,7 @@ def _expand(p: str) -> str:
     return out
 
 
-def load_tiles(config_path: Path | None = None) -> list[Tile]:
-    """Load enabled tiles from the registry config. Never raises: a missing
-    or malformed config degrades to an empty tile list so the dashboard
-    still renders."""
+def _parse_tiles(config_path: Path | None, include_disabled: bool) -> list[Tile]:
     path = config_path or CONFIG_PATH
     try:
         raw = json.loads(path.read_text(encoding="utf-8-sig"))
@@ -244,7 +241,10 @@ def load_tiles(config_path: Path | None = None) -> list[Tile]:
         return []
     tiles = []
     for e in entries:
-        if not isinstance(e, dict) or not e.get("enabled", True):
+        if not isinstance(e, dict):
+            continue
+        enabled = bool(e.get("enabled", True))
+        if not enabled and not include_disabled:
             continue
         if not e.get("id") or not e.get("url"):
             continue
@@ -256,13 +256,27 @@ def load_tiles(config_path: Path | None = None) -> list[Tile]:
                 url=str(e["url"]),
                 health_url=str(e.get("health_url", "")),
                 autostart=bool(e.get("autostart", False)),
-                enabled=True,
+                enabled=enabled,
                 extra_class=str(e.get("extra_class", "")),
                 command=tuple(_expand(str(c)) for c in e.get("command", []) or []),
                 cwd=_expand(str(e.get("cwd", "") or "")),
             )
         )
     return tiles
+
+
+def load_tiles(config_path: Path | None = None) -> list[Tile]:
+    """Load enabled tiles from the registry config. Never raises: a missing
+    or malformed config degrades to an empty tile list so the dashboard
+    still renders."""
+    return _parse_tiles(config_path, include_disabled=False)
+
+
+def load_all_tiles(config_path: Path | None = None) -> list[Tile]:
+    """Load every configured tile, including disabled ones (each Tile keeps
+    its own ``enabled`` flag). Callers that apply their own visibility rules
+    on top of the registry — e.g. the retired-tools switch — use this."""
+    return _parse_tiles(config_path, include_disabled=True)
 
 
 def probe_tile(tile: Tile, timeout: float = PROBE_TIMEOUT_SEC) -> dict:
@@ -336,14 +350,44 @@ def shutdown_autostart() -> None:
 atexit.register(shutdown_autostart)
 
 
+# Retired 2026-10-22: these tiles are hidden by the show_retired_tools
+# setting (keep in sync with dashboard.RETIRED_TILE_IDS). While the switch
+# is off, their services must not autostart either.
+RETIRED_TILE_IDS = frozenset({"hq", "deep-research", "deck-studio"})
+
+
+def _show_retired_tools() -> bool:
+    """Read the retired-tools switch from the persisted settings file (the
+    same store SettingsStore writes; resolved lazily, like brand.py)."""
+    try:
+        if getattr(sys, "frozen", False):
+            path = Path(sys.executable).resolve().parent / "data" / "settings.json"
+        else:
+            path = Path(__file__).resolve().parent.parent / "data" / "settings.json"
+        if path.exists():
+            data = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                return bool(data.get("show_retired_tools", False))
+    except Exception:
+        pass
+    return False
+
+
 def ensure_autostart(tiles: list[Tile] | None = None) -> None:
     """Launch any enabled+autostart tile whose service is down.
 
     Called from the Control API's /status route (the live dashboard polls it
     every 5s); internally rate-limited so each tile gets at most one launch
     attempt per AUTOSTART_RETRY_SEC. Never raises.
+
+    The default (registry-loaded) tile set excludes retired tiles while
+    show_retired_tools is off; an explicitly passed list is respected
+    as-is.
     """
-    tiles = tiles if tiles is not None else load_tiles()
+    if tiles is None:
+        tiles = load_tiles()
+        if not _show_retired_tools():
+            tiles = [t for t in tiles if t.id not in RETIRED_TILE_IDS]
     _debug_log(f"ensure_autostart: {len(tiles)} tile(s) {[t.id for t in tiles]}")
     now = time.monotonic()
     with _registry_lock:

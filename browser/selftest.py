@@ -656,7 +656,7 @@ def step2() -> None:
     )
     check(
         "omnibox search detection",
-        "google.com/search" in win.omnibox.to_url("hello world").toString(),
+        "duckduckgo.com" in win.omnibox.to_url("hello world").toString(),
     )
 
     check(

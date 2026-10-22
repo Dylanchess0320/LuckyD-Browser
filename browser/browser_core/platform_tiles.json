@@ -1,5 +1,5 @@
 {
-  "_comment": "LuckyD Platform tile registry. Add a tool = add an entry. enabled:false hides it without deleting the config. extra_class 'hq' gets the accent style.",
+  "_comment": "LuckyD Platform tile registry. Add a tool = add an entry. enabled:false hides it without deleting the config. extra_class 'hq' gets the accent style. Retired 2026-10-22: the deck-studio tile stays configured here, but the show_retired_tools setting (default off) hides it — and the hq/deep-research tiles — from the dashboard and stops its autostart.",
   "tiles": [
     {
       "id": "deep-research",

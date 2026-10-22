@@ -258,6 +258,17 @@ class SettingsDialog(QDialog):
         self.dash.setChecked(bool(settings.get("dashboard_newtab", True)))
         gform.addRow(self.dash)
 
+        self.retired_tools = QCheckBox(
+            "Show retired tools (HQ, Workflows, Deep Researcher, Deck Studio)", self
+        )
+        self.retired_tools.setToolTip(
+            "These tools are hidden by default but fully built in.\n"
+            "Turn this on to bring back their menu items, palette entries,\n"
+            "dashboard tiles and shortcuts. Takes effect on restart."
+        )
+        self.retired_tools.setChecked(bool(settings.get("show_retired_tools", False)))
+        gform.addRow(self.retired_tools)
+
         self.assistant_startup = QCheckBox(
             "Remember my setup (reopen the AI assistant on startup)", self
         )
@@ -423,6 +434,7 @@ class SettingsDialog(QDialog):
         self._settings.set("cdp_debugging", self.cdp_debug.isChecked())
         self._settings.set("harness_autostart", self.autostart.isChecked())
         self._settings.set("dashboard_newtab", self.dash.isChecked())
+        self._settings.set("show_retired_tools", self.retired_tools.isChecked())
         self._settings.set("assistant_visible_startup", self.assistant_startup.isChecked())
         self._settings.set("bookmark_bar_visible", self.bm_bar.isChecked())
         self._settings.set("download_dir", self.dl_dir.text().strip())

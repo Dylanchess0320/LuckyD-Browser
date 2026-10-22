@@ -572,7 +572,8 @@ class MainWindow(QMainWindow):
         view_menu.addAction(ai_toggle)
 
         tools_menu = mbar.addMenu("&Tools")
-        self._add(tools_menu, "Coding Agent", self.open_hq, "Ctrl+Shift+H")
+        if self._show_retired_tools():
+            self._add(tools_menu, "Coding Agent", self.open_hq, "Ctrl+Shift+H")
         self._add(
             tools_menu, "Agent Mesh (4 parallel sessions)", self.open_agent_mesh, "Ctrl+Alt+M"
         )
@@ -584,10 +585,12 @@ class MainWindow(QMainWindow):
             lambda: self.open_terminal("powershell"),
             "Ctrl+Shift+`",
         )
-        self._add(tools_menu, "Workflows…", self.open_workflows)
+        if self._show_retired_tools():
+            self._add(tools_menu, "Workflows…", self.open_workflows)
         self._add(tools_menu, "Network Monitor", self.open_network_monitor)
         self._add(tools_menu, "Organize Tabs with AI", self.organize_tabs_with_ai)
-        self._add(tools_menu, "Deep Researcher Swarm…", self.open_deep_research, "Ctrl+Shift+R")
+        if self._show_retired_tools():
+            self._add(tools_menu, "Deep Researcher Swarm…", self.open_deep_research, "Ctrl+Shift+R")
         self._add(tools_menu, "Summarize This Page", self.summarize_page, "Ctrl+Shift+U")
         self._add(tools_menu, "Site Permissions…", self.open_site_permissions)
         tools_menu.addSeparator()
@@ -1843,6 +1846,13 @@ class MainWindow(QMainWindow):
             self.bm_bar_act.setChecked(bool(self.settings.get("bookmark_bar_visible", True)))
             self._app.apply_adblock(bool(self.settings.get("adblock_enabled", True)))
 
+    def _show_retired_tools(self) -> bool:
+        """Retired tools (LuckyD HQ, Workflows, Deep Researcher, Deck Studio)
+        stay hidden from every UI surface unless the user flips the
+        show_retired_tools setting back on. The tools themselves — pages,
+        routes, modules — remain fully built in."""
+        return bool(self.settings.get("show_retired_tools", False))
+
     def open_internal_page(self, name: str) -> None:
         """Handle luckyd:// internal links (dashboard tiles, new-tab footer)."""
         actions = {
@@ -1853,10 +1863,11 @@ class MainWindow(QMainWindow):
             "assistant": self.show_assistant,
             "extensions": self.open_extensions,
             "shortcuts": self.show_shortcuts,
-            "hq": self.open_hq,
             "permissions": self.open_site_permissions,
             "dashboard": lambda: self.open_in_new_tab(self._newtab_url()),
         }
+        if self._show_retired_tools():
+            actions["hq"] = self.open_hq
         handler = actions.get(name.strip("/").lower())
         if handler:
             handler()
@@ -1922,6 +1933,12 @@ class MainWindow(QMainWindow):
         <tr><td><span class='kbd'>Ctrl+/</span></td><td>Show this help</td></tr>
         </table>
         """
+        if not self._show_retired_tools():
+            shortcuts = shortcuts.replace(
+                "<tr><td><span class='kbd'>Ctrl+Shift+H</span></td>"
+                "<td>Coding agent</td></tr>\n        ",
+                "",
+            )
         from PySide6.QtWidgets import QMessageBox
 
         QMessageBox.about(self, f"{APP_DISPLAY} — Shortcuts", shortcuts)

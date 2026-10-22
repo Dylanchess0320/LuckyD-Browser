@@ -213,7 +213,6 @@ _BODY = r"""<body>
 
   <form class="search" id="searchform">
     <select id="engine">
-      <option value="google">Google</option>
       <option value="bing">Bing</option>
       <option value="ddg">DuckDuckGo</option>
       <option value="brave">Brave</option>
@@ -247,7 +246,7 @@ _BODY = r"""<body>
 </main>
 """
 _JS = r"""<script>
-const ENGINES = { google: 'https://www.google.com/search?q=', bing: 'https://www.bing.com/search?q=',
+const ENGINES = { bing: 'https://www.bing.com/search?q=',
   ddg: 'https://duckduckgo.com/?q=', brave: 'https://search.brave.com/search?q=' };
 const APPS = [
   ['⌘', 'Agent HQ', '/hq'],
@@ -265,16 +264,19 @@ const APPS = [
   ['⌨️', 'Keyboard Shortcuts', 'luckyd://shortcuts'],
 ];
 const DEFAULTS = [
-  ['Google','https://www.google.com'], ['YouTube','https://www.youtube.com'],
+  ['YouTube','https://www.youtube.com'],
   ['GitHub','https://github.com'], ['ChatGPT','https://chatgpt.com'],
   ['Perplexity','https://www.perplexity.ai'], ['Wikipedia','https://www.wikipedia.org'],
   ['Reddit','https://www.reddit.com']
 ];
 let shortcuts = JSON.parse(localStorage.getItem('ld_shortcuts') || 'null') || DEFAULTS;
-// One-time cleanup: drop the retired FMHY tile from saved shortcuts.
-shortcuts = shortcuts.filter(([n, u]) => !/fmhy/i.test(n + u));
+// One-time cleanup: drop the retired FMHY and Google tiles from saved shortcuts.
+shortcuts = shortcuts.filter(([n, u]) => !/fmhy/i.test(n + u) &&
+  !(n === 'Google' && u === 'https://www.google.com'));
 localStorage.setItem('ld_shortcuts', JSON.stringify(shortcuts));
-document.getElementById('engine').value = localStorage.getItem('ld_engine') || 'ddg';
+// A saved engine we no longer offer (e.g. Google) falls back to DDG.
+const _savedEngine = localStorage.getItem('ld_engine');
+document.getElementById('engine').value = ENGINES[_savedEngine] ? _savedEngine : 'ddg';
 
 function tick() {
   const now = new Date();
@@ -386,15 +388,18 @@ refreshStatus(); setInterval(refreshStatus, 5000);
 """
 _JS2 = r"""// Platform tiles from browser_core/platform_tiles.json (TileRegistry).
 const PLATFORM_TILES = __PLATFORM_TILES__;
+// Built-in apps hidden by the retired-tools switch (server-injected).
+const RETIRED_APPS = __RETIRED_APPS__;
 function renderApps() {
   const g = document.getElementById('apps');
+  const visible = APPS.filter(([, name]) => !RETIRED_APPS.includes(name));
   // A registry tile must never duplicate a built-in app (e.g. Deep Research
   // lives in APPS and in platform_tiles.json) — skip platform tiles whose
   // name already renders above, case-insensitively.
-  const seen = new Set(APPS.map(([, name]) => name.toLowerCase()));
-  APPS.concat(PLATFORM_TILES.filter(([, name]) => !seen.has(name.toLowerCase()))).forEach(([ico, name, href], i) => {
+  const seen = new Set(visible.map(([, name]) => name.toLowerCase()));
+  visible.concat(PLATFORM_TILES.filter(([, name]) => !seen.has(name.toLowerCase()))).forEach(([ico, name, href]) => {
     const a = document.createElement('a');
-    a.className = 'tile' + (i === 0 ? ' hq' : ''); a.href = href;
+    a.className = 'tile' + (name === 'Agent HQ' ? ' hq' : ''); a.href = href;
     a.innerHTML = '<span class="ico">' + ico + '</span><span class="tname"></span>';
     a.querySelector('span:last-child').textContent = name;
     g.appendChild(a);
@@ -565,6 +570,19 @@ renderApps(); render();
 DASHBOARD_HTML = _HEAD + _BODY + _JS + _JS2
 
 
+# Retired 2026-10-22 (Dylan): hidden from the UI, fully built in. Flip the
+# "show_retired_tools" setting to True to restore every surface at once.
+RETIRED_APP_NAMES = ("Agent HQ", "Deep Research", "Workflows")
+RETIRED_TILE_IDS = frozenset({"hq", "deep-research", "deck-studio"})
+
+
+def _show_retired_tools(settings) -> bool:
+    try:
+        return bool(settings.get("show_retired_tools", False)) if settings is not None else False
+    except Exception:
+        return False
+
+
 def dashboard_html(settings=None) -> str:
     """The dashboard with the active theme's design tokens injected, so the
     new-tab hub matches the Qt chrome, sidebar and HQ splash exactly.
@@ -579,13 +597,22 @@ def dashboard_html(settings=None) -> str:
     else:
         html = "<style>" + _css_vars(settings) + "</style>" + DASHBOARD_HTML
     # Platform tiles: registry-driven extras appended to the built-in Apps.
+    show_retired = _show_retired_tools(settings)
     try:
-        from browser_core.tile_registry import load_tiles
+        from browser_core.tile_registry import load_all_tiles
 
-        extra = [[t.icon, t.name, t.url] for t in load_tiles()]
+        tiles = [
+            t
+            for t in load_all_tiles()
+            if t.enabled and (show_retired or t.id not in RETIRED_TILE_IDS)
+        ]
+        extra = [[t.icon, t.name, t.url] for t in tiles]
     except Exception:
         extra = []  # a broken config must never take the dashboard down
-    return html.replace("__PLATFORM_TILES__", json.dumps(extra))
+    retired = [] if show_retired else list(RETIRED_APP_NAMES)
+    return html.replace("__PLATFORM_TILES__", json.dumps(extra)).replace(
+        "__RETIRED_APPS__", json.dumps(retired)
+    )
 
 
 _SPLASH_CSS = r"""
