@@ -56,6 +56,8 @@ def _colorref(hex_color: str) -> int:
 
 def _dwm_set(hwnd: int, attribute: int, value: int) -> bool:
     """Set one DWM window attribute; False when unsupported/unavailable."""
+    if sys.platform != "win32":
+        return False
     try:
         dwmapi = ctypes.windll.dwmapi
         dwmapi.DwmSetWindowAttribute.argtypes = [

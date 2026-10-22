@@ -69,8 +69,13 @@ def _desktop_exe() -> Path | None:
         import ctypes
 
         buf = ctypes.create_unicode_buffer(520)
+        windll = getattr(ctypes, "windll", None)  # Windows-only; absent elsewhere
         # SHGetFolderPathW(hwnd, csidl=0x0010 DESKTOPDIRECTORY, token, flags, path)
-        if ctypes.windll.shell32.SHGetFolderPathW(None, 0x0010, None, 0, buf) == 0 and buf.value:
+        if (
+            windll is not None
+            and windll.shell32.SHGetFolderPathW(None, 0x0010, None, 0, buf) == 0
+            and buf.value
+        ):
             candidates.append(Path(buf.value) / "luckyd-cli.exe")
     except Exception:
         pass
@@ -207,8 +212,13 @@ def _agent2_dir() -> Path | None:
         import ctypes
 
         buf = ctypes.create_unicode_buffer(520)
+        windll = getattr(ctypes, "windll", None)  # Windows-only; absent elsewhere
         # SHGetFolderPathW(hwnd, csidl=0x0010 DESKTOPDIRECTORY, token, flags, path)
-        if ctypes.windll.shell32.SHGetFolderPathW(None, 0x0010, None, 0, buf) == 0 and buf.value:
+        if (
+            windll is not None
+            and windll.shell32.SHGetFolderPathW(None, 0x0010, None, 0, buf) == 0
+            and buf.value
+        ):
             candidates.append(Path(buf.value) / "coding-agent")
     except Exception:
         pass
