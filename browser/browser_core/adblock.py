@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import re
 from pathlib import Path
 
@@ -73,6 +74,52 @@ def _url_path(url_str: str) -> str:
         return urlsplit(url_str).path or ""
     except Exception:
         return ""
+
+
+# ── Google sign-in identity ───────────────────────────────────────────
+# Google refuses sign-in from embedded browsers ("browser or app may not
+# be secure") when the request identity looks like QtWebEngine: the global
+# profile UA already spoofs desktop Chrome (browser_core/profile.py), but
+# it advertises "{major}.0.0.0" and Qt's Client Hints don't match a real
+# Chrome's. For the sign-in hosts only, pin a fully consistent identity:
+# the engine's FULL Chromium version in the UA plus matching sec-ch-ua*
+# hints. Scoped to these hosts so no other site's fingerprint changes.
+GOOGLE_SIGNIN_HOSTS = frozenset({"accounts.google.com", "myaccount.google.com"})
+
+
+def google_signin_headers() -> dict[str, str]:
+    """The pinned Chrome identity for Google sign-in requests.
+
+    Built from the live engine version (profile.signin_ua) so the UA and
+    the Client Hints can never disagree. Never raises; may be empty when
+    no version can be determined (caller then leaves headers untouched).
+    """
+    try:
+        from browser_core.profile import client_hints, signin_ua
+
+        ua = signin_ua()
+        headers = {"User-Agent": ua}
+        headers.update(client_hints(ua))
+        return headers
+    except Exception:
+        return {}
+
+
+def _pin_google_signin_identity(info, host: str) -> bool:
+    """Set the pinned identity headers on a sign-in request.
+
+    Returns True when the request targets a Google sign-in host (caller
+    must then let it through untouched — sign-in is never blocked)."""
+    host_lower = (host or "").lower()
+    if host_lower not in GOOGLE_SIGNIN_HOSTS:
+        return False
+    setter = getattr(info, "setHttpHeader", None)
+    if callable(setter):
+        for name, value in google_signin_headers().items():
+            # One bad header must never break the request itself.
+            with contextlib.suppress(Exception):
+                setter(name.encode("utf-8"), value.encode("utf-8"))
+    return True
 
 
 # ── YouTube ad-serving URL regexes ────────────────────────────────────
@@ -211,13 +258,19 @@ class AdBlockInterceptor(QWebEngineUrlRequestInterceptor):
     # ── Qt interceptor ────────────────────────────────────────────────
 
     def interceptRequest(self, info) -> None:  # noqa: N802 (Qt API name)
-        if not self._enabled:
-            return
-
         url = info.requestUrl()
         host = url.host()
         url_str = url.toString()
         if not host or not url_str:
+            return
+
+        # Google sign-in identity: pinned BEFORE the enabled check and the
+        # blocking layers — sign-in requests always pass, with headers that
+        # match a real desktop Chrome (see google_signin_headers).
+        if _pin_google_signin_identity(info, host):
+            return
+
+        if not self._enabled:
             return
 
         # CAPTCHA-safe allowlist: checked BEFORE Layer 1 so Google

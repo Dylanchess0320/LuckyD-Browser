@@ -152,6 +152,10 @@ def css_vars(settings=None) -> str:
         f"--ld-accent2:{t['accent2']}",
         f"--ld-ok:{t['ok']}",
         f"--ld-danger:{t['danger']}",
+        # Hover overlay derived from the TEXT color: a faint light wash on
+        # dark themes, a faint dark wash on light ones (Arctic Light) — a
+        # hardcoded white overlay is invisible/wrong on light backgrounds.
+        f"--ld-hover:{_rgba(t['text'], 0.08)}",
         f"--ld-grad:linear-gradient(135deg,{grad_a} 0%,{grad_b} 60%,{t['panel']} 100%)",
         # ── unified design-system tokens (spacing, radius, elevation, accent
         # gradient, focus ring, muted/disabled, status colors) ──

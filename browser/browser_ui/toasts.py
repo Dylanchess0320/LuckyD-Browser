@@ -103,6 +103,12 @@ class ToastManager:
         del accent
 
     def show(self, message: str, kind: str = "info") -> None:
+        # No popup tips (Dylan 2026-10-22): "info" toasts were the tips
+        # system — hints, announcements, FYIs — and they are gone. Only
+        # real confirmations and problems ("ok" / "warn" / "error") still
+        # surface as popups; everything else stays in the status bar/logs.
+        if kind == "info":
+            return
         toast = _Toast(self._win, message, kind)
         self._items.append(toast)
         self._layout()

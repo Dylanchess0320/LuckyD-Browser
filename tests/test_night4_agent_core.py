@@ -329,14 +329,18 @@ async def test_run_done_first_step(patched_jsdriver, fast_sleep) -> None:
         [
             "1. open the page\n2. read the answer",  # plan call (first)
             '{"actions": [{"action": "done", "text": "found it"}]}',
+            "Found it on X.",  # findings-summary call (last)
         ]
     )
     sess = _session(ai, driver)
     said = []
     result = await sess.run("find it", on_step=said.append)
-    assert result == "found it"
+    # Every run ends with a findings summary (2026-10-22): the model's done
+    # text, then the summary built from the run journal.
+    assert result == "found it\n\n🔎 Findings\nFound it on X."
     assert any("found it" in m for m in said)
-    assert ai.calls == 2  # plan call + step call
+    assert any("🔎 Findings" in m for m in said)
+    assert ai.calls == 3  # plan call + step call + summary call
 
 
 @pytest.mark.asyncio()
@@ -344,7 +348,14 @@ async def test_run_empty_done_text_defaults(patched_jsdriver, fast_sleep) -> Non
     driver = _FakeDriver()
     patched_jsdriver["driver"] = driver
     ai = _FakeAI(["1. look\n2. finish", '{"actions": [{"action": "done"}]}'])
-    assert await _session(ai, driver).run("t") == "Done."
+    result = await _session(ai, driver).run("t")
+    # Done text still defaults, and the journal findings block follows it
+    # (the summary call has no reply left here, so the fallback journal —
+    # pages visited + outcome — is what gets appended).
+    assert result.startswith("Done.")
+    assert "🔎 Findings" in result
+    assert "Pages visited:" in result
+    assert "https://x.com" in result
 
 
 @pytest.mark.asyncio()
@@ -358,7 +369,9 @@ async def test_run_invalid_reply_then_done(patched_jsdriver, fast_sleep) -> None
             '{"actions": [{"action": "done", "text": "recovered"}]}',
         ]
     )
-    assert await _session(ai, driver, max_steps=3).run("t") == "recovered"
+    result = await _session(ai, driver, max_steps=3).run("t")
+    assert result.startswith("recovered")
+    assert "🔎 Findings" in result
 
 
 @pytest.mark.asyncio()
@@ -373,7 +386,9 @@ async def test_run_executes_actions_and_caps_batch(patched_jsdriver, fast_sleep)
             '{"actions": [{"action": "done", "text": "ok"}]}',
         ]
     )
-    assert await _session(ai, driver).run("t") == "ok"
+    result = await _session(ai, driver).run("t")
+    assert result.startswith("ok")
+    assert "🔎 Findings" in result
     assert len(driver.acts) == 4  # batch capped at 4
 
 
@@ -389,7 +404,9 @@ async def test_run_stuck_signature_counts(patched_jsdriver, fast_sleep) -> None:
             '{"actions": [{"action": "done", "text": "gave up"}]}',
         ]
     )
-    assert await _session(ai, driver).run("t") == "gave up"
+    result = await _session(ai, driver).run("t")
+    assert result.startswith("gave up")
+    assert "🔎 Findings" in result
 
 
 @pytest.mark.asyncio()
@@ -418,7 +435,11 @@ async def test_run_step_cap_exhausted(patched_jsdriver, fast_sleep) -> None:
     patched_jsdriver["driver"] = driver
     ai = _FakeAI(["1. scroll\n2. more"] + ['{"actions": [{"action": "scroll"}]}'] * 4)
     result = await _session(ai, driver, max_steps=2).run("t")
-    assert result == "Reached 2 steps without finishing."
+    # Step-limit exits also end with findings (the summary call here returns
+    # an action payload, which is rejected — the journal block is used).
+    assert result.startswith("Reached 2 steps without finishing.")
+    assert "🔎 Findings" in result
+    assert "Pages visited:" in result
 
 
 @pytest.mark.asyncio()
@@ -434,7 +455,8 @@ async def test_run_snapshot_failure_retries(patched_jsdriver, fast_sleep) -> Non
     patched_jsdriver["driver"] = driver
     ai = _FakeAI(["1. try\n2. done", '{"actions": [{"action": "done", "text": "ok"}]}'])
     said = []
-    assert await _session(ai, driver).run("t", on_step=said.append) == "ok"
+    result = await _session(ai, driver).run("t", on_step=said.append)
+    assert result.startswith("ok")
     assert any("Snapshot failed" in m for m in said)
 
 
@@ -462,7 +484,9 @@ async def test_run_vision_attaches_shot(patched_jsdriver, fast_sleep) -> None:
 
     ai = _SpyAI(["1. look\n2. finish", '{"actions": [{"action": "done", "text": "v"}]}'])
     sess = AgentSession(ai, MagicMock(), max_steps=2, use_cdp=False, vision=True)
-    assert await sess.run("t") == "v"
+    result = await sess.run("t")
+    assert result.startswith("v")
+    assert "🔎 Findings" in result
     content = seen[1][1]["content"]  # step call's user message
     assert isinstance(content, list)
     assert content[1]["image_url"]["url"].startswith("data:image/jpeg;base64,")

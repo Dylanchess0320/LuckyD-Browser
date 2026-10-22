@@ -498,12 +498,92 @@ class AgentSession:
         finally:
             ACTIVE_SESSIONS -= 1
 
+    @staticmethod
+    def _journal_findings(
+        visited: list[tuple[str, str, str]], history: list[str], outcome: str
+    ) -> str:
+        """Deterministic findings block built from the run journal — the
+        fallback when the summary call is unavailable, and the raw material
+        for it when it is."""
+        lines = ["🔎 Findings"]
+        if visited:
+            lines.append("Pages visited:")
+            for url, title, excerpt in visited:
+                label = f"{title} — {url}" if title else url
+                lines.append(f"• {label}")
+                if excerpt:
+                    lines.append(f'  "{excerpt}"')
+        else:
+            lines.append("Pages visited: none")
+        if history:
+            lines.append("What the agent did:")
+            for entry in history[-8:]:
+                lines.append(f"• {entry}")
+        lines.append(f"Outcome: {outcome}")
+        return "\n".join(lines)
+
+    async def _finish(
+        self,
+        task: str,
+        provider,
+        visited: list[tuple[str, str, str]],
+        history: list[str],
+        outcome: str,
+        say,
+        *,
+        synthesize: bool = True,
+    ) -> str:
+        """Every run ends with a visible findings summary (Dylan 2026-10-22:
+        runs used to end silently with just the model's done text or a stub).
+
+        One final model call summarizes the journal; if that call fails,
+        returns an action payload, or comes back empty, the deterministic
+        journal block is used instead. A run that never reached a page
+        returns its outcome untouched."""
+        if not visited and not history:
+            return outcome
+        journal = self._journal_findings(visited, history, outcome)
+        summary = ""
+        if synthesize:
+            try:
+                raw, _used = await self._ai.chat(
+                    [
+                        {
+                            "role": "system",
+                            "content": (
+                                "You summarize a finished browser-agent run for the user. "
+                                "State what was found, citing the pages visited. Be brief "
+                                "and concrete; never invent facts beyond the journal."
+                            ),
+                        },
+                        {
+                            "role": "user",
+                            "content": (
+                                f"Task: {task}\nOutcome: {outcome}\n\n"
+                                f"Run journal:\n{journal[:4000]}\n\n"
+                                "Write the findings summary now."
+                            ),
+                        },
+                    ],
+                    provider=provider,
+                )
+                candidate = str(raw).strip()
+                # An action payload is not a summary — fall back to the journal.
+                if candidate and not parse_action(candidate):
+                    summary = candidate
+            except Exception:
+                summary = ""
+        block = f"🔎 Findings\n{summary}" if summary else journal
+        say(block)
+        return f"{outcome}\n\n{block}"
+
     async def _run(self, task: str, provider=None, on_step=None) -> str:
         def say(message: str) -> None:
             if on_step:
                 on_step(message)
 
         history: list[str] = []
+        visited: list[tuple[str, str, str]] = []
         # Prefer the raw-CDP driver (trusted input events + screenshots);
         # fall back to JS injection if the debug port is unavailable.
         driver = None
@@ -530,13 +610,21 @@ class AgentSession:
         for step in range(1, self.max_steps + 1):
             if self.stop_requested:
                 say("⏹ Stopped by user.")
-                return "Stopped."
+                return await self._finish(
+                    task, provider, visited, history, "Stopped.", say, synthesize=False
+                )
             try:
                 snap = await driver.snapshot(compact=compact)
             except Exception as exc:
                 say(f"⚠ Snapshot failed ({exc}); retrying…")
                 await asyncio.sleep(1.5)
                 continue
+
+            # Journal the page for the end-of-run findings summary.
+            snap_url = str(snap.get("url") or "")
+            if snap_url and (not visited or visited[-1][0] != snap_url):
+                excerpt = " ".join(str(snap.get("text") or "").split())[:160]
+                visited.append((snap_url, str(snap.get("title") or ""), excerpt))
 
             # Stuck detection: same URL + same elements as last step means
             # the page didn't change — push the model to change tactics.
@@ -564,7 +652,15 @@ class AgentSession:
             try:
                 raw, _used = await self._ai.chat(messages, provider=provider)
             except Exception as exc:
-                return f"LLM error: {exc}"
+                return await self._finish(
+                    task,
+                    provider,
+                    visited,
+                    history,
+                    f"LLM error: {exc}",
+                    say,
+                    synthesize=False,
+                )
             think_s = time.monotonic() - think_t0
 
             actions = parse_action(raw)
@@ -576,7 +672,7 @@ class AgentSession:
             if first.get("action") == "done":
                 answer = str(first.get("text", "")).strip() or "Done."
                 say(f"✅ {answer}")
-                return answer
+                return await self._finish(task, provider, visited, history, answer, say)
 
             actions = actions[:4]  # cap batches
             reasons = " → ".join(str(a.get("reason") or a.get("action")) for a in actions)
@@ -590,7 +686,7 @@ class AgentSession:
                 if kind == "done":
                     answer = str(sub.get("text", "")).strip() or "Done."
                     say(f"✅ {answer}")
-                    return answer
+                    return await self._finish(task, provider, visited, history, answer, say)
                 try:
                     if kind == "undo" and not hasattr(driver, "undo"):
                         result = await self.undo_last()
@@ -603,7 +699,14 @@ class AgentSession:
             # snapshot so in-flight rendering can finish.
             await asyncio.sleep(0.15)
 
-        return f"Reached {self.max_steps} steps without finishing."
+        return await self._finish(
+            task,
+            provider,
+            visited,
+            history,
+            f"Reached {self.max_steps} steps without finishing.",
+            say,
+        )
 
     async def _make_plan(self, task: str, provider=None) -> str:
         """One upfront planning call — small models execute noticeably better

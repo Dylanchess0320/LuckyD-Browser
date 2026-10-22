@@ -1,10 +1,9 @@
 """Dashboard — the live new-tab page served by the Browser Control API.
 
 Served from the same origin as the Control API (127.0.0.1:9777 by default),
-so the page can call /status directly — no CORS, no auth juggling, no
-external server. It is the one-window hub:
+so the page can call its endpoints directly — no CORS, no auth juggling,
+no external server. It is the one-window hub:
 
-  * live status pills — coding-agent state, Control API, configured AI
   * one-tap tiles — the coding-agent workspace (the exe's web UI via /hq),
     the AI assistant, bookmarks, history, downloads, settings, shortcuts
   * web search box + user speed-dial tiles (localStorage, shared with the
@@ -36,6 +35,7 @@ _DASH_CSS = r"""  :root {
     --text: var(--ld-text, #e8ecf5); --muted: var(--ld-muted, #8b93a7);
     --accent: var(--ld-accent, #5b9dff); --accent2: var(--ld-accent2, #b46bff);
     --ok: var(--ld-ok, #34d399); --warn: #fbbf24; --err: var(--ld-danger, #ff5b6e);
+    --hover: var(--ld-hover, rgba(255,255,255,.09));
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   input, select, button { font: inherit; }
@@ -55,25 +55,10 @@ _DASH_CSS = r"""  :root {
     background: radial-gradient(58% 42% at 50% 0%, rgba(91,157,255,.07), transparent 70%);
   }
   header, main { position: relative; z-index: 1; }
-  header { display: flex; justify-content: space-between; align-items: flex-start;
+  header { display: flex; justify-content: flex-end; align-items: flex-start;
     padding: 22px 34px; flex-wrap: wrap; gap: 12px; }
-  #pills { display: flex; gap: 8px; flex-wrap: wrap; padding-top: 8px; }
-  .pill { display: inline-flex; align-items: center; gap: 7px; font-size: 11px;
-    font-weight: 600; letter-spacing: .05em;
-    padding: 6px 12px; border-radius: 999px; background: var(--card);
-    border: 1px solid var(--border); color: var(--muted); white-space: nowrap; }
-  .pill .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
-  .pill.ok .dot { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
-  .pill.warn .dot { background: var(--warn); box-shadow: 0 0 8px var(--warn); }
-  .pill.err .dot { background: var(--err); box-shadow: 0 0 8px var(--err); }
-  .pill.ok { color: var(--ok); } .pill.warn { color: var(--warn); } .pill.err { color: var(--err); }
-  #clock { text-align: right; }
-  #clock .time { font-size: 27px; font-weight: 650; letter-spacing: -.01em;
-    font-variant-numeric: tabular-nums; line-height: 1.1; }
-  #clock .date { font-size: 11px; font-weight: 600; letter-spacing: .18em;
-    text-transform: uppercase; color: var(--muted); margin-top: 5px; }
   #hello-line { font-size: 13px; font-weight: 500; letter-spacing: .01em;
-    color: var(--muted); margin-top: 8px; }
+    color: var(--muted); text-align: right; }
   #hello-line b { color: var(--accent); font-weight: 700; }
   #party { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
     pointer-events: none; z-index: 99; }
@@ -113,23 +98,19 @@ _CSS = r"""  .search { display: flex; background: var(--card); border: 1px solid
     border-radius: 14px; text-decoration: none; color: var(--text); font-size: 12px;
     font-weight: 600; letter-spacing: .01em;
     position: relative; transition: transform .12s, border-color .12s, background .12s; }
-  .tile:hover { transform: translateY(-2px); border-color: rgba(120,170,255,.5); background: rgba(255,255,255,.09); }
+  .tile:hover { transform: translateY(-2px); border-color: var(--accent); background: var(--hover); }
   .tile .ico { font-size: 22px; }
   .tile img { width: 26px; height: 26px; border-radius: 6px; }
   .tile .fav { width: 26px; height: 26px; border-radius: 7px; display: inline-flex;
     align-items: center; justify-content: center; color: #fff; font-size: 14px;
     font-weight: 700; text-shadow: 0 1px 2px rgba(0,0,0,.35); }
-  .tile .tname { color: var(--text); font-size: 13px; font-weight: 700; letter-spacing: .02em;
-    text-shadow: 0 1px 3px rgba(0,0,0,.45); }
+  .tile .tname { color: var(--text); font-size: 13px; font-weight: 700; letter-spacing: .02em; }
   .tile .del { position: absolute; top: 3px; right: 6px; color: var(--muted); font-size: 13px; opacity: 0; cursor: pointer; padding: 2px 4px; border-radius: 6px; }
-  .tile .del:hover, .tile .del:focus-visible { color: var(--err); background: rgba(255,255,255,.09); outline: none; }
+  .tile .del:hover, .tile .del:focus-visible { color: var(--err); background: var(--hover); outline: none; }
   .tile:hover .del, .tile:focus-within .del { opacity: 1; }
   .tile.add { color: var(--muted); font-size: 24px; justify-content: center; cursor: pointer; }
   .tile.add span { font-size: 11px; font-weight: 600; letter-spacing: .05em; }
-  .tile.hq { border-color: rgba(91,157,255,.45); background: rgba(91,157,255,.10); }
-  .tile.hq:hover { border-color: var(--accent); background: rgba(91,157,255,.16); }
-  .tile.research { border-color: rgba(56,189,248,.45); background: rgba(56,189,248,.10); }
-  .tile.research:hover { border-color: var(--accent); background: rgba(56,189,248,.18); }
+  .tile.hq { border-color: var(--accent); }
   .section { margin-top: 28px; font-size: 11px; font-weight: 700; letter-spacing: .18em;
     text-transform: uppercase; color: var(--muted); }
   #addform { margin-top: 14px; display: none; gap: 8px; }
@@ -141,38 +122,6 @@ _CSS = r"""  .search { display: flex; background: var(--card); border: 1px solid
     padding: 0 18px; font-size: 13.5px; font-weight: 650; letter-spacing: .02em; cursor: pointer; }
   #addform button:hover { filter: brightness(1.1); }
 
-  /* Dual-mode Omnibar + AI Response Card */
-  .mode-tabs { display: flex; gap: 8px; margin-bottom: 12px; justify-content: center; }
-  .mode-tab { padding: 7px 18px; border-radius: 999px; background: var(--card);
-    border: 1px solid var(--border); color: var(--muted); font-size: 12px; font-weight: 650;
-    letter-spacing: .03em; cursor: pointer;
-    transition: color .15s, background .15s, border-color .15s; user-select: none; }
-  .mode-tab:hover { color: var(--text); background: rgba(255,255,255,.09); }
-  .mode-tab.active { background: var(--accent); border-color: transparent; color: #fff;
-    box-shadow: 0 2px 14px rgba(91,157,255,.30); }
-
-  .ai-chips { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; justify-content: center; }
-  .ai-chip { background: var(--card); border: 1px solid var(--border); border-radius: 999px;
-    padding: 6px 13px; font-size: 11.5px; font-weight: 500; letter-spacing: .01em;
-    color: var(--muted); cursor: pointer;
-    transition: transform .12s, border-color .12s, color .12s; }
-  .ai-chip:hover { transform: translateY(-1px); border-color: var(--accent); color: var(--text); }
-
-  #ai-card { margin-top: 20px; padding: 18px 22px; background: rgba(18,24,42,.88);
-    border: 1px solid var(--accent); border-radius: 16px;
-    box-shadow: 0 10px 40px rgba(0,0,0,.5), 0 0 25px rgba(91,157,255,.18);
-    display: none; animation: pop .25s ease-out; text-align: left; }
-  #ai-card-header { display: flex; justify-content: space-between; align-items: center;
-    border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 12px; }
-  #ai-card-header .title { font-size: 13px; font-weight: 700; letter-spacing: .05em;
-    color: var(--accent); display: flex; align-items: center; gap: 6px; }
-  #ai-card-header .actions { display: flex; gap: 6px; }
-  .ai-btn { background: var(--card); border: 1px solid var(--border); color: var(--muted);
-    border-radius: 8px; font-size: 11.5px; font-weight: 600; padding: 4px 10px;
-    cursor: pointer; transition: color .12s, border-color .12s; }
-  .ai-btn:hover { color: var(--text); border-color: var(--accent); }
-  #ai-card-body { font-size: 13.5px; font-weight: 400; line-height: 1.6; color: var(--text);
-    white-space: pre-wrap; word-break: break-word; }
 """
 
 # Shortcuts the dashboard itself documents (taglines in the JS below) — only
@@ -183,10 +132,10 @@ _DASH_SHORTCUTS = [
     ("Ctrl+Shift+S", "Save a screenshot of the visible page"),
 ]
 
-# _DASH_CSS holds the header/pills/clock chrome; _CSS holds the main
-# content (search, mode tabs, AI card, tiles, add-form). Both must reach
-# page_head as extra_css — _CSS was accidentally dropped from the assembly
-# in 27facf8, which left the dashboard's search/tiles/AI card unstyled.
+# _DASH_CSS holds the header/greeting chrome; _CSS holds the main content
+# (search, tiles, add-form). Both must reach page_head as extra_css —
+# _CSS was accidentally dropped from the assembly in 27facf8, which left
+# the dashboard's search/tiles unstyled.
 _HEAD = page_head(
     "New Tab",
     _DASH_CSS + _CSS,
@@ -195,22 +144,10 @@ _HEAD = page_head(
 )
 _BODY = r"""<body>
 <header>
-  <div id="pills">
-    <span class="pill" id="pill-harness"><span class="dot"></span><span>Coding agent…</span></span>
-    <span class="pill ok" id="pill-api"><span class="dot"></span><span>Browser API</span></span>
-    <span class="pill" id="pill-ai"><span class="dot"></span><span>AI…</span></span>
-    <span class="pill" id="pill-ads" style="display:none"><span class="dot"></span><span>Shield…</span></span>
-  </div>
-  <div id="clock"><div class="time" id="time"></div><div class="date" id="date"></div>
-    <div id="hello-line"><b id="hello"></b> <span id="tagline"></span></div></div>
+  <div id="hello-line"><b id="hello"></b> <span id="tagline"></span></div>
 </header>
 <div id="party"><div class="burst" id="partytext"></div></div>
 <main>
-  <div class="mode-tabs">
-    <button type="button" class="mode-tab active" id="tab-search" onclick="setSearchMode('search')">🔍 Web Search</button>
-    <button type="button" class="mode-tab" id="tab-ask" onclick="setSearchMode('ask')">⚡ Ask Lucky</button>
-  </div>
-
   <form class="search" id="searchform">
     <select id="engine">
       <option value="bing">Bing</option>
@@ -220,18 +157,6 @@ _BODY = r"""<body>
     <input id="q" placeholder="Search the web or type a URL" autocomplete="off" autofocus>
     <button type="submit" id="searchbtn">Go</button>
   </form>
-
-  <div id="ai-card">
-    <div id="ai-card-header">
-      <div class="title"><span>◈</span> <span>Lucky's answer</span></div>
-      <div class="actions">
-        <button type="button" class="ai-btn" onclick="copyAiAnswer()">📋 Copy</button>
-        <button type="button" class="ai-btn" onclick="location.href='luckyd://assistant'">↗️ Open AI Assistant</button>
-        <button type="button" class="ai-btn" onclick="closeAiCard()">✕</button>
-      </div>
-    </div>
-    <div id="ai-card-body"></div>
-  </div>
 
   <div class="section">Apps</div>
   <div class="grid" id="apps"></div>
@@ -278,16 +203,8 @@ localStorage.setItem('ld_shortcuts', JSON.stringify(shortcuts));
 const _savedEngine = localStorage.getItem('ld_engine');
 document.getElementById('engine').value = ENGINES[_savedEngine] ? _savedEngine : 'ddg';
 
-function tick() {
-  const now = new Date();
-  document.getElementById('time').textContent =
-    now.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
-  document.getElementById('date').textContent =
-    now.toLocaleDateString([], {weekday: 'long', month: 'long', day: 'numeric'});
-}
-tick(); setInterval(tick, 10000);
-
-// Time-aware greeting with a rotating LuckyD wink.
+// Time-aware greeting with a rotating LuckyD wink. The browser's display
+// name is injected server-side (__DISPLAY_NAME__) — Settings → Appearance.
 const TAGLINES = [
   'your tabs missed you', 'no accounts, no keys, no worries', 'Lucky is ready when you are',
   'press Ctrl+K for everything', 'tip: Ctrl+` opens a terminal', 'surf different',
@@ -296,7 +213,7 @@ const TAGLINES = [
 (function greet() {
   const h = new Date().getHours();
   const part = (h < 5 ? 'Up late' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening');
-  document.getElementById('hello').textContent = '🍀 ' + part + ' — Lucky\'s ready.';
+  document.getElementById('hello').textContent = '🍀 ' + part + ' — __DISPLAY_NAME__\'s ready.';
   document.getElementById('tagline').textContent = TAGLINES[Math.floor(Math.random() * TAGLINES.length)];
 })();
 
@@ -326,65 +243,6 @@ async function unlockSynthwave() {
   } catch (e) { party('🌆 nice combo!'); }
 }
 
-function setPill(id, cls, text) {
-  const p = document.getElementById(id);
-  p.className = 'pill ' + cls;
-  p.querySelector('span:last-child').textContent = text;
-}
-// Provider ids are internals — the dashboard speaks product names.
-const PROVIDER_NAMES = {
-  ollama: 'Ollama', lmstudio: 'LM Studio', opencode: 'OpenCode Zen',
-  openrouter: 'OpenRouter', clinepass: 'Cline Pass', 'cline-usage': 'Cline Credits',
-  google: 'Gemini', groq: 'Groq', zai: 'Z.ai', deepseek: 'DeepSeek',
-  openai: 'OpenAI', anthropic: 'Anthropic', cline: 'Cline',
-};
-function friendlyProvider(id) { return PROVIDER_NAMES[id] || id; }
-async function refreshStatus() {
-  try {
-    const r = await fetch('/status');
-    const s = await r.json();
-    if (s.harness) {
-      const tools = Number(s.harness_tools || 0);
-      setPill('pill-harness', 'ok',
-        tools ? 'Coding agent online · ' + tools + ' tools' : 'Coding agent online');
-    } else if (s.harness_starting) {
-      setPill('pill-harness', 'warn', 'Coding agent starting…');
-    } else {
-      setPill('pill-harness', 'err', 'Coding agent offline');
-    }
-    setPill('pill-api', 'ok', 'Browser API on');
-    const prov = (s.ai_providers || []);
-    const localSt = (s.ai_local_status || {});
-    let aiLabel, aiState;
-    if (prov.length) {
-      aiState = 'ok';
-      aiLabel = 'AI: ' + prov.slice(0, 3).map(friendlyProvider).join(' · ') +
-        (prov.length > 3 ? '…' : '');
-    } else if (localSt.ollama === 'not_running' || localSt.lmstudio === 'not_running') {
-      // Tell the user exactly what's wrong instead of a dead "not set up".
-      const which = localSt.ollama === 'not_running' ? 'Ollama' : 'LM Studio';
-      aiState = 'err';
-      aiLabel = which + ' not running — start it, then reload';
-    } else if (localSt.ollama === 'no_models' || localSt.lmstudio === 'no_models') {
-      aiState = 'warn';
-      aiLabel = 'Ollama up, no models — run: ollama pull qwen3:4b';
-    } else {
-      aiState = 'warn';
-      aiLabel = 'AI not set up';
-    }
-    setPill('pill-ai', aiState, aiLabel);
-    const blocked = Number(s.ads_blocked || 0);
-    // A "0 blocked" pill reads like a problem — show it only once it's earned.
-    document.getElementById('pill-ads').style.display = blocked ? '' : 'none';
-    setPill('pill-ads', 'ok', '🛡 ' + blocked.toLocaleString() + ' blocked');
-  } catch (e) {
-    // /status unreachable — don't leave pills stuck on their loading text.
-    setPill('pill-harness', 'err', 'Status unavailable');
-    setPill('pill-ai', 'err', 'Status unavailable');
-    document.getElementById('pill-ads').style.display = 'none';
-  }
-}
-refreshStatus(); setInterval(refreshStatus, 5000);
 """
 _JS2 = r"""// Platform tiles from browser_core/platform_tiles.json (TileRegistry).
 const PLATFORM_TILES = __PLATFORM_TILES__;
@@ -457,97 +315,10 @@ function render() {
 }
 function save() { localStorage.setItem('ld_shortcuts', JSON.stringify(shortcuts)); }
 
-let currentSearchMode = localStorage.getItem('ld_search_mode') || 'search';
-function setSearchMode(mode) {
-  currentSearchMode = mode;
-  localStorage.setItem('ld_search_mode', mode);
-  const isAsk = mode === 'ask';
-  document.getElementById('tab-search').className = 'mode-tab' + (isAsk ? '' : ' active');
-  document.getElementById('tab-ask').className = 'mode-tab' + (isAsk ? ' active' : '');
-  document.getElementById('engine').style.display = isAsk ? 'none' : 'block';
-  const q = document.getElementById('q');
-  q.placeholder = isAsk ? 'Ask Lucky anything — questions, code, analysis…' : 'Search the web or type a URL';
-  document.getElementById('searchbtn').textContent = isAsk ? 'Ask AI' : 'Go';
-}
-setSearchMode(currentSearchMode);
-
-window.__lastAiAnswer = '';
-let __askBusy = false;
-async function askAI(query) {
-  if (!query.trim() || __askBusy) return;
-  const card = document.getElementById('ai-card');
-  const body = document.getElementById('ai-card-body');
-  const btn = document.getElementById('searchbtn');
-  __askBusy = true;
-  if (btn) { btn.disabled = true; btn.textContent = 'Thinking…'; }
-  card.style.display = 'block';
-  body.textContent = 'Thinking…';
-  card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-
-  try {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 120000);
-    let res;
-    try {
-      res = await fetch('/ask', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: query }),
-        signal: ctrl.signal,
-      });
-    } finally { clearTimeout(timer); }
-    let data = null;
-    try { data = await res.json(); } catch (e) { data = null; }
-    if (!res.ok) {
-      const detail = (data && (data.error || data.message)) || ('HTTP ' + res.status);
-      throw new Error(detail);
-    }
-    if (data && data.ok === false) throw new Error(data.error || 'AI request failed');
-    const text = (data && (data.answer || data.text || data.result)) ||
-      (typeof data === 'string' ? data : JSON.stringify(data));
-    if (!text || !String(text).trim()) throw new Error('Empty AI response — try again.');
-    body.textContent = text;
-    window.__lastAiAnswer = text;
-  } catch (err) {
-    const msg = (err && err.name === 'AbortError')
-      ? 'Timed out after 2 minutes — the model may be overloaded. Try again.'
-      : ('Could not get an AI answer — ' + (err.message || err));
-    body.textContent = msg +
-      '\n\nTip: open the AI Assistant (Ctrl+Shift+A) or check your provider in Settings.';
-  } finally {
-    __askBusy = false;
-    if (btn) {
-      btn.disabled = false;
-      btn.textContent = (typeof currentSearchMode !== 'undefined' && currentSearchMode === 'ask') ? 'Ask AI' : 'Go';
-    }
-  }
-}
-
-function askPreset(prompt) {
-  setSearchMode('ask');
-  document.getElementById('q').value = prompt;
-  askAI(prompt);
-}
-
-function copyAiAnswer() {
-  if (window.__lastAiAnswer) {
-    navigator.clipboard.writeText(window.__lastAiAnswer);
-    party('📋 Copied to clipboard!');
-  }
-}
-
-function closeAiCard() {
-  document.getElementById('ai-card').style.display = 'none';
-}
-
 document.getElementById('searchform').addEventListener('submit', ev => {
   ev.preventDefault();
   const q = document.getElementById('q').value.trim();
   if (!q) return;
-  if (currentSearchMode === 'ask') {
-    askAI(q);
-    return;
-  }
   const engine = document.getElementById('engine').value;
   localStorage.setItem('ld_engine', engine);
   if (/^[^\s]+\.[^\s]{2,}$/.test(q)) { location.href = q.startsWith('http') ? q : 'https://' + q; }
@@ -610,8 +381,23 @@ def dashboard_html(settings=None) -> str:
     except Exception:
         extra = []  # a broken config must never take the dashboard down
     retired = [] if show_retired else list(RETIRED_APP_NAMES)
-    return html.replace("__PLATFORM_TILES__", json.dumps(extra)).replace(
-        "__RETIRED_APPS__", json.dumps(retired)
+    # Custom display name (Settings → Appearance) for the greeting line.
+    try:
+        try:
+            from browser_core.settings import display_name as _display_name
+        except ImportError:
+            from browser.browser_core.settings import display_name as _display_name
+
+        name = _display_name(settings)
+    except Exception:
+        name = "LuckyD Browser"
+    # The name lands inside a single-quoted JS string: escape quotes,
+    # backslashes and "<" (a "</script>" in a name must never break out).
+    name_js = name.replace("\\", "\\\\").replace("'", "\\'").replace("<", "\\u003c")
+    return (
+        html.replace("__PLATFORM_TILES__", json.dumps(extra))
+        .replace("__RETIRED_APPS__", json.dumps(retired))
+        .replace("__DISPLAY_NAME__", name_js)
     )
 
 

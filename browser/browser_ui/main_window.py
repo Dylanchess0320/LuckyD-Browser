@@ -15,6 +15,7 @@ from browser_core import tts as _tts
 from browser_core.permissions import ALLOW, ASK, DENY, feature_key, feature_label, origin_of
 from browser_core.profile import incognito_profile
 from browser_core.session import plan_restore, tab_record, window_record
+from browser_core.settings import display_name as _settings_display_name
 
 # Kept importable: other modules (About dialog, selftest) import from
 # browser_core.updater, so the module stays — these two names are just no
@@ -36,6 +37,7 @@ from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWidgets import (
     QDialog,
     QFileDialog,
+    QHBoxLayout,
     QInputDialog,
     QLabel,
     QLineEdit,
@@ -45,7 +47,9 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QPushButton,
     QToolBar,
+    QToolButton,
     QVBoxLayout,
+    QWidget,
 )
 
 from .ai_sidebar import AiSidebar
@@ -58,17 +62,17 @@ from .dialogs import (
 )
 from .downloads import DownloadsDock
 from .icons import letter_tile
-from .omnibox import Omnibox
+from .omnibox import Omnibox, display_url_text
 from .palette import CommandPalette
 from .tab_widget import BrowserTabWidget
-from .theme import apply_to_app
+from .theme import apply_to_app, palette
 from .titlebar import apply_titlebar_theme
 from .toasts import ToastManager
 from .vertical_tabs import VerticalTabsDock
 
 ASSETS_DIR = Path(__file__).resolve().parent.parent / "assets"
 NEWTAB_PATH = ASSETS_DIR / "newtab.html"
-APP_DISPLAY = "LuckyD"
+APP_DISPLAY = "LuckyD"  # fallback brand; live windows use settings.display_name()
 
 
 class MainWindow(QMainWindow):
@@ -112,11 +116,12 @@ class MainWindow(QMainWindow):
         self._fs_was_maximized = False
 
         self.tabs = BrowserTabWidget(self)
-        self.setCentralWidget(self.tabs)
+        # The user's display name for the browser (Settings → Appearance;
+        # default "LuckyD Browser"). In-app surfaces only — window title,
+        # homepage greeting, About — never the exe/installer identity.
+        self._app_display = _settings_display_name(self.settings)
+        self._build_central()
 
-        # Quiet update badge state BEFORE the toolbar creates the real QAction.
-        self._pending_update: dict | None = None
-        self._update_act: QAction | None = None
         self._build_toolbar()
         self._build_bookmark_bar()
         self._build_statusbar()
@@ -146,20 +151,10 @@ class MainWindow(QMainWindow):
 
         self.tabs.tabCloseRequested.connect(self._on_tab_closed)
 
-        # Friendly hint toast on startup (once per session)
-        QTimer.singleShot(1800, self._show_welcome_hint)
-
         # Auto-update checks are permanently disabled: they were unreliable
         # (GitHub API rate limits, proxies/VPNs, timing). Updates live on the
         # GitHub releases page — Help > Check for Updates opens it in a tab.
         self._release_page_url = RELEASES_PAGE_URL
-
-    def _show_welcome_hint(self) -> None:
-        """One friendly toast per session: shortcuts + free AI hint."""
-        with contextlib.suppress(Exception):
-            self.toast(
-                "Tip: ? in address bar asks AI • Ctrl+K commands • Esc exits fullscreen", "info"
-            )
 
     def _apply_theme(self) -> None:
         """Apply the current theme (called on startup and when theme changes)."""
@@ -236,11 +231,56 @@ class MainWindow(QMainWindow):
 
     # ── UI builders ──────────────────────────────────────────────────
 
+    def _build_central(self) -> None:
+        """Central layout with the tab strip ABOVE the address bar.
+
+        QMainWindow always docks toolbars above the central widget, so the
+        classic tab-strip-on-top order needs the bars inside one container:
+        [tab strip][nav bar][bookmark bar][tab pages]. The QTabBar is
+        reparented into the strip row (the tab widget keeps managing the
+        same bar object; BrowserTabBar references its widget explicitly,
+        not via parent()). Any failure falls back to the classic layout —
+        tabs as the central widget with docked toolbars — rather than
+        breaking window construction.
+        """
+        self._tab_bar = None
+        self._central_layout: QVBoxLayout | None = None
+        try:
+            central = QWidget(self)
+            layout = QVBoxLayout(central)
+            layout.setContentsMargins(0, 0, 0, 0)
+            layout.setSpacing(0)
+            strip = QWidget(central)
+            strip_layout = QHBoxLayout(strip)
+            strip_layout.setContentsMargins(0, 0, 0, 0)
+            strip_layout.setSpacing(0)
+            tab_bar = self.tabs.tabBar()
+            tab_bar.setParent(strip)
+            strip_layout.addWidget(tab_bar, 1)
+            self._tab_bar = tab_bar
+            with contextlib.suppress(Exception):
+                plus = self.tabs.cornerWidget(Qt.Corner.TopRightCorner)
+                if plus is not None:
+                    plus.setParent(strip)
+                    strip_layout.addWidget(plus)
+            layout.addWidget(strip)
+            layout.addWidget(self.tabs)
+            self._central_layout = layout
+            self.setCentralWidget(central)
+        except Exception:
+            self._tab_bar = None
+            self._central_layout = None
+            self.setCentralWidget(self.tabs)
+
     def _build_toolbar(self) -> None:
         bar = QToolBar("Navigation", self)
         bar.setObjectName("nav_toolbar")
         bar.setMovable(False)
-        self.addToolBar(bar)
+        if self._central_layout is not None:
+            # Inside the central container, directly under the tab strip.
+            self._central_layout.insertWidget(1, bar)
+        else:
+            self.addToolBar(bar)
 
         self.back_act = QAction("←", self)
         self.back_act.setToolTip("Back (Alt+Left) — mouse back button also works")
@@ -267,13 +307,9 @@ class MainWindow(QMainWindow):
         self.omnibox.navigate.connect(self.load_in_current_tab)
         bar.addWidget(self.omnibox)
 
-        # Update badge: it always points at the GitHub releases page — the
-        # in-app update checker that drove it was removed as unreliable.
-        self._update_act = QAction("⬆", self)
-        self._update_act.setToolTip("Get the latest LuckyD — opens the releases page on GitHub")
-        self._update_act.setVisible(True)
-        self._update_act.triggered.connect(self._open_releases_page)
-        bar.addAction(self._update_act)
+        # (The old ⬆ update badge that sat here is gone — Dylan 2026-10-22:
+        # updates already live under Menu → Help → Check for Updates. The
+        # freed top-right slot now holds the menu button, added below.)
 
         # Legacy toolbar buttons (star/AI/coding-agent/mesh/summarize/read)
         # were removed in 7.0: the new-tab dashboard's Apps grid covers them
@@ -315,19 +351,33 @@ class MainWindow(QMainWindow):
             )
             bar.addWidget(incog_label)
 
+        # The whole menu bar (File/History/Bookmarks/View/Tools/Help) lives
+        # behind this one dropdown button at the top-right — where the old
+        # update arrow sat. _build_menus() fills its menu.
+        self.menu_btn = QToolButton(self)
+        self.menu_btn.setText("☰")
+        self.menu_btn.setToolTip("Menu — File, History, Bookmarks, View, Tools, Help")
+        self.menu_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        bar.addWidget(self.menu_btn)
+
         self.nav_bar = bar
 
     def _build_bookmark_bar(self) -> None:
         """Toggleable bookmarks strip under the nav bar (Ctrl+Shift+B)."""
-        # Force a second toolbar row so the strip always spans the full width.
-        self.addToolBarBreak(Qt.ToolBarArea.TopToolBarArea)
         bar = QToolBar("Bookmarks", self)
         bar.setObjectName("bookmark_bar")
         bar.setMovable(False)
         bar.setFloatable(False)
         bar.setIconSize(QSize(16, 16))
         bar.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
-        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, bar)
+        if self._central_layout is not None:
+            # Third row of the central container: strip, nav, bookmarks.
+            self._central_layout.insertWidget(2, bar)
+        else:
+            # Classic fallback: force a second toolbar row so the strip
+            # always spans the full width.
+            self.addToolBarBreak(Qt.ToolBarArea.TopToolBarArea)
+            self.addToolBar(Qt.ToolBarArea.TopToolBarArea, bar)
         bar.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         bar.customContextMenuRequested.connect(self._bookmark_bar_menu)
         self.bookmark_bar = bar
@@ -395,7 +445,6 @@ class MainWindow(QMainWindow):
         """Immersive mode: strip every chrome surface, keep only the page."""
         on = not getattr(self, "_focus", False)
         self._focus = on
-        self.menuBar().setVisible(not on)
         self.nav_bar.setVisible(not on)
         if on:
             self._focus_bm_was = self.bookmark_bar.isVisible()
@@ -508,9 +557,14 @@ class MainWindow(QMainWindow):
         return act
 
     def _build_menus(self) -> None:
-        mbar = self.menuBar()
+        # No native menu-bar row (2026-10-22): the six menus are standalone
+        # QMenu objects, grouped as submenus of ONE root menu behind the
+        # top-right menu button (see _build_toolbar). The native titlebar —
+        # window controls and dragging — is untouched. The empty menu bar
+        # widget itself stays hidden for good.
+        self.menuBar().setVisible(False)
 
-        file_menu = mbar.addMenu("&File")
+        file_menu = QMenu("&File", self)
         self._add(file_menu, "New Tab", self.new_tab, "Ctrl+T")
         self._add(file_menu, "New Window", self.new_window, "Ctrl+N")
         self._add(
@@ -533,14 +587,14 @@ class MainWindow(QMainWindow):
         self._add(file_menu, "Close Tab", self.close_current_tab, "Ctrl+W")
         self._add(file_menu, "Quit", self.close, "Ctrl+Q")
 
-        history_menu = mbar.addMenu("&History")
+        history_menu = QMenu("&History", self)
         self._add(history_menu, "Show All History", self.open_history, "Ctrl+H")
         self._add(history_menu, "Clear All History…", self.clear_history)
 
-        self.bookmarks_menu = mbar.addMenu("&Bookmarks")
+        self.bookmarks_menu = QMenu("&Bookmarks", self)
         self.bookmarks_menu.aboutToShow.connect(self._rebuild_bookmarks_menu)
 
-        view_menu = mbar.addMenu("&View")
+        view_menu = QMenu("&View", self)
         self._add(view_menu, "Zoom In", self.zoom_in, "Ctrl+=")
         self._add(view_menu, "Zoom Out", self.zoom_out, "Ctrl+-")
         self._add(view_menu, "Actual Size", self.zoom_reset, "Ctrl+0")
@@ -565,13 +619,13 @@ class MainWindow(QMainWindow):
         self.vtabs_act.setStatusTip("Show tabs as a sidebar strip instead of the top bar")
         self.vtabs_act.toggled.connect(self.toggle_vertical_tabs)
         view_menu.addAction(self.vtabs_act)
-        self._add(view_menu, "Focus Mode", self.toggle_focus_mode, "Ctrl+Shift+F")
+        self._add(view_menu, "Focus Mode", self.toggle_focus_mode)
         ai_toggle = self.ai_sidebar.toggleViewAction()
         ai_toggle.setText("AI Assistant")
         ai_toggle.setShortcut(QKeySequence("Ctrl+Shift+A"))
         view_menu.addAction(ai_toggle)
 
-        tools_menu = mbar.addMenu("&Tools")
+        tools_menu = QMenu("&Tools", self)
         if self._show_retired_tools():
             self._add(tools_menu, "Coding Agent", self.open_hq, "Ctrl+Shift+H")
         self._add(
@@ -613,12 +667,29 @@ class MainWindow(QMainWindow):
         tools_menu.addSeparator()
         self._add(tools_menu, "Settings…", self.open_settings, "Ctrl+,")
 
-        help_menu = mbar.addMenu("&Help")
+        help_menu = QMenu("&Help", self)
         self._add(help_menu, "Check for Updates…", self.check_for_updates)
         help_menu.addSeparator()
         self._add(help_menu, "Keyboard Shortcuts…", self.show_shortcuts, "Ctrl+/")
         help_menu.addSeparator()
         self._add(help_menu, "About", self.show_about)
+
+        # One root menu for the top-right button: the same six menus, in
+        # the same order, as submenus. Every command (and the dynamic
+        # Bookmarks/Workspaces repopulation) works exactly as before —
+        # the menu objects are the same live objects as ever.
+        root_menu = QMenu(self)
+        for menu in (
+            file_menu,
+            history_menu,
+            self.bookmarks_menu,
+            view_menu,
+            tools_menu,
+            help_menu,
+        ):
+            root_menu.addMenu(menu)
+        self._root_menu = root_menu
+        self.menu_btn.setMenu(root_menu)
 
     def _rebuild_bookmarks_menu(self) -> None:
         self.bookmarks_menu.clear()
@@ -694,6 +765,12 @@ class MainWindow(QMainWindow):
                 self,
                 activated=lambda i=i: self._jump_tab(i),
             )
+        # Focus Mode (Ctrl+Shift+F) — window-level, NOT a menu shortcut:
+        # focus mode hides the menu chrome, and a menu action's shortcut
+        # stops dispatching while its menu is hidden, which made focus
+        # mode a one-way door. This binding survives hidden chrome, so
+        # the same command toggles it off AND on.
+        _qshortcut(QKeySequence("Ctrl+Shift+F"), self, activated=self.toggle_focus_mode)
         # Command palette (Ctrl+K)
         _qshortcut(QKeySequence("Ctrl+K"), self, activated=self.show_palette)
         # Reopen closed tab (Ctrl+Shift+T)
@@ -1070,7 +1147,8 @@ class MainWindow(QMainWindow):
 
     def on_url_changed(self, url) -> None:
         if not self.omnibox.hasFocus():
-            self.omnibox.setText(url.toString())
+            port = int(self.settings.get("browser_api_port", 9777) or 9777)
+            self.omnibox.setText(display_url_text(url.toString(), port))
         self._update_star()
 
     def on_title_changed(self, title: str) -> None:
@@ -1140,9 +1218,9 @@ class MainWindow(QMainWindow):
     def _update_title(self, title: str = "") -> None:
         suffix = " — Incognito" if self.incognito else ""
         if title:
-            self.setWindowTitle(f"{title} — {APP_DISPLAY}{suffix}")
+            self.setWindowTitle(f"{title} — {self._app_display}{suffix}")
         else:
-            self.setWindowTitle(f"{APP_DISPLAY}{suffix}")
+            self.setWindowTitle(f"{self._app_display}{suffix}")
 
     def _update_nav_state(self, view) -> None:
         self.back_act.setEnabled(view.history().canGoBack())
@@ -1841,6 +1919,9 @@ class MainWindow(QMainWindow):
     def open_settings(self) -> None:
         dialog = SettingsDialog(self.settings, self.profile, self)
         if dialog.exec():
+            # A renamed browser shows its new name immediately.
+            self._app_display = _settings_display_name(self.settings)
+            self._update_title()
             self.adblock_act.setChecked(bool(self.settings.get("adblock_enabled", True)))
             # Settings can also flip the bookmark bar / startup behaviour.
             self.bm_bar_act.setChecked(bool(self.settings.get("bookmark_bar_visible", True)))
@@ -1874,12 +1955,18 @@ class MainWindow(QMainWindow):
 
     def show_shortcuts(self) -> None:
         """Display a keyboard shortcuts reference dialog."""
-        shortcuts = """
+        # Colors come from the ACTIVE theme palette — the old hardcoded
+        # Neon values (dark-navy chips, default text) were unreadable on
+        # light themes like Arctic Light (Dylan 2026-10-22).
+        pal = palette(self.settings)
+        shortcuts = f"""
         <style>
-          td, th { padding: 3px 16px 3px 4px; text-align: left; font-size: 12px; }
-          th { color: #5b9dff; font-weight: 600; font-size: 13px; padding-top: 10px; }
-          .kbd { background: #1a2132; border: 1px solid #232c42; border-radius: 4px;
-                 padding: 1px 7px; font-family: monospace; font-size: 11px; }
+          td, th {{ padding: 3px 16px 3px 4px; text-align: left; font-size: 12px;
+                    color: {pal["text"]}; }}
+          th {{ color: {pal["accent"]}; font-weight: 600; font-size: 13px; padding-top: 10px; }}
+          .kbd {{ background: {pal["card"]}; color: {pal["text"]};
+                  border: 1px solid {pal["border"]}; border-radius: 4px;
+                  padding: 1px 7px; font-family: monospace; font-size: 11px; }}
         </style>
         <b>Keyboard Shortcuts</b><br><br>
         <table>
@@ -1941,7 +2028,7 @@ class MainWindow(QMainWindow):
             )
         from PySide6.QtWidgets import QMessageBox
 
-        QMessageBox.about(self, f"{APP_DISPLAY} — Shortcuts", shortcuts)
+        QMessageBox.about(self, f"{self._app_display} — Shortcuts", shortcuts)
 
     def show_about(self) -> None:
         from browser_core.updater import current_version
@@ -1958,11 +2045,11 @@ class MainWindow(QMainWindow):
         channel = "Standalone build" if getattr(sys, "frozen", False) else "Source (dev)"
 
         dlg = QDialog(self)
-        dlg.setWindowTitle(f"About {APP_DISPLAY}")
+        dlg.setWindowTitle(f"About {self._app_display}")
         dlg.setWindowIcon(self.windowIcon())
         lay = QVBoxLayout(dlg)
         text = QLabel(
-            f"<h3>🍀 {APP_DISPLAY}</h3>"
+            f"<h3>🍀 {self._app_display}</h3>"
             f"<p><b>Version:</b> {__version__}<br>"
             f"<b>Channel:</b> {channel}<br>"
             f"<b>Updates:</b> github.com/Dylanchess0320/LuckyD-Browser/releases</p>"

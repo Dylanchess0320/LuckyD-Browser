@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -206,11 +207,22 @@ class BookmarksDialog(QDialog):
         self._reload()
 
 
+def _scrollable(page: QWidget) -> QScrollArea:
+    """Wrap a settings tab page in a scroll area so the dialog can shrink
+    freely — every row stays reachable by scrolling instead of clipping."""
+    area = QScrollArea()
+    area.setWidgetResizable(True)
+    area.setWidget(page)
+    return area
+
+
 class SettingsDialog(QDialog):
     def __init__(self, settings, profile, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Settings")
-        self.setMinimumWidth(480)
+        # Freely resizable, including well below the old 480px floor —
+        # tab pages scroll (see _scrollable), so nothing becomes unreadable.
+        self.setMinimumSize(360, 300)
         self._settings = settings
         self._profile = profile
 
@@ -312,7 +324,7 @@ class SettingsDialog(QDialog):
         self.cdp_debug.setChecked(bool(settings.get("cdp_debugging", True)))
         gform.addRow(self.cdp_debug)
 
-        tabs.addTab(general, "General")
+        tabs.addTab(_scrollable(general), "General")
 
         # ── Privacy ───────────────────────────────────────────────
         privacy = QWidget(tabs)
@@ -343,11 +355,20 @@ class SettingsDialog(QDialog):
         clear_row.addStretch(1)
         pform.addRow(clear_row)
 
-        tabs.addTab(privacy, "Privacy")
+        tabs.addTab(_scrollable(privacy), "Privacy")
 
         # ── Appearance ────────────────────────────────────────────
         appearance = QWidget(tabs)
         aform = QFormLayout(appearance)
+
+        self.display_name = QLineEdit(settings.get("browser_display_name", ""))
+        self.display_name.setPlaceholderText("LuckyD Browser")
+        self.display_name.setToolTip(
+            "Call the browser whatever you want — the name shows in the\n"
+            "window title, on the homepage and in About. Display only:\n"
+            "the app itself keeps its real name. Blank = LuckyD Browser."
+        )
+        aform.addRow("Browser name", self.display_name)
 
         self.theme_box = QComboBox(self)
         self.theme_box.addItems([THEMES[k]["label"] for k in THEMES])
@@ -378,7 +399,7 @@ class SettingsDialog(QDialog):
         self.zoom_memory.setChecked(bool(settings.get("zoom_remember", True)))
         aform.addRow(self.zoom_memory)
 
-        tabs.addTab(appearance, "Appearance")
+        tabs.addTab(_scrollable(appearance), "Appearance")
 
         # ── Updates ───────────────────────────────────────────────
         updates = QWidget(tabs)
@@ -389,7 +410,7 @@ class SettingsDialog(QDialog):
         self.auto_update.setChecked(bool(settings.get("update_auto_check", True)))
         uform.addRow(self.auto_update)
 
-        tabs.addTab(updates, "Updates")
+        tabs.addTab(_scrollable(updates), "Updates")
 
         layout.addWidget(tabs)
 
@@ -441,6 +462,7 @@ class SettingsDialog(QDialog):
         self._settings.set("zoom_factor", float(self.zoom_box.currentData() or 1.0))
         self._settings.set("zoom_remember", self.zoom_memory.isChecked())
         self._settings.set("update_auto_check", self.auto_update.isChecked())
+        self._settings.set("browser_display_name", self.display_name.text().strip())
         # Theme: find the key for the selected label
         selected_label = self.theme_box.currentText()
         for k, v in THEMES.items():

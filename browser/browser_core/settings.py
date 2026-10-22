@@ -111,12 +111,33 @@ DEFAULTS = {
     # Deep Researcher and Deck Studio are hidden from every UI surface but
     # stay fully built in — set this to True to bring them all back.
     "show_retired_tools": False,
+    # Custom browser display name (2026-10-22): "" = the default
+    # "LuckyD Browser". In-app surfaces only (window title, homepage
+    # greeting, About) — never the exe/installer/package identity.
+    "browser_display_name": "",
     "theme": "neon",
     "ai_provider": "",
     "ai_model_overrides": {},
     "update_last_checked": "",
     "last_seen_version": "",
 }
+
+
+DEFAULT_DISPLAY_NAME = "LuckyD Browser"
+
+
+def display_name(settings=None) -> str:
+    """The browser's user-facing display name.
+
+    The user's custom name (Settings → Appearance → Browser name) when one
+    is set; empty/whitespace (or no settings) falls back to the default.
+    Display only — executable, installer and package identity never change.
+    """
+    try:
+        custom = str(settings.get("browser_display_name", "") or "").strip() if settings else ""
+    except Exception:
+        custom = ""
+    return custom or DEFAULT_DISPLAY_NAME
 
 
 class SettingsStore:

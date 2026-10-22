@@ -303,7 +303,6 @@ class BrowserApp:
                 if ok:
                     self.install_local_auth_cookies(win.profile)
                 win.toasts.show(msg, kind=kind)
-                win.ai_sidebar.refresh_harness_status()
             except Exception:
                 pass
 
@@ -348,14 +347,17 @@ class BrowserApp:
             print(f"[browser] session restore skipped: {exc}")
 
     def _announce_whats_new(self, window: MainWindow) -> None:
-        """One toast on the first launch after an update."""
-        try:
-            from browser import WHATS_NEW, __version__
+        """Popup announcements are gone (Dylan 2026-10-22 — no tip popups).
 
-            if str(self.settings.get("last_seen_version", "")) == __version__:
-                return
+        Kept as a version marker only: record that this build has been
+        seen so nothing downstream waits on a first-launch announcement.
+        ``window`` is accepted (and unused) for the existing call site.
+        """
+        del window
+        try:
+            from browser import __version__
+
             self.settings.set("last_seen_version", __version__)
-            QTimer.singleShot(2500, lambda: window.toast(WHATS_NEW, "ok"))
         except Exception:
             pass
 

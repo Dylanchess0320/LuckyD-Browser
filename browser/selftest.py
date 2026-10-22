@@ -660,23 +660,23 @@ def step2() -> None:
     )
 
     check(
-        "harness mode honors saved setting",
-        win.ai_sidebar.harness_box.isChecked() == bool(win.settings.get("harness_mode", True)),
-    )
-    check(
         "harness supervisor wired",
         hasattr(app, "harness") and app.harness.status().get("url", "").endswith(":8000"),
         app.harness.status().get("url", "") if hasattr(app, "harness") else "missing",
     )
     check(
-        "sidebar harness status widget",
-        win.ai_sidebar.harness_status.text() != "",
+        "sidebar has one input + actions dropdown (no checkboxes)",
+        hasattr(win.ai_sidebar, "actions_btn")
+        and not hasattr(win.ai_sidebar, "harness_box")
+        and not hasattr(win.ai_sidebar, "vision_box")
+        and not hasattr(win.ai_sidebar, "context_box")
+        and not hasattr(win.ai_sidebar, "agent_input"),
     )
     _dp = win.ai_sidebar.bridge.default_provider()
     _expect = win.ai_sidebar.bridge.supports_vision(_dp)
     check(
-        "vision auto-sync matches default provider",
-        win.ai_sidebar.vision_box.isChecked() == _expect,
+        "vision capability matches default provider",
+        win.ai_sidebar._vision_capable() == _expect,
         f"{_dp} -> vision={_expect}",
     )
     # v1.6.0 — tab groups (assign, collapse chip, session persistence, AI apply)
@@ -808,7 +808,9 @@ def finish(api_thread=None) -> None:
     win._exit_video_fullscreen()
     check(
         "video fullscreen restores chrome",
-        not win.isFullScreen() and win.nav_bar.isVisible() and win.menuBar().isVisible(),
+        # The menu bar is permanently hidden since 2026-10-22 (menus live
+        # behind the top-right menu button) — chrome = nav bar + button.
+        not win.isFullScreen() and win.nav_bar.isVisible() and win.menu_btn.isVisible(),
     )
     failed = [r for r in RESULTS if not r[1]]
     print(f"\n{len(RESULTS) - len(failed)}/{len(RESULTS)} checks passed")

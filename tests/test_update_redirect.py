@@ -1,7 +1,8 @@
-"""Redirect tests: Help > Check for Updates + toolbar arrow open GitHub.
+"""Redirect tests: Help > Check for Updates opens GitHub releases.
 
-The in-app updater was retired as unreliable, so every update path is now a
+The in-app updater was retired as unreliable, so the update path is now a
 plain navigation to the public releases page (no network, no threads).
+The old toolbar ⬆ badge was removed in 2026-10-22 — Help is the one path.
 """
 
 from __future__ import annotations
@@ -20,7 +21,10 @@ def test_releases_url_constant_points_at_github_releases():
 
 
 def test_badge_and_menu_route_to_the_releases_page():
-    assert "self._update_act.triggered.connect(self._open_releases_page)" in MW_SRC
+    # The toolbar ⬆ badge was removed (2026-10-22 — updates already live in
+    # the menu); the Help → Check for Updates route to the releases page is
+    # the one update path and must keep working.
+    assert "self._update_act" not in MW_SRC
     assert '"Check for Updates…", self.check_for_updates' in MW_SRC
     assert "self.open_in_new_tab(QUrl(self._release_page()))" in MW_SRC
 

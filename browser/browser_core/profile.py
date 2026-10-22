@@ -45,6 +45,63 @@ def desktop_ua() -> str:
     return DESKTOP_UA
 
 
+def chromium_version() -> str:
+    """The engine's full Chromium version ("126.0.6478.0"-style), or "".
+
+    The global profile UA advertises ``{major}.0.0.0``; Google sign-in risk
+    checks compare the UA against Client Hints and feature signals, so the
+    sign-in flow pins the FULL real version instead (see adblock.py).
+    Never raises.
+    """
+    try:
+        from PySide6.QtWebEngineCore import qWebEngineChromiumVersion
+
+        full = str(qWebEngineChromiumVersion())
+        return full if full and full[0].isdigit() else ""
+    except Exception:
+        return ""
+
+
+def signin_ua() -> str:
+    """Full-version Chrome UA for Google sign-in hosts.
+
+    Falls back to desktop_ua() when the engine version is unavailable, so
+    the header set is never worse than the global UA. Never raises.
+    """
+    full = chromium_version()
+    if full:
+        return (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+            f"(KHTML, like Gecko) Chrome/{full} Safari/537.36"
+        )
+    return desktop_ua()
+
+
+def chrome_major(ua: str) -> int:
+    """The Chrome major version claimed by a UA string (0 when absent)."""
+    import re
+
+    match = re.search(r"Chrome/(\d+)", ua or "")
+    return int(match.group(1)) if match else 0
+
+
+def client_hints(ua: str) -> dict[str, str]:
+    """Chromium Client Hints consistent with ``ua`` — real Chrome sends
+    these on every secure request; QtWebEngine's own hints (when it sends
+    any) can carry inconsistent brands, which Google sign-in flags."""
+    major = chrome_major(ua)
+    if major < 100:
+        return {}
+    return {
+        "sec-ch-ua": f'"Google Chrome";v="{major}", "Chromium";v="{major}", "Not_A Brand";v="99"',
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": '"Windows"',
+        "sec-ch-ua-platform-version": '"15.0.0"',
+        "sec-ch-ua-arch": '"x86"',
+        "sec-ch-ua-bitness": '"64"',
+    }
+
+
 # Accept-Language sent on every request. QtWebEngine sends none by default,
 # which makes consent.google.com bounce in a redirect loop (no language →
 # consent page → no language → …). Setting it breaks the loop.

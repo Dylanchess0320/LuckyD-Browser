@@ -104,7 +104,10 @@ def test_ui_surfaces_gate_on_the_switch() -> None:
     assert "_show_retired_tools" in main_window
     assert 'self._add(tools_menu, "Coding Agent", self.open_hq, "Ctrl+Shift+H")' in main_window
     assert '"show_retired_tools"' in palette
-    assert '"show_retired_tools"' in sidebar
+    # Pass 2 removed the sidebar Research button unconditionally (Dylan,
+    # 2026-10-22) — it no longer needs the switch, it is simply gone.
+    assert "🔬 Research" not in sidebar
+    assert "_open_research_from_input" not in sidebar
     assert '"show_retired_tools", self.retired_tools.isChecked()' in dialogs
     # The open_* handlers themselves are NOT removed — hiding is UI-only.
     assert "def open_hq" in main_window

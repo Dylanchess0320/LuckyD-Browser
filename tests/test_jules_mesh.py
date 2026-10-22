@@ -337,7 +337,9 @@ async def test_action_undo_stack_and_js_driver_undo() -> None:
     assert len(stack) == 0
 
     final = await session.run("Complete the form", on_step=steps_seen.append)
-    assert final == "Done!"
+    # Runs end with the answer plus a findings summary (2026-10-22).
+    assert final.startswith("Done!")
+    assert "🔎 Findings" in final
     assert any("Step 1/10 (10%)" in s for s in steps_seen)
 
 

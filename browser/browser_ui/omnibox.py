@@ -18,6 +18,36 @@ _LOCALHOST_RE = re.compile(
 )
 
 
+_LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1", "[::1]"})
+
+
+def display_url_text(url: str, api_port: int = 9777) -> str:
+    """The address-bar text for a tab URL.
+
+    The internal homepage dashboard is served by the browser's own control
+    server (http://127.0.0.1:9777/dashboard) — showing that raw IP:port in
+    the bar is noise (Dylan 2026-10-22), so the dashboard displays as a
+    clean, empty bar. The rule is deliberately narrow: only the control
+    server's own host:port and only the dashboard paths — real localhost
+    dev pages and every other URL display verbatim. Display-only: the
+    tab's actual URL, history and reload are untouched.
+    """
+    try:
+        from urllib.parse import urlsplit
+
+        parts = urlsplit(url)
+        host = (parts.hostname or "").lower()
+        if (
+            host in _LOOPBACK_HOSTS
+            and (parts.port or None) == int(api_port)
+            and parts.path in ("", "/", "/dashboard")
+        ):
+            return ""
+    except Exception:
+        pass
+    return url
+
+
 def build_completion_entries(history_rows, bookmark_rows) -> tuple[list[str], dict[str, str]]:
     """Merge history + bookmarks into (labels, label→url), deduped.
 

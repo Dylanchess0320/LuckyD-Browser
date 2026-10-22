@@ -133,6 +133,7 @@ class CommandPalette(QWidget):
             ("PowerShell Terminal", lambda: self._mw.open_terminal("powershell")),
             ("Workflows", self._mw.open_workflows),
             ("Save Screenshot", self._mw.save_screenshot),
+            ("Focus Mode", self._mw.toggle_focus_mode),
             ("Toggle Bookmarks Bar", self._mw.bm_bar_act.toggle),
             ("Bookmarks", self._mw.open_bookmarks),
             ("History", self._mw.open_history),

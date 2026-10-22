@@ -12,8 +12,6 @@ import re
 from browser_core.agent import ActionUndoStack, AgentSession, JsBridge
 from browser_core.ai_bridge import AIBridge
 from browser_core.brand import tokens as _brand_tokens
-from browser_core.lucky import greeting as _lucky_greeting
-from browser_core.lucky import suggest as _lucky_suggest
 from browser_core.lucky import system_prompt as _lucky_system_prompt
 from browser_core.skills import (
     Skill,
@@ -24,14 +22,15 @@ from browser_core.skills import (
 )
 from PySide6.QtCore import QBuffer, QIODevice, Qt, QThread, QTimer, QUrl, Signal
 from PySide6.QtWidgets import (
-    QCheckBox,
     QComboBox,
     QDockWidget,
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMenu,
     QPushButton,
     QTextBrowser,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -298,11 +297,9 @@ class AiSidebar(QDockWidget):
             if name in ("clinepass", "cline-usage") and self._cline_credit_exhausted():
                 label += "  (credits exhausted)"
             self.provider_box.addItem(label, name)
-        self.context_box = QCheckBox("Page context", body)
-        self.context_box.setChecked(True)
-        self.context_box.setToolTip("Include the current page text with your message")
+        # Page context is always included (2026-10-22: the checkbox is
+        # gone — capabilities stay, clutter goes).
         top.addWidget(self.provider_box, 1)
-        top.addWidget(self.context_box)
         layout.addLayout(top)
 
         model_row = QHBoxLayout()
@@ -314,11 +311,6 @@ class AiSidebar(QDockWidget):
         layout.addLayout(model_row)
         self.provider_box.currentIndexChanged.connect(self._provider_changed)
 
-        # Live coding-agent backend status.
-        self.harness_status = QLabel("Coding agent: …", body)
-        self.harness_status.setTextFormat(Qt.TextFormat.RichText)
-        layout.addWidget(self.harness_status)
-
         if not self.bridge.providers():
             warn = QLabel(self._setup_hint_html(), body)
             warn.setTextFormat(Qt.TextFormat.RichText)
@@ -327,55 +319,56 @@ class AiSidebar(QDockWidget):
             warn.linkActivated.connect(lambda href: self._open_link(QUrl(href)))
             layout.addWidget(warn)
 
-        actions = QHBoxLayout()
+        # Every assistant action lives behind ONE dropdown (2026-10-22:
+        # the two button rows and all checkboxes were removed — the full
+        # coding agent is simply how agent tasks run now, page context and
+        # vision steps are always on, and the Research button is gone with
+        # the retired Deep Researcher).
+        self._agent_running = False
+        actions_menu = QMenu(body)
         for label, tip, slot in (
             ("Summarize", "Summarize this page in 5 bullet points", self._summarize),
             ("📷 Look at page", "Ask about a screenshot of this page", self._visual_qa),
-            ("Clear", "Clear this conversation", self._clear_chat),
-        ):
-            btn = QPushButton(label, body)
-            btn.setToolTip(tip)
-            btn.clicked.connect(slot)
-            actions.addWidget(btn)
-        layout.addLayout(actions)
-
-        actions2 = QHBoxLayout()
-        action2_items = [
             (
                 "📊 Extract",
                 "Pull tables, prices, and contact info into Markdown",
                 self._extract_data,
             ),
             ("🛡️ Audit", "Security and privacy review of this page", self._security_audit),
-            (
-                "🔬 Research",
-                "Open Deep Research with the text below as the question",
-                self._open_research_from_input,
-            ),
-            ("📋 Copy", "Copy this conversation as Markdown", self._copy_chat),
-        ]
-        # Deep Researcher is retired from the UI (show_retired_tools brings
-        # its sidebar button back along with every other surface).
-        _settings = getattr(self._mw, "settings", None)
-        if not bool(_settings.get("show_retired_tools", False) if _settings else False):
-            action2_items = [x for x in action2_items if x[0] != "🔬 Research"]
-        for label, tip, slot in action2_items:
-            btn = QPushButton(label, body)
-            btn.setToolTip(tip)
-            btn.clicked.connect(slot)
-            actions2.addWidget(btn)
-        layout.addLayout(actions2)
-
-        self.harness_box = QCheckBox(body)
-        self.harness_box.setText("🔌 Full coding agent (recommended)")
-        self.harness_box.setToolTip(
-            "Agent tasks run on the full coding-agent backend, which "
-            "starts automatically and can drive your open tabs. "
-            "Uncheck to use the lighter built-in agent instead."
+            ("📋 Copy chat", "Copy this conversation as Markdown", self._copy_chat),
+        ):
+            act = actions_menu.addAction(label)
+            act.setToolTip(tip)
+            act.triggered.connect(slot)
+        actions_menu.addSeparator()
+        self._act_run_agent = actions_menu.addAction("▶ Run as agent task")
+        self._act_run_agent.setToolTip(
+            "Run the text in the input below as an autonomous task — "
+            "the full coding agent drives your open tabs and reports back"
         )
-        self.harness_box.setChecked(bool(self._mw.settings.get("harness_mode", True)))
-        self.harness_box.toggled.connect(lambda on: self._mw.settings.set("harness_mode", bool(on)))
-        layout.addWidget(self.harness_box)
+        self._act_run_agent.triggered.connect(self._start_agent)
+        self._act_stop_agent = actions_menu.addAction("⏹ Stop agent")
+        self._act_stop_agent.setToolTip("Stop the running task")
+        self._act_stop_agent.triggered.connect(self._stop_agent)
+        self._act_undo_agent = actions_menu.addAction("↩ Undo agent step")
+        self._act_undo_agent.setToolTip(
+            "Undo the last reversible browser action taken by the agent"
+        )
+        self._act_undo_agent.triggered.connect(self._undo_agent_step)
+        actions_menu.addSeparator()
+        clear_act = actions_menu.addAction("Clear conversation")
+        clear_act.setToolTip("Clear this conversation")
+        clear_act.triggered.connect(self._clear_chat)
+        self.actions_btn = QToolButton(body)
+        self.actions_btn.setText("Actions ▾")
+        self.actions_btn.setToolTip("Assistant actions")
+        self.actions_btn.setMenu(actions_menu)
+        self.actions_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        actions_row = QHBoxLayout()
+        actions_row.addWidget(self.actions_btn)
+        actions_row.addStretch(1)
+        layout.addLayout(actions_row)
+        self._sync_agent_actions()
 
         self.chat = QTextBrowser(body)
         # Links in chat open as browser tabs — never in an external
@@ -396,12 +389,17 @@ class AiSidebar(QDockWidget):
         self._set_skill_chips_visible(False)
         layout.addLayout(self._skill_row)
 
+        # ONE input bar (2026-10-22): questions go to chat (page context
+        # always included); autonomous runs start from the same text via
+        # Actions ▾ → "Run as agent task". Vision steps are always on for
+        # vision-capable models — no checkboxes anywhere in this panel.
         row = QHBoxLayout()
         self.input = QLineEdit(body)
         self.input.textChanged.connect(self._update_skill_chips)
         self.input.setPlaceholderText("Ask about this page or anything…")
         self.input.setToolTip(
-            "Tip: tick 'Page context' to include the current page text (Enter to send)"
+            "Enter to ask (the current page is always included as context). "
+            "For an autonomous task, use Actions ▾ → Run as agent task."
         )
         self.send_btn = QPushButton("Send", body)
         self.send_btn.setToolTip("Send to AI (Enter)")
@@ -410,48 +408,13 @@ class AiSidebar(QDockWidget):
         row.addWidget(self.send_btn)
         layout.addLayout(row)
 
-        layout.addWidget(QLabel("Autonomous agent — drives the current tab:", body))
-        agent_row = QHBoxLayout()
-        self.agent_input = QLineEdit(body)
-        self.agent_input.setPlaceholderText("e.g. Search this site for X, report back")
-        self.agent_input.returnPressed.connect(self._start_agent)
-        self.agent_btn = QPushButton("Start", body)
-        self.agent_btn.setToolTip("Run the task on the current tab")
-        self.agent_btn.clicked.connect(self._start_agent)
-        self.stop_btn = QPushButton("Stop", body)
-        self.stop_btn.setToolTip("Stop the running task")
-        self.stop_btn.setEnabled(False)
-        self.stop_btn.clicked.connect(self._stop_agent)
-        self.undo_btn = QPushButton("Undo", body)
-        self.undo_btn.setToolTip("Undo the last reversible browser action taken by the agent")
-        self.undo_btn.setEnabled(False)
-        self.undo_btn.clicked.connect(self._undo_agent_step)
-        agent_row.addWidget(self.agent_input, 1)
-        agent_row.addWidget(self.agent_btn)
-        agent_row.addWidget(self.stop_btn)
-        agent_row.addWidget(self.undo_btn)
-        layout.addLayout(agent_row)
-        self.vision_box = QCheckBox("Vision steps (auto — screenshots each step)", body)
-        self.vision_box.setToolTip(
-            "The agent sees a screenshot every step (uses image tokens). "
-            "Auto-enabled when the selected model accepts images "
-            "(gpt-4o, gemini, claude-sonnet, gemma3…), auto-disabled "
-            "for text-only models so the agent never sends a bad payload."
-        )
-        layout.addWidget(self.vision_box)
-
         self.status = QLabel("", body)
         self.status.setStyleSheet(f"color: {_tok('muted')}; font-size: 12px;")
         layout.addWidget(self.status)
 
         self.setWidget(body)
-        self._sync_vision_default()
         self._restore_provider()
         self._greet()
-        self.refresh_harness_status()
-
-    def _open_research_from_input(self) -> None:
-        self._mw.open_deep_research(self.input.text().strip())
 
     def _apply_theme(self) -> None:
         """Adopt the active theme's tokens and re-render the chat with them."""
@@ -535,69 +498,11 @@ class AiSidebar(QDockWidget):
     # ── rendering ────────────────────────────────────────────────────
 
     def _greet(self) -> None:
-        providers = (
-            ", ".join(self._provider_label(p) for p in self.bridge.providers())
-            or "not set up — see the setup steps above ↑"
-        )
-        muted = _tok("muted")
-        text_c = _tok("text")
-        accent = _tok("accent")
-        # Lucky's hello: time-of-day headline so the sidebar feels alive on
-        # every launch without ever nagging. Hour lookup can't fail startup —
-        # any error falls back to noon.
-        try:
-            from datetime import datetime as _dt
-
-            headline = _lucky_greeting(_dt.now().hour)
-        except Exception:
-            headline = _lucky_greeting(12)
-        # Friendly onboarding: short steps, free rotation hint, keyboard tips
-        free_hint = ""
-        try:
-            # NOTE: keep this in a separate name — `providers` above is the
-            # joined display string used in the greeting HTML below.
-            available: list[str] = getattr(self.bridge, "providers", lambda: [])()
-            if "cline-usage" in available or "clinepass" in available:
-                free_pool: list[str] = getattr(self.bridge, "free_top_models", lambda: [])()
-                if free_pool:
-                    free_hint = f"Cline top models (auto-rotating): {', '.join(free_pool[:3])}…"
-        except Exception:
-            pass
-        self._blocks = [
-            {
-                "role": "raw",
-                "text": (
-                    f"<div style='color:{muted};padding:6px 2px;line-height:1.5'>"
-                    f"<b style='color:{text_c};font-size:14px'>🍀 {headline}</b><br>"
-                    f"<span>Ask about this page, or give the agent below a task — it drives the current tab while you watch.</span><br>"
-                    # Dylan 2026-09-14: Quick Start was outdated — left blank.
-                    f"<div style='margin:6px 0;padding:8px 10px;background:rgba(255,255,255,.04);border:1px solid {_tok('border')};border-radius:10px'>"
-                    f"</div>"
-                    f"<span style='font-size:11px'>AI: {html.escape(providers)}</span><br>"
-                    f"<span style='font-size:11px;color:{accent}'>{html.escape(free_hint)}</span><br>"
-                    f"<span style='font-size:11px'>Tips: <b>?</b> in the address bar asks AI • <b>Ctrl+K</b> commands • <b>Esc</b> exits fullscreen</span>"
-                    f"</div>"
-                ),
-            }
-        ]
-        # Lucky's suggest-only nudge, shown once with the greeting: at most
-        # one quiet proposal from local signals (open tabs here — the only
-        # signal the sidebar can read cheaply), "" stays invisible.
-        try:
-            open_tabs = int(self._mw.tabs.count())
-        except Exception:
-            open_tabs = 0
-        nudge = _lucky_suggest(open_tabs=open_tabs)
-        if nudge:
-            self._blocks.append(
-                {
-                    "role": "raw",
-                    "text": (
-                        f"<div style='color:{muted};padding:2px 2px 6px 2px;"
-                        f"font-size:12px'>🍀 {html.escape(nudge)}</div>"
-                    ),
-                }
-            )
+        # Empty means empty (Dylan 2026-10-22): no greeting/onboarding text
+        # is seeded into the chat — a fresh or cleared conversation shows a
+        # blank output area. (The no-provider setup hint above the chat is a
+        # separate widget and stays: it's a genuine setup blocker.)
+        self._blocks = []
         self._render()
 
     def _render_block(self, block: dict) -> str:
@@ -676,40 +581,23 @@ class AiSidebar(QDockWidget):
             err = html.escape(str(res.get("error", "could not start ollama pull")))
             self.status.setText(f"Ollama pull failed: {err}")
 
-    def refresh_harness_status(self) -> None:
-        """Update the coding-agent status line from the supervisor cache."""
-        muted = _tok("muted")
-        ok = _tok("ok")
-        err = _tok("danger")
-        warn = "#fbbf24"
-        sup = getattr(self._mw._app, "harness", None)
-        if sup is None:
-            self.harness_status.setText(
-                f"<span style='color:{muted}'>Coding agent: unavailable</span>"
-            )
-            return
-        st = sup.status()
-        if st.get("up"):
-            self.harness_status.setText(f"<span style='color:{ok}'>● Coding agent online</span>")
-        elif st.get("starting"):
-            self.harness_status.setText(
-                f"<span style='color:{warn}'>● Coding agent starting…</span>"
-            )
-        elif st.get("error"):
-            self.harness_status.setText(
-                f"<span style='color:{err}'>● Coding agent offline</span> "
-                f"<span style='color:{muted};font-size:10px'>retries automatically</span>"
-            )
-        else:
-            self.harness_status.setText(
-                f"<span style='color:{muted}'>● Coding agent off — starts when needed</span>"
-            )
-
-    def _sync_vision_default(self) -> None:
-        """Vision steps default ON for vision-capable models, OFF otherwise."""
+    def _vision_capable(self) -> bool:
+        """Vision steps are always on when the selected model accepts
+        images (the old checkbox's auto behavior, minus the checkbox)."""
         provider = self._selected_provider() or self.bridge.default_provider()
-        capable = bool(provider) and self.bridge.supports_vision(provider)
-        self.vision_box.setChecked(capable)
+        return bool(provider) and self.bridge.supports_vision(provider)
+
+    def _sync_agent_actions(self) -> None:
+        """Enable/disable the agent entries in the Actions dropdown."""
+        running = bool(getattr(self, "_agent_running", False))
+        for attr, enabled in (
+            ("_act_run_agent", not running),
+            ("_act_stop_agent", running),
+            ("_act_undo_agent", len(self._undo_stack) > 0),
+        ):
+            act = getattr(self, attr, None)
+            if act is not None:
+                act.setEnabled(enabled)
 
     # ── chat ─────────────────────────────────────────────────────────
 
@@ -747,7 +635,6 @@ class AiSidebar(QDockWidget):
                 f"No models on {self._provider_label(provider)} — "
                 "install one, then reselect the provider"
             )
-            self._sync_vision_default()
             return
         for model in models:
             self.model_box.addItem(self._model_label(provider, model), model)
@@ -756,7 +643,6 @@ class AiSidebar(QDockWidget):
             self.model_box.setCurrentIndex(index)
         self.model_box.blockSignals(False)
         self.model_box.setEnabled(True)
-        self._sync_vision_default()
 
     def _provider_label(self, provider: str) -> str:
         """Human-friendly provider name shown in the dropdown."""
@@ -824,7 +710,6 @@ class AiSidebar(QDockWidget):
         saved[provider] = model
         self._mw.settings.set("ai_model_overrides", saved)
         self.status.setText(f"{self._provider_label(provider)} model → {model}")
-        self._sync_vision_default()
 
     def _send(self) -> None:
         text = self.input.text().strip()
@@ -836,11 +721,11 @@ class AiSidebar(QDockWidget):
             return
         self._user(text)
         self._history.append({"role": "user", "content": text})
-        if self.context_box.isChecked():
-            view = self._mw.tabs.current_view()
-            if view is not None and view.url().scheme() in ("http", "https"):
-                view.page().toPlainText(lambda t: self._start_chat(t))
-                return
+        # Page context is always included (no checkbox anymore).
+        view = self._mw.tabs.current_view()
+        if view is not None and view.url().scheme() in ("http", "https"):
+            view.page().toPlainText(lambda t: self._start_chat(t))
+            return
         self._start_chat("")
 
     def _start_chat(self, page_text: str) -> None:
@@ -1125,16 +1010,26 @@ class AiSidebar(QDockWidget):
     # ── autonomous agent ─────────────────────────────────────────────
 
     def _start_agent(self) -> None:
-        task = self.agent_input.text().strip()
+        """Run the single input's text as an autonomous agent task.
+
+        The full coding agent (harness) is the default and only mode now —
+        the old checkbox is gone. If the harness worker cannot even be
+        constructed, fall back to the built-in tab agent so a task never
+        dead-ends."""
+        task = self.input.text().strip()
         if not task or self._agent_worker is not None or self._harness_worker is not None:
             return
-        if self.harness_box.isChecked():
-            self.agent_input.clear()
+        self.input.clear()
+        try:
             self._start_harness_agent(task)
             return
+        except Exception:
+            pass
+        self._start_builtin_agent(task)
+
+    def _start_builtin_agent(self, task: str) -> None:
         view = self._mw.tabs.current_view()
         url = view.url().toString() if view else ""
-        self.agent_input.clear()
         self._append(f"<b style='color:{_tok('accent')}'>Agent task:</b> {html.escape(task)}")
         use_cdp = bool(url) and url.startswith(
             ("http://", "https://", "file://localhost", "file://", "about:")
@@ -1146,10 +1041,7 @@ class AiSidebar(QDockWidget):
             get_url=lambda u=url: (
                 self._mw.tabs.current_view().url().toString() if self._mw.tabs.current_view() else u
             ),
-            vision=(
-                self.vision_box.isChecked()
-                and self.bridge.supports_vision(self._selected_provider())
-            ),
+            vision=self._vision_capable(),
             undo_stack=self._undo_stack,
         )
         self._agent_session = session
@@ -1158,14 +1050,14 @@ class AiSidebar(QDockWidget):
         )
         self._agent_worker.step.connect(self._on_agent_step)
         self._agent_worker.finished.connect(self._agent_done)
-        self.agent_btn.setEnabled(False)
-        self.stop_btn.setEnabled(True)
+        self._agent_running = True
+        self._sync_agent_actions()
         self.status.setText("Agent running…")
         self._agent_worker.start()
 
     def _on_agent_step(self, message: str) -> None:
         self._append(f"<span style='color:{_tok('muted')}'>{html.escape(message)}</span>")
-        self.undo_btn.setEnabled(len(self._undo_stack) > 0)
+        self._sync_agent_actions()
 
     def _stop_agent(self) -> None:
         if self._harness_worker is not None:
@@ -1178,9 +1070,8 @@ class AiSidebar(QDockWidget):
 
     def _agent_done(self, result: str) -> None:
         self._append(f"<b style='color:{_tok('accent')}'>Done:</b> {html.escape(result)}")
-        self.agent_btn.setEnabled(True)
-        self.stop_btn.setEnabled(False)
-        self.undo_btn.setEnabled(len(self._undo_stack) > 0)
+        self._agent_running = False
+        self._sync_agent_actions()
         self.status.setText("Agent idle")
         self._agent_worker = None
         self._agent_session = None
@@ -1189,7 +1080,7 @@ class AiSidebar(QDockWidget):
         """Revert the most recent reversible browser action recorded in self._undo_stack."""
         entry = self._undo_stack.pop()
         if entry is None:
-            self.undo_btn.setEnabled(False)
+            self._sync_agent_actions()
             self.status.setText("Nothing to undo")
             return
         js = ActionUndoStack.undo_js_for(entry)
@@ -1200,7 +1091,7 @@ class AiSidebar(QDockWidget):
         self._append(
             f"<span style='color:{_tok('accent2')}'>↩ Undid: {html.escape(summary)}</span>"
         )
-        self.undo_btn.setEnabled(len(self._undo_stack) > 0)
+        self._sync_agent_actions()
         self.status.setText(f"Undid {summary}")
 
     # ── harness-mode agent ──────────────────────────────────────────────
@@ -1233,7 +1124,15 @@ class AiSidebar(QDockWidget):
 
     def _start_harness_agent(self, task: str) -> None:
         self._append(f"<b style='color:{_tok('accent2')}'>Task:</b> {html.escape(task)}")
-        full_task = task + self._control_api_hint()
+        # Every run must end with findings (Dylan 2026-10-22) — ask for
+        # them in the task itself; _harness_done also guards empty results.
+        full_task = (
+            task
+            + self._control_api_hint()
+            + "\n\nIMPORTANT: when you finish, end your reply with a short "
+            "findings summary — the pages/sources you visited and what you "
+            "found on each. Never finish without reporting what you found."
+        )
         worker = _HarnessWorker(
             self._ensure_harness_bridge(),
             full_task,
@@ -1247,12 +1146,18 @@ class AiSidebar(QDockWidget):
         worker.finished.connect(self._harness_done)
         worker.failed.connect(self._harness_failed)
         self._harness_worker = worker
-        self.agent_btn.setEnabled(False)
-        self.stop_btn.setEnabled(True)
+        self._agent_running = True
+        self._sync_agent_actions()
         self.status.setText("Task started…")
         worker.start()
 
     def _harness_done(self, result: str) -> None:
+        if not str(result or "").strip():
+            # A silent ending reads as a hang — say plainly that the run
+            # finished without reporting findings (Dylan 2026-10-22).
+            result = (
+                "The agent finished but didn't report any findings. Try again, or narrow the task."
+            )
         self._append(
             f"<b style='color:{_tok('accent2')}'>Done:</b> "
             "<pre style='white-space:pre-wrap;margin:4px 0'>"
@@ -1266,19 +1171,17 @@ class AiSidebar(QDockWidget):
                 "before finishing. Re-run with a narrower task, or type "
                 "“continue” to let it keep going.</i>"
             )
-        self.agent_btn.setEnabled(True)
-        self.stop_btn.setEnabled(False)
+        self._agent_running = False
+        self._sync_agent_actions()
         self.status.setText("Agent idle")
         self._harness_worker = None
-        self.refresh_harness_status()
 
     def _harness_failed(self, message: str) -> None:
         self._append(f"<i>That run failed — {html.escape(message)}</i>")
-        self.agent_btn.setEnabled(True)
-        self.stop_btn.setEnabled(False)
+        self._agent_running = False
+        self._sync_agent_actions()
         self.status.setText("Agent run failed")
         self._harness_worker = None
-        self.refresh_harness_status()
 
 
 class _HarnessWorker(QThread):
