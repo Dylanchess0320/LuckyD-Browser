@@ -31,7 +31,7 @@ from browser_core.updater import (  # noqa: F401
 #: timing), so every update path below just opens this page in a tab.
 RELEASES_PAGE_URL = "https://github.com/Dylanchess0320/LuckyD-Browser/releases"
 from browser_core.zoom import clamp_zoom, origin_key, remember, zoom_for
-from PySide6.QtCore import QEvent, QSize, Qt, QTimer, QUrl, Signal
+from PySide6.QtCore import QEvent, QSize, Qt, QUrl, Signal
 from PySide6.QtGui import QAction, QGuiApplication, QIcon, QImage, QKeySequence, QShortcut
 from PySide6.QtWebEngineCore import QWebEnginePage
 from PySide6.QtWebEngineWidgets import QWebEngineView
@@ -45,7 +45,6 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMenu,
     QMessageBox,
-    QProgressBar,
     QPushButton,
     QStackedWidget,
     QToolBar,
@@ -66,6 +65,7 @@ from .downloads import DownloadsDock
 from .icons import letter_tile
 from .omnibox import Omnibox, display_url_text
 from .palette import CommandPalette
+from .status_bar import StatusBar
 from .tab_widget import BrowserTabWidget
 from .theme import apply_to_app, palette
 from .titlebar import apply_titlebar_theme
@@ -116,6 +116,9 @@ class MainWindow(QMainWindow):
         self._video_fs = False
         self._fs_hidden: list = []
         self._fs_was_maximized = False
+        # Per-view load progress (id(view) → fraction) so the status
+        # strip's progress line survives tab switches mid-load.
+        self._view_progress: dict[int, float] = {}
 
         self.tabs = BrowserTabWidget(self)
         # The user's display name for the browser (Settings → Appearance;
@@ -554,31 +557,13 @@ class MainWindow(QMainWindow):
                 self.vtabs.show()
 
     def _build_statusbar(self) -> None:
-        self.progress = QProgressBar(self)
-        self.progress.setMaximumWidth(160)
-        self.progress.setTextVisible(False)
-        self.progress.setRange(0, 100)
-        self.progress.hide()
-
-        self.zoom_label = QPushButton("100%", self)
-        self.zoom_label.setObjectName("zoom_pill")
-        self.zoom_label.setFlat(True)
-        self.zoom_label.setMinimumWidth(48)
-        self.zoom_label.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.zoom_label.setToolTip("Page zoom — click to reset to 100%")
-        self.zoom_label.clicked.connect(self.zoom_reset)
-        self.zoom_label.hide()
-
-        self.lock_label = QPushButton("", self)
-        self.lock_label.setFlat(True)
-        self.lock_label.setMinimumWidth(28)
-        self.lock_label.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.lock_label.setStyleSheet("font-size: 14px; padding: 0 4px;")
-        self.lock_label.clicked.connect(self.open_site_permissions)
-
-        self.statusBar().addPermanentWidget(self.lock_label)
-        self.statusBar().addPermanentWidget(self.zoom_label)
-        self.statusBar().addPermanentWidget(self.progress)
+        """The bottom strip is text-only (2026-10-22 rebuild): hovered-link
+        URLs + status text on a label, load progress as a thin line on the
+        bar's top edge. No lock button, no zoom pill, no progress widget —
+        Site Permissions lives in the Tools menu / Ctrl+K / context menu,
+        zoom in the View menu. See browser_ui/status_bar.py."""
+        self.status_bar = StatusBar(self.settings, self)
+        self.setStatusBar(self.status_bar)
 
     def _build_findbar(self) -> None:
         self.find_bar = QToolBar("Find", self)
@@ -1226,21 +1211,22 @@ class MainWindow(QMainWindow):
     # ── tab signal handlers (called by BrowserTabWidget) ─────────────
 
     def on_load_started(self, view) -> None:
+        self._view_progress[id(view)] = 0.0
         if view is self.tabs.current_view():
-            self.progress.setValue(0)
-            self.progress.show()
+            self.status_bar.set_load_progress(0.0)
 
     def on_load_progress(self, view, pct: int) -> None:
+        frac = max(0.0, min(1.0, pct / 100))
+        self._view_progress[id(view)] = frac
         if view is self.tabs.current_view():
-            self.progress.setValue(pct)
+            self.status_bar.set_load_progress(frac)
 
     def on_load_finished(self, view, ok: bool) -> None:
         self._apply_zoom(view)
+        self._view_progress.pop(id(view), None)
         if view is self.tabs.current_view():
-            self.progress.hide()
+            self.status_bar.set_load_progress(None)
             self._update_nav_state(view)
-            self._update_zoom_label(view)
-            self._update_security(view)
         url = view.url()
         if ok and url.scheme() in ("http", "https"):
             self.storage.add_visit(url.toString(), view.title())
@@ -1259,15 +1245,13 @@ class MainWindow(QMainWindow):
         self.on_url_changed(view.url())
         self._update_title(view.title())
         self._update_nav_state(view)
-        self._update_zoom_label(view)
-        self._update_security(view)
         if view.page().isLoading():
-            self.progress.show()
+            self.status_bar.set_load_progress(self._view_progress.get(id(view), 0.0))
         else:
-            self.progress.hide()
+            self.status_bar.set_load_progress(None)
 
     def on_link_hovered(self, text: str) -> None:
-        self.statusBar().showMessage(text)
+        self.status_bar.show_hover_url(text)
 
     def on_fullscreen_requested(self, request) -> None:
         request.accept()
@@ -1406,21 +1390,18 @@ class MainWindow(QMainWindow):
         view = self.tabs.current_view()
         if view is not None:
             view.setZoomFactor(clamp_zoom(view.zoomFactor() + 0.1))
-            self._update_zoom_label(view)
             self._remember_zoom(view)
 
     def zoom_out(self) -> None:
         view = self.tabs.current_view()
         if view is not None:
             view.setZoomFactor(clamp_zoom(view.zoomFactor() - 0.1))
-            self._update_zoom_label(view)
             self._remember_zoom(view)
 
     def zoom_reset(self) -> None:
         view = self.tabs.current_view()
         if view is not None:
             view.setZoomFactor(1.0)
-            self._update_zoom_label(view)
             self._remember_zoom(view)
 
     # ── reader mode ──────────────────────────────────────────────────
@@ -1491,42 +1472,6 @@ class MainWindow(QMainWindow):
             return
         levels = remember(self.settings.get("zoom_levels", {}), url, view.zoomFactor())
         self.settings.set("zoom_levels", levels)
-
-    def _update_zoom_label(self, view) -> None:
-        pct = int(view.zoomFactor() * 100)
-        self.zoom_label.setText(f"{pct}%")
-        # Dynamic property drives the accent state in the theme QSS.
-        self.zoom_label.setProperty("zoomed", pct != 100)
-        self.zoom_label.style().unpolish(self.zoom_label)
-        self.zoom_label.style().polish(self.zoom_label)
-        self.zoom_label.show()
-        QTimer.singleShot(
-            3000, lambda: self.zoom_label.hide() if self.zoom_label.text() == "100%" else None
-        )
-
-    def _update_security(self, view) -> None:
-        """Update the lock icon based on the page's security."""
-        try:
-            cert_errors = view.page().certificateErrorCount()
-            url = view.url().toString()
-            if cert_errors and cert_errors > 0:
-                self.lock_label.setText("⚠")
-                self.lock_label.setStyleSheet("color: #ff5b6e; font-size: 14px; padding: 0 4px;")
-                self.lock_label.setToolTip("Connection not secure — certificate error")
-            elif url.startswith("https://"):
-                self.lock_label.setText("🔒")
-                self.lock_label.setStyleSheet("color: #34d399; font-size: 14px; padding: 0 4px;")
-                self.lock_label.setToolTip("Connection secure (HTTPS) — click for site permissions")
-            elif url.startswith("http://"):
-                self.lock_label.setText("🔓")
-                self.lock_label.setStyleSheet("color: #fbbf24; font-size: 14px; padding: 0 4px;")
-                self.lock_label.setToolTip("Not secure (HTTP) — click for site permissions")
-            else:
-                self.lock_label.setText("")
-                self.lock_label.setStyleSheet("font-size: 14px; padding: 0 4px;")
-                self.lock_label.setToolTip("")
-        except Exception:
-            self.lock_label.setText("")
 
     def view_source(self) -> None:
         view = self.tabs.current_view()
@@ -2202,7 +2147,6 @@ class MainWindow(QMainWindow):
             QDialog,
             QDialogButtonBox,
             QLabel,
-            QPushButton,
             QVBoxLayout,
         )
 

@@ -37,6 +37,7 @@ os.environ["QTWEBENGINE_REMOTE_DEBUGGING"] = "127.0.0.1:19222"
 from browser_app import BrowserApp
 from PySide6 import QtWebEngineWidgets  # noqa: F401  (before QApplication)
 from PySide6.QtCore import QTimer, QUrl
+from PySide6.QtWidgets import QProgressBar, QPushButton, QStatusBar
 
 RESULTS: list[tuple[str, bool, str]] = []
 API_RESULTS: list[tuple[str, bool, str]] = []
@@ -648,7 +649,16 @@ def step2() -> None:
         "zoom reset forgets site",
         "https://example.com" not in app.settings.get("zoom_levels", {}),
     )
-    check("zoom pill is a clickable reset button", hasattr(win.zoom_label, "clicked"))
+    _sb = win.findChild(QStatusBar)
+    check(
+        "status bar is a text-only strip (no lock / zoom pill / progress widget)",
+        _sb is not None
+        and not hasattr(win, "zoom_label")
+        and not hasattr(win, "lock_label")
+        and not hasattr(win, "progress")
+        and not _sb.findChildren(QPushButton)
+        and not _sb.findChildren(QProgressBar),
+    )
 
     check(
         "omnibox URL detection",

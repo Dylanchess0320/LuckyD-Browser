@@ -213,19 +213,6 @@ QToolBar#bookmark_bar QToolButton:hover {
 QToolBar#bookmark_bar QToolButton:pressed { background: $panel2; }
 QToolBar#bookmark_bar QToolButton:disabled { color: $muted; font-style: italic; }
 
-/* ── zoom pill (status bar) ────────────────────────────────────────── */
-QPushButton#zoom_pill {
-    background: transparent;
-    border: 1px solid transparent;
-    border-radius: 9px;
-    padding: 2px 10px;
-    color: $muted;
-    font-size: 11.5px;
-    font-weight: 600;
-}
-QPushButton#zoom_pill:hover { background: $card; border-color: $border; color: $accent; }
-QPushButton#zoom_pill[zoomed="true"] { color: $accent2; border-color: $border; }
-
 /* ── tab bar ──────────────────────────────────────────────────────── */
 QTabWidget::pane {
     background: $window;
@@ -397,19 +384,16 @@ QDockWidget::title {
     background: $window; border-bottom: 1px solid $border; padding: 8px 12px;
 }
 
-/* ── progress / status ────────────────────────────────────────────── */
-QProgressBar {
-    background: $panel2; border: 1px solid $border; border-radius: 7px;
-    max-height: 12px; text-align: center;
-}
-QProgressBar::chunk {
-    border-radius: 6px;
-    background: $accent;
-}
+/* ── status strip: slim, text-only (load progress is a painted
+      2px line on its top edge — see browser_ui/status_bar.py) ─────── */
 QStatusBar {
-    background: $window; border-top: 1px solid $border; color: $muted;
+    background: $window;
+    border-top: 1px solid $border;
+    color: $text;
+    font-size: 12.5px;
 }
 QStatusBar::item { border: none; }
+QStatusBar QLabel#status_text { padding: 3px 10px; }
 
 /* ── scrollbars: slim, glow on hover ──────────────────────────────── */
 QScrollBar:vertical { background: transparent; width: 10px; margin: 2px; }
