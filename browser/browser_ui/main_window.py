@@ -719,7 +719,8 @@ class MainWindow(QMainWindow):
             self.open_agent_mesh,
             "Ctrl+Alt+M",
         )
-        self._add(tools_menu, "LuckyD Chat", self.open_luckyd_chat)
+        if self._show_retired_tools():
+            self._add(tools_menu, "LuckyD Chat", self.open_luckyd_chat)
         self._add(tools_menu, "Agent 1 Terminal", lambda: self.open_terminal("agent"), "Ctrl+`")
         self._add(tools_menu, "Agent 2 Terminal", lambda: self.open_terminal("agent2"))
         self._add(
@@ -2028,9 +2029,9 @@ class MainWindow(QMainWindow):
             self._app.apply_adblock(bool(self.settings.get("adblock_enabled", True)))
 
     def _show_retired_tools(self) -> bool:
-        """Retired tools (LuckyD HQ, Workflows, Deep Researcher, Deck Studio)
-        stay hidden from every UI surface unless the user flips the
-        show_retired_tools setting back on. The tools themselves — pages,
+        """Retired tools (LuckyD HQ, Workflows, Deep Researcher, Deck Studio,
+        LuckyD Chat) stay hidden from every UI surface unless the user flips
+        the show_retired_tools setting back on. The tools themselves — pages,
         routes, modules — remain fully built in."""
         return bool(self.settings.get("show_retired_tools", False))
 

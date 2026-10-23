@@ -108,8 +108,9 @@ DEFAULTS = {
     "dashboard_newtab": True,
     "assistant_visible_startup": True,
     # Retired tools (2026-10-22): LuckyD HQ (Coding Agent), Workflows,
-    # Deep Researcher and Deck Studio are hidden from every UI surface but
-    # stay fully built in — set this to True to bring them all back.
+    # Deep Researcher, Deck Studio and LuckyD Chat are hidden from every
+    # UI surface but stay fully built in — set this to True to bring
+    # them all back.
     "show_retired_tools": False,
     # Custom browser display name (2026-10-22): "" = the default
     # "LuckyD Browser". In-app surfaces only (window title, homepage

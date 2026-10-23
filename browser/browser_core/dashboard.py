@@ -344,8 +344,8 @@ DASHBOARD_HTML = _HEAD + _BODY + _JS + _JS2
 
 # Retired 2026-10-22 (Dylan): hidden from the UI, fully built in. Flip the
 # "show_retired_tools" setting to True to restore every surface at once.
-RETIRED_APP_NAMES = ("Agent HQ", "Deep Research", "Workflows")
-RETIRED_TILE_IDS = frozenset({"hq", "deep-research", "deck-studio"})
+RETIRED_APP_NAMES = ("Agent HQ", "Deep Research", "Workflows", "LuckyD Chat")
+RETIRED_TILE_IDS = frozenset({"hq", "deep-research", "deck-studio", "luckyd-chat"})
 
 
 def _show_retired_tools(settings) -> bool:

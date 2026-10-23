@@ -1,6 +1,8 @@
-"""Retired tools (2026-10-22): LuckyD HQ, Workflows, Deep Researcher and
-Deck Studio are hidden from every UI surface behind the single
-``show_retired_tools`` setting (default off) — but stay fully built in.
+"""Retired tools (2026-10-22): LuckyD HQ, Workflows, Deep Researcher,
+Deck Studio and LuckyD Chat are hidden from every UI surface behind the
+single ``show_retired_tools`` setting (default off) — but stay fully
+built in. (LuckyD Chat's own gate assertions live in
+test_retired_luckyd_chat.py.)
 
 These tests pin the hiding behaviour and the reversibility of the switch.
 The underlying modules/routes are covered by their own suites and are
@@ -37,7 +39,7 @@ def test_switch_defaults_to_hidden() -> None:
 
 def test_dashboard_hides_retired_apps_and_tiles_by_default() -> None:
     html = dashboard_html()
-    assert 'const RETIRED_APPS = ["Agent HQ", "Deep Research", "Workflows"];' in html
+    assert 'const RETIRED_APPS = ["Agent HQ", "Deep Research", "Workflows", "LuckyD Chat"];' in html
     # Deck Studio only ever reaches the dashboard via the tile registry.
     assert "Deck Studio" not in html
     assert "__RETIRED_APPS__" not in html

@@ -272,12 +272,14 @@ class SettingsDialog(QDialog):
         gform.addRow(self.dash)
 
         self.retired_tools = QCheckBox(
-            "Show retired tools (HQ, Workflows, Deep Researcher, Deck Studio)", self
+            "Show retired tools (HQ, Workflows, Deep Researcher, Deck Studio, LuckyD Chat)",
+            self,
         )
         self.retired_tools.setToolTip(
             "These tools are hidden by default but fully built in.\n"
             "Turn this on to bring back their menu items, palette entries,\n"
-            "dashboard tiles and shortcuts. Takes effect on restart."
+            "dashboard tiles, shortcuts and the Connections tab.\n"
+            "Takes effect on restart."
         )
         self.retired_tools.setChecked(bool(settings.get("show_retired_tools", False)))
         gform.addRow(self.retired_tools)
@@ -418,6 +420,11 @@ class SettingsDialog(QDialog):
         tabs.addTab(_scrollable(appearance), "Appearance")
 
         # ── Connections (LuckyD Chat: Hub + Claw on Dylan's PC) ────
+        # LuckyD Chat is a retired tool (2026-10-22): the tab only joins
+        # the dialog while show_retired_tools is on — same switch as its
+        # tile and menu entry. The fields are still built either way and
+        # accept() still saves them, so stored Hub/Claw tokens and
+        # addresses are preserved untouched while the tab is hidden.
         connections = QWidget(tabs)
         cform = QFormLayout(connections)
 
@@ -437,7 +444,8 @@ class SettingsDialog(QDialog):
         self.claw_token.setPlaceholderText("Claw token")
         cform.addRow("Claw token", self.claw_token)
 
-        tabs.addTab(_scrollable(connections), "Connections")
+        if bool(settings.get("show_retired_tools", False)):
+            tabs.addTab(_scrollable(connections), "Connections")
 
         # ── Updates ───────────────────────────────────────────────
         updates = QWidget(tabs)

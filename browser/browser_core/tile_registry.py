@@ -353,7 +353,7 @@ atexit.register(shutdown_autostart)
 # Retired 2026-10-22: these tiles are hidden by the show_retired_tools
 # setting (keep in sync with dashboard.RETIRED_TILE_IDS). While the switch
 # is off, their services must not autostart either.
-RETIRED_TILE_IDS = frozenset({"hq", "deep-research", "deck-studio"})
+RETIRED_TILE_IDS = frozenset({"hq", "deep-research", "deck-studio", "luckyd-chat"})
 
 
 def _show_retired_tools() -> bool:
