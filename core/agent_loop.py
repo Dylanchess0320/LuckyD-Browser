@@ -443,10 +443,10 @@ class CodingAgent:
 
     # Same-gateway rotation pool for api.cline.bot (9.8: these replaced the
     # retired OpenCode Zen "-free" pool). Ordered free-first.
+    # 10.8.3: deepseek/deepseek-chat and qwen/qwen3-8b removed — upstream
+    # 404 on the gateway (2026-10-22 live-probe audit); minimax-m2.5 leads.
     _CLINE_ROTATION_POOL = (
-        "deepseek/deepseek-chat",
         "minimax/minimax-m2.5",
-        "qwen/qwen3-8b",
         "deepseek/deepseek-v4-flash",
         "z-ai/glm-5.3-flash",
     )

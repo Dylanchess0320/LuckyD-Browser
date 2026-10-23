@@ -184,11 +184,15 @@ def test_fetch_models_cline_usage_live_reorders_top_first(
     bridge = _bridge(hermetic)
     models = bridge.fetch_models("cline-usage")
     assert seen["headers"] == {"Authorization": "Bearer zk-test"}
+    # The fake payload mirrors the real gateway /models list, which still
+    # *lists* ids that 404 when actually called (deepseek-chat, kat-coder)
+    # — the bridge faithfully surfaces the live list; the curated catalog
+    # prune (10.8.3) governs defaults/fallbacks, not the live listing.
     assert models == [
-        "deepseek/deepseek-chat",  # current model pinned first (also TOP[0])
-        "minimax/minimax-m2.5",  # _CLINE_GATEWAY_TOP_MODELS order…
+        "minimax/minimax-m2.5",  # current model (also TOP[0]) pinned first
+        "custom-x",  # …then the rest of the live catalog in live order
+        "deepseek/deepseek-chat",
         "kwaipilot/kat-coder-pro",
-        "custom-x",  # …then the rest of the live catalog
     ]
 
 
@@ -237,7 +241,10 @@ def test_fetch_models_clinepass_model_override_pinned_first(
     bridge = _bridge(hermetic)
     models = bridge.fetch_models("clinepass")
     assert "cline-pass/kimi-k2.6" in models
-    assert models[:6] == list(ai_bridge._CLINE_GATEWAY_TOP_MODELS[:6])
+    # Top models that exist in the static catalog lead, in TOP order
+    # (cline-pass/claude-sonnet-4 is a live-list-only rotation member).
+    lead = [m for m in ai_bridge._CLINE_GATEWAY_TOP_MODELS if m in ai_bridge._CLINE_GATEWAY_CATALOG]
+    assert models[: len(lead)] == lead
     assert "cline-pass/kimi-k3" in models  # curated catalog still present
 
 
@@ -357,13 +364,13 @@ def test_chat_fast_path_cline_gateway_rotates_models(
         [("clinelocal", "CLINELOCAL_HOST", "https://api.cline.bot/api/v1", "")],
     )
     hermetic["local"] = {
-        "clinelocal": ("deepseek/deepseek-chat", "https://api.cline.bot/api/v1", "", "openai")
+        "clinelocal": ("minimax/minimax-m2.5", "https://api.cline.bot/api/v1", "", "openai")
     }
     tried: list[str] = []
 
     async def _call(name, info, messages, on_token):
         tried.append(info[0])
-        if info[0] in ("deepseek/deepseek-chat", "minimax/minimax-m2.5"):
+        if info[0] in ("minimax/minimax-m2.5", "z-ai/glm-5.3-flash"):
             raise RuntimeError("404 model not found")
         return "cline-fast-ok"
 
@@ -373,7 +380,7 @@ def test_chat_fast_path_cline_gateway_rotates_models(
     text, name = asyncio.run(bridge.chat([{"role": "user", "content": "hi"}]))
     assert (text, name) == ("cline-fast-ok", "clinelocal")
     assert tried == list(ai_bridge._CLINE_GATEWAY_TOP_MODELS[:3])
-    assert bridge._configs["clinelocal"][0] == "qwen/qwen3-8b"
+    assert bridge._configs["clinelocal"][0] == "cline-pass/deepseek-v4-flash"
     assert bridge._free_cursor == 3
 
 
@@ -403,7 +410,7 @@ def test_chat_fast_path_cline_all_fail_then_cloud(
     monkeypatch.setattr(bridge, "_call", _call)
     text, name = asyncio.run(bridge.chat([{"role": "user", "content": "hi"}]))
     assert (text, name) == ("cloud-ok", "openai")
-    # All 10 top models tried in the fast path, then the Cline gateway skipped
+    # All top models tried in the fast path, then the Cline gateway skipped
     # once in the generic loop — openai tried exactly once.
     assert calls.count("clinelocal") == len(ai_bridge._CLINE_GATEWAY_TOP_MODELS)
     assert calls.count("openai") == 1
@@ -481,7 +488,7 @@ def test_chat_auto_cline_rotation_on_generic_failure(
 
     async def _call(name, info, messages, on_token):
         tried.append(info[0])
-        if info[0] == "deepseek/deepseek-chat":
+        if info[0] == "minimax/minimax-m2.5":
             raise RuntimeError("404 model not found")
         return "cline-ok"
 
@@ -492,8 +499,8 @@ def test_chat_auto_cline_rotation_on_generic_failure(
     monkeypatch.setattr(bridge, "_call", _call)
     text, name = asyncio.run(bridge.chat([{"role": "user", "content": "hi"}]))
     assert (text, name) == ("cline-ok", "cline-usage")
-    assert tried == ["deepseek/deepseek-chat", "minimax/minimax-m2.5"]
-    assert bridge._configs["cline-usage"][0] == "minimax/minimax-m2.5"
+    assert tried == ["minimax/minimax-m2.5", "z-ai/glm-5.3-flash"]
+    assert bridge._configs["cline-usage"][0] == "z-ai/glm-5.3-flash"
 
 
 # ── _call: streaming, per-kind URLs/headers, errors ───────────────────
@@ -848,8 +855,8 @@ def test_chat_explicit_cline_all_models_fail(hermetic, monkeypatch: pytest.Monke
     with pytest.raises(RuntimeError, match="all providers failed — last error: 500 everywhere"):
         asyncio.run(bridge.chat([{"role": "user", "content": "hi"}], provider="cline-usage"))
     # Configured model + every alternate top model tried exactly once.
-    assert tried == ["deepseek/deepseek-chat"] + [
-        m for m in ai_bridge._CLINE_GATEWAY_TOP_MODELS if m != "deepseek/deepseek-chat"
+    assert tried == [ai_bridge._CLINE_USAGE_MODEL] + [
+        m for m in ai_bridge._CLINE_GATEWAY_TOP_MODELS if m != ai_bridge._CLINE_USAGE_MODEL
     ]
 
 
@@ -873,8 +880,8 @@ def test_chat_auto_cline_rotation_exhausted_raises(
     with pytest.raises(RuntimeError, match="all providers failed — last error: cline down"):
         asyncio.run(bridge.chat([{"role": "user", "content": "hi"}]))
     # Configured model + every alternate tried exactly once.
-    assert calls == ["deepseek/deepseek-chat"] + [
-        m for m in ai_bridge._CLINE_GATEWAY_TOP_MODELS if m != "deepseek/deepseek-chat"
+    assert calls == [ai_bridge._CLINE_USAGE_MODEL] + [
+        m for m in ai_bridge._CLINE_GATEWAY_TOP_MODELS if m != ai_bridge._CLINE_USAGE_MODEL
     ]
 
 

@@ -130,9 +130,10 @@ MODEL_CATALOG: dict[str, ModelConfig] = {
         context_window=128_000,
     ),
     "cline-free": ModelConfig(
-        name="DeepSeek via Cline (free tier)",
+        name="MiniMax M2.5 via Cline (free tier)",
         provider="cline-usage",
-        model_id="deepseek/deepseek-chat",
+        # 10.8.3: was deepseek/deepseek-chat — upstream 404 on the gateway.
+        model_id="minimax/minimax-m2.5",
         cost_per_1k_input=0.0,
         cost_per_1k_output=0.0,
         avg_latency_ms=1500,

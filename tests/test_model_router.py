@@ -305,7 +305,7 @@ class TestBridgeIntegration:
         # fail them so the router has to fall through to DeepSeek.
         fake_litellm.behavior = {
             "openai/cline-pass/deepseek-v4-pro": "fail",
-            "openai/deepseek/deepseek-chat": "fail",
+            "openai/minimax/minimax-m2.5": "fail",  # cline-free entry (10.8.3: was deepseek-chat)
         }
         bridge = bridge_env({"DEEPSEEK_API_KEY": "test-key"})
         assert bridge._router is not None
@@ -318,7 +318,7 @@ class TestBridgeIntegration:
     async def test_router_health_recorded_on_bridge(self, bridge_env, fake_litellm) -> None:
         fake_litellm.behavior = {
             "openai/cline-pass/deepseek-v4-pro": "fail",
-            "openai/deepseek/deepseek-chat": "fail",
+            "openai/minimax/minimax-m2.5": "fail",  # cline-free entry (10.8.3: was deepseek-chat)
         }
         bridge = bridge_env({"DEEPSEEK_API_KEY": "test-key"})
         await bridge.chat(MSGS)
