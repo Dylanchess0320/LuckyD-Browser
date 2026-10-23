@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [10.8.5] - 2026-10-23
+
+Settings screen fixed, plus a security update for the AI provider library.
+
+### Fixed
+- **Settings tabs hidden when "show retired tools" is off**: the Connections settings page was still built when retired tools were hidden, but it was never added to the settings tab list — so it painted visibly on top of the dialog and buried the Privacy, Appearance, and Updates tabs underneath it. The Connections page now always joins the tab stack like every other page, and the tab list — General, Privacy, Appearance, Connections, Updates — is identical whether retired tools are shown or hidden. Pinned by regression tests in both switch states.
+
+### Security
+- **litellm 1.83.14 → 1.88.6** (the library the AI features use to talk to model providers; Dependabot PR #111): closes four Dependabot alerts — a **critical** authentication bypass via Host Header injection (GHSA-4xpc-pv4p-pm3w), a **high** MCP authentication bypass via OAuth2 passthrough (GHSA-7488-6r32-c95q), a medium MCP proxy improper-authentication issue, and a medium authenticated SSRF / credential-exfiltration issue.
+
+### Known limitations
+- **Twitch video (Error 4000) and some game audio (e.g., Poki) still don't work in this build**: the shipped Qt WebEngine build has no proprietary H.264/AAC decoders (codec probes: canPlayType and MediaSource report H.264/AAC unsupported while VP9/Opus/AV1/MP3/OGG/WAV all pass). That is a property of the engine build, not of the app code. The cure is a codec-enabled engine build, tracked as a separate project; use another browser for Twitch and affected games meanwhile.
+
 ## [10.8.4] - 2026-10-23
 
 Gmail sign-in, fixed: the browser was introducing itself to Google with contradictory identities, and Google refused the sign-in as insecure.

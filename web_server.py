@@ -98,7 +98,7 @@ load_env()  # load .env before any agent/LLM construction
 try:
     from browser import __version__ as _HARNESS_VERSION  # noqa: N812
 except Exception:  # standalone web_server.py checkout / frozen one-file build
-    _HARNESS_VERSION = "10.8.4"
+    _HARNESS_VERSION = "10.8.5"
 _HARNESS_STARTED = time.time()
 _HARNESS_PID = os.getpid()
 

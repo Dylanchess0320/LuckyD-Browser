@@ -1,20 +1,21 @@
-# LuckyD Browser v10.8.4 — Release Notes
+# LuckyD Browser v10.8.5 — Release Notes
 
 > **The AI browser that doesn't need an API key.** A focused fix release:
-> Google sign-in works again.
+> the Settings screen works again, plus an AI library security update.
 
-**[⬇ Download `LuckyDBrowserSetup-10.8.4.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.4/LuckyDBrowserSetup-10.8.4.exe)** — Windows 10/11 x64 · per-user install · no admin needed
+**[⬇ Download `LuckyDBrowserSetup-10.8.5.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.5/LuckyDBrowserSetup-10.8.5.exe)** — Windows 10/11 x64 · per-user install · no admin needed
 
 ---
 
-## What's new in 10.8.4 — Gmail sign-in, fixed
+## What's new in 10.8.5 — Settings fixed + security update
 
-- **Gmail sign-in works again** — Google was refusing sign-ins with "this browser or app may not be secure." The cause was in the browser itself: it presented Google with contradictory identities — an outdated Chrome 126 user-agent (a version-read error was being silently swallowed) while the engine is Chromium 140, and sign-in pages had their headers rewritten to yet another version with a made-up "Google Chrome" identity badge. Google read that mix as a sketchy embedded browser and blocked it. The browser now presents one consistent, truthful identity everywhere, and the sign-in header rewriting is gone entirely.
+- **Settings screen fixed** — with "show retired tools" turned off, the Settings dialog was broken: the Connections settings page was painted over the dialog and the Privacy, Appearance, and Updates tabs were hidden underneath it. Every Settings tab — General, Privacy, Appearance, Connections, Updates — now shows the same whether retired tools are on or off.
+- **Security update for the AI library** — litellm, the library the AI features use to reach model providers, is updated from 1.83.14 to 1.88.6. It closes four security alerts, including a critical authentication-bypass vulnerability and a high-severity one.
 - **Known limitation — Twitch and some game sites:** Twitch video still won't play in this build, and some web games (for example on Poki) still have no sound. Different cause: the web engine LuckyD is built on ships without the H.264 and AAC decoders those sites use, and no app setting can add them. It's being worked on as a separate engine project — please use another browser for Twitch and affected games meanwhile.
 
-On top of everything from 10.8.3 (the cleanup pass: Ctrl+K palette rebuilt, model pickers list only working models, status bar slimmed with the hover address kept, LuckyD Chat retired for now, GitHub page rewritten with the Discord invite back: discord.gg/CmvErK8bkM).
+On top of everything from 10.8.4 (Gmail sign-in fixed: one consistent browser identity instead of contradictory ones) and 10.8.3 (the cleanup pass: Ctrl+K palette rebuilt, model pickers list only working models, status bar slimmed with the hover address kept, LuckyD Chat retired for now, Discord invite back: discord.gg/CmvErK8bkM).
 
-3,582 tests passing · coverage 89% · full CI green.
+3,586 tests passing · coverage 89% · full CI green.
 
 ---
 

@@ -79,6 +79,8 @@ Then start chatting. That's it. Want everything on your own machine? Add Ollama 
 
 ## What's new
 
+**v10.8.5** — Settings fixed: with retired tools hidden, the Connections settings page painted over the Settings dialog and hid the Privacy, Appearance, and Updates tabs — all five tabs now show in both switch states. Plus a security update for the AI provider library (litellm 1.88.6, closing a critical authentication-bypass alert). Known limitation: Twitch video and some game audio still don't work — the web engine ships without H.264/AAC decoders (separate engine project in progress)
+
 **v10.8.4** — Gmail sign-in fixed: the browser was presenting Google contradictory identities (a stale Chrome 126 user-agent plus rewritten sign-in headers) and Google refused it as insecure; it now presents one consistent identity. Known limitation: Twitch video and some game audio still don't work — the web engine ships without H.264/AAC decoders (separate engine project in progress)
 
 **v10.8.3** — The cleanup pass: Ctrl+K palette rebuilt, model pickers list only working models (your luckyd models first), status bar slimmed down with the hover address kept, LuckyD Chat retired for now, GitHub page rewritten as a showcase with the Discord invite back

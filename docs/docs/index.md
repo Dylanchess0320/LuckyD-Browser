@@ -5,7 +5,7 @@
 <p class="tagline">The AI browser that runs <em>your</em> models — local, unlimited, offline — plus a full coding agent and real terminals in one window.</p>
 
 <div class="cta-row" markdown>
-[⬇ Download v10.8.4](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.4/LuckyDBrowserSetup-10.8.4.exe){ .luckyd-btn }
+[⬇ Download v10.8.5](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.5/LuckyDBrowserSetup-10.8.5.exe){ .luckyd-btn }
 [Getting started](getting-started.md){ .luckyd-btn-ghost }
 [What's new](release-notes.md){ .luckyd-btn-ghost }
 </div>
@@ -76,12 +76,12 @@
 
 ## Install in 10 seconds
 
-1. Get [**LuckyDBrowserSetup-10.8.4.exe**](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.4/LuckyDBrowserSetup-10.8.4.exe)
+1. Get [**LuckyDBrowserSetup-10.8.5.exe**](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.5/LuckyDBrowserSetup-10.8.5.exe)
 2. Run it — per-user, **no admin**, installs to `%LOCALAPPDATA%\Programs\LuckyDBrowser`
 3. Optional: run `ollama_setup.ps1` from the install folder → Ollama + `llama3.2:3b` (~2 GB, one time)
 4. `Ctrl+Shift+A` → chat offline. Or bring your own keys (Gemini, Groq, DeepSeek, OpenAI, Anthropic, Z.ai, OpenRouter, Cline, OpenCode)
 
-Windows 10/11 x64 only. Silent install: `LuckyDBrowserSetup-10.8.4.exe /VERYSILENT /NORESTART`
+Windows 10/11 x64 only. Silent install: `LuckyDBrowserSetup-10.8.5.exe /VERYSILENT /NORESTART`
 
 ## Why LuckyD
 
@@ -98,9 +98,9 @@ Most "AI browsers" rent you a chatbot behind an account. LuckyD is a **real Chro
 
 > The others rent you their AI. **LuckyD runs yours.**
 
-## New in 10.8.4 — Gmail sign-in, fixed
+## New in 10.8.5 — Settings fixed + security update
 
-Google sign-in works again: the browser had been presenting Google with contradictory identities — an outdated Chrome version in its user-agent and a different one in rewritten sign-in headers — and Google refused it as insecure; it now presents one consistent identity everywhere. Known limitation: Twitch video and some game audio still don't work in this build, because the web engine ships without the H.264/AAC decoders those sites use — a codec-enabled engine is a separate project, so use another browser for Twitch meanwhile. On top of 10.8.3: the rebuilt Ctrl+K palette, model pickers that list only working models, the slim status bar, and LuckyD Chat retired for now.
+The Settings screen is fixed: with "show retired tools" off, the Connections settings page was being painted over the dialog and hiding the Privacy, Appearance, and Updates tabs — all five tabs (General, Privacy, Appearance, Connections, Updates) now show the same either way. This release also updates the AI provider library (litellm 1.83.14 → 1.88.6), closing four security alerts including a critical authentication-bypass fix. Known limitation: Twitch video and some game audio still don't work in this build, because the web engine ships without the H.264/AAC decoders those sites use — a codec-enabled engine is a separate project, so use another browser for Twitch meanwhile. On top of 10.8.4: Gmail sign-in fixed.
 
 ## New in 10.6.3 — Antigravity paste fix + code health
 
@@ -226,6 +226,6 @@ A hardened foundation: every local service now authenticates with HttpOnly sessi
 
 <p align="center">
   <b>MIT © LuckyD</b> · Chromium · Ollama · Qt · xterm.js · pywinpty · PyInstaller · Inno Setup<br>
-  <a href="https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.4/LuckyDBrowserSetup-10.8.4.exe">Download v10.8.4</a>
+  <a href="https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.5/LuckyDBrowserSetup-10.8.5.exe">Download v10.8.5</a>
   · <a href="https://www.youtube.com/@LuckyDYoutube">YouTube</a>
 </p>

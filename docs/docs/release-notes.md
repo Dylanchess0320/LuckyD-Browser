@@ -1,5 +1,13 @@
 # LuckyD Browser — Release Notes
 
+## [10.8.5] — Settings fixed + AI library security update — 2026-10-23
+
+**[`LuckyDBrowserSetup-10.8.5.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.5/LuckyDBrowserSetup-10.8.5.exe)** — Windows 10/11 x64 · per-user install · no admin needed.
+
+- **Settings screen fixed**: with "show retired tools" turned off, the Connections settings page was painted over the Settings dialog and hid the Privacy, Appearance, and Updates tabs. All five Settings tabs — General, Privacy, Appearance, Connections, Updates — now show the same in both switch states.
+- **Security update**: litellm (the library the AI features use to reach model providers) is updated 1.83.14 → 1.88.6, closing four Dependabot alerts including a critical authentication-bypass fix.
+- **Known limitation**: Twitch video and some game audio (e.g., Poki) still don't work — the web engine ships without the H.264/AAC decoders those sites use. That's a separate engine project; use another browser for Twitch and affected games meanwhile.
+
 ## [10.8.4] — Gmail sign-in, fixed — 2026-10-23
 
 **[`LuckyDBrowserSetup-10.8.4.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.4/LuckyDBrowserSetup-10.8.4.exe)** — Windows 10/11 x64 · per-user install · no admin needed.
