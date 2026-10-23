@@ -10,7 +10,7 @@ import json
 import re
 
 from browser_core.agent import ActionUndoStack, AgentSession, JsBridge
-from browser_core.ai_bridge import _CLINE_USAGE_FREE_TIER, AIBridge
+from browser_core.ai_bridge import AIBridge
 from browser_core.brand import tokens as _brand_tokens
 from browser_core.lucky import system_prompt as _lucky_system_prompt
 from browser_core.skills import (
@@ -774,11 +774,16 @@ class AiSidebar(QDockWidget):
                 return f"{model}   · flat subscription"
             return f"{model}   · credit-billed ⚠"
         if provider == "cline-usage":
-            # Free-tier models are billed at $0.00; credit models deduct
-            # balance. Single source of truth: the bridge's audited free
-            # tier (10.8.3 live-probe audit — the old hardcoded tuple here
-            # had drifted to dead ids and a model that was never offered).
-            if model in _CLINE_USAGE_FREE_TIER:
+            # Free-tier models are billed at $0.00; credit models deduct balance.
+            free_tier = (
+                "minimax/minimax-m2.5",
+                "meta-llama/llama-3.2-3b-instruct",
+                "google/gemini-2.0-flash",
+                "qwen/qwen3-8b",
+            )
+            if model in free_tier:
+                return f"{model}   · free tier"
+            if model in ("deepseek/deepseek-chat", "deepseek/deepseek-r1"):
                 return f"{model}   · free tier"
             return f"{model}   · credit-billed"
         return model

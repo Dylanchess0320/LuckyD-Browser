@@ -112,7 +112,7 @@ async function askCline(prompt, { model } = {}) {
     }
     if (!token) throw new Error("no Cline session token — run `cline auth` once (or set CLINER_PASS_ACCESS_TOKEN)");
     const base = (process.env.CLINER_PASS_BASE_URL || "https://api.cline.bot").replace(/\/$/, "");
-    const chosen = model || process.env.CLINER_PASS_MODEL || "minimax/minimax-m2.5";
+    const chosen = model || process.env.CLINER_PASS_MODEL || "deepseek/deepseek-chat";
     const res = await fetch(`${base}/api/v1/chat/completions`, {
         method: "POST",
         headers: {

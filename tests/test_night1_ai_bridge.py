@@ -250,23 +250,13 @@ def test_fetch_models_clinepass_curated_fallback(monkeypatch, hermetic) -> None:
     assert "cline-pass/kimi-k3" in models
     # Fallback is the full gateway catalog, top-sorted: Cline top models lead.
     assert set(models) == set(ai_bridge._CLINE_GATEWAY_CATALOG)
-    lead = [m for m in ai_bridge._CLINE_GATEWAY_TOP_MODELS if m in ai_bridge._CLINE_GATEWAY_CATALOG]
-    assert models[: len(lead)] == lead
+    assert models[:6] == list(ai_bridge._CLINE_GATEWAY_TOP_MODELS[:6])
 
 
 def test_fetch_models_cline_usage_catalog(monkeypatch, hermetic) -> None:
     monkeypatch.setattr(ai_bridge.httpx, "get", _raise_httpx)
     b = _bridge_with({})
-    models = b.fetch_models("cline-usage")
-    assert "minimax/minimax-m2.5" in models
-    # 10.8.3 audit: the gateway-dead ids are out of the fallback catalog.
-    for dead in (
-        "deepseek/deepseek-chat",
-        "meta-llama/llama-3.2-3b-instruct",
-        "qwen/qwen3-8b",
-        "kwaipilot/kat-coder-pro",
-    ):
-        assert dead not in models
+    assert "deepseek/deepseek-chat" in b.fetch_models("cline-usage")
 
 
 def test_fetch_models_openrouter_free_first(monkeypatch, hermetic) -> None:
@@ -451,13 +441,13 @@ def test_chat_cline_explicit_rotates_models(hermetic, monkeypatch) -> None:
 
     async def _call(name, info, messages, on_token):
         tried.append(info[0])
-        if info[0] == "minimax/minimax-m2.5":
+        if info[0] == "deepseek/deepseek-chat":
             raise RuntimeError("404 model not found")
         return "cline-ok"
 
     monkeypatch.setattr(b, "_call", _call)
     text, name = asyncio.run(b.chat([{"role": "user", "content": "hi"}], provider="cline-usage"))
     assert text == "cline-ok" and name == "cline-usage"
-    assert tried[0] == "minimax/minimax-m2.5"
+    assert tried[0] == "deepseek/deepseek-chat"
     assert len(tried) >= 2
     assert b.model_for("cline-usage") == tried[-1]

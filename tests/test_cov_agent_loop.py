@@ -911,31 +911,31 @@ class TestRunLoop:
         ag.llm_client = FakeLLMClient(
             [
                 {"content": "[API Error: 429 rate limited]"},
-                {"content": "[API Error: still down]"},  # minimax-m2.5 fails too
-                RuntimeError("gateway exploded"),  # deepseek-v4-flash raises
-                {"content": "recovered via fallback"},  # glm-5.3-flash works
+                {"content": "[API Error: still down]"},  # deepseek-chat fails too
+                RuntimeError("gateway exploded"),  # minimax-m2.5 raises
+                {"content": "recovered via fallback"},  # qwen3-8b works
             ]
         )
         result = await ag.run("hello", max_turns=5)
         assert result == "recovered via fallback"
-        assert ag.model == "z-ai/glm-5.3-flash"
+        assert ag.model == "qwen/qwen3-8b"
 
     @pytest.mark.asyncio
     async def test_free_model_skips_current_model_in_fallbacks(self):
         ag = _make_agent()
         ag.messages = _seeded_messages()
         # First entry of the fallback list: the loop must skip it via `continue`.
-        ag.model = "minimax/minimax-m2.5"
+        ag.model = "deepseek/deepseek-chat"
         ag._provider_config.provider = "cline-usage"  # free-tier fallback applies
         ag.llm_client = FakeLLMClient(
             [
                 {"content": "[API Error: 429]"},
-                {"content": "ok on v4-flash"},
+                {"content": "ok on minimax"},
             ]
         )
         result = await ag.run("hello", max_turns=5)
-        assert result == "ok on v4-flash"
-        assert ag.model == "deepseek/deepseek-v4-flash"
+        assert result == "ok on minimax"
+        assert ag.model == "minimax/minimax-m2.5"
 
     @pytest.mark.asyncio
     async def test_free_model_all_fallbacks_fail(self):

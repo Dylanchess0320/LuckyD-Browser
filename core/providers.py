@@ -181,16 +181,14 @@ PROVIDER_DEFAULTS: dict[str, ProviderDefaults] = {
     },
     # Cline Usage (credit-billed / free tier) — same api.cline.bot gateway and
     # same auth as ClinePass (CLINEPASS_API_KEY, else the logged-in Cline CLI
-    # session), but model ids are provider-prefixed (e.g. minimax/minimax-m2.5)
+    # session), but model ids are provider-prefixed (e.g. deepseek/deepseek-chat)
     # and usage is billed per-request. Free-tier models cost $0 (rate-limited).
-    # 10.8.3: default was deepseek/deepseek-chat — upstream 404 on the
-    # gateway (2026-10-22 live-probe audit); minimax-m2.5 is the audited lead.
     "cline-usage": {
         "env_key": "CLINEPASS_API_KEY",
         "env_base": "CLINEPASS_BASE_URL",
         "env_model": "CLINE_USAGE_MODEL",
         "default_base": "https://api.cline.bot/api/v1",
-        "default_model": "minimax/minimax-m2.5",
+        "default_model": "deepseek/deepseek-chat",
     },
     # MiniMax (MiniMax-M3, Anthropic-compatible Messages API).
     # mesh: python main.py --provider minimax --agent 1

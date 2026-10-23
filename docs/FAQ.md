@@ -78,10 +78,11 @@ new setup exe and install it over the old one; nothing is wiped.
 
 ## 9. Is there a Discord?
 
-No official Discord server right now. For bugs, open a
-[GitHub issue](https://github.com/Dylanchess0320/LuckyD-Browser/issues).
-For ideas and questions, GitHub Discussions (seed posts drafted in
-[DISCUSSIONS-SEEDS.md](DISCUSSIONS-SEEDS.md)).
+Yes — join the official LuckyD Browser Discord:
+**[discord.gg/CmvErK8bkM](https://discord.gg/CmvErK8bkM)**. That's the
+place for questions, ideas, and release chatter. For bugs, a
+[GitHub issue](https://github.com/Dylanchess0320/LuckyD-Browser/issues)
+still gets the fastest fix.
 
 ## 10. My antivirus quarantined the exe. False positive?
 
