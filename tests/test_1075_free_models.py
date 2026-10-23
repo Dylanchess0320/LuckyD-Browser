@@ -165,7 +165,7 @@ class TestRouterFreeFirst:
     def test_router_default_is_local_free(self):
         from core.router import ModelRouter
 
-        assert ModelRouter().default_model_id == "llama3.2:3b"
+        assert ModelRouter().default_model_id == "luckyd:8b"
 
 
 class TestBridgeFreeDefaults:

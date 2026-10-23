@@ -819,8 +819,8 @@ class LLMClient:
                     # plan; anything else means the session/key is bad.
                     hint = (
                         "Check your Cline plan/subscription, or switch to a free path: "
-                        "/model cline-usage deepseek/deepseek-chat, or "
-                        "/model ollama llama3.2:3b."
+                        "/model cline-usage minimax/minimax-m2.5, or "
+                        "/model ollama luckyd:8b."
                     )
                 else:
                     hint = (
@@ -846,8 +846,8 @@ class LLMClient:
                 "content": (
                     f"[API Error: 402 — payment required] {why}"
                     "Balance exhausted. Top up credits, switch to a free-tier model "
-                    "(/model cline-usage deepseek/deepseek-chat), or use local Ollama "
-                    "(/model ollama llama3.2:3b)."
+                    "(/model cline-usage minimax/minimax-m2.5), or use local Ollama "
+                    "(/model ollama luckyd:8b)."
                 ),
             }
         if code == 429:

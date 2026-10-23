@@ -16,7 +16,7 @@ python main.py model <model-name>
 Example:
 python main.py model gemini-3-flash-preview  # Google Gemini (current)
 python main.py model nemotron-3-ultra-free    # OpenCode Zen alternative
-python main.py model llama3.2:3b              # Local Ollama (free)
+python main.py model luckyd:8b                # Local Ollama (free)
 
 ## Provider Priority:
 1. Google Gemini (currently active - free tier)

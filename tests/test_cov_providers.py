@@ -369,12 +369,12 @@ class TestResolveProviderConfig:
         monkeypatch.setattr(httpx, "get", _fake_httpx_get(exc=ConnectionError("refused")))
         cfg = resolve_provider_config("ollama")
         assert cfg["base_url"] == "http://127.0.0.1:11434/v1"
-        assert cfg["model"] == "llama3.2:3b"
+        assert cfg["model"] == "luckyd:8b"
 
     def test_ollama_models_non_200(self, clean_env, monkeypatch):
         monkeypatch.setattr(httpx, "get", _fake_httpx_get(status_code=500))
         cfg = resolve_provider_config("ollama")
-        assert cfg["model"] == "llama3.2:3b"
+        assert cfg["model"] == "luckyd:8b"
 
     def test_deepseek_auto_uses_resolver(self, clean_env, monkeypatch):
         fake = _FakeModelResolver()

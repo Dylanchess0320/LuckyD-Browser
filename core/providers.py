@@ -125,7 +125,7 @@ PROVIDER_DEFAULTS: dict[str, ProviderDefaults] = {
         "env_base": "OLLAMA_HOST",
         "env_model": "OLLAMA_MODEL",
         "default_base": "http://127.0.0.1:11434/v1",
-        "default_model": "llama3.2:3b",
+        "default_model": "luckyd:8b",
     },
     "deepseek": {
         "env_key": "DEEPSEEK_API_KEY",

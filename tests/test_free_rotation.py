@@ -160,7 +160,7 @@ class TestPriority:
             "openrouter",
             "groq",
         ]
-        assert FREE_MODEL_PRIORITY[2] == ("ollama", "llama3.2:3b")
+        assert FREE_MODEL_PRIORITY[2] == ("ollama", "luckyd:8b")
 
     def test_gemini_is_a_free_tier_provider(self):
         from core.providers import FREE_TIER_PROVIDERS
@@ -186,7 +186,7 @@ class TestRotator:
 
         monkeypatch.setattr(providers, "cline_session_token", lambda: "tok-live")
         rot = FreeModelRotator()
-        assert rot.rotate() == ("cline-usage", "deepseek/deepseek-chat")
+        assert rot.rotate() == ("cline-usage", "minimax/minimax-m2.5")
 
     def test_mark_failed_skips_pair(self, free_env, monkeypatch):
         from core import providers
@@ -195,7 +195,7 @@ class TestRotator:
         monkeypatch.setattr(providers, "cline_session_token", lambda: "tok-live")
         free_env.setenv("GOOGLE_API_KEY", TEST_API_KEY)
         rot = FreeModelRotator()
-        rot.mark_failed("cline-usage", "deepseek/deepseek-chat")
+        rot.mark_failed("cline-usage", "minimax/minimax-m2.5")
         assert rot.rotate() == ("gemini", "gemini-2.5-flash")
 
     def test_mark_provider_failed_skips_whole_provider(self, free_env, monkeypatch):
@@ -208,13 +208,13 @@ class TestRotator:
         rot.mark_provider_failed("cline-usage")
         # Next usable is gemini, then the ollama terminal fallback.
         assert rot.rotate() == ("gemini", "gemini-2.5-flash")
-        assert rot.rotate() == ("ollama", "llama3.2:3b")
+        assert rot.rotate() == ("ollama", "luckyd:8b")
 
     def test_ollama_is_terminal_fallback_without_network(self, free_env):
         from core.free_rotation import available_free_models
 
         # Nothing usable (probe refuses) — ollama is still listed last.
-        assert available_free_models() == [("ollama", "llama3.2:3b")]
+        assert available_free_models() == [("ollama", "luckyd:8b")]
 
     def test_exhausted_rotator_returns_none(self, free_env):
         from core.free_rotation import FreeModelRotator
@@ -327,7 +327,7 @@ class TestResolveFallback:
 
         cfg = resolve_provider_config()
         assert cfg["provider"] == "ollama"
-        assert cfg["model"] == "llama3.2:3b"
+        assert cfg["model"] == "luckyd:8b"
 
     def test_free_default_picks_gemini(self, free_env):
         from core.providers import resolve_provider_config
@@ -355,7 +355,7 @@ def _cline_cfg():
     return SimpleNamespace(
         api_key="tok",
         base_url="https://api.cline.bot/api/v1",
-        model="deepseek/deepseek-chat",
+        model="minimax/minimax-m2.5",
         temperature=0.0,
         max_tokens=8192,
         provider="cline-usage",
@@ -374,7 +374,7 @@ class TestAgentRotate403:
         ag.model = "gpt-4o"
 
         async def _chat_stream(*_a, **_k):
-            if ag.model == "deepseek/deepseek-chat":
+            if ag.model == "minimax/minimax-m2.5":
                 return dict(_GOOD)
             return dict(_ERR_403)
 
@@ -388,7 +388,7 @@ class TestAgentRotate403:
 
         assert msg is not None and msg["content"] == "OK"
         assert ag._provider_config.provider == "cline-usage"
-        assert ag.model == "deepseek/deepseek-chat"
+        assert ag.model == "minimax/minimax-m2.5"
 
     async def test_403_with_nothing_usable_restores_original(self, free_env):
         from core.agent_loop import CodingAgent
@@ -423,14 +423,14 @@ class TestAgentRotate403:
 
         async def _chat_stream(*_a, **_k):
             tried_models.append(ag.model)
-            if ag.model == "llama3.2:3b":
+            if ag.model == "luckyd:8b":
                 return dict(_GOOD)
             return dict(_ERR_403)
 
         ollama_cfg = SimpleNamespace(
             api_key="",
             base_url="http://127.0.0.1:11434/v1",
-            model="llama3.2:3b",
+            model="luckyd:8b",
             temperature=0.0,
             max_tokens=8192,
             provider="ollama",
@@ -447,7 +447,7 @@ class TestAgentRotate403:
         assert msg is not None and msg["content"] == "OK"
         assert ag._provider_config.provider == "ollama"
         # Only the ollama model was attempted — openai was never retried.
-        assert tried_models == ["llama3.2:3b"]
+        assert tried_models == ["luckyd:8b"]
 
 
 # ── ai_bridge.default_provider: free priority order ────────────────────

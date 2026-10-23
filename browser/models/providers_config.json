@@ -22,12 +22,8 @@
       "env_key": "CLINEPASS_API_KEY",
       "free_models": [
         "minimax/minimax-m2.5",
-        "deepseek/deepseek-chat",
         "deepseek/deepseek-r1",
-        "meta-llama/llama-3.2-3b-instruct",
         "google/gemini-2.5-flash",
-        "qwen/qwen3-8b",
-        "kwaipilot/kat-coder-pro",
         "z-ai/glm-5",
         "z-ai/glm-5.3-flash",
         "poolside/laguna-s-2.1:free"
@@ -145,16 +141,14 @@
     "ollama": {
       "base_url": "http://127.0.0.1:11434/v1",
       "free_models": [
-        "llama3.2:3b",
-        "gemma3:4b",
-        "phi3:mini",
-        "mistral:7b",
-        "codellama:7b"
+        "luckyd:4b",
+        "luckyd:8b",
+        "luckyd:latest"
       ],
       "free_tier": true,
       "local": true,
       "name": "Ollama (Local)",
-      "recommended": "llama3.2:3b",
+      "recommended": "luckyd:8b",
       "requires_key": false
     },
     "openai": {

@@ -11,7 +11,7 @@ Default priority — best free first::
 
     1. Cline (free tier)  — ``cline-usage`` via the logged-in Cline CLI session
     2. Gemini (free tier) — ``gemini`` via ``GOOGLE_API_KEY``
-    3. Ollama local      — ``llama3.2:3b`` (terminal fallback, always listed)
+    3. Ollama local      — ``luckyd:8b`` (terminal fallback, always listed)
     4. Other free tiers  — OpenRouter free catalog, Groq free tier
 
 Rotation triggers: HTTP 402 (quota/balance exhausted), 403 (auth/entitlement
@@ -46,10 +46,14 @@ __all__ = [
 ]
 
 #: (provider, model) pairs in default priority order — best free first.
+#: 10.8.3: the lead Cline pair was deepseek/deepseek-chat until the
+#: 2026-10-22 live-probe audit proved the gateway 404s that id (it maps to
+#: an upstream "deepseek-v3" that no longer exists) — minimax-m2.5 is the
+#: audited-working free lead (and the config's recommended Cline model).
 FREE_MODEL_PRIORITY: tuple[tuple[str, str], ...] = (
-    ("cline-usage", "deepseek/deepseek-chat"),
+    ("cline-usage", "minimax/minimax-m2.5"),
     ("gemini", "gemini-2.5-flash"),
-    ("ollama", "llama3.2:3b"),
+    ("ollama", "luckyd:8b"),
     # 10.7.5: the old "deepseek/deepseek-chat-v3.1:free" id never existed in
     # the OpenRouter free catalog (it 404'd on rotation). "openrouter/free"
     # is the live meta-router that auto-picks any available $0 model.
@@ -249,7 +253,7 @@ def available_free_models(
 
     Skips providers that aren't usable right now (no key/session, Cline
     while a 402 marker is valid) and pairs already in ``failed``. Ollama
-    (``llama3.2:3b``) is always appended last as the terminal fallback —
+    (``luckyd:8b``) is always appended last as the terminal fallback —
     ``list_providers()`` treats local Ollama as always configured, and the
     agent's escape legs probe it before attempting.
 
@@ -262,7 +266,7 @@ def available_free_models(
             continue
         if free_provider_usable(pair[0]):
             usable.append(pair)
-    ollama_pair = ("ollama", "llama3.2:3b")
+    ollama_pair = ("ollama", "luckyd:8b")
     if ollama_pair not in failed_set:
         usable.append(ollama_pair)
     # 10.5: prefer the last-known-working pair (membership unchanged;

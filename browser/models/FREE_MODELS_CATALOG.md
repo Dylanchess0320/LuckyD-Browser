@@ -1,22 +1,25 @@
 # LuckyD Browser — Free Models Catalog
 
-Synced with the wired provider catalogs on **October 21, 2026** (10.7.8).
+Synced with the wired provider catalogs on **October 22, 2026** (10.8.3 audit).
 `free_models` below means **$0 per token** on that provider — local models,
 free-tier quotas, or `:free` catalog ids. Anything that bills per token or
 needs a paid subscription is listed as paid, never as free.
 
 ## Always free, no key (local)
 
-- Ollama: `llama3.2:3b`, `gemma3:4b`, `phi3:mini`, `mistral:7b`, `codellama:7b`
-  (plus any model the local server reports — the first installed model wins)
+- Ollama: `luckyd:4b`, `luckyd:8b`, `luckyd:latest` — Dylan's own local
+  models, i.e. exactly what `ollama list` reports on his PC (verified
+  2026-10-22). The old generic list (llama3.2:3b, gemma3:4b, phi3:mini,
+  mistral:7b, codellama:7b) named models that are not installed there, so
+  every entry was a dead pick.
 
 ## Free with a login or free-tier key
 
 - **Cline Usage** (logged-in Cline CLI session, rate-limited $0 models):
-  `minimax/minimax-m2.5`, `deepseek/deepseek-chat`, `deepseek/deepseek-r1`,
-  `meta-llama/llama-3.2-3b-instruct`, `google/gemini-2.5-flash`,
-  `qwen/qwen3-8b`, `kwaipilot/kat-coder-pro`, `z-ai/glm-5`,
-  `z-ai/glm-5.3-flash`, `poolside/laguna-s-2.1:free`
+  `minimax/minimax-m2.5`, `deepseek/deepseek-r1`,
+  `google/gemini-2.5-flash`, `z-ai/glm-5`, `z-ai/glm-5.3-flash`,
+  `poolside/laguna-s-2.1:free` — every entry live-probed on the gateway
+  2026-10-22 and streamed real output.
 - **Google Gemini** (free-tier key): `gemini-2.5-flash`,
   `gemini-2.5-flash-lite`, `gemini-3.5-flash-lite`, `gemini-3.5-flash`,
   `gemini-3.8-flash`, `gemma-4-26b-a4b-it`, `gemma-4-31b-it`
@@ -40,6 +43,17 @@ needs a paid subscription is listed as paid, never as free.
   (`cline-pass/*`, $9.99/mo flat subscription), OpenCode Zen (keyed gateway;
   its old keyless `-free` tier died in 2026-09 — every keyless call 401s, so
   no Zen model is listed as free anymore).
+
+## Removed in 10.8.3 (live-probe audit, 2026-10-22)
+
+- Cline Usage free ids `deepseek/deepseek-chat`,
+  `meta-llama/llama-3.2-3b-instruct`, `qwen/qwen3-8b`,
+  `kwaipilot/kat-coder-pro` — the gateway maps each to an upstream id that
+  returns 404 "model not found" (`deepseek-v3`, `meta/llama-3.2-3b`,
+  `kat-coder-pro-v1`; qwen3-8b was deprecated upstream 2026-10-09). They
+  sat in the "free ✓" picker but could never answer. The free-rotation
+  lead pair moved from deepseek-chat to `minimax/minimax-m2.5` for the
+  same reason.
 
 ## Removed in 10.7.5 (dead or mislabeled ids)
 

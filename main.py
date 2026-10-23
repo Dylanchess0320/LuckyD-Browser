@@ -155,16 +155,13 @@ _CLINEPASS_CATALOG = [
 # from your Cline Credits balance.
 # Sources: https://docs.cline.bot/api/models + /getting-started/free-models
 # (2026-09, v9.1: added kat-coder-pro, glm-5, deepseek-v4-flash, glm-5.3-flash,
-# laguna-s-2.1:free, longcat-2.0 — all FREE in CLI/IDE with Cline account).
+# laguna-s-2.1:free, longcat-2.0 — all FREE in CLI/IDE with Cline account;
+# 2026-10-22: live-probe audit pruned the free tier — see _CLINE_USAGE_FREE_TIER).
 _CLINE_USAGE_CATALOG = [
     # ── Free tier (rate-limited, $0.00 — needs non-negative credit balance)
     "minimax/minimax-m2.5",
-    "deepseek/deepseek-chat",
     "deepseek/deepseek-r1",
-    "meta-llama/llama-3.2-3b-instruct",
     "google/gemini-2.5-flash",
-    "qwen/qwen3-8b",
-    "kwaipilot/kat-coder-pro",
     "z-ai/glm-5",
     "z-ai/glm-5.3-flash",
     "poolside/laguna-s-2.1:free",
@@ -176,7 +173,25 @@ _CLINE_USAGE_CATALOG = [
     "mistral/mistral-large",
 ]
 
-_CLINE_USAGE_FREE_TIER = frozenset(_CLINE_USAGE_CATALOG[:10])
+# 10.8.3 audit (2026-10-22, live gateway probes with a real Cline session):
+# deepseek/deepseek-chat, meta-llama/llama-3.2-3b-instruct, qwen/qwen3-8b and
+# kwaipilot/kat-coder-pro were removed from the free tier — the gateway maps
+# each to an upstream id that 404s ("model not found"; qwen3-8b was
+# deprecated upstream 2026-10-09), so they could never work at $0. The six
+# survivors all streamed real chunks in the same probe round. The free tier
+# is an EXPLICIT set, never a positional slice of the catalog: slicing is
+# what would silently promote credit-billed ids into "free" the next time
+# an entry is removed.
+_CLINE_USAGE_FREE_TIER = frozenset(
+    {
+        "minimax/minimax-m2.5",
+        "deepseek/deepseek-r1",
+        "google/gemini-2.5-flash",
+        "z-ai/glm-5",
+        "z-ai/glm-5.3-flash",
+        "poolside/laguna-s-2.1:free",
+    }
+)
 
 # ClinePass has no free-tier model — every ClinePass model counts against the
 # flat-subscription quota.
@@ -302,12 +317,15 @@ def _build_free_groups(free_only: bool, cline_free: list[str]) -> list[dict]:
         # Fallback to hardcoded if config gave no groups (should not happen)
         if not free_groups:
             free_groups = [
-                {"provider": "Ollama ✓", "models": ["codellama", "llama3.1", "mistral", "phi3"]},
+                {
+                    "provider": "Ollama ✓",
+                    "models": ["luckyd:4b", "luckyd:8b", "luckyd:latest"],
+                },
                 {"provider": "Cline Usage (free tier) ✓", "models": cline_free},
             ]
     else:
         free_groups = [
-            {"provider": "Ollama", "models": ["codellama", "llama3.1", "mistral", "phi3"]},
+            {"provider": "Ollama", "models": ["luckyd:4b", "luckyd:8b", "luckyd:latest"]},
             {"provider": "Cline Usage (free tier)", "models": cline_free},
         ]
     return free_groups

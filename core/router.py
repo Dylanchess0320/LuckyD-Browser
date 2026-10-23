@@ -90,14 +90,14 @@ class RoutingResult:
 MODEL_CATALOG: dict[str, ModelConfig] = {
     # Free models ($0/token: local or free-tier catalogs) — auto default.
     "ollama-local": ModelConfig(
-        name="Llama 3.2 3B (Local, free)",
+        name="Luckyd 8B (Local, free)",
         provider="ollama",
-        model_id="llama3.2:3b",
+        model_id="luckyd:8b",
         cost_per_1k_input=0.0,
         cost_per_1k_output=0.0,
         avg_latency_ms=1500,
         strengths=["code", "privacy", "offline", "speed"],
-        context_window=128_000,
+        context_window=40_960,
     ),
     "openrouter-free": ModelConfig(
         name="OpenRouter Free (auto, free)",
@@ -273,7 +273,7 @@ class ModelRouter:
     def __init__(
         self,
         models: list[ModelConfig] | None = None,
-        default_model: str = "llama3.2:3b",
+        default_model: str = "luckyd:8b",
         max_cost_per_task: float = 0.50,  # USD
         fallback_enabled: bool = True,
     ):
