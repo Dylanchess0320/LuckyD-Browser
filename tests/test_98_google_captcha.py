@@ -221,7 +221,7 @@ def test_profile_helpers_exist_and_are_startup_safe() -> None:
 
     assert hasattr(profile_mod, "_enable_language")
     assert hasattr(profile_mod, "_enable_desktop_ua")
-    assert "Chrome/126" in profile_mod.DESKTOP_UA
+    assert "Chrome/140" in profile_mod.DESKTOP_UA
     assert "en-US" in profile_mod.ACCEPT_LANGUAGE
     fake = _FakeProfile(with_methods=True)
     profile_mod._enable_language(fake)  # type: ignore[arg-type]
@@ -243,7 +243,7 @@ def test_desktop_ua_falls_back_to_constant_when_engine_query_fails() -> None:
     """desktop_ua() never raises and returns a Chrome UA.
 
     With Qt mocked, qWebEngineChromiumVersion() is a MagicMock whose
-    majorVersion() is not an int >= 100, so the fallback fires.
+    str() fails the version-shape validation, so the fallback fires.
     """
     import importlib.util
 

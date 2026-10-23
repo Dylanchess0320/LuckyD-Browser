@@ -268,20 +268,22 @@ class _HeaderInfo:
         self.headers[bytes(name).decode()] = bytes(value).decode()
 
 
-def test_signin_hosts_get_a_consistent_chrome_identity(tmp_path: Path) -> None:
+def test_signin_hosts_are_never_blocked_or_rewritten(tmp_path: Path) -> None:
+    """Sign-in requests pass through untouched (2026-10-23 fix).
+
+    The pass-2 pin rewrote sign-in headers with a fabricated identity
+    (full-version UA + a "Google Chrome" sec-ch-ua brand) that the
+    JS-visible UA/UAData contradicted — the exact inconsistency behind
+    Google's "browser or app may not be secure" rejection. Identity now
+    comes from the profile only; the interceptor just stands aside.
+    """
     from browser_core.adblock import AdBlockInterceptor
 
     interceptor = AdBlockInterceptor(enabled=True, list_path=tmp_path / "none.txt")
     info = _HeaderInfo("https://accounts.google.com/v3/signin/identifier")
     interceptor.interceptRequest(info)
     assert not info.blocked  # sign-in is never blocked
-    ua = info.headers.get("User-Agent", "")
-    assert ua.startswith("Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
-    assert "QtWebEngine" not in ua
-    hints = info.headers.get("sec-ch-ua", "")
-    assert "Chromium" in hints and "Google Chrome" in hints
-    assert info.headers.get("sec-ch-ua-platform") == '"Windows"'
-    assert info.headers.get("sec-ch-ua-mobile") == "?0"
+    assert info.headers == {}  # and never rewritten
 
 
 def test_non_signin_hosts_get_no_pinned_headers(tmp_path: Path) -> None:
@@ -293,13 +295,14 @@ def test_non_signin_hosts_get_no_pinned_headers(tmp_path: Path) -> None:
     assert info.headers == {}
 
 
-def test_signin_ua_has_no_qtwebengine_marker() -> None:
-    from browser_core.profile import client_hints, signin_ua
+def test_profile_ua_has_no_qtwebengine_marker() -> None:
+    from browser_core.profile import DESKTOP_UA, desktop_ua
 
-    ua = signin_ua()
+    ua = desktop_ua()
     assert "QtWebEngine" not in ua
     assert "Chrome/" in ua
-    hints = client_hints(ua)
-    if hints:  # engine version query can be unavailable under stubbed Qt
-        major = ua.split("Chrome/", 1)[1].split(".", 1)[0]
-        assert f'v="{major}"' in hints["sec-ch-ua"]
+    # Under stubbed Qt the engine-version query is unusable, so the UA is
+    # the last-known-good fallback — whose major tracks the shipped
+    # engine (Chromium 140 in the current build, not the stale 126).
+    assert ua == DESKTOP_UA
+    assert "Chrome/140" in DESKTOP_UA
