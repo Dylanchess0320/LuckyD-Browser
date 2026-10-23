@@ -455,6 +455,23 @@ DeepSeek Harness boot, Ctrl+K focus, readable shortcuts, sRGB video).
 
 ## [Unreleased]
 
+## [10.8.3] - 2026-10-23
+
+The cleanup pass: the palette, the model pickers, and the status bar — rebuilt around what you actually use.
+
+### Changed
+- **Ctrl+K command palette, rebuilt**: it was rendering as a 100×30-pixel sliver with an unpainted background, an Esc key that could never close it, Enter dead after a mouse click, and ~150 unsorted bare titles on open. Now the window is the card — 640px, centered, painted from theme tokens in both themes; every row says what it is (Tab, Bookmark, History, Action) with detail and a right-aligned shortcut/kind tag; results group Actions → Tabs → Workspaces → Bookmarks → History, capped at 50 with a "…N more matches" footer; Esc, Enter, and click-away all work; matching is subsequence-based.
+- **Terminal model picker tells the truth**: the Ollama (Local) group now lists exactly the local models that exist — **luckyd:4b, luckyd:8b, luckyd:latest** (8b recommended) — instead of five generic models, none of which were installed. Rotation fallbacks and defaults point at models that exist (local fallback luckyd:8b, context 40960).
+- **Status bar reconstructed**: a slim strip keeps the hovered link's address with the scheme muted and the **domain emphasized**, routes plain status text to the same label, and shows page loads as a thin 2px progress line along its top edge, hidden at 100%. The lock/permissions button, the zoom pill, and the chunky progress bar are gone — Site Permissions still opens from the Tools menu, Ctrl+K, or the right-click menu, and zoom still resets from the View menu.
+- **GitHub page, rewritten**: the README is now a proper showcase, the repo is cleaned of files nothing references, and the **Discord invite (discord.gg/CmvErK8bkM) is back on the page**; the docs FAQ again points to the real server.
+
+### Fixed
+- **Free model lists pruned to models that actually work**: four Cline free-tier ids the gateway now 404s (deepseek-chat, llama-3.2-3b-instruct, qwen3-8b — deprecated, successor paid — and kat-coder-pro) were removed from the free list in **both** the terminal picker and the AI sidebar catalog. Every surviving free model (MiniMax M2.5, DeepSeek R1, Gemini 2.5 Flash, GLM-5, GLM-5.3 Flash, Laguna S 2.1) was verified live against the gateway with streaming probes. The sidebar's default free model is now MiniMax M2.5 instead of the dead deepseek-chat.
+- **Free-tier definition hardened**: the free tier was a positional slice of the catalog — pruning entries would have silently promoted credit-billed models (gpt-4o, claude-sonnet) into "free". It is now an explicit set in both catalogs, pinned by regression tests (including a bridge↔terminal drift pin).
+
+### Removed
+- **LuckyD Chat retired (for now)**: the homepage tile, the Tools menu entry, and the Settings → Connections tab are hidden behind the existing `show_retired_tools` switch (default off). All code and your saved Hub/Claw tokens and addresses are kept untouched — flip the switch and it comes back exactly as it was.
+
 ## [10.8.2] - 2026-10-22
 
 Agent mode, fixed: the AI Assistant's agent runs work with Cline again.

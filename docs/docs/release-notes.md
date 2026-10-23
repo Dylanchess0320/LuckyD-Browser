@@ -1,5 +1,15 @@
 # LuckyD Browser — Release Notes
 
+## [10.8.3] — The cleanup pass — 2026-10-23
+
+**[`LuckyDBrowserSetup-10.8.3.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.3/LuckyDBrowserSetup-10.8.3.exe)** — Windows 10/11 x64 · per-user install · no admin needed.
+
+- **Ctrl+K palette rebuilt**: a real centered card in theme colors; every row labeled by kind with shortcut hints; grouped results with a sane cap; Esc, Enter, and click-away all fixed.
+- **Model pickers list only working models**: the terminal's Ollama group is now your luckyd models (4b / 8b / latest); the free cloud list in the terminal and the AI sidebar was pruned to six models verified live against the gateway; the sidebar's default is now MiniMax M2.5.
+- **Status bar, slimmed down**: the hovered link's address stays, domain emphasized, page loads shown as a thin top-edge line; the permissions button and zoom pill are gone (Site Permissions still in Tools / Ctrl+K / right-click).
+- **LuckyD Chat retired for now**: homepage tile, menu entry, and Connections tab hidden behind the retired-tools switch; all code and your saved connection settings preserved — fully restorable.
+- **GitHub page showcase**: the README rewritten, the repo cleaned up, and the Discord invite (discord.gg/CmvErK8bkM) back on the page and in the FAQ.
+
 ## [10.8.2] — Agent mode fixed — 2026-10-22
 
 **[`LuckyDBrowserSetup-10.8.2.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.2/LuckyDBrowserSetup-10.8.2.exe)** — Windows 10/11 x64 · per-user install · no admin needed.

@@ -79,6 +79,8 @@ Then start chatting. That's it. Want everything on your own machine? Add Ollama 
 
 ## What's new
 
+**v10.8.3** — The cleanup pass: Ctrl+K palette rebuilt, model pickers list only working models (your luckyd models first), status bar slimmed down with the hover address kept, LuckyD Chat retired for now, GitHub page rewritten as a showcase with the Discord invite back
+
 **v10.8.2** — Agent mode fixed: AI Assistant agent runs use the provider + model you picked (Cline included), and a model that fails mid-request rotates to the next one instead of ending in an empty reply
 
 Older changes: [full changelog](CHANGELOG.md) · [all releases](https://github.com/Dylanchess0320/LuckyD-Browser/releases)
