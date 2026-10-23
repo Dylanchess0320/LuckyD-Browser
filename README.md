@@ -71,17 +71,13 @@ LuckyD is built in the open, with its users. **[Join the Discord](https://discor
 
 Then start chatting. That's it. Want everything on your own machine? Add Ollama in Settings → Models for local-only mode.
 
-<p align="center">
-  <img src="docs/screenshots/agent-terminal-dashboard.png" alt="LuckyD Browser — Multi Agent Terminal" width="920">
-</p>
-
 ---
 
 ## What's new
 
-**v10.8.5** — Settings fixed: with retired tools hidden, the Connections settings page painted over the Settings dialog and hid the Privacy, Appearance, and Updates tabs — all five tabs now show in both switch states. Plus a security update for the AI provider library (litellm 1.88.6, closing a critical authentication-bypass alert). Known limitation: Twitch video and some game audio still don't work — the web engine ships without H.264/AAC decoders (separate engine project in progress)
+**v10.8.5** — Settings fixed: with retired tools hidden, the Connections settings page painted over the Settings dialog and hid the Privacy, Appearance, and Updates tabs — all five tabs now show in both switch states. Plus a security update for the AI provider library (litellm 1.88.6, closing a critical authentication-bypass alert). Known limitation: Twitch video and some game audio still don't work — the web engine ships without H.264/AAC decoders
 
-**v10.8.4** — Gmail sign-in fixed: the browser was presenting Google contradictory identities (a stale Chrome 126 user-agent plus rewritten sign-in headers) and Google refused it as insecure; it now presents one consistent identity. Known limitation: Twitch video and some game audio still don't work — the web engine ships without H.264/AAC decoders (separate engine project in progress)
+**v10.8.4** — Gmail sign-in fixed: the browser was presenting Google contradictory identities (a stale Chrome 126 user-agent plus rewritten sign-in headers) and Google refused it as insecure; it now presents one consistent identity. Known limitation: Twitch video and some game audio still don't work — the web engine ships without H.264/AAC decoders
 
 **v10.8.3** — The cleanup pass: Ctrl+K palette rebuilt, model pickers list only working models (your luckyd models first), status bar slimmed down with the hover address kept, LuckyD Chat retired for now, GitHub page rewritten as a showcase with the Discord invite back
 
@@ -139,6 +135,5 @@ Don't rebuild agent trust plumbing — build *with* ours. [`kit/`](kit/) ships L
   <b>MIT © LuckyD</b><br>
   <a href="https://github.com/Dylanchess0320/LuckyD-Browser/releases/latest">Download</a>
   · <a href="https://discord.gg/CmvErK8bkM">Discord</a>
-  · <a href="https://www.youtube.com/@LuckyDYoutube">YouTube</a>
   · <a href="CHANGELOG.md">Changelog</a>
 </p>
