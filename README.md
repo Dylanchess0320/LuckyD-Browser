@@ -1,10 +1,8 @@
 <div align="center">
 
-
-
 # LuckyD Browser
 
-**A web browser with a built-in AI assistant that works for free — no account, no API key, no subscription.**
+**The Chromium browser with a real AI assistant built in — free to use, private by design, and yours to rename.**
 
 [![Release](https://img.shields.io/github/v/release/Dylanchess0320/LuckyD-Browser?color=7c5cff&label=release)](https://github.com/Dylanchess0320/LuckyD-Browser/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
@@ -12,44 +10,52 @@
 
 ### [⬇ Download LuckyD Browser for Windows](https://github.com/Dylanchess0320/LuckyD-Browser/releases/latest)
 
-**[🎬 Watch it in action](https://www.youtube.com/@LuckyDYoutube)** · **[📝 Changelog](CHANGELOG.md)**
+**[📝 Changelog](CHANGELOG.md)** · **[📖 Documentation](https://dylanchess0320.github.io/LuckyD-Browser/)**
 
 </div>
 
 ---
 
-## What is this?
+## Why LuckyD?
 
-LuckyD is a normal, fast web browser — with an AI assistant living inside it. Press `Ctrl+Shift+A` on any page and ask it to summarize the article, explain something, or write code. It uses free AI providers and local models, so there's **no account, no API key, no subscription**.
+Most AI browsers rent you a chatbot on a subscription. LuckyD takes the other road: it's a full Chromium daily driver with an AI layer that **finds you a working model for free** — a rotating pool of free cloud models first, local models on your own machine when you want total privacy, and your own API keys only if you choose to add them.
 
-- 🆓 **Free AI, no catch** — free providers and local models built in. No account, no key, no monthly bill.
-- 🌐 **A real browser** — tabs, bookmarks, ad blocking, workspaces, private mode. Use it as your daily driver.
-- 🤖 **A coding agent in a tab** — press `Ctrl+Shift+H` and tell it what to build. It writes code, runs terminals, and gets things done.
-- 🔒 **Private by default** — no telemetry, no tracking. Incognito writes nothing to disk. Local-only mode keeps every prompt on your machine.
+- 🆓 **Free AI, no catch** — no account, no API key, no subscription. The assistant works the moment you install.
+- 🌐 **A real browser** — Chromium engine, tabs, bookmarks, workspaces, built-in ad blocking, private mode.
+- 🔒 **Private by default** — no telemetry, no tracking. Local-only mode keeps every prompt on your machine.
+- 🎨 **Yours, visually** — hand-built themes including Arctic Light, animated homepages you can switch off, and a setting to rename the browser itself.
 
 > Other AI browsers rent you their chatbot. **LuckyD finds you a free one — or runs one on your machine.**
 
 ---
 
-## LuckyD AI
+## The AI Assistant
 
-The browser's AI isn't a single chatbot — it's a routing layer that finds you something that actually works, plus an agent terminal that runs real coding CLIs.
+Press `Ctrl+Shift+A` on any page. One input bar, two modes, toggled right where you type:
 
-**Provider handling that tells the truth.** Settings → Models shows every provider's live status — Ready, Needs key, or Exhausted (with retry countdown) — read from the same health snapshot the backend uses. The "Switch to best working" button moves you to the provider with evidence it answered recently, in one click. No more picking a dead model and wondering why nothing happens.
+- **Ask** — questions about the page or anything else. Summarize an article, explain a paragraph, draft a reply.
+- **Agent** — hand it a task. It works through the browser's toolset and reports back in the transcript, with a live status line while it runs.
 
-**16 coding agents in a tab.** Press `Ctrl+Shift+H` for the agent terminal: Antigravity, Claude, Codex, Copilot, Qwen, OpenCode, MiniMax Code, MiniMax Media, Cline, OpenClaw, Hermes, Pi, Grok, Muse Code, Jules, and more. Paste large prompts without corruption (10.6.3 fixed the ConPTY garbling on big pastes). Each agent runs in its own PTY with bracketed-paste support.
-
-**The LuckyD AI vision.** The direction is a single LuckyD AI: you ask, it routes — free providers first, local models when you want privacy, your own keys when you add them — and it remembers what worked. The 10.5/10.6 provider-health work (live status, last-known-working tracking, free-model rotation) is the foundation. Not a separate model to download; the intelligence is in the routing.
+Behind both modes sits provider handling that tells the truth. Settings → Models shows every provider's live status — **Ready**, **Needs key**, or **Exhausted** (with a retry countdown) — read from the same health snapshot the backend uses. When a model dies mid-request, the run rotates to the next working one instead of ending in an empty reply. The free Cline rotation (MiMo v2.6 Pro among the models it serves) is the default path; plug in Ollama for fully local models, or add your own keys for Gemini, OpenAI, Anthropic, OpenRouter, DeepSeek, and more — cloud providers are always an explicit opt-in, never a silent fallback.
 
 ---
 
-## Built-in apps
+## Multi Agent Terminal
 
-Three apps ship inside the browser — all wired to the same free-model routing, so they work out of the box with no API key.
+A real terminal built into the browser, made for coding agents. Open a tab, pick your CLI, and run several agents side by side — each in its own live session. The `/model` picker spans the whole catalog in one list: your local Ollama models and the free cloud rotation together, so switching brains mid-session is one command, not a settings expedition.
 
-- 🔬 **Deep Researcher** (`Ctrl+Shift+R`) — a multi-agent research swarm (planner → parallel grounded workers → synthesizer → critic → verifier) that returns citation-backed reports. Auto-rides your best free model, `openrouter/free` as the resilient fallback.
-- 🎬 **Workflows** — record and replay browser automations with self-healing element targets, run them on a schedule, or just **describe one in plain English** and let Generate with AI build it.
-- 🎞 **Deck Studio** — Markdown in, finished video deck out (Marp pipeline: paginate → AI images → fit check → export), with one free-first model cascade: Cline → Gemini → OpenRouter `:free`.
+---
+
+## Made to be yours
+
+- **Themes** — a considered set of looks, from the deep default to **Arctic Light**, all drawn from one design-token system so every surface matches.
+- **Animated homepages** — Aurora Glow, Particle Drift, and Gentle Parallax bring the start page to life and follow your cursor. Prefer calm? One switch turns animation off completely.
+- **Rename your browser** — Settings → the display name is yours. The window, the menus, and the identity follow what you call it.
+- **Ctrl+K command palette** — every command, tab, bookmark, and history entry in one search box, each row labeled for what it is.
+
+## A proper daily driver
+
+Underneath the AI, this is a browser built for everyday use: fast tab handling with the tab strip where it belongs, bookmarks and history, workspaces, a built-in ad blocker, private windows that write nothing to disk, and per-site permission controls (Tools → Site Permissions) so you decide exactly what each site may touch.
 
 ---
 
@@ -57,50 +63,19 @@ Three apps ship inside the browser — all wired to the same free-model routing,
 
 1. **[Download the installer](https://github.com/Dylanchess0320/LuckyD-Browser/releases/latest)** (Windows 10/11, 64-bit)
 2. Run it — installs for just you, **no admin needed**
-3. Open LuckyD and press `Ctrl+Shift+A` — the AI works right away with free providers
+3. Open LuckyD and press `Ctrl+Shift+A` — the AI works right away on free providers
 
-Then start chatting. That's it. (Want everything on your own machine? Add Ollama in Settings → Models for local-only mode.)
-
-<details>
-<summary>Want to use your own AI keys instead? (optional)</summary>
-
-LuckyD also works with cloud providers if you prefer: Gemini, Groq, DeepSeek, OpenAI, Anthropic, OpenRouter, and more. Add a key in Settings → Models. Local mode keeps working as the free fallback.
-
-</details>
-
----
-
-## See it
+Then start chatting. That's it. Want everything on your own machine? Add Ollama in Settings → Models for local-only mode.
 
 <p align="center">
-  <img src="docs/screenshots/agent-terminal-dashboard.png" alt="LuckyD Browser — agent terminal and HQ dashboard" width="920">
+  <img src="docs/screenshots/agent-terminal-dashboard.png" alt="LuckyD Browser — Multi Agent Terminal" width="920">
 </p>
-
-
 
 ---
 
 ## What's new
 
 **v10.8.2** — Agent mode fixed: AI Assistant agent runs use the provider + model you picked (Cline included), and a model that fails mid-request rotates to the next one instead of ending in an empty reply
-
-**v10.8.1** — The polish pass: Ask/Agent toggle + Enter-to-send in the AI Assistant, LuckyD Chat built into the browser (Hub chat + Claw tasks), Multi Agent Terminal (formerly Agent Mesh), animated cursor-reactive homepage themes, truly transparent logo, rebuilt shortcuts page, decluttered homepage
-
-**v10.8.0** — The big cleanup: tabs on top, one menu button, rebuilt AI Assistant with findings summaries, retired tools hidden behind one switch, Google search removed everywhere, Gmail sign-in fixed, cleaner homepage, rename-your-browser setting
-
-**v10.7.8** — Theme-matched native header, visible tab close buttons, Google search removed, HQ stale-harness handshake, reliable Deep Researcher cancellation, and dead free-model cleanup
-
-**v10.7.5** — Free-model cleanup: dead model ids pruned, every auto-selected model is a verified $0 route (local Ollama / free tiers), and LuckyD Code falls back to the free rotation on any setting instead of failing on a stale paid pick. Paid providers remain explicit opt-ins with your own key.
-
-**v10.7.4** — Agent Mesh Doctor (`lucky-code mesh --doctor` / `--recommend`) with cost-tier badges across all 19 agents, reversible tab action undo (`Ctrl+Alt+Z` + `/tabs/undo`), one-click Ollama setup & onboarding APIs, exponential Cline 402 credit backoff, and CLI session prefix/title resolution + run cost summaries.
-
-**v10.7.3** — Lazy session restore, smoother terminal, stable tabs
-
-**v10.7.1** — Jules async delegate (dispatch real cloud coding tasks from the mesh: approval-gated, quota-guarded, PRs flow into review; live-tested against the real API) + hardening sweep (retry-budget errors surface properly, delegate concurrency capped at 8, registries pruned, prompt-injection fencing).
-**v10.7.0** — One unified agent loop: Terminal /mesh routing and Code agents merged into the browser's `CodingAgent`; deterministic model selection (every mid-run switch is now recorded, plus an opt-in pin mode); oversized-input protection (same bug class as the 10.6.3 paste fix); PTY output chunking; durable background tasks that survive restarts; classified retry wired into the HTTP layer; summarize-instead-of-drop on context truncation; subagent results quarantined out of context. New: task-completion evals (`tests/coding_eval.py`) — 14/14 after hardening, up from 12/14.
-**v10.6.3** — Antigravity agent paste fix (large pastes no longer corrupt in the terminal); 33 code-health PRs merged (exception handlers, test assertions, sandbox hardening including an RCE fix); provider-health UI polish (live status badges, one-click best-working switch). Nothing else changed since 10.6.2.
-**v10.6.1** — Google bot-detection auto-fallback: searches that hit Google's "unusual traffic" page now re-run on the next working engine automatically. Nothing else changed since 10.6.0.
-**v10.5.0** — Model & provider handling rebuilt: the browser now shows which AI providers are actually working, warns you before you pick a dead one, and switches to the best working option in one click. Free models stay the default.
 
 Older changes: [full changelog](CHANGELOG.md) · [all releases](https://github.com/Dylanchess0320/LuckyD-Browser/releases)
 
@@ -113,13 +88,10 @@ Older changes: [full changelog](CHANGELOG.md) · [all releases](https://github.c
 
 | Shortcut | Action |
 |----------|--------|
-| `Ctrl+Shift+A` | AI Sidebar |
-| `Ctrl+Shift+H` | Coding Agent HQ |
-| `Ctrl+Shift+U` | Summarize this page |
-| `Ctrl+Shift+L` | Read page aloud |
-| `Ctrl+Shift+R` | Deep Research |
-| `` Ctrl+` `` | Terminal |
+| `Ctrl+Shift+A` | AI Assistant |
 | `Ctrl+K` | Command palette |
+| `Ctrl+T` | New tab |
+| `Ctrl+W` | Close tab |
 
 ### Build from source
 
@@ -133,8 +105,9 @@ browser\run_browser.bat
 ### Architecture
 
 ```
-browser/   PySide6 / Qt WebEngine · Control API :9777 · Terminal :9881
+browser/   PySide6 / Qt WebEngine (Chromium) · Control API :9777 · Terminal :9881
 core/      agent loop, LLM client, checkpoints
+main.py    luckyd terminal CLI (/model picker, free rotation, local + cloud)
 tests/     headless pytest (Qt mocked on Linux CI)
 ```
 
