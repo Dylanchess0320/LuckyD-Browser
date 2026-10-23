@@ -365,11 +365,12 @@ _OPENROUTER_FREE_FALLBACK = [
 # The chat path rotates through these when the configured Cline model
 # fails (404, unsupported, rate limit). Usage-billed free models first —
 # they cost nothing and work with a logged-in Cline CLI session.
+# 10.8.3: live-probe audit (2026-10-22, same evidence as the terminal
+# catalog in main.py) — deepseek/deepseek-chat, qwen/qwen3-8b and
+# kwaipilot/kat-coder-pro return upstream 404 on this gateway, so they
+# can never win a rotation; removed. minimax/minimax-m2.5 leads.
 _CLINE_GATEWAY_TOP_MODELS = [
-    "deepseek/deepseek-chat",
     "minimax/minimax-m2.5",
-    "qwen/qwen3-8b",
-    "kwaipilot/kat-coder-pro",
     "z-ai/glm-5.3-flash",
     "cline-pass/deepseek-v4-flash",
     "cline-pass/kimi-k3",
@@ -385,20 +386,35 @@ _CLINE_GATEWAY_TOP_MODELS_SET = set(_CLINE_GATEWAY_TOP_MODELS)
 # 10.7.8: removed deepseek/deepseek-v4-flash and cline-free/longcat-2.0 from
 # the usage gateway (real 403: "available only via Cline product surfaces");
 # they are ClinePass/IDE-only ids, so the picker must not offer them here.
-_CLINE_USAGE_MODEL = "deepseek/deepseek-chat"
+_CLINE_USAGE_MODEL = "minimax/minimax-m2.5"
 _CLINE_USAGE_CATALOG = [
     # ── Free tier (rate-limited, $0.00 — needs non-negative credit balance)
+    # 10.8.3: pruned to the ids that survived the 2026-10-22 live-probe
+    # audit of the Cline gateway (mirrors main.py _CLINE_USAGE_FREE_TIER —
+    # keep the two in sync). Removed as upstream-404 dead: deepseek/
+    # deepseek-chat, meta-llama/llama-3.2-3b-instruct, qwen/qwen3-8b
+    # (deprecated 2026-10-09), kwaipilot/kat-coder-pro.
     "minimax/minimax-m2.5",
-    "deepseek/deepseek-chat",  # DeepSeek V3 — fast general model
     "deepseek/deepseek-r1",  # DeepSeek R1 — reasoning model
-    "meta-llama/llama-3.2-3b-instruct",  # Small Llama, quick responses
     "google/gemini-2.5-flash",  # Google Gemini free tier
-    "qwen/qwen3-8b",  # Qwen 3 small, CPU-friendly
-    "kwaipilot/kat-coder-pro",  # free coding model
     "z-ai/glm-5",  # Z-AI free tier
     "z-ai/glm-5.3-flash",  # Z-AI flash free
     "poolside/laguna-s-2.1:free",  # poolside free
 ]
+# The bridge catalog is free-tier only (credit-billed ids were removed in
+# 10.7.5), so the free tier is the whole catalog — but spell it out as an
+# explicit set, never a positional slice, and pin it to the catalog (and
+# to main.py's free tier) with regression tests.
+_CLINE_USAGE_FREE_TIER = frozenset(
+    {
+        "minimax/minimax-m2.5",
+        "deepseek/deepseek-r1",
+        "google/gemini-2.5-flash",
+        "z-ai/glm-5",
+        "z-ai/glm-5.3-flash",
+        "poolside/laguna-s-2.1:free",
+    }
+)
 # 10.7.5: credit-billed ids (gemini-2.5-pro, claude-sonnet-4-6, gpt-4o, ...)
 # were removed from this catalog — the picker presented them next to the $0
 # models and picking one silently billed Cline Credits. Paid Cline models

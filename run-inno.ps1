@@ -1,0 +1,2 @@
+& 'C:\Users\dylan\AppData\Local\Programs\Inno Setup 6\ISCC.exe' 'C:\Users\dylan\LuckyD-Browser\browser\installer\LuckyDBrowser.iss' *> 'C:\Users\dylan\OneDrive\Desktop\LuckyD\inno.log'
+"EXIT:$LASTEXITCODE" | Out-File 'C:\Users\dylan\OneDrive\Desktop\LuckyD\inno.log' -Append

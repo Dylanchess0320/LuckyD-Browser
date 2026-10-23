@@ -266,7 +266,7 @@ provider, and works for Ollama/DeepSeek/etc. too):
   mimo-v2.5-pro, minimax-m3, qwen3.7-max, qwen3.7-plus.
 - **Credit-billed** (Cline Credits): the gateway's free-tier
   `minimax/minimax-m2.5` and the regular paid models
-  (`deepseek/deepseek-chat`, `google/gemini-2.5-pro`,
+  (`google/gemini-2.5-pro`,
   `anthropic/claude-sonnet-4-6`, `openai/gpt-4o`) — these need a
   non-negative credit balance at app.cline.bot/credits. With the provider
   set to "auto", a rate-limited/credit-blocked model falls through to the

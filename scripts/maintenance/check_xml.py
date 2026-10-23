@@ -1,0 +1,6 @@
+import xml.etree.ElementTree as ET
+
+ET.parse(
+    r"C:\Users\dylan\OneDrive\Desktop\movie-recommender\android-app\app\src\main\res\layout\item_feed.xml"
+)
+print("Valid XML")

@@ -745,7 +745,8 @@ def _resolve_provider(provider_hint: str | None, model_name: str) -> dict:
         base_url = os.environ.get(env_base, "") or _base_defaults.get(provider_hint, "")
         _model_defaults = {
             "clinepass": "cline-pass/kimi-k3",
-            "cline-usage": "deepseek/deepseek-chat",
+            # 10.8.3: was deepseek/deepseek-chat (upstream 404 on the gateway).
+            "cline-usage": "minimax/minimax-m2.5",
         }
         resolved_model = (
             model_name or os.environ.get(env_model, "") or _model_defaults.get(provider_hint, "")
