@@ -4,11 +4,19 @@ same ``show_retired_tools`` switch that retired HQ / Workflows / Deep
 Researcher / Deck Studio in pass 1 — code, routes and stored tokens
 all stay in place, and flipping the switch brings everything back.
 
-Pass-1 parity is the spec: tiles and menu entries are filtered, the
-Settings → Connections tab only joins the dialog while the switch is
-on, and the control-server routes themselves are deliberately NOT
-gated (exactly like /hq, /workflows and /research, whose routes still
-serve while retired — see test_retired_tools.py).
+Pass-1 parity is the spec for TOOL surfaces: tiles and menu entries
+are filtered, and the control-server routes themselves are
+deliberately NOT gated (exactly like /hq, /workflows and /research,
+whose routes still serve while retired — see test_retired_tools.py).
+
+Settings tabs are NOT tool surfaces: since the 2026-10-23 fix every
+tab — Connections included — is present in both switch states. The
+original gating was a live bug, not a feature: the Connections page
+widget is built either way, and a page never handed to the tab stack
+is never hidden, so it floated visible over the dialog and buried
+the Privacy/Appearance/Updates tabs (Dylan's report). The contract
+is pinned in test_settings_tabs_contract.py (source level) and in
+test_retired_luckyd_chat_qt.py (real widgets).
 
 Qt-free on purpose: the suite runs against mocked/absent Qt. The real
 widget-level proof (Tools menu + Settings tabs, both switch states)
@@ -126,15 +134,18 @@ def test_tools_menu_entry_gated_but_handler_kept() -> None:
     assert "def open_luckyd_chat" in mw
 
 
-def test_connections_tab_gated_but_fields_and_saves_kept() -> None:
+def test_connections_tab_always_present_fields_and_saves_kept() -> None:
     dialogs = _src("browser_ui/dialogs.py")
+    # 2026-10-23 contract: the tab joins the dialog unconditionally —
+    # the switch governs tool surfaces, never Settings tabs.
+    assert 'tabs.addTab(_scrollable(connections), "Connections")' in dialogs
     gated = (
         'if bool(settings.get("show_retired_tools", False)):\n'
         '            tabs.addTab(_scrollable(connections), "Connections")'
     )
-    assert gated in dialogs
-    # The fields are still built and still saved on accept(), so stored
-    # tokens/addresses survive with the tab hidden (never deleted).
+    assert gated not in dialogs
+    # The fields are built and saved on accept(), so stored
+    # tokens/addresses survive in both switch states (never deleted).
     for field in ("hub_url", "hub_token", "claw_url", "claw_token"):
         assert f"self.{field}" in dialogs
         assert f'set("{field}", self.{field}.text().strip())' in dialogs

@@ -278,8 +278,8 @@ class SettingsDialog(QDialog):
         self.retired_tools.setToolTip(
             "These tools are hidden by default but fully built in.\n"
             "Turn this on to bring back their menu items, palette entries,\n"
-            "dashboard tiles, shortcuts and the Connections tab.\n"
-            "Takes effect on restart."
+            "dashboard tiles and shortcuts. Takes effect on restart.\n"
+            "(Settings tabs are always shown either way.)"
         )
         self.retired_tools.setChecked(bool(settings.get("show_retired_tools", False)))
         gform.addRow(self.retired_tools)
@@ -420,11 +420,15 @@ class SettingsDialog(QDialog):
         tabs.addTab(_scrollable(appearance), "Appearance")
 
         # ── Connections (LuckyD Chat: Hub + Claw on Dylan's PC) ────
-        # LuckyD Chat is a retired tool (2026-10-22): the tab only joins
-        # the dialog while show_retired_tools is on — same switch as its
-        # tile and menu entry. The fields are still built either way and
-        # accept() still saves them, so stored Hub/Claw tokens and
-        # addresses are preserved untouched while the tab is hidden.
+        # This tab is a SETTINGS surface, not a tool surface: it is
+        # always added, in both show_retired_tools states. The switch
+        # governs retired TOOL surfaces only (tiles, menus, pages).
+        # It used to be gated on the switch (2026-10-22), which was a
+        # live bug: the page widget is built either way, and a page
+        # that is never handed to the tab stack is never hidden — it
+        # floated visible over the tab bar and the current page,
+        # burying the other tabs. accept() saves the fields either
+        # way, so stored Hub/Claw tokens and addresses are preserved.
         connections = QWidget(tabs)
         cform = QFormLayout(connections)
 
@@ -444,8 +448,7 @@ class SettingsDialog(QDialog):
         self.claw_token.setPlaceholderText("Claw token")
         cform.addRow("Claw token", self.claw_token)
 
-        if bool(settings.get("show_retired_tools", False)):
-            tabs.addTab(_scrollable(connections), "Connections")
+        tabs.addTab(_scrollable(connections), "Connections")
 
         # ── Updates ───────────────────────────────────────────────
         updates = QWidget(tabs)

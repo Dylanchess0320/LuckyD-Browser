@@ -5,9 +5,14 @@ are proven against the real widgets).
 Covers, in BOTH switch states:
 - MainWindow: the Tools menu carries "LuckyD Chat" only when
   show_retired_tools is on.
-- SettingsDialog: the "Connections" tab exists only when the switch is
-  on — and with it hidden, accepting the dialog leaves stored Hub/Claw
-  tokens and addresses untouched (preserved, never deleted).
+- SettingsDialog: the tab roster is IDENTICAL in both states — every
+  tab, Connections included (2026-10-23 contract: the switch governs
+  tool surfaces, never Settings tabs; gating the tab left its page
+  widget orphaned and visibly painted over the whole dialog), the
+  Connections fields show the stored values, and accepting the dialog
+  leaves stored Hub/Claw tokens and addresses untouched (preserved,
+  never deleted). Plus the orphan regression itself: no page widget
+  may sit visible outside the tab stack.
 
 Needs real PySide6 + QtWebEngine: in the CI replica venv (no PySide6)
 the whole module skips; run it in the Qt repro venv:
@@ -73,30 +78,71 @@ def _tab_titles(dialog) -> list[str]:
     return [tabs.tabText(i) for i in range(tabs.count())]
 
 
-def test_settings_connections_tab_both_states(qapp, tmp_path) -> None:
+FULL_ROSTER = ["General", "Privacy", "Appearance", "Connections", "Updates"]
+
+
+def test_settings_tabs_identical_in_both_states(qapp, tmp_path) -> None:
     from browser_ui.dialogs import SettingsDialog
 
-    # Switch OFF (the default): no Connections tab, and accepting the
-    # dialog must leave the stored tokens/addresses exactly as seeded.
-    store, path = _store(tmp_path, show_retired_tools=False)
-    dlg = SettingsDialog(store, SimpleNamespace())
-    titles = _tab_titles(dlg)
-    assert "Connections" not in titles
-    assert titles == ["General", "Privacy", "Appearance", "Updates"]
-    dlg.accept()
-    saved = json.loads(path.read_text(encoding="utf-8"))
-    for key, value in TOKENS.items():
-        assert saved[key] == value, key
+    for state in (False, True):
+        store, path = _store(tmp_path, show_retired_tools=state)
+        dlg = SettingsDialog(store, SimpleNamespace())
+        # The roster never depends on the retired-tools switch, and
+        # the Connections fields show the stored values in both.
+        assert _tab_titles(dlg) == FULL_ROSTER
+        assert dlg.hub_token.text() == TOKENS["hub_token"]
+        assert dlg.claw_token.text() == TOKENS["claw_token"]
+        assert dlg.hub_url.text() == TOKENS["hub_url"]
+        assert dlg.claw_url.text() == TOKENS["claw_url"]
+        # Accepting must leave the stored tokens/addresses exactly as
+        # seeded, whichever way the switch sits.
+        dlg.accept()
+        saved = json.loads(path.read_text(encoding="utf-8"))
+        for key, value in TOKENS.items():
+            assert saved[key] == value, key
 
-    # Switch ON: the tab is back, fields show the stored values.
-    store2, _ = _store(tmp_path, show_retired_tools=True)
-    dlg2 = SettingsDialog(store2, SimpleNamespace())
-    assert "Connections" in _tab_titles(dlg2)
-    assert dlg2.hub_token.text() == TOKENS["hub_token"]
-    assert dlg2.claw_token.text() == TOKENS["claw_token"]
-    assert dlg2.hub_url.text() == TOKENS["hub_url"]
-    assert dlg2.claw_url.text() == TOKENS["claw_url"]
-    dlg2.reject()
+
+def test_settings_no_orphan_page_paints_over_dialog(qapp, tmp_path) -> None:
+    """Regression for Dylan's 2026-10-23 report: with the switch off,
+    the never-added Connections page stayed visible as a stray child
+    of the QTabWidget and painted its form over the tab bar and the
+    General page, burying Privacy/Appearance/Updates."""
+    from browser_ui.dialogs import SettingsDialog
+    from PySide6.QtWidgets import QStackedWidget, QTabBar, QWidget
+
+    for state in (False, True):
+        store, _ = _store(tmp_path, show_retired_tools=state)
+        dlg = SettingsDialog(store, SimpleNamespace())
+        dlg.show()
+        qapp.processEvents()
+        try:
+            tabs = dlg.findChild(QTabWidget)
+            assert tabs is not None
+            assert tabs.tabText(tabs.currentIndex()) == "General"
+            # The Connections fields live on a non-current page: they
+            # must NOT be visible while General is selected.
+            assert not dlg.hub_token.isVisible()
+            assert not dlg.claw_url.isVisible()
+            # And no widget may float directly on the tab widget,
+            # outside the stack that hides non-current pages.
+            stacked = tabs.findChild(QStackedWidget)
+            stack_pages = {stacked.widget(i) for i in range(stacked.count())}
+            for child in tabs.children():
+                if isinstance(child, (QTabBar, QStackedWidget)):
+                    continue
+                if isinstance(child, QWidget):
+                    assert child in stack_pages or not child.isVisible(), (
+                        f"orphan widget visible outside the tab stack: {child!r}"
+                    )
+            # Selecting Connections reveals the fields, with values.
+            tabs.setCurrentIndex(_tab_titles(dlg).index("Connections"))
+            qapp.processEvents()
+            assert dlg.hub_token.isVisible()
+            assert dlg.hub_token.text() == TOKENS["hub_token"]
+        finally:
+            dlg.close()
+            dlg.deleteLater()
+            qapp.processEvents()
 
 
 def _menu_action_texts(win) -> set[str]:
