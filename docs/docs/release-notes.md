@@ -1,5 +1,12 @@
 # LuckyD Browser — Release Notes
 
+## [10.8.4] — Gmail sign-in, fixed — 2026-10-23
+
+**[`LuckyDBrowserSetup-10.8.4.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.4/LuckyDBrowserSetup-10.8.4.exe)** — Windows 10/11 x64 · per-user install · no admin needed.
+
+- **Gmail sign-in works again**: Google was rejecting sign-ins with "this browser or app may not be secure" because the browser presented contradictory identities — a stale Chrome 126 user-agent (a swallowed version-read error) on a Chromium 140 engine, plus sign-in headers rewritten to a different version with a fabricated client-hints brand. The user-agent is now built from the real engine version, sign-in requests are never rewritten, and regression tests pin the behavior.
+- **Known limitation**: Twitch video and some game audio (e.g., Poki) still don't work — the web engine ships without the H.264/AAC decoders those sites use. That's a separate engine project; use another browser for Twitch and affected games meanwhile.
+
 ## [10.8.3] — The cleanup pass — 2026-10-23
 
 **[`LuckyDBrowserSetup-10.8.3.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.3/LuckyDBrowserSetup-10.8.3.exe)** — Windows 10/11 x64 · per-user install · no admin needed.

@@ -455,6 +455,16 @@ DeepSeek Harness boot, Ctrl+K focus, readable shortcuts, sRGB video).
 
 ## [Unreleased]
 
+## [10.8.4] - 2026-10-23
+
+Gmail sign-in, fixed: the browser was introducing itself to Google with contradictory identities, and Google refused the sign-in as insecure.
+
+### Fixed
+- **Google sign-in ("this browser or app may not be secure")**: two defects combined. (1) The user-agent builder called a version method the engine binding doesn't provide; the error was swallowed, so every profile silently fell back to a stale Chrome 126 identity while the engine is Chromium 140. (2) Sign-in pages then had their identity headers rewritten to a different, full version number with a fabricated "Google Chrome" client-hints brand — three identities in one conversation, the exact signature Google's embedded-browser rejection looks for. The engine version is now parsed and validated properly, the browser presents one UA-reduced Chrome/140 identity everywhere (wire headers, page JavaScript, and client hints verified identical), and sign-in requests are never rewritten — identity lives only in the profile. Pinned by regression tests (UA parse/fallback pins, no sign-in rewrites, Twitch HLS and Google auth hosts never blocked or rewritten).
+
+### Known limitations
+- **Twitch video (Error 4000) and some game audio (e.g., Poki) still don't work in this build**: the shipped Qt WebEngine build has no proprietary H.264/AAC decoders (codec probes: canPlayType and MediaSource report H.264/AAC unsupported while VP9/Opus/AV1/MP3/OGG/WAV all pass). That is a property of the engine build, not of the app code — the ad blocker, the settings, and the request interceptor were all audited and exonerated with live evidence. The cure is a codec-enabled engine build, tracked as a separate project; use another browser for Twitch and affected games meanwhile.
+
 ## [10.8.3] - 2026-10-23
 
 The cleanup pass: the palette, the model pickers, and the status bar — rebuilt around what you actually use.

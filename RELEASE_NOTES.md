@@ -1,24 +1,20 @@
-# LuckyD Browser v10.8.3 — Release Notes
+# LuckyD Browser v10.8.4 — Release Notes
 
-> **The AI browser that doesn't need an API key.** Free AI built in — and now
-> every list in it only offers models that actually work.
+> **The AI browser that doesn't need an API key.** A focused fix release:
+> Google sign-in works again.
 
-**[⬇ Download `LuckyDBrowserSetup-10.8.3.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.3/LuckyDBrowserSetup-10.8.3.exe)** — Windows 10/11 x64 · per-user install · no admin needed
+**[⬇ Download `LuckyDBrowserSetup-10.8.4.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.4/LuckyDBrowserSetup-10.8.4.exe)** — Windows 10/11 x64 · per-user install · no admin needed
 
 ---
 
-## What's new in 10.8.3 — The cleanup pass
+## What's new in 10.8.4 — Gmail sign-in, fixed
 
-- **Ctrl+K palette, rebuilt** — it was quietly broken: a 100×30-pixel sliver with no visible card, an Esc key that never closed it, and rows you couldn't tell apart. Now it's a real centered card in your theme colors; every row is labeled (Tab, Bookmark, History, Action) with shortcut hints; results are grouped and capped; Esc, Enter, and click-away all work.
-- **Your models, not generic ones** — the terminal's `/model` picker now lists exactly the local models on your machine — **luckyd:4b, luckyd:8b, luckyd:latest** — instead of five stock models that were never installed.
-- **Only working free models** — four free-tier models the gateway has dropped were removed from the free lists in the terminal picker *and* the AI sidebar; every model still listed was verified live. The sidebar's default free model is now MiniMax M2.5.
-- **Status bar, reconstructed** — a slim strip that keeps what you use: the address of the link you're hovering, with its domain emphasized, and page loads as a thin line along the top edge. The permissions button and zoom pill are gone — Site Permissions is still in the Tools menu, Ctrl+K, and right-click.
-- **LuckyD Chat retired (for now)** — its homepage tile, menu entry, and settings tab are hidden. Nothing is deleted: your saved connection tokens stay exactly where they were, and one settings switch brings Chat back.
-- **A GitHub page worth landing on** — the README is rewritten as a showcase, the repo is cleaned of files nothing used, and the Discord invite is back on the page: **discord.gg/CmvErK8bkM**.
+- **Gmail sign-in works again** — Google was refusing sign-ins with "this browser or app may not be secure." The cause was in the browser itself: it presented Google with contradictory identities — an outdated Chrome 126 user-agent (a version-read error was being silently swallowed) while the engine is Chromium 140, and sign-in pages had their headers rewritten to yet another version with a made-up "Google Chrome" identity badge. Google read that mix as a sketchy embedded browser and blocked it. The browser now presents one consistent, truthful identity everywhere, and the sign-in header rewriting is gone entirely.
+- **Known limitation — Twitch and some game sites:** Twitch video still won't play in this build, and some web games (for example on Poki) still have no sound. Different cause: the web engine LuckyD is built on ships without the H.264 and AAC decoders those sites use, and no app setting can add them. It's being worked on as a separate engine project — please use another browser for Twitch and affected games meanwhile.
 
-On top of everything from 10.8.2 (Agent mode runs your picked provider + model, Cline included; a model that fails mid-request rotates to the next one automatically).
+On top of everything from 10.8.3 (the cleanup pass: Ctrl+K palette rebuilt, model pickers list only working models, status bar slimmed with the hover address kept, LuckyD Chat retired for now, GitHub page rewritten with the Discord invite back: discord.gg/CmvErK8bkM).
 
-3,575 tests passing · coverage 89% · full CI green.
+3,582 tests passing · coverage 89% · full CI green.
 
 ---
 
