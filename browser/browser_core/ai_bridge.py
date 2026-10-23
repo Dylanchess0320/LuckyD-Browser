@@ -1325,6 +1325,7 @@ class AIBridge:
                 headers["Authorization"] = f"Bearer {key}"
 
         text = ""
+        stream_error = None
         # Local keyless models can be slow on CPU — allow a longer first token.
         timeout = 300.0 if not api_key else 60.0
         # Same proxy ghost as the probe: localhost must bypass proxies.
@@ -1351,6 +1352,18 @@ class AIBridge:
                         line = line[6:]
                     try:
                         data = json.loads(line)
+                        if (
+                            isinstance(data, dict)
+                            and data.get("error")
+                            and not data.get("choices")
+                            and not data.get("candidates")
+                        ):
+                            # Gateway error event inside an HTTP-200 stream
+                            # (e.g. api.cline.bot reporting a dead upstream
+                            # model) — remember it; raised below if nothing
+                            # usable arrived (10.8.2).
+                            stream_error = data["error"]
+                            continue
                         delta = self._extract_delta(data, kind)
                         if delta:
                             text += delta
@@ -1358,7 +1371,32 @@ class AIBridge:
                                 on_token(delta)
                     except json.JSONDecodeError:
                         pass
+        if not text and stream_error is not None:
+            # Returning "" here made chat() report success with an empty
+            # reply and never rotate models. Raising feeds the failure
+            # into chat()'s existing per-model rotation / fallback chain.
+            detail = self._stream_error_detail(stream_error)
+            if "402" in detail and self.is_cline_gateway(name):
+                # Same signal as an HTTP 402 (10.4): exhausted Cline Credits.
+                _record_cline_credit_exhausted(f"stream error from {base_url} ({model}): {detail}")
+            raise RuntimeError(f"{name} stream error: {detail}")
         return text
+
+    @staticmethod
+    def _stream_error_detail(error) -> str:
+        """Human detail for a gateway in-stream error payload."""
+        if isinstance(error, dict):
+            detail = str(error.get("message") or error.get("code") or "").strip()
+            raw = json.dumps(error, default=str)
+            if not detail:
+                detail = raw[:300]
+        else:
+            detail = str(error or "").strip()
+            raw = detail
+        match = re.search(r"status (\d{3})", raw)
+        if match and match.group(1) not in detail:
+            detail = f"HTTP {match.group(1)}: {detail}"
+        return detail[:300] or "unknown stream error"
 
     @staticmethod
     def _text_of(content) -> str:

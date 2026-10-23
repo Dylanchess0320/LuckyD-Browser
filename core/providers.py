@@ -377,25 +377,45 @@ def detect_provider() -> str | None:
 def _assistant_browser_settings() -> dict[str, object]:
     """Read the LuckyD browser assistant's saved provider/model picks.
 
-    The AI sidebar persists its selection in browser/data/settings.json under
-    "ai_provider" ("" / missing = auto) and "ai_model_overrides" ({provider: model}).
-    Returns {} when the file can't be read.
+    The AI sidebar persists its selection under "ai_provider" ("" / missing
+    = auto) and "ai_model_overrides" ({provider: model}). The file location
+    must match where the browser actually writes (browser_core.settings
+    ._data_dir): a packaged browser writes
+    %LOCALAPPDATA%/LuckyDBrowser/settings.json; a source checkout writes
+    <repo>/browser/data/settings.json. The packaged location is checked
+    first when frozen — the old code only ever looked beside the exe
+    (<exe dir>/browser/data/), a path no installed browser writes, so the
+    mirror silently saw {} on every installed build and agent mode fell
+    back to provider defaults instead of the user's picks (10.8.2).
+    Returns {} when no candidate file can be read.
     """
     try:
         import json as _json
+        import os as _os
         import sys as _sys
         from pathlib import Path
 
-        if getattr(_sys, "frozen", False):
+        candidates: list[Path] = []
+        frozen = getattr(_sys, "frozen", False)
+        if frozen:
+            base = _os.environ.get("LOCALAPPDATA", "").strip()
+            if base:
+                candidates.append(Path(base) / "LuckyDBrowser" / "settings.json")
+            else:
+                candidates.append(
+                    Path.home() / "AppData" / "Local" / "LuckyDBrowser" / "settings.json"
+                )
             root = Path(_sys.executable).resolve().parent
         else:
             root = Path(__file__).resolve().parent.parent
-        path = root / "browser" / "data" / "settings.json"
-        if not path.exists():
-            return {}
-        # utf-8-sig strips a leading BOM (the browser SettingsStore writes one).
-        data = _json.loads(path.read_text(encoding="utf-8-sig"))
-        return data if isinstance(data, dict) else {}
+        candidates.append(root / "browser" / "data" / "settings.json")
+        for path in candidates:
+            if not path.exists():
+                continue
+            # utf-8-sig strips a leading BOM (the browser SettingsStore writes one).
+            data = _json.loads(path.read_text(encoding="utf-8-sig"))
+            return data if isinstance(data, dict) else {}
+        return {}
     except Exception:
         return {}
 
@@ -431,7 +451,9 @@ def resolve_provider_config(provider: str | None = None) -> dict[str, object]:
 
     When no explicit CODING_AGENT_PROVIDER is set, the HQ mirrors whatever
     provider + model the browser AI assistant is currently using (read from
-    browser/data/settings.json). An explicit CODING_AGENT_PROVIDER still wins.
+    the browser's settings.json — see _assistant_browser_settings for where
+    that lives per install layout). An explicit CODING_AGENT_PROVIDER still
+    wins.
     """
     mirror_model: str | None = None
     explicit = normalize_provider_id(os.environ.get("CODING_AGENT_PROVIDER", ""))

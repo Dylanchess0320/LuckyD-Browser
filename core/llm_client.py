@@ -19,6 +19,32 @@ from .context_manager import ContextManager
 # Models whose thinking mode makes function-call thought signatures mandatory
 _GEMINI_THINKING_RE = re.compile(r"gemini-[3-9]|thinking", re.IGNORECASE)
 
+
+def _gateway_error_text(error) -> str:
+    """Format a gateway error payload as '[API Error: <code>] <detail>'.
+
+    Gateways (api.cline.bot in particular) can deliver a failure INSIDE an
+    HTTP 200 response — an SSE {"error": …} event or a plain error body —
+    when the upstream model id is dead. The detail usually embeds the
+    upstream HTTP status ("… request failed with status 404: …"); surface
+    it as the code so the agent loop's [API Error] handling (including its
+    model auto-rotation) sees the real failure instead of an empty reply.
+    """
+    if isinstance(error, dict):
+        detail = str(error.get("message") or error.get("code") or "").strip()
+        raw = json.dumps(error, default=str)
+        if not detail:
+            detail = raw[:300]
+    else:
+        detail = str(error or "").strip()
+        raw = detail
+    match = re.search(r"status (\d{3})", raw) or re.search(r"\b([45]\d{2})\b", raw)
+    code = match.group(1) if match else ""
+    if not code and isinstance(error, dict):
+        code = str(error.get("code") or "").strip()
+    return f"[API Error: {code or 'stream'}] {detail[:300]}"
+
+
 # Whitelist of JSON-schema keys Gemini function declarations accept
 _SCHEMA_KEYS = {
     "type",
@@ -622,7 +648,8 @@ class LLMClient:
                 await resp.aread()
             resp.raise_for_status()
             msg = await self._read_stream(resp, stream_callback, think_callback)
-            self._note_success()
+            if not str((msg or {}).get("content", "")).startswith("[API Error:"):
+                self._note_success()
             return msg
 
     async def _read_stream(self, resp, stream_callback, think_callback) -> dict | None:
@@ -632,6 +659,7 @@ class LLMClient:
         tool_calls_map: dict[int, dict] = {}
         usage: dict = {}
         finish_reason: str = ""
+        stream_error = None
         async for line in resp.aiter_lines():
             if not line or not line.startswith("data: "):
                 continue
@@ -647,6 +675,11 @@ class LLMClient:
                 usage = chunk["usage"]
             choices = chunk.get("choices", [])
             if not choices:
+                # A gateway error event (HTTP 200, no choices) — remember
+                # it; if nothing usable arrives, it becomes the result
+                # instead of an empty "successful" message (10.8.2).
+                if isinstance(chunk, dict) and chunk.get("error"):
+                    stream_error = chunk["error"]
                 continue
             choice0 = choices[0]
             # Capture finish_reason when present (e.g. "stop", "length", "tool_calls")
@@ -675,6 +708,19 @@ class LLMClient:
                     tool_calls_map[idx]["name"] += func["name"]
                 if "arguments" in func:
                     tool_calls_map[idx]["arguments"] += func["arguments"]
+        if (
+            stream_error is not None
+            and not content_chunks
+            and not reasoning_chunks
+            and not tool_calls_map
+        ):
+            # The gateway failed the request inside an HTTP-200 stream
+            # (e.g. api.cline.bot's stream_initialization_failed when the
+            # upstream model id is dead). Returning an empty "successful"
+            # message here made the agent loop finish with an "empty
+            # reply" report instead of rotating models — surface the real
+            # error in the [API Error] contract it already handles.
+            return {"role": "assistant", "content": _gateway_error_text(stream_error)}
         msg = self._assemble_message(content_chunks, reasoning_chunks, tool_calls_map)
         if usage:
             msg["_usage"] = usage
@@ -837,6 +883,11 @@ class LLMClient:
             # Some gateways (e.g. ClinePass) wrap the completion in {"data": {...}}.
             if "choices" not in data and isinstance(data.get("data"), dict):
                 data = data["data"]
+            if "choices" not in data and data.get("error"):
+                # Gateway error body on HTTP 200 (e.g. Cline's
+                # {"error": "… status 404 …", "success": false}) — surface
+                # it like an HTTP error instead of an empty message.
+                return {"role": "assistant", "content": _gateway_error_text(data["error"])}
             choice = data.get("choices", [{}])[0]
             msg = choice.get("message", {})
             reasoning = msg.get("reasoning_content", "")
