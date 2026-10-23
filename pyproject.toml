@@ -78,7 +78,7 @@ browser = [
 # jumps 1.82.6 -> 1.83.0). 1.83.14 is the final patch of the first clean
 # post-incident release line. Do not loosen this pin without re-auditing.
 router = [
-    "litellm==1.83.14",
+    "litellm==1.88.6",
 ]
 all = [
     "luckyd-code[dev,onnx,browser]",
