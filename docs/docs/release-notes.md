@@ -1,5 +1,12 @@
 # LuckyD Browser — Release Notes
 
+## [10.8.2] — Agent mode fixed — 2026-10-22
+
+**[`LuckyDBrowserSetup-10.8.2.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.2/LuckyDBrowserSetup-10.8.2.exe)** — Windows 10/11 x64 · per-user install · no admin needed.
+
+- **Agent mode works with Cline again**: agent runs ignored the provider/model picked in the browser and silently used a default model — the coding-agent backend now reads your saved settings from the location the installed app actually writes, so Agent mode runs the same working provider + model as Ask mode.
+- **No more empty replies**: when a gateway reports an error inside a streaming response instead of an answer, the failure now surfaces as a real error and the agent rotates to the next model automatically. Partial answers are never discarded.
+
 ## [10.8.1] — The polish pass + LuckyD Chat built in — 2026-10-22
 
 **[`LuckyDBrowserSetup-10.8.1.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.1/LuckyDBrowserSetup-10.8.1.exe)** — Windows 10/11 x64 · per-user install · no admin needed.

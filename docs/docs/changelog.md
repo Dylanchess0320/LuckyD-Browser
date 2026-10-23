@@ -455,6 +455,15 @@ DeepSeek Harness boot, Ctrl+K focus, readable shortcuts, sRGB video).
 
 ## [Unreleased]
 
+## [10.8.2] - 2026-10-22
+
+Agent mode, fixed: the AI Assistant's agent runs work with Cline again.
+
+### Fixed
+- **AI Assistant Agent mode ignored your provider/model pick**: the coding-agent backend read the browser's saved settings from a location the installed app never writes, so agent runs silently fell back to a default model while Ask mode used your pick. The backend now reads the settings from the same per-user location the browser writes (`%LOCALAPPDATA%/LuckyDBrowser/settings.json`), so Agent mode runs the same working provider + model as Ask mode — Cline included.
+- **Silent model failures became empty replies**: when a gateway reports an error inside a streaming response (an HTTP 200 carrying an error event instead of an answer — e.g. a model id the gateway no longer serves), the failure was swallowed and the run ended with an "empty reply" report. It now surfaces as a real error and the agent **rotates to the next model automatically**. Applies to the coding-agent backend and the built-in assistant client; a partial answer is never discarded.
+
+
 > Post-9.0: DeepSeek mesh/terminal aliases removed (Muse Code kept); AI sidebar
 > Quick Start intentionally blank; `browser/README.md` documents the shipped
 > userscripts (YouTube Ad-Block, Video Speed).

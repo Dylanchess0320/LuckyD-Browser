@@ -5,7 +5,7 @@
 <p class="tagline">The AI browser that runs <em>your</em> models — local, unlimited, offline — plus a full coding agent and real terminals in one window.</p>
 
 <div class="cta-row" markdown>
-[⬇ Download v10.8.1](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.1/LuckyDBrowserSetup-10.8.1.exe){ .luckyd-btn }
+[⬇ Download v10.8.2](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.2/LuckyDBrowserSetup-10.8.2.exe){ .luckyd-btn }
 [Getting started](getting-started.md){ .luckyd-btn-ghost }
 [What's new](release-notes.md){ .luckyd-btn-ghost }
 </div>
@@ -76,12 +76,12 @@
 
 ## Install in 10 seconds
 
-1. Get [**LuckyDBrowserSetup-10.8.1.exe**](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.1/LuckyDBrowserSetup-10.8.1.exe)
+1. Get [**LuckyDBrowserSetup-10.8.2.exe**](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.2/LuckyDBrowserSetup-10.8.2.exe)
 2. Run it — per-user, **no admin**, installs to `%LOCALAPPDATA%\Programs\LuckyDBrowser`
 3. Optional: run `ollama_setup.ps1` from the install folder → Ollama + `llama3.2:3b` (~2 GB, one time)
 4. `Ctrl+Shift+A` → chat offline. Or bring your own keys (Gemini, Groq, DeepSeek, OpenAI, Anthropic, Z.ai, OpenRouter, Cline, OpenCode)
 
-Windows 10/11 x64 only. Silent install: `LuckyDBrowserSetup-10.8.1.exe /VERYSILENT /NORESTART`
+Windows 10/11 x64 only. Silent install: `LuckyDBrowserSetup-10.8.2.exe /VERYSILENT /NORESTART`
 
 ## Why LuckyD
 
@@ -98,9 +98,9 @@ Most "AI browsers" rent you a chatbot behind an account. LuckyD is a **real Chro
 
 > The others rent you their AI. **LuckyD runs yours.**
 
-## New in 10.8.1 — The polish pass + LuckyD Chat built in
+## New in 10.8.2 — Agent mode fixed
 
-Every finding from real-world testing of 10.8.0 is fixed: the AI Assistant gains an Ask/Agent toggle and Enter-to-send, agent runs always end with their findings, the shortcuts dialog is rebuilt to fit the screen, and the logo is truly transparent. LuckyD Chat (Hub chat + Claw tasks) is now built into the browser, the Agent Mesh becomes the Multi Agent Terminal with readable panes, and the homepage gets cursor-reactive animation themes — Aurora Glow, Particle Drift, Gentle Parallax, or Off.
+The AI Assistant's agent runs now use the provider and model you actually picked — on 10.8.1 they silently fell back to a default model, which is why Agent mode failed with Cline while Ask mode worked. And when a model fails mid-request, the agent rotates to the next one instead of ending in an empty reply. On top of 10.8.1: the Ask/Agent toggle and Enter-to-send, LuckyD Chat built into the browser, the Multi Agent Terminal, cursor-reactive homepage animation themes, and a truly transparent logo.
 
 ## New in 10.6.3 — Antigravity paste fix + code health
 
@@ -226,6 +226,6 @@ A hardened foundation: every local service now authenticates with HttpOnly sessi
 
 <p align="center">
   <b>MIT © LuckyD</b> · Chromium · Ollama · Qt · xterm.js · pywinpty · PyInstaller · Inno Setup<br>
-  <a href="https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.1/LuckyDBrowserSetup-10.8.1.exe">Download v10.8.1</a>
+  <a href="https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.2/LuckyDBrowserSetup-10.8.2.exe">Download v10.8.2</a>
   · <a href="https://www.youtube.com/@LuckyDYoutube">YouTube</a>
 </p>

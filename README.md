@@ -82,6 +82,8 @@ LuckyD also works with cloud providers if you prefer: Gemini, Groq, DeepSeek, Op
 
 ## What's new
 
+**v10.8.2** — Agent mode fixed: AI Assistant agent runs use the provider + model you picked (Cline included), and a model that fails mid-request rotates to the next one instead of ending in an empty reply
+
 **v10.8.1** — The polish pass: Ask/Agent toggle + Enter-to-send in the AI Assistant, LuckyD Chat built into the browser (Hub chat + Claw tasks), Multi Agent Terminal (formerly Agent Mesh), animated cursor-reactive homepage themes, truly transparent logo, rebuilt shortcuts page, decluttered homepage
 
 **v10.8.0** — The big cleanup: tabs on top, one menu button, rebuilt AI Assistant with findings summaries, retired tools hidden behind one switch, Google search removed everywhere, Gmail sign-in fixed, cleaner homepage, rename-your-browser setting

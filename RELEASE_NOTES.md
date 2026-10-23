@@ -1,25 +1,20 @@
-# LuckyD Browser v10.8.1 — Release Notes
+# LuckyD Browser v10.8.2 — Release Notes
 
-> **The AI browser that doesn't need an API key.** Free AI built in — now with
-> LuckyD Chat in the browser, and a polish pass over everything you touched.
+> **The AI browser that doesn't need an API key.** Free AI built in — and now
+> Agent mode uses the AI you actually picked.
 
-**[⬇ Download `LuckyDBrowserSetup-10.8.1.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.1/LuckyDBrowserSetup-10.8.1.exe)** — Windows 10/11 x64 · per-user install · no admin needed
+**[⬇ Download `LuckyDBrowserSetup-10.8.2.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.2/LuckyDBrowserSetup-10.8.2.exe)** — Windows 10/11 x64 · per-user install · no admin needed
 
 ---
 
-## What's new in 10.8.1 — the polish pass
+## What's new in 10.8.2 — Agent mode, fixed
 
-- **LuckyD Chat, built in** — your Hub chat and your Claw tasks now live inside the browser: send a job, watch it run, read the receipt when it lands. Paste your Hub and Claw tokens once in Settings → Connections; nothing is baked in.
-- **AI Assistant, finished properly** — an **Ask ⇄ Agent toggle** sits beside the input, and **Enter sends** in whichever mode is lit (Shift+Enter for a newline). "Thinking…" and "answered by …" appear **inside the chat**, where you're looking — and agent runs can no longer end in silence: every run closes with its findings summary.
-- **Animated homepage themes** — **Aurora Glow**, **Particle Drift**, and **Gentle Parallax** react to your mouse cursor. Pick one — or Off — in Settings → Appearance. GPU-light, pauses when hidden, theme-true colors.
-- **Multi Agent Terminal** — the Agent Mesh, renamed and rebuilt to read: balanced panes, per-pane scrolling, one-click focus. (`/mesh` still works.)
-- **Shortcuts page rebuilt** — capped to your screen, scrollable, compact, and colored by your actual theme — Arctic Light included.
-- **Truly transparent logo** — chroma-keyed across the whole image with the icon set rebuilt: no square plate on any surface.
-- **Decluttered again** — homepage tips gone, shortcut tiles uniform, the blank strip above the homepage closed, dropdown-arrow decoration removed, and the **+ button sits beside your last tab**, where it belongs.
+- **Agent mode works with Cline again** — on 10.8.1, AI Assistant agent runs ignored the provider and model you picked in the browser and silently fell back to a default model, so Agent mode failed while Ask mode (which uses your pick directly) worked. The coding-agent backend now reads your saved settings from the same place the installed browser writes them — Agent and Ask finally run the same AI.
+- **No more empty replies** — when a model gateway reports an error inside a streaming response (an error event instead of an answer, e.g. a model the gateway no longer serves), the run no longer ends with a blank "empty reply": the failure surfaces as a real error and the agent **rotates to the next model automatically**. A partial answer is never thrown away.
 
-On top of everything from 10.8.0 (tabs on top, one menu button, rebuilt AI Assistant, Google search removed, Gmail sign-in fix, name-your-browser).
+On top of everything from 10.8.1 (Ask ⇄ Agent toggle + Enter-to-send, LuckyD Chat built in, Multi Agent Terminal, animated homepage themes, truly transparent logo, rebuilt shortcuts page).
 
-3,514 tests passing · coverage 89% · full CI green.
+3,524 tests passing · coverage 89% · full CI green.
 
 ---
 
