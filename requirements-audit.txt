@@ -1,0 +1,13 @@
+# pip-audit constraints (CI Security Scan only; NOT used by any install).
+#
+# 2026-10-27: six OSV advisories (CVE-2026-112906/112907/112913/112914/
+# 112937/112940) affect filelock 3.20.4-4.2.0; the fix line is 4.2.1
+# (published for Python >=3.11 only). The dev tree cannot take the fix:
+# pre-commit's virtualenv requires filelock >=3.24.2,<4, and no single
+# version satisfies both that range and the clean lines. So the audit pins
+# the clean versions here instead of in requirements.txt, where they would
+# break `pip install -r requirements-dev.txt` on every CI Python.
+# Drop these pins (and switch the CI step back to plain requirements.txt)
+# once virtualenv uncaps filelock and the tree resolves to >=4.2.1.
+filelock==3.20.3; python_version < "3.11"
+filelock==4.2.1; python_version >= "3.11"

@@ -85,7 +85,9 @@ jobs:
       - name: Dependency Scanning (pip-audit)
         # safety>=3.0 requires an interactive platform login, which can never
         # succeed in CI; pip-audit (PyPA, OSV DB) needs no auth and stays a hard gate.
-        run: pip-audit -r requirements.txt
+        # requirements-audit.txt adds advisory-clean filelock pins the dev
+        # tree cannot take (virtualenv caps filelock <4) — see that file.
+        run: pip-audit -r requirements.txt -r requirements-audit.txt
 
       - name: SAST (Bandit)
         run: bandit -r tools llm memory project features core browser --severity medium --quiet
