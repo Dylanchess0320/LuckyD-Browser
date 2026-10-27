@@ -1,5 +1,13 @@
 # LuckyD Browser — Release Notes
 
+## [10.8.6] — Agent mode: stable while it works — 2026-10-25
+
+**[`LuckyDBrowserSetup-10.8.6.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.6/LuckyDBrowserSetup-10.8.6.exe)** — Windows 10/11 x64 · per-user install · no admin needed.
+
+- **Switching tabs mid-task no longer glitches the screen**: in AI Assistant Agent mode the agent used to follow whichever tab was visible — switch tabs while it was working and the new tab would scroll itself and flash highlight badges under your cursor. The agent now stays locked to the tab it started on for the whole run; if you close its tab mid-run, the run ends quietly instead of hijacking another tab. Undo still lands on the tab where the action happened.
+- **The memory saver leaves the working tab alone**: the tab the agent is driving can no longer be frozen (which stalled its steps) or discarded (which left a blank frame on switch-back) mid-run.
+- **Known limitation**: Twitch video and some game audio (e.g., Poki) still don't work — the web engine ships without the H.264/AAC decoders those sites use. That's a separate engine project; use another browser for Twitch and affected games meanwhile.
+
 ## [10.8.5] — Settings fixed + AI library security update — 2026-10-23
 
 **[`LuckyDBrowserSetup-10.8.5.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.5/LuckyDBrowserSetup-10.8.5.exe)** — Windows 10/11 x64 · per-user install · no admin needed.

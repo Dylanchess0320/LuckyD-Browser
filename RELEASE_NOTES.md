@@ -1,21 +1,21 @@
-# LuckyD Browser v10.8.5 — Release Notes
+# LuckyD Browser v10.8.6 — Release Notes
 
 > **The AI browser that doesn't need an API key.** A focused fix release:
-> the Settings screen works again, plus an AI library security update.
+> Agent mode is stable while it works — switch tabs mid-task, no glitches.
 
-**[⬇ Download `LuckyDBrowserSetup-10.8.5.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.5/LuckyDBrowserSetup-10.8.5.exe)** — Windows 10/11 x64 · per-user install · no admin needed
+**[⬇ Download `LuckyDBrowserSetup-10.8.6.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.6/LuckyDBrowserSetup-10.8.6.exe)** — Windows 10/11 x64 · per-user install · no admin needed
 
 ---
 
-## What's new in 10.8.5 — Settings fixed + security update
+## What's new in 10.8.6 — Agent mode: stable while it works
 
-- **Settings screen fixed** — with "show retired tools" turned off, the Settings dialog was broken: the Connections settings page was painted over the dialog and the Privacy, Appearance, and Updates tabs were hidden underneath it. Every Settings tab — General, Privacy, Appearance, Connections, Updates — now shows the same whether retired tools are on or off.
-- **Security update for the AI library** — litellm, the library the AI features use to reach model providers, is updated from 1.83.14 to 1.88.6. It closes four security alerts, including a critical authentication-bypass vulnerability and a high-severity one.
+- **Switching tabs mid-task no longer glitches the screen** — in AI Assistant Agent mode, the agent used to follow whichever tab was visible: switch tabs while it was working and the new tab would scroll itself and flash highlight badges under your cursor. The agent now stays locked to the tab it started on for the whole run — switch away, watch something else, come back — and if you close its tab mid-run, the run ends quietly instead of hijacking another tab. Undo still lands on the tab where the action happened.
+- **The memory saver leaves the working tab alone** — the tab the agent is driving can no longer be frozen (which stalled its steps) or discarded (which left a blank frame when you switched back) while the run is in flight.
 - **Known limitation — Twitch and some game sites:** Twitch video still won't play in this build, and some web games (for example on Poki) still have no sound. Different cause: the web engine LuckyD is built on ships without the H.264 and AAC decoders those sites use, and no app setting can add them. It's being worked on as a separate engine project — please use another browser for Twitch and affected games meanwhile.
 
-On top of everything from 10.8.4 (Gmail sign-in fixed: one consistent browser identity instead of contradictory ones) and 10.8.3 (the cleanup pass: Ctrl+K palette rebuilt, model pickers list only working models, status bar slimmed with the hover address kept, LuckyD Chat retired for now, Discord invite back: discord.gg/CmvErK8bkM).
+On top of everything from 10.8.5 (Settings fixed + AI library security update), 10.8.4 (Gmail sign-in fixed: one consistent browser identity instead of contradictory ones) and 10.8.3 (the cleanup pass: Ctrl+K palette rebuilt, model pickers list only working models, status bar slimmed with the hover address kept, LuckyD Chat retired for now, Discord invite back: discord.gg/CmvErK8bkM).
 
-3,586 tests passing · coverage 89% · full CI green.
+3,582 tests passing · full CI green.
 
 ---
 

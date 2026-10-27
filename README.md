@@ -75,6 +75,8 @@ Then start chatting. That's it. Want everything on your own machine? Add Ollama 
 
 ## What's new
 
+**v10.8.6** — Agent mode is stable while it works: switching tabs mid-task no longer glitches the screen — the AI Assistant's agent stays locked to the tab it started on (switch away, come back, it kept working there), Undo lands on that same tab, and the memory saver can't freeze or discard the working tab mid-run
+
 **v10.8.5** — Settings fixed: with retired tools hidden, the Connections settings page painted over the Settings dialog and hid the Privacy, Appearance, and Updates tabs — all five tabs now show in both switch states. Plus a security update for the AI provider library (litellm 1.88.6, closing a critical authentication-bypass alert). Known limitation: Twitch video and some game audio still don't work — the web engine ships without H.264/AAC decoders
 
 **v10.8.4** — Gmail sign-in fixed: the browser was presenting Google contradictory identities (a stale Chrome 126 user-agent plus rewritten sign-in headers) and Google refused it as insecure; it now presents one consistent identity. Known limitation: Twitch video and some game audio still don't work — the web engine ships without H.264/AAC decoders

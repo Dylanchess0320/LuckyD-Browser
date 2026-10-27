@@ -5,7 +5,7 @@
 <p class="tagline">The AI browser that runs <em>your</em> models — local, unlimited, offline — plus a full coding agent and real terminals in one window.</p>
 
 <div class="cta-row" markdown>
-[⬇ Download v10.8.5](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.5/LuckyDBrowserSetup-10.8.5.exe){ .luckyd-btn }
+[⬇ Download v10.8.6](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.6/LuckyDBrowserSetup-10.8.6.exe){ .luckyd-btn }
 [Getting started](getting-started.md){ .luckyd-btn-ghost }
 [What's new](release-notes.md){ .luckyd-btn-ghost }
 </div>
@@ -76,12 +76,12 @@
 
 ## Install in 10 seconds
 
-1. Get [**LuckyDBrowserSetup-10.8.5.exe**](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.5/LuckyDBrowserSetup-10.8.5.exe)
+1. Get [**LuckyDBrowserSetup-10.8.6.exe**](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.6/LuckyDBrowserSetup-10.8.6.exe)
 2. Run it — per-user, **no admin**, installs to `%LOCALAPPDATA%\Programs\LuckyDBrowser`
 3. Optional: run `ollama_setup.ps1` from the install folder → Ollama + `llama3.2:3b` (~2 GB, one time)
 4. `Ctrl+Shift+A` → chat offline. Or bring your own keys (Gemini, Groq, DeepSeek, OpenAI, Anthropic, Z.ai, OpenRouter, Cline, OpenCode)
 
-Windows 10/11 x64 only. Silent install: `LuckyDBrowserSetup-10.8.5.exe /VERYSILENT /NORESTART`
+Windows 10/11 x64 only. Silent install: `LuckyDBrowserSetup-10.8.6.exe /VERYSILENT /NORESTART`
 
 ## Why LuckyD
 
@@ -97,6 +97,10 @@ Most "AI browsers" rent you a chatbot behind an account. LuckyD is a **real Chro
 | Open source MIT · no admin to install | ✅ | ❌ | ❌ | ❌ |
 
 > The others rent you their AI. **LuckyD runs yours.**
+
+## New in 10.8.6 — Agent mode: stable while it works
+
+Switching tabs while the AI Assistant's agent was doing work used to glitch the screen — the agent followed whichever tab was visible and drove it (scrolling, highlight flashes) the moment you switched. The agent is now pinned to the tab it started on for the whole run, Undo lands on that tab too, and the memory saver can't freeze or discard the working tab mid-run. On top of 10.8.5: Settings fixed + AI library security update.
 
 ## New in 10.8.5 — Settings fixed + security update
 
@@ -226,6 +230,6 @@ A hardened foundation: every local service now authenticates with HttpOnly sessi
 
 <p align="center">
   <b>MIT © LuckyD</b> · Chromium · Ollama · Qt · xterm.js · pywinpty · PyInstaller · Inno Setup<br>
-  <a href="https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.5/LuckyDBrowserSetup-10.8.5.exe">Download v10.8.5</a>
+  <a href="https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.6/LuckyDBrowserSetup-10.8.6.exe">Download v10.8.6</a>
   · <a href="https://www.youtube.com/@LuckyDYoutube">YouTube</a>
 </p>

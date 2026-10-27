@@ -455,6 +455,18 @@ DeepSeek Harness boot, Ctrl+K focus, readable shortcuts, sRGB video).
 
 ## [Unreleased]
 
+## [10.8.6] - 2026-10-25
+
+Agent-mode tab switching, fixed: switching tabs while the AI Assistant's agent was working no longer glitches the screen.
+
+### Fixed
+- **Screen glitched out when switching tabs during an agent run (AI Assistant → Agent mode)**: the built-in tab agent resolved its target tab LIVE on every step — the JS bridge and the CDP driver both looked up the current tab when each request landed — so a mid-run tab switch retargeted the run at the newly visible tab, which then scrolled itself and flashed orange highlight badges wherever the user was looking. The run is now PINNED to the tab it started in for its whole duration: every JS step, the CDP attach URL, and Undo all target that one tab. If the pinned tab is closed mid-run, the run ends quietly instead of hijacking another tab. Pinned by regression tests (pin policy, bridge pinning behavior, run-start/CDP/undo wiring).
+- **Memory saver could freeze or discard the agent's working tab mid-run**: a switched-away work tab could be Frozen (JS paused — steps stalled out) or Discarded (page unloaded — a blank frame on switch-back). Tabs an agent run is driving are now hands-off for the memory saver, and the hold is released on every run-end path.
+- **Tab-switch compositor churn**: every tab switch re-toggled page visibility on every tab even when nothing changed, churning the renderer exactly while the agent kept pages animating (scroll + highlight JS). Visibility now only changes on an actual change, and a timed-out agent JS request no longer leaks its pending waiter.
+
+### Known limitations
+- **Twitch video (Error 4000) and some game audio (e.g., Poki) still don't work in this build**: the shipped Qt WebEngine build has no proprietary H.264/AAC decoders (codec probes: canPlayType and MediaSource report H.264/AAC unsupported while VP9/Opus/AV1/MP3/OGG/WAV all pass). That is a property of the engine build, not of the app code. The cure is a codec-enabled engine build, tracked as a separate project; use another browser for Twitch and affected games meanwhile.
+
 ## [10.8.5] - 2026-10-23
 
 Settings screen fixed, plus a security update for the AI provider library.
