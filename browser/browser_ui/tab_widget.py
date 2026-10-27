@@ -820,6 +820,19 @@ class BrowserTabWidget(QTabWidget):
         self._mark_idle_clocks()
         self._mw.on_tabs_changed()  # active index is part of the session
 
+    def _set_page_visible(self, view: WebView, visible: bool) -> None:
+        """Set a page's visibility only when it actually changes.
+
+        Tab switches used to call setVisible on EVERY page even when the
+        state was unchanged — redundant renderer/compositor toggling on
+        every switch is what made the window flicker while the agent kept
+        pages animating (scroll/highlight JS)."""
+        if getattr(view, "_ld_page_visible", True) == visible:
+            return
+        view._ld_page_visible = visible
+        with contextlib.suppress(Exception):
+            view.page().setVisible(visible)
+
     def _mark_idle_clocks(self) -> None:
         now = time.monotonic()
         current = self.currentWidget()
@@ -832,8 +845,7 @@ class BrowserTabWidget(QTabWidget):
                 self._idle_since.pop(vid, None)
             else:
                 self._idle_since.setdefault(vid, now)
-            with contextlib.suppress(Exception):
-                view.page().setVisible(view is current)
+            self._set_page_visible(view, view is current)
 
     def _wake_view(self, view: WebView) -> None:
         """Bring a frozen/discarded (or lazily restored) tab back to Active."""
@@ -848,8 +860,8 @@ class BrowserTabWidget(QTabWidget):
             return
         view._ld_sleep = None
         page = view.page()
+        self._set_page_visible(view, True)
         with contextlib.suppress(Exception):
-            page.setVisible(True)
             state = getattr(page, "LifecycleState", None)
             if state is not None:
                 page.setLifecycleState(state.Active)
@@ -877,6 +889,7 @@ class BrowserTabWidget(QTabWidget):
                 is_current=view is current,
                 pinned=self.is_pinned(i),
                 audible=audible,
+                agent_busy=bool(getattr(view, "_ld_agent_busy", False)),
             ):
                 continue
             idle = now - self._idle_since.setdefault(id(view), now)
@@ -884,6 +897,8 @@ class BrowserTabWidget(QTabWidget):
             self._apply_sleep(view, wanted)
 
     def _apply_sleep(self, view: WebView, wanted: str) -> None:
+        if getattr(view, "_ld_agent_busy", False):
+            return  # an agent run owns this tab — never freeze/discard it mid-run
         current = getattr(view, "_ld_sleep", None) or ACTIVE
         if wanted in (current, ACTIVE):
             return
@@ -892,7 +907,7 @@ class BrowserTabWidget(QTabWidget):
         if state is None:
             return
         try:
-            page.setVisible(False)
+            self._set_page_visible(view, False)
             if wanted == DISCARDED:
                 page.setLifecycleState(state.Discarded)
             elif wanted == FROZEN:

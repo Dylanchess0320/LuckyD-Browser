@@ -240,6 +240,22 @@ def parse_action(raw: str) -> list[dict] | None:
     return None
 
 
+def resolve_agent_view(running: bool, pinned, current):
+    """Which tab an agent run's JS may touch.
+
+    While a run is active the target is PINNED to the tab the run started
+    in — a mid-run tab switch must never retarget the run at the newly
+    visible tab (that retargeting glitched the screen: the agent scrolled
+    the page and flashed highlight badges in whatever tab the user
+    switched to). `pinned` is None when the pinned tab was closed mid-run:
+    the run then gets no target and winds down quietly rather than
+    hijacking another tab. With no run active, the visible tab drives.
+    """
+    if not running:
+        return current
+    return pinned
+
+
 class JsBridge(QObject):
     """GUI-thread executor for JavaScript — marshals worker-thread requests."""
 
@@ -274,7 +290,7 @@ class JsDriver:
         if future is not None and not future.done():
             future.get_loop().call_soon_threadsafe(future.set_result, result)
 
-    async def _js(self, script: str):
+    async def _js(self, script: str, timeout: float = 15):
         if hasattr(self._bridge, "run") and not hasattr(self._bridge, "request"):
             return await self._bridge.run(script)
         loop = asyncio.get_running_loop()
@@ -282,7 +298,13 @@ class JsDriver:
         token = object()
         self._pending[token] = future
         self._bridge.request.emit(token, script)
-        return await asyncio.wait_for(future, timeout=15)
+        try:
+            return await asyncio.wait_for(future, timeout=timeout)
+        except asyncio.TimeoutError:
+            # Drop the dead waiter — a timed-out request must not leak
+            # pending futures (or let a late response settle one).
+            self._pending.pop(token, None)
+            raise
 
     async def snapshot(self, compact: bool = False) -> dict:
         max_els, max_text = (45, 800) if compact else (80, 1200)

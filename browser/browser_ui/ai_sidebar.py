@@ -9,7 +9,12 @@ import html
 import json
 import re
 
-from browser_core.agent import ActionUndoStack, AgentSession, JsBridge
+from browser_core.agent import (
+    ActionUndoStack,
+    AgentSession,
+    JsBridge,
+    resolve_agent_view,
+)
 from browser_core.ai_bridge import _CLINE_USAGE_FREE_TIER, AIBridge
 from browser_core.brand import tokens as _brand_tokens
 from browser_core.lucky import system_prompt as _lucky_system_prompt
@@ -265,11 +270,13 @@ class AiSidebar(QDockWidget):
         if isinstance(saved, dict):
             for pname, pmodel in saved.items():
                 self.bridge.set_model_override(str(pname), str(pmodel))
-        self.js_bridge = JsBridge(lambda: self._mw.tabs.current_view(), self)
+        self.js_bridge = JsBridge(self._bridge_target_view, self)
         self.harness_bridge = None
         self._chat_worker = None
         self._agent_worker = None
         self._agent_session = None
+        # The tab the current agent run is pinned to (None when idle).
+        self._agent_view = None
         self._undo_stack = ActionUndoStack()
         self._harness_worker = None
         self._shot_worker = None
@@ -1101,6 +1108,42 @@ class AiSidebar(QDockWidget):
 
     # ── autonomous agent ─────────────────────────────────────────────
 
+    @staticmethod
+    def _live_view(tabs, view):
+        """view if it is still an open tab, else None.
+
+        A closed tab leaves a dead C++ wrapper that raises on touch, so
+        liveness is probed with indexOf before anything reads the view."""
+        if view is None:
+            return None
+        try:
+            return view if tabs.indexOf(view) >= 0 else None
+        except RuntimeError:
+            return None
+
+    def _bridge_target_view(self):
+        """The one tab the agent run is allowed to drive.
+
+        PINNED at run start: a mid-run tab switch must never retarget the
+        run at the newly visible tab — the agent used to follow the live
+        current tab and started scrolling the page / flashing highlight
+        badges in whatever tab the user switched to, which is exactly what
+        glitched the screen. If the pinned tab is closed mid-run the run
+        stops quietly instead of hijacking another tab."""
+        current = self._mw.tabs.current_view()
+        if not self._agent_running or self._agent_view is None:
+            return current
+        view = self._live_view(self._mw.tabs, self._agent_view)
+        if view is None and self._agent_session is not None:
+            self._agent_session.stop()  # pinned tab closed mid-run — end quietly
+        return resolve_agent_view(running=True, pinned=view, current=current)
+
+    def _release_agent_tab(self) -> None:
+        """Drop the memory-saver hold on the agent's tab once the run ends."""
+        view = self._live_view(self._mw.tabs, self._agent_view)
+        if view is not None:
+            view._ld_agent_busy = False
+
     def _start_agent(self) -> None:
         """Run the single input's text as an autonomous agent task.
 
@@ -1116,6 +1159,12 @@ class AiSidebar(QDockWidget):
         self.input.clear()
         self._agent_task_text = task
         self._agent_fell_back = False
+        # Pin the run to the tab the task was started in — mid-run tab
+        # switches must never retarget it (see _bridge_target_view), and
+        # the memory saver must not freeze/discard the work tab mid-run.
+        self._agent_view = self._mw.tabs.current_view()
+        if self._agent_view is not None:
+            self._agent_view._ld_agent_busy = True
         try:
             self._start_harness_agent(task)
             return
@@ -1144,8 +1193,18 @@ class AiSidebar(QDockWidget):
         return True
 
     def _start_builtin_agent(self, task: str) -> None:
-        view = self._mw.tabs.current_view()
+        # The run drives the tab pinned at _start_agent time — even when the
+        # user has switched tabs since (the harness fallback can arrive
+        # seconds later). No pinned tab (edge): use the visible one.
+        view = self._live_view(self._mw.tabs, self._agent_view) or self._mw.tabs.current_view()
         url = view.url().toString() if view else ""
+
+        def _pinned_url() -> str:
+            # CDP attach resolves the page target by URL — always the
+            # pinned tab's URL, never whatever tab is visible by then.
+            target = self._live_view(self._mw.tabs, self._agent_view)
+            return target.url().toString() if target is not None else url
+
         self._append(f"<b style='color:{_tok('accent')}'>Agent task:</b> {html.escape(task)}")
         use_cdp = bool(url) and url.startswith(
             ("http://", "https://", "file://localhost", "file://", "about:")
@@ -1154,9 +1213,7 @@ class AiSidebar(QDockWidget):
             self.bridge,
             self.js_bridge,
             use_cdp=use_cdp,
-            get_url=lambda u=url: (
-                self._mw.tabs.current_view().url().toString() if self._mw.tabs.current_view() else u
-            ),
+            get_url=_pinned_url,
             vision=self._vision_capable(),
             undo_stack=self._undo_stack,
         )
@@ -1187,6 +1244,7 @@ class AiSidebar(QDockWidget):
     def _agent_done(self, result: str) -> None:
         self._append(f"<b style='color:{_tok('accent')}'>Done:</b> {html.escape(result)}")
         self._agent_running = False
+        self._release_agent_tab()
         self._sync_agent_actions()
         self._clear_status()
         self._agent_worker = None
@@ -1200,7 +1258,9 @@ class AiSidebar(QDockWidget):
             self._set_status("Nothing to undo")
             return
         js = ActionUndoStack.undo_js_for(entry)
-        view = self._mw.tabs.current_view()
+        # Undo lands on the pinned agent tab (where the action happened),
+        # not on whatever tab the user has switched to since.
+        view = self._live_view(self._mw.tabs, self._agent_view) or self._mw.tabs.current_view()
         if js and view is not None:
             view.page().runJavaScript(js)
         summary = str(entry.get("summary") or entry.get("kind") or "action")
@@ -1295,6 +1355,7 @@ class AiSidebar(QDockWidget):
                 "“continue” to let it keep going.</i>"
             )
         self._agent_running = False
+        self._release_agent_tab()
         self._sync_agent_actions()
         self._clear_status()
         self._harness_worker = None
@@ -1306,6 +1367,7 @@ class AiSidebar(QDockWidget):
             return
         self._append(f"<i>That run failed — {html.escape(message)}</i>")
         self._agent_running = False
+        self._release_agent_tab()
         self._sync_agent_actions()
         self._clear_status()
         self._harness_worker = None

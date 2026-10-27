@@ -40,9 +40,15 @@ def should_protect(
     is_current: bool,
     pinned: bool,
     audible: bool,
+    agent_busy: bool = False,
 ) -> bool:
-    """True when this tab must stay fully alive."""
-    if is_current or pinned or audible:
+    """True when this tab must stay fully alive.
+
+    `agent_busy` marks a tab the autonomous agent is actively driving —
+    freezing/discarding it mid-run stalls the run (JS paused / page
+    unloaded) and shows a glitched frame when the user switches back.
+    """
+    if is_current or pinned or audible or agent_busy:
         return True
     return is_protected_url(url)
 
