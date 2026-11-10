@@ -15,7 +15,7 @@ from browser_core.agent import (
     JsBridge,
     resolve_agent_view,
 )
-from browser_core.ai_bridge import _CLINE_USAGE_FREE_TIER, AIBridge
+from browser_core.ai_bridge import _CLINE_USAGE_FREE_TIER, _MODEL_PRICES, AIBridge
 from browser_core.brand import tokens as _brand_tokens
 from browser_core.lucky import system_prompt as _lucky_system_prompt
 from browser_core.skills import (
@@ -438,6 +438,26 @@ class AiSidebar(QDockWidget):
         self.setWidget(body)
         self._restore_provider()
         self._greet()
+        # Auto mode shows what it will actually use — the LuckyD default,
+        # or the fallback when LuckyD is offline (10.8.8 live free rotation).
+        if self._selected_provider() is None:
+            self._set_status(self._auto_status_note())
+
+    def _auto_status_note(self) -> str:
+        """Status line for Auto mode: the default, or the fallback when
+        LuckyD (local Ollama) is offline. Never blank — the user should
+        always see what Auto will use before sending."""
+        note = ""
+        with contextlib.suppress(Exception):
+            note = str(self.bridge.free_fallback_note() or "")
+        if note:
+            return note
+        default = None
+        with contextlib.suppress(Exception):
+            default = self.bridge.default_provider()
+        if default:
+            return f"Auto — {self._provider_label(default)} · {self.bridge.model_for(default)}"
+        return "Auto — no free provider available"
 
     def _apply_theme(self) -> None:
         """Adopt the active theme's tokens and re-render the chat with them."""
@@ -715,6 +735,8 @@ class AiSidebar(QDockWidget):
         self.model_box.clear()
         self.model_box.setEnabled(False)
         if provider is None:
+            # Back to Auto: show what Auto will use (default or fallback).
+            self._set_status(self._auto_status_note())
             return
         self.model_box.addItem("loading models…")
         self._model_worker = _ModelWorker(self.bridge, provider, self)
@@ -771,11 +793,23 @@ class AiSidebar(QDockWidget):
 
     @staticmethod
     def _model_label(provider: str, model: str) -> str:
-        """Show the billing group right in the picker."""
+        """Show the billing group — and the price — right in the picker.
+
+        Paid Cline models carry their $/1M in/out price from the bridge's
+        _MODEL_PRICES (2026-11-10: Dylan reversed the 10.7.5 paid-removal —
+        paid models are back in the picker WITH their cost visible, so a
+        credit-billed pick is never a silent billing surprise)."""
+        price = _MODEL_PRICES.get(model)
+
+        def _priced(model: str, price: tuple[float, float] | None, suffix: str) -> str:
+            if price is None:
+                return f"{model}   · {suffix}"
+            return f"{model}   · ${price[0]:g}/${price[1]:g} per 1M"
+
         if provider == "clinepass":
             if model.startswith("cline-pass/"):
-                return f"{model}   · flat subscription"
-            return f"{model}   · credit-billed ⚠"
+                return _priced(model, price, "flat subscription")
+            return _priced(model, price, "credit-billed ⚠")
         if provider == "cline-usage":
             # Free-tier models are billed at $0.00; credit models deduct
             # balance. Single source of truth: the bridge's audited free
@@ -783,7 +817,7 @@ class AiSidebar(QDockWidget):
             # had drifted to dead ids and a model that was never offered).
             if model in _CLINE_USAGE_FREE_TIER:
                 return f"{model}   · free tier"
-            return f"{model}   · credit-billed"
+            return _priced(model, price, "credit-billed")
         return model
 
     def _model_changed(self, _text: str) -> None:

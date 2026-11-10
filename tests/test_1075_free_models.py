@@ -116,8 +116,10 @@ class TestFreeRotationTargets:
     def test_openrouter_leg_uses_real_free_router(self):
         from core.free_rotation import FREE_MODEL_PRIORITY
 
-        pairs = dict(FREE_MODEL_PRIORITY)
-        assert pairs["openrouter"] == "openrouter/free"
+        assert ("openrouter", "openrouter/free") in FREE_MODEL_PRIORITY
+        # 10.8.8: the rotation also carries the best live-verified :free
+        # model (nemotron-3-ultra) as a second OpenRouter leg.
+        assert ("openrouter", "nvidia/nemotron-3-ultra-550b-a55b:free") in FREE_MODEL_PRIORITY
 
 
 class TestFreeOnAnySetting:
@@ -176,8 +178,21 @@ class TestBridgeFreeDefaults:
         assert defaults["groq"] == "groq/compound-mini"
         assert defaults["openrouter"] == "openrouter/free"
 
-    def test_cline_usage_catalog_has_no_billed_ids(self):
-        from browser_core.ai_bridge import _CLINE_USAGE_CATALOG
+    def test_cline_usage_paid_ids_carry_prices(self):
+        """10.8.8: the paid section is back in the catalog WITH cost — every
+        paid id has a $/1M price (the picker shows it), and none is free."""
+        from browser_core.ai_bridge import (
+            _CLINE_USAGE_CATALOG,
+            _CLINE_USAGE_FREE_TIER,
+            _MODEL_PRICES,
+        )
 
+        paid = [m for m in _CLINE_USAGE_CATALOG if m not in _CLINE_USAGE_FREE_TIER]
+        assert paid  # the catalog is no longer free-only
+        for model in paid:
+            assert model in _MODEL_PRICES, model
+            price_in, price_out = _MODEL_PRICES[model]
+            assert price_in > 0 and price_out > 0
+        # The superseded 10.7.5 ids were never re-added.
         for billed in ("openai/gpt-4o", "anthropic/claude-sonnet-4-6", "google/gemini-2.5-pro"):
             assert billed not in _CLINE_USAGE_CATALOG

@@ -153,14 +153,18 @@ class TestPriority:
     def test_priority_order_is_best_free_first(self):
         from core.free_rotation import FREE_MODEL_PRIORITY
 
+        # 10.8.8: Dylan's own model is the default (first); Cline is LAST
+        # (free credits ending); the cloud free legs sit between.
         assert [p for p, _ in FREE_MODEL_PRIORITY] == [
-            "cline-usage",
-            "gemini",
             "ollama",
             "openrouter",
+            "openrouter",
+            "gemini",
             "groq",
+            "cline-usage",
         ]
-        assert FREE_MODEL_PRIORITY[2] == ("ollama", "luckyd:8b")
+        assert FREE_MODEL_PRIORITY[0] == ("ollama", "luckyd:8b")
+        assert FREE_MODEL_PRIORITY[-1] == ("cline-usage", "minimax/minimax-m2.5")
 
     def test_gemini_is_a_free_tier_provider(self):
         from core.providers import FREE_TIER_PROVIDERS
@@ -180,7 +184,7 @@ class TestRotator:
         assert rot.rotate() == ("gemini", "gemini-2.5-flash")
         assert rot.current == ("gemini", "gemini-2.5-flash")
 
-    def test_cline_session_is_first_when_present(self, free_env, monkeypatch):
+    def test_cline_session_is_the_free_option_when_others_absent(self, free_env, monkeypatch):
         from core import providers
         from core.free_rotation import FreeModelRotator
 
@@ -251,13 +255,15 @@ class TestBestFreeProvider:
         free_env.setenv("GOOGLE_API_KEY", TEST_API_KEY)
         assert best_free_provider() == "gemini"
 
-    def test_cline_session_beats_gemini(self, free_env, monkeypatch):
+    def test_gemini_beats_cline_now(self, free_env, monkeypatch):
+        """10.8.8: Cline is last in the rotation (free credits ending) —
+        a keyed Gemini beats a live Cline session."""
         from core import providers
         from core.free_rotation import best_free_provider
 
         monkeypatch.setattr(providers, "cline_session_token", lambda: "tok-live")
         free_env.setenv("GOOGLE_API_KEY", TEST_API_KEY)
-        assert best_free_provider() == "cline-usage"
+        assert best_free_provider() == "gemini"
 
 
 # ── detect_provider: free-first default ────────────────────────────────
@@ -474,22 +480,25 @@ def _local_entry(model="llama3.2:3b"):
 
 
 class TestBridgeDefaultOrder:
-    def test_cline_beats_local(self, monkeypatch):
+    def test_local_luckyd_beats_cline(self, monkeypatch):
+        """10.8.8: the default is Dylan's own model — local Ollama beats a
+        live Cline session now (Cline is last in the free rotation)."""
         bridge = _bridge_state(
             monkeypatch,
             {"OPENAI_API_KEY": "k"},
             {"ollama": _local_entry()},
             cline_token="sess-token",
         )
-        assert bridge.default_provider() == "cline-usage"
+        assert bridge.default_provider() == "ollama"
 
-    def test_gemini_beats_local_and_paid(self, monkeypatch):
+    def test_local_luckyd_beats_gemini_and_paid(self, monkeypatch):
+        """10.8.8: local Ollama beats keyed Gemini and paid OpenAI."""
         bridge = _bridge_state(
             monkeypatch,
             {"GOOGLE_API_KEY": "k", "OPENAI_API_KEY": "k2"},
             {"ollama": _local_entry()},
         )
-        assert bridge.default_provider() == "google"
+        assert bridge.default_provider() == "ollama"
 
     def test_local_beats_paid(self, monkeypatch):
         bridge = _bridge_state(monkeypatch, {"OPENAI_API_KEY": "k"}, {"ollama": _local_entry()})
@@ -499,6 +508,115 @@ class TestBridgeDefaultOrder:
         bridge = _bridge_state(monkeypatch, {"GROQ_API_KEY": "k", "OPENROUTER_API_KEY": "k2"}, {})
         assert bridge.default_provider() == "openrouter"
 
-    def test_paid_fallback_when_no_free(self, monkeypatch):
+    def test_no_free_provider_means_no_default(self, monkeypatch):
+        """10.8.8: paid models are NEVER auto-picked as default — with only
+        a paid key configured, Auto has no default and says so plainly
+        instead of silently billing."""
         bridge = _bridge_state(monkeypatch, {"OPENAI_API_KEY": "k"}, {})
-        assert bridge.default_provider() == "openai"
+        assert bridge.default_provider() is None
+        assert "no free provider" in bridge.free_fallback_note()
+
+    def test_luckyd_offline_falls_back_to_openrouter(self, monkeypatch):
+        """Steer 2: when Ollama is unreachable, Auto falls back to the
+        next free leg (OpenRouter) instead of failing or picking Cline."""
+        bridge = _bridge_state(monkeypatch, {"OPENROUTER_API_KEY": "k"}, {})
+        assert bridge.default_provider() == "openrouter"
+        assert "LuckyD (offline)" in bridge.free_fallback_note()
+
+
+# ── live-detected priority (10.8.8) ─────────────────────────────────────
+
+
+def _write_detection_cache(path, pairs, live_benchmarks=True):
+    """A fake detection cache file (same shape as core.free_detection
+    writes), fresh as of now."""
+    import json
+    import time
+
+    data = {
+        "fetched_at_ts": time.time(),
+        "fetched_at": "2026-11-10T00:00:00",
+        "pairs": [[p, m] for p, m in pairs],
+        "opencode_app_free": ["opencode/deepseek-v4.1-flash-free"],
+        "antigravity_free": ["gemini-3.8-flash"],
+        "report": "cached detection (test)",
+        "sources": ["openrouter", "rankllms"],
+        "live_benchmarks": live_benchmarks,
+    }
+    path.write_text(json.dumps(data), encoding="utf-8")
+
+
+class TestEffectiveFreePriority:
+    def test_cached_detection_overrides_static_order(self, free_env, tmp_path, monkeypatch):
+        from core.free_rotation import effective_free_priority
+
+        # A detected order that differs from the static one (gemini ahead
+        # of openrouter) — the cache must win when fresh.
+        cache = tmp_path / "free_models_cache.json"
+        _write_detection_cache(
+            cache,
+            [
+                ("ollama", "luckyd:8b"),
+                ("gemini", "gemini-2.5-flash"),
+                ("openrouter", "nvidia/nemotron-3-ultra-550b-a55b:free"),
+                ("groq", "compound-mini"),
+                ("cline-usage", "minimax/minimax-m2.5"),
+            ],
+        )
+        monkeypatch.setenv("LUCKYD_FREE_MODELS_CACHE", str(cache))
+        order = effective_free_priority()
+        assert order[1] == ("gemini", "gemini-2.5-flash")
+        assert order[2] == ("openrouter", "nvidia/nemotron-3-ultra-550b-a55b:free")
+
+    def test_no_cache_falls_back_to_static_priority(self, free_env, tmp_path, monkeypatch):
+        from core.free_rotation import FREE_MODEL_PRIORITY, effective_free_priority
+
+        monkeypatch.setenv("LUCKYD_FREE_MODELS_CACHE", str(tmp_path / "missing.json"))
+        assert effective_free_priority() == list(FREE_MODEL_PRIORITY)
+
+    def test_stale_cache_falls_back_to_static_priority(self, free_env, tmp_path, monkeypatch):
+        """A cache older than the 24h TTL is ignored, not trusted."""
+        import json
+        import time
+
+        from core.free_rotation import FREE_MODEL_PRIORITY, effective_free_priority
+
+        cache = tmp_path / "free_models_cache.json"
+        _write_detection_cache(cache, [("gemini", "gemini-2.5-flash")])
+        data = json.loads(cache.read_text(encoding="utf-8"))
+        data["fetched_at_ts"] = time.time() - 25 * 3600
+        cache.write_text(json.dumps(data), encoding="utf-8")
+        monkeypatch.setenv("LUCKYD_FREE_MODELS_CACHE", str(cache))
+        assert effective_free_priority() == list(FREE_MODEL_PRIORITY)
+
+    def test_rotator_snapshots_priority_at_construction(self, free_env, tmp_path, monkeypatch):
+        """A mid-conversation cache refresh never swaps the active pick:
+        the rotator keeps the list it was built with."""
+        from core.free_rotation import FreeModelRotator
+
+        cache = tmp_path / "free_models_cache.json"
+        _write_detection_cache(
+            cache,
+            [
+                ("ollama", "luckyd:8b"),
+                ("gemini", "gemini-2.5-flash"),
+                ("cline-usage", "minimax/minimax-m2.5"),
+            ],
+        )
+        monkeypatch.setenv("LUCKYD_FREE_MODELS_CACHE", str(cache))
+        free_env.setenv("GOOGLE_API_KEY", TEST_API_KEY)
+        rot = FreeModelRotator()
+        # Ollama probe refuses in free_env, so the first usable pair is gemini.
+        assert rot.rotate() == ("gemini", "gemini-2.5-flash")
+        # The cache now changes (a re-probe re-ranked the cloud legs) —
+        # the live rotator must not notice until a fresh rotator is built.
+        _write_detection_cache(
+            cache,
+            [
+                ("ollama", "luckyd:8b"),
+                ("openrouter", "openrouter/free"),
+                ("gemini", "gemini-2.5-flash"),
+            ],
+        )
+        rot.mark_failed("gemini", "gemini-2.5-flash")
+        assert rot.rotate() == ("ollama", "luckyd:8b")  # terminal fallback, old list

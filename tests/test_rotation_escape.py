@@ -94,8 +94,10 @@ class TestAutoRotate402:
         msg = await ag._auto_rotate_model(dict(_ERR_402), [], None)
 
         assert msg is not None and msg["content"] == "OK"
-        # First pool candidate failed, second pinned — provider untouched.
-        assert ag.model == ag._CLINE_ROTATION_POOL[1]
+        # The current model (pool[1], deepseek-v4.1-flash) is skipped by
+        # the rotation — the next pool candidate (pool[2]) is pinned,
+        # provider untouched.
+        assert ag.model == ag._CLINE_ROTATION_POOL[2]
         assert ag._provider_config.provider == "cline-usage"
 
     async def test_escapes_to_ollama_when_gateway_exhausted(self, clean_provider_env):

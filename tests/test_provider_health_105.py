@@ -101,7 +101,12 @@ class TestHealthSnapshot:
         from core.providers import list_providers
 
         by_id = {p["id"]: p for p in list_providers()}
-        for index, (pid, _model) in enumerate(FREE_MODEL_PRIORITY):
+        # Deduped provider order (see test_provider_health.py).
+        seen: list[str] = []
+        for pid, _model in FREE_MODEL_PRIORITY:
+            if pid not in seen:
+                seen.append(pid)
+        for index, pid in enumerate(seen):
             assert by_id[pid]["rotation_order"] == index
         # Paid-only providers are not in the rotation.
         assert by_id["openai"]["rotation_order"] is None
@@ -376,7 +381,9 @@ class TestAgentsBridge:
         assert "error" not in snap
         by_id = {p["id"]: p for p in snap["providers"]}
         assert by_id["groq"]["next_in_rotation"] is True
-        assert by_id["groq"]["rotation_order"] == 4
+        # 10.8.8 rotation: ollama 0, openrouter 1, gemini 2, groq 3,
+        # cline-usage 4 (deduped).
+        assert by_id["groq"]["rotation_order"] == 3
         assert "credit_ttl_remaining_sec" in by_id["cline-usage"]
 
     def test_read_best_free(self, clean_env, tmp_path):

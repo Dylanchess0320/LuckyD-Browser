@@ -47,6 +47,22 @@ CLINE_FREE_DEAD = {
     "kwaipilot/kat-coder-pro",
 }
 CLINE_CREDIT_BILLED = {
+    # 10.8.8 Pareto paid section (Dylan 2026-11-10: paid models back in
+    # WITH cost visible — the 10.7.5 removal is reversed). Cheapest first.
+    "meta/muse-ember",
+    "deepseek/deepseek-v4.1-flash-1017",
+    "deepseek/deepseek-v4.1-flash",
+    "z-ai/glm-5.3",
+    "moonshotai/kimi-k3.1-pro",
+    "anthropic/claude-sonnet-5.5",
+    "openai/gpt-6.1-sol",
+    "google/gemini-4-argon",
+    "anthropic/claude-opus-5.5",
+    "meta/muse-wonder",
+    "openai/gpt-6-astra",
+}
+# The superseded 10.7.5 paid ids — outclassed since, never re-added.
+CLINE_CREDIT_BILLED_RETIRED = {
     "google/gemini-2.5-pro",
     "anthropic/claude-sonnet-4-6",
     "openai/gpt-4o",
@@ -152,7 +168,8 @@ class TestClineFreeAudit:
 
     def test_credit_billed_ids_never_leak_into_the_free_tier(self):
         """Regression for the old ``_CLINE_USAGE_CATALOG[:10]`` slice: once
-        free entries are removed, a positional slice promotes paid ids."""
+        free entries are removed, a positional slice promotes paid ids.
+        10.8.8: the paid section is the Pareto set (not the old ids)."""
         import main
 
         assert not (CLINE_CREDIT_BILLED & set(main._CLINE_USAGE_FREE_TIER))
@@ -160,6 +177,7 @@ class TestClineFreeAudit:
         paid = [m for m in main._CLINE_USAGE_CATALOG if m not in main._CLINE_USAGE_FREE_TIER]
         assert set(free) == CLINE_FREE_SURVIVORS
         assert set(paid) == CLINE_CREDIT_BILLED
+        assert not (CLINE_CREDIT_BILLED_RETIRED & set(main._CLINE_USAGE_CATALOG))
 
 
 class TestDefaultsPointAtInstalledModels:
@@ -171,7 +189,10 @@ class TestDefaultsPointAtInstalledModels:
     def test_free_rotation_lead_and_fallback_pairs(self, clean_env):
         from core.free_rotation import FREE_MODEL_PRIORITY, available_free_models
 
-        assert FREE_MODEL_PRIORITY[0] == ("cline-usage", "minimax/minimax-m2.5")
+        # 10.8.8: the default is Dylan's own model; Cline is last (free
+        # credits ending). Ollama is both lead and terminal fallback.
+        assert FREE_MODEL_PRIORITY[0] == ("ollama", "luckyd:8b")
+        assert FREE_MODEL_PRIORITY[-1] == ("cline-usage", "minimax/minimax-m2.5")
         assert ("ollama", "luckyd:8b") in FREE_MODEL_PRIORITY
         assert not any(m == "llama3.2:3b" for _p, m in FREE_MODEL_PRIORITY)
         assert not any(m == "deepseek/deepseek-chat" for _p, m in FREE_MODEL_PRIORITY)

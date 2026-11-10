@@ -445,9 +445,11 @@ class CodingAgent:
     # retired OpenCode Zen "-free" pool). Ordered free-first.
     # 10.8.3: deepseek/deepseek-chat and qwen/qwen3-8b removed — upstream
     # 404 on the gateway (2026-10-22 live-probe audit); minimax-m2.5 leads.
+    # 10.8.8: deepseek-v4-flash -> v4.1-flash (current generation, verified
+    # live on the gateway 2026-11-10).
     _CLINE_ROTATION_POOL = (
         "minimax/minimax-m2.5",
-        "deepseek/deepseek-v4-flash",
+        "deepseek/deepseek-v4.1-flash",
         "z-ai/glm-5.3-flash",
     )
 
@@ -455,9 +457,10 @@ class CodingAgent:
     # bill against the flat subscription quota, so they survive a $0 (even
     # negative) Cline Credits balance that 402s every usage-billed id.
     # Curated mirror of main.py _CLINEPASS_CATALOG — keep in sync.
+    # 10.8.8: kimi-k3 -> kimi-k3.1-pro, v4-flash -> v4.1-flash-1017.
     _CLINEPASS_ROTATION_POOL = (
-        "cline-pass/kimi-k3",
-        "cline-pass/deepseek-v4-flash",
+        "cline-pass/kimi-k3.1-pro",
+        "cline-pass/deepseek-v4.1-flash-1017",
         "cline-pass/glm-5.3",
     )
 

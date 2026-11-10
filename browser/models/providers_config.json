@@ -1,5 +1,5 @@
 {
-  "_source": "Cline gateways (api.cline.bot) + keyed clouds + OpenCode Zen (opencode.ai, keyed since 2026-09 \u2014 the old $0 keyless tier is gone). 'free_models' = $0 cost per token.",
+  "_source": "Cline gateways (api.cline.bot) + keyed clouds + OpenCode Zen (opencode.ai, keyed since 2026-09). 'free_models' = $0 cost per token. 10.8.8 refresh 2026-11-10: default is Ollama luckyd:8b; Cline free demoted to last fallback (free credits ending).",
   "ai_providers": {
     "anthropic": {
       "base_url": "https://api.anthropic.com/v1",
@@ -11,6 +11,7 @@
       "note": "api.anthropic.com \u2014 pay-per-token. 2026-09-24: Claude Opus 5.5 (Fable-5.1-class, $4/$20 per 1M); Fable 5.1 flagship at $10/$50 per 1M.",
       "paid_models": [
         "claude-opus-5-5",
+        "claude-sonnet-5.5",
         "claude-fable-5-1",
         "claude-sonnet-5"
       ],
@@ -30,7 +31,20 @@
       ],
       "free_tier": true,
       "name": "Cline (usage)",
-      "note": "Rotating FREE promotions in Cline CLI/IDE (Cline account, quota-limited, rate-limited). Same auth as ClinePass.",
+      "note": "Cline free tier (rate-limited). 10.8.8: Cline is stopping free credits \u2014 the free tier is now the LAST fallback, not the default (default is Ollama luckyd:8b). Same auth as ClinePass.",
+      "paid_models": [
+        "meta/muse-ember",
+        "deepseek/deepseek-v4.1-flash-1017",
+        "deepseek/deepseek-v4.1-flash",
+        "z-ai/glm-5.3",
+        "moonshotai/kimi-k3.1-pro",
+        "anthropic/claude-sonnet-5.5",
+        "openai/gpt-6.1-sol",
+        "google/gemini-4-argon",
+        "anthropic/claude-opus-5.5",
+        "meta/muse-wonder",
+        "openai/gpt-6-astra"
+      ],
       "recommended": "minimax/minimax-m2.5",
       "requires_key": false
     },
@@ -40,8 +54,31 @@
       "free_models": [],
       "free_tier": false,
       "name": "ClinePass",
-      "note": "Flat $9.99/mo subscription \u2014 2-5x usage on open coding models; works with $0 credit balance. Reuses logged-in Cline CLI session when no key set.",
-      "recommended": "cline-pass/kimi-k3",
+      "note": "Flat $9.99/mo subscription \u2014 2-5x usage on open coding models; works with $0 credit balance. Reuses logged-in Cline CLI session when no key set. 10.8.8 catalog: 21 models (15 Oct 30 docs table + 6 legacy kept, not proven dead).",
+      "paid_models": [
+        "cline-pass/deepseek-v4.1-flash-1017",
+        "cline-pass/deepseek-v4.1-flash",
+        "cline-pass/mimo-v2.6-flash",
+        "cline-pass/glm-5.3-flash",
+        "cline-pass/minimax-m3.1-flash",
+        "cline-pass/muse-spark-1.3-contributor",
+        "cline-pass/minimax-m3",
+        "cline-pass/mimo-v2.6-pro",
+        "cline-pass/qwen3.7-plus",
+        "cline-pass/deepseek-v4-pro",
+        "cline-pass/glm-5.3",
+        "cline-pass/kimi-k3.1-pro",
+        "cline-pass/qwen3.8-max",
+        "cline-pass/qwen3.7-max",
+        "cline-pass/kimi-k3",
+        "cline-pass/kimi-k2.7-code",
+        "cline-pass/kimi-k2.6",
+        "cline-pass/deepseek-v4-flash",
+        "cline-pass/mimo-v2.5",
+        "cline-pass/mimo-v2.5-pro",
+        "cline-pass/glm-5.2"
+      ],
+      "recommended": "cline-pass/deepseek-v4.1-flash-1017",
       "requires_key": false
     },
     "deepseek": {
@@ -50,12 +87,12 @@
       "free_models": [],
       "free_tier": false,
       "name": "DeepSeek",
-      "note": "2026-09-24: DeepSeek V4 \u2014 cheapest frontier-class ($0.14/$0.28 per 1M), 1M context, strong coding/agent tasks. Pay-per-token (not a $0 tier); needs DEEPSEEK_API_KEY.",
-      "recommended": "deepseek-v4",
+      "note": "2026-11-10: DeepSeek V4.1 Flash (1017 snapshot Oct 17) \u2014 $0.15/$0.60 off-peak, $0.30/$1.20 peak, 1M context, DeepSWE 77.0. Pay-per-token (not a $0 tier); needs DEEPSEEK_API_KEY.",
+      "recommended": "deepseek-v4.1-flash-1017",
       "requires_key": true,
       "paid_models": [
-        "deepseek-v4",
-        "deepseek-v4-flash",
+        "deepseek-v4.1-flash-1017",
+        "deepseek-v4.1-flash",
         "deepseek-v4-pro"
       ]
     },
@@ -77,6 +114,7 @@
       "recommended": "gemini-3.8-flash",
       "requires_key": true,
       "paid_models": [
+        "gemini-4-argon",
         "gemini-2.5-pro",
         "gemini-3-pro-preview",
         "gemini-3-flash-preview"
@@ -102,8 +140,9 @@
       "free_models": [],
       "free_tier": false,
       "name": "Meta (Muse)",
-      "note": "2026-10-12: Muse Wonder \u2014 Meta's first frontier model (launched Oct 12, 2026), ~1M context, Active Memory / Active Focus, $4/$20 per 1M tokens. Key from the Meta Model API (OpenAI-compatible).",
+      "note": "2026-11-10: Muse Ember (launched Nov 9, 2026) \u2014 smallest/cheapest Muse model, $0.10/$0.50 per 1M, 1M context, AA 36; Wonder is the frontier agentic model, $4/$20 per 1M. Key from the Meta Model API (OpenAI-compatible).",
       "paid_models": [
+        "muse-ember-1.0",
         "muse-wonder-1.0"
       ],
       "recommended": "muse-wonder-1.0",
@@ -131,11 +170,12 @@
       "free_models": [],
       "free_tier": false,
       "name": "Moonshot (Kimi)",
-      "note": "2026-09-24: Kimi K3 \u2014 huge open-weight multimodal MoE, 1M context, native vision, strong long-horizon agentic coding, $3/$15 per 1M tokens. Key from platform.kimi.ai (OpenAI-compatible).",
+      "note": "2026-11-10: Kimi K3.1 Pro \u2014 $2/$10 per 1M, AA 46, 1M context, native vision, strong long-horizon agentic coding. Key from platform.kimi.ai (OpenAI-compatible).",
       "paid_models": [
+        "kimi-k3.1-pro",
         "kimi-k3"
       ],
-      "recommended": "kimi-k3",
+      "recommended": "kimi-k3.1-pro",
       "requires_key": true
     },
     "ollama": {
@@ -161,10 +201,10 @@
       "note": "api.openai.com \u2014 pay-per-token. 2026-09-24: GPT-6 family (Astra flagship, Sol balanced, Luna lightweight).",
       "paid_models": [
         "gpt-6-astra",
-        "gpt-6-sol",
+        "gpt-6.1-sol",
         "gpt-6-luna"
       ],
-      "recommended": "gpt-6-sol",
+      "recommended": "gpt-6.1-sol",
       "requires_key": true
     },
     "opencode": {
@@ -174,9 +214,16 @@
       "free_models": [],
       "free_tier": false,
       "name": "OpenCode Zen",
-      "note": "opencode.ai gateway \u2014 keyed since 2026-09 (the old $0 keyless tier is gone). Restored to the mesh at Dylan's request 2026-09-21.",
-      "paid_models": [],
-      "recommended": "gemini-3.5-flash-lite",
+      "note": "opencode.ai Zen gateway \u2014 keyed since 2026-09 (the old $0 keyless tier is gone). Restored to the mesh at Dylan's request 2026-09-21. The in-app free tier (opencode/deepseek-v4.1-flash-free etc.) works ONLY inside the OpenCode app / LuckyD Code, not via this API.",
+      "paid_models": [
+        "deepseek-v4.1-flash",
+        "muse-ember-1.0",
+        "gemini-4-argon",
+        "gpt-6.1-sol",
+        "claude-sonnet-5-5",
+        "claude-opus-5-5"
+      ],
+      "recommended": "deepseek-v4.1-flash",
       "requires_key": true
     },
     "openrouter": {
@@ -185,18 +232,18 @@
       "free_models": [
         "openrouter/free",
         "cohere/north-mini-code:free",
+        "dots-studio/dots-3-note-preview:free",
         "google/gemma-4-26b-a4b-it:free",
         "google/gemma-4-31b-it:free",
         "liquid/lfm-2.5-2.6b:free",
+        "liquid/lfm-3-1.7b:free",
         "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
-        "nvidia/nemotron-3-super-120b-a12b:free",
         "nvidia/nemotron-3-ultra-550b-a55b:free",
         "nvidia/nemotron-3.5-lightning:free",
-        "poolside/laguna-s-2.1:free",
-        "poolside/laguna-xs-2.1:free",
-        "thinkingmachines/inkling-small:free",
-        "thinkingmachines/inkling:free",
-        "z-ai/glm-5.2:free"
+        "nvidia/nemotron-3.5-super-vl:free",
+        "recursive/flint-v1.0:free",
+        "thinkingmachines/inkling-2-small:free",
+        "xingchen-agi/xing4.0-29b-a4b:free"
       ],
       "free_tier": true,
       "name": "OpenRouter",
@@ -233,14 +280,14 @@
       "requires_key": true
     }
   },
-  "default_provider": "cline-usage",
+  "default_provider": "ollama",
   "fallback_chain": [
     "ollama",
-    "cline-usage",
     "openrouter",
     "google",
     "zai",
-    "groq"
+    "groq",
+    "cline-usage"
   ],
   "model_resolution": {
     "auto_select": true,

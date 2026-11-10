@@ -143,6 +143,10 @@ MODEL_CATALOG: dict[str, ModelConfig] = {
     # Paid frontier (explicit picks / fallback only, user's own key).
     # 10.7.5: retired 2025 ids (gpt-4o, claude-opus-4-6,
     # gemini-2.5-pro-preview, codellama:34b) removed.
+    # 10.8.8 Pareto refresh (verified live 2026-11-10): Opus 5.5 context is
+    # 1M (was 200K); GPT-6.1 Sol replaces GPT-6 Sol; Kimi K3.1 Pro replaces
+    # K3 (cheaper $2/$10 vs $3/$15, AA 46); Muse Ember + DeepSeek V4.1
+    # Flash join as the cheapest Pareto picks.
     "claude-opus": ModelConfig(
         name="Claude Opus 5.5 (paid)",
         provider="anthropic",
@@ -151,27 +155,47 @@ MODEL_CATALOG: dict[str, ModelConfig] = {
         cost_per_1k_output=0.02,
         avg_latency_ms=3000,
         strengths=["reasoning", "code", "analysis", "writing"],
-        context_window=200_000,
+        context_window=1_000_000,
     ),
     "gpt-frontier": ModelConfig(
-        name="GPT-6 Sol (paid)",
+        name="GPT-6.1 Sol (paid)",
         provider="openai",
-        model_id="gpt-6-sol",
+        model_id="gpt-6.1-sol",
         cost_per_1k_input=0.002,
         cost_per_1k_output=0.01,
         avg_latency_ms=2000,
         strengths=["code", "reasoning", "multimodal"],
         context_window=128_000,
     ),
-    "kimi-k3": ModelConfig(
-        name="Kimi K3 (paid)",
+    "kimi-k3.1-pro": ModelConfig(
+        name="Kimi K3.1 Pro (paid)",
         provider="openrouter",
-        model_id="moonshotai/kimi-k3",
-        cost_per_1k_input=0.0005,
-        cost_per_1k_output=0.002,
+        model_id="moonshotai/kimi-k3.1-pro",
+        cost_per_1k_input=0.002,
+        cost_per_1k_output=0.01,
         avg_latency_ms=1200,
         strengths=["code", "reasoning", "speed"],
         context_window=256_000,
+    ),
+    "muse-ember": ModelConfig(
+        name="Muse Ember (paid)",
+        provider="openrouter",
+        model_id="meta/muse-ember",
+        cost_per_1k_input=0.0001,
+        cost_per_1k_output=0.0005,
+        avg_latency_ms=1200,
+        strengths=["code", "reasoning", "speed"],
+        context_window=1_000_000,
+    ),
+    "deepseek-v4.1-flash": ModelConfig(
+        name="DeepSeek V4.1 Flash (paid)",
+        provider="openrouter",
+        model_id="deepseek/deepseek-v4.1-flash-1017",
+        cost_per_1k_input=0.000006,
+        cost_per_1k_output=0.0005,
+        avg_latency_ms=1200,
+        strengths=["code", "reasoning", "speed"],
+        context_window=1_000_000,
     ),
 }
 
@@ -265,7 +289,7 @@ class ModelRouter:
     Usage:
         router = ModelRouter(
             models=list(MODEL_CATALOG.values()),
-            default_model="kimi-k3",
+            default_model="kimi-k3.1-pro",
         )
         decision = router.route("Fix the auth bug in login.py")
         result = await router.execute("Fix the auth bug", llm_caller=my_fn)

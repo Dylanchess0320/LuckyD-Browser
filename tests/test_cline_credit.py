@@ -304,9 +304,11 @@ class TestBrowserDefaultHonorsMarker:
         assert bridge.default_provider() is None
 
     def test_falls_through_to_keyed_cloud(self, credit_env, monkeypatch):
+        """10.8.8: with Cline marked exhausted and only a PAID key left,
+        Auto has no default — paid providers are never auto-picked."""
         record_cline_credit_exhausted(_REASON)
         bridge = _hermetic_bridge(monkeypatch, {"CLINEPASS_API_KEY": "k", "OPENAI_API_KEY": "sk-x"})
-        assert bridge.default_provider() == "openai"
+        assert bridge.default_provider() is None
 
     def test_local_still_wins_with_marker(self, credit_env, monkeypatch):
         record_cline_credit_exhausted(_REASON)

@@ -43,23 +43,40 @@ CLINE_CREDIT_BILLED = {
     "openai/gpt-4o-mini",
     "mistral/mistral-large",
 }
+# 10.8.8 Pareto paid section (Dylan 2026-11-10: the 10.7.5 paid-removal is
+# reversed — paid models go back in WITH their cost visible). Cheapest
+# first; every id verified live on the Cline gateway 2026-11-10.
+CLINE_PAID_PARETO = {
+    "meta/muse-ember",
+    "deepseek/deepseek-v4.1-flash-1017",
+    "deepseek/deepseek-v4.1-flash",
+    "z-ai/glm-5.3",
+    "moonshotai/kimi-k3.1-pro",
+    "anthropic/claude-sonnet-5.5",
+    "openai/gpt-6.1-sol",
+    "google/gemini-4-argon",
+    "anthropic/claude-opus-5.5",
+    "meta/muse-wonder",
+    "openai/gpt-6-astra",
+}
 
 
 class TestBridgeCatalogPrune:
     def test_bridge_catalog_is_exactly_the_audited_survivors(self):
         from browser_core import ai_bridge
 
-        assert set(ai_bridge._CLINE_USAGE_CATALOG) == CLINE_FREE_SURVIVORS
+        assert set(ai_bridge._CLINE_USAGE_CATALOG) == CLINE_FREE_SURVIVORS | CLINE_PAID_PARETO
 
     def test_bridge_free_tier_is_explicit_and_matches_catalog(self):
         """The bridge free tier is an explicit set (never a positional
-        slice) and — the bridge catalog being free-only since 10.7.5 —
-        it is exactly the catalog."""
+        slice): exactly the six audited $0 survivors, a strict subset of
+        the catalog now that the paid Pareto section is back in."""
         from browser_core import ai_bridge
 
         assert isinstance(ai_bridge._CLINE_USAGE_FREE_TIER, frozenset)
         assert set(ai_bridge._CLINE_USAGE_FREE_TIER) == CLINE_FREE_SURVIVORS
-        assert set(ai_bridge._CLINE_USAGE_FREE_TIER) == set(ai_bridge._CLINE_USAGE_CATALOG)
+        assert set(ai_bridge._CLINE_USAGE_FREE_TIER) < set(ai_bridge._CLINE_USAGE_CATALOG)
+        assert set(ai_bridge._CLINE_USAGE_CATALOG) == CLINE_FREE_SURVIVORS | CLINE_PAID_PARETO
 
     def test_dead_ids_absent_from_every_bridge_surface(self):
         from browser_core import ai_bridge
@@ -69,11 +86,26 @@ class TestBridgeCatalogPrune:
         assert not (CLINE_FREE_DEAD & set(ai_bridge._CLINE_GATEWAY_TOP_MODELS))
         assert not (CLINE_FREE_DEAD & set(ai_bridge._CLINE_GATEWAY_CATALOG))
 
-    def test_credit_billed_ids_never_leak_into_bridge_free_tier(self):
+    def test_paid_pareto_ids_are_in_catalog_with_prices_not_in_free_tier(self):
+        """10.8.8: paid models are back in the catalog WITH their cost
+        visible — every paid id has a $/1M price (the picker shows it) and
+        none of them is in the free tier."""
         from browser_core import ai_bridge
 
-        assert not (CLINE_CREDIT_BILLED & set(ai_bridge._CLINE_USAGE_FREE_TIER))
+        assert set(ai_bridge._CLINE_USAGE_CATALOG) >= CLINE_PAID_PARETO
+        assert not (CLINE_PAID_PARETO & set(ai_bridge._CLINE_USAGE_FREE_TIER))
+        for model in CLINE_PAID_PARETO:
+            assert model in ai_bridge._MODEL_PRICES, model
+            price_in, price_out = ai_bridge._MODEL_PRICES[model]
+            assert price_in > 0 and price_out > 0
+
+    def test_old_credit_billed_ids_stay_out(self):
+        """The superseded 10.7.5 paid ids (outclassed since) are still not
+        offered — they were never re-added, only the Pareto picks were."""
+        from browser_core import ai_bridge
+
         assert not (CLINE_CREDIT_BILLED & set(ai_bridge._CLINE_USAGE_CATALOG))
+        assert not (CLINE_CREDIT_BILLED & set(ai_bridge._CLINE_USAGE_FREE_TIER))
 
     def test_bridge_and_terminal_free_tiers_cannot_drift(self):
         from browser_core import ai_bridge
@@ -81,7 +113,7 @@ class TestBridgeCatalogPrune:
         import main
 
         assert set(ai_bridge._CLINE_USAGE_FREE_TIER) == set(main._CLINE_USAGE_FREE_TIER)
-        assert set(ai_bridge._CLINE_USAGE_CATALOG) == set(main._CLINE_USAGE_FREE_TIER)
+        assert set(ai_bridge._CLINE_USAGE_CATALOG) == set(main._CLINE_USAGE_CATALOG)
 
 
 class TestBridgeDefaultsAndPools:
@@ -140,3 +172,12 @@ class TestSidebarLabelling:
         assert "_CLINE_USAGE_FREE_TIER" in source
         for dead in CLINE_FREE_DEAD:
             assert dead not in source
+
+    def test_sidebar_shows_prices_for_paid_models(self):
+        """10.8.8: paid models show their $/1M price in the picker (the
+        10.7.5 silent-billing fix is the visible price, not removal)."""
+        source = (_REPO_ROOT / "browser" / "browser_ui" / "ai_sidebar.py").read_text(
+            encoding="utf-8"
+        )
+        assert "_MODEL_PRICES" in source
+        assert "per 1M" in source

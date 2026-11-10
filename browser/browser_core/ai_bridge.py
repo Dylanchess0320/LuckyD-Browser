@@ -44,8 +44,23 @@ except Exception:  # pragma: no cover - import guard
     _core_cline_exhausted = None
     _core_cline_record = None
 
+# Live free-model detection (core/free_detection.py) — optional like the
+# router above: the frozen browser may not have `core` importable.
+# The bridge reads the CACHED list only (no network on the selection path);
+# a background refresh is kicked off at bridge init (see __init__).
+_effective_free_priority: Any = None
+try:
+    from core.free_rotation import effective_free_priority as _effective_free_priority
+except Exception:  # pragma: no cover - import guard
+    _effective_free_priority = None
+_ensure_fresh_detection: Any = None
+try:
+    from core.free_detection import ensure_fresh_detection as _ensure_fresh_detection
+except Exception:  # pragma: no cover - import guard
+    _ensure_fresh_detection = None
+
 # LiteLLM model router (browser_core/model_router.py) — optional, like the
-# two seams above. When litellm is installed and the router is enabled,
+# seams above. When litellm is installed and the router is enabled,
 # auto-mode chat tries its config-driven tier chain (free -> cheap -> local)
 # first; any router failure falls back to this bridge's httpx chain, so a
 # missing/broken router can never take chat down.
@@ -154,7 +169,9 @@ _PROVIDER_SPECS = [
     ("xai", "XAI_API_KEY", "grok-4.7", "https://api.x.ai/v1", "openai"),
     # 2026-09-24: Moonshot Kimi K3 — open-weight multimodal MoE, 1M context.
     # OpenAI-compatible: https://api.moonshot.ai/v1, MOONSHOT_API_KEY.
-    ("moonshot", "MOONSHOT_API_KEY", "kimi-k3", "https://api.moonshot.ai/v1", "openai"),
+    # 2026-11-10: default is now Kimi K3.1 Pro — cheaper ($2/$10 vs $3/$15
+    # per 1M) and better (AA 46); K3 stays reachable as an override.
+    ("moonshot", "MOONSHOT_API_KEY", "kimi-k3.1-pro", "https://api.moonshot.ai/v1", "openai"),
     # 2026-10-12: Meta Muse Wonder — frontier agentic/coding model (launched
     # Oct 12, 2026), ~1M context. OpenAI-compatible: https://api.meta.ai/v1,
     # META_API_KEY.
@@ -247,26 +264,42 @@ _VISION_EXCLUDE = ("gemma3:1b", "gemma-3-1b")
 _CLINEPASS_BASE = "https://api.cline.bot/api/v1"
 _CLINEPASS_MODEL = "cline-pass/deepseek-v4-pro"
 
-# Curated fallback for api.cline.bot — the gateway has no public model
-# catalog endpoint (only /chat/completions). Sources: ClinePass docs model
-# table (subscription) + Cline API docs (credit-billed), 2026-09 (v9.1:
-# added glm-5.3, glm-5.2, qwen3.8-max from live docs).
+# Curated fallback for api.cline.bot — the gateway HAS a public model
+# catalog endpoint (GET /api/v1/models, verified 2026-11-10: 448 models).
+# Sources: ClinePass docs model table (subscription), updated 2026-10-30
+# — the Sept 2026 list below it was stale. ClinePass ids are the
+# subscription-routed "cline-pass/..." form of the same gateway models.
 _CLINEPASS_CATALOG = [
-    # ── Included in the ClinePass flat subscription — these work with a
-    # $0 (even negative) credit balance; usage counts against the sub quota.
-    "cline-pass/glm-5.3",
-    "cline-pass/glm-5.2",
-    "cline-pass/kimi-k3",
-    "cline-pass/deepseek-v4-flash",  # fast + cheapest — great agent model
+    # ── Included in the ClinePass flat subscription ($9.99/mo) — these
+    # work with a $0 (even negative) credit balance; usage counts against
+    # the sub quota. Reference $/1M in/out in _MODEL_PRICES (ClinePass
+    # docs reference-pricing table, 2026-10-30). Cheapest first.
+    "cline-pass/deepseek-v4.1-flash-1017",  # $0.15/$0.60 off-peak
+    "cline-pass/deepseek-v4.1-flash",  # $0.15/$0.60 off-peak
+    "cline-pass/mimo-v2.6-flash",  # $0.14/$0.28
+    "cline-pass/glm-5.3-flash",  # $0.15/$0.50
+    "cline-pass/minimax-m3.1-flash",  # $0.15/$0.60
+    "cline-pass/muse-spark-1.3-contributor",  # $0.10/$0.20
+    "cline-pass/minimax-m3",  # $0.30/$1.20 (<=512K)
+    "cline-pass/mimo-v2.6-pro",  # $0.435/$0.87
+    "cline-pass/qwen3.7-plus",  # $0.40/$1.60 (<=256K)
+    "cline-pass/deepseek-v4-pro",  # $0.66/$1.98 off-peak
+    "cline-pass/glm-5.3",  # $1.40/$4.40
+    "cline-pass/kimi-k3.1-pro",  # $2.00/$10.00
+    "cline-pass/qwen3.8-max",  # $2.00/$6.00
+    "cline-pass/qwen3.7-max",  # $2.50/$7.50
+    "cline-pass/kimi-k3",  # $3.00/$15.00
+    # Legacy ids from the Sept 2026 catalog, KEPT 2026-11-10: the Oct 30
+    # docs table is a pricing reference, not a serving list, and
+    # cline-pass/* ids cannot be verified against the gateway listing
+    # (client-side namespace — the gateway lists usage ids only), so none
+    # of these is proven dead and Dylan's rule keeps them offered.
     "cline-pass/kimi-k2.7-code",
     "cline-pass/kimi-k2.6",
-    "cline-pass/deepseek-v4-pro",
+    "cline-pass/deepseek-v4-flash",
     "cline-pass/mimo-v2.5",
     "cline-pass/mimo-v2.5-pro",
-    "cline-pass/minimax-m3",
-    "cline-pass/qwen3.8-max",
-    "cline-pass/qwen3.7-max",
-    "cline-pass/qwen3.7-plus",
+    "cline-pass/glm-5.2",
 ]
 
 # OpenCode Zen (opencode.ai) platform catalog.
@@ -274,8 +307,11 @@ _CLINEPASS_CATALOG = [
 # models. That tier is gone — verified 2026-09-13: /models lists only
 # opencode-platform models and every chat call without OPENCODE_API_KEY
 # returns 401 "Missing API key". The provider is now keyed like any cloud.
-# The list below mirrors the live /models catalog (2026-09-13) and is only
-# the fetch_models() fallback when the live catalog request fails.
+# The list below mirrors the live /models catalog — re-verified 2026-11-10
+# via GET https://opencode.ai/zen/v1/models (84 models, no key needed) —
+# and is only the fetch_models() fallback when the live catalog request
+# fails. Zen's "-free" codename models are NOT listed: that free tier is
+# OpenCode-CLI-only and refuses calls from LuckyD.
 _OPENCODE_ZEN_BASE = "https://opencode.ai/zen/v1"
 _OPENCODE_ZEN_DEFAULT = "gemini-3.5-flash-lite"
 _ZEN_CATALOG = [
@@ -284,8 +320,8 @@ _ZEN_CATALOG = [
     "gpt-5.4-nano",
     "gpt-5.4-mini",
     "claude-haiku-4-5",
+    "claude-haiku-5-5",
     "gemini-3.5-flash",
-    "gemini-3-flash",
     "gemini-3.6-flash",
     "gemini-3.7-flash",
     "gemini-3.8-flash",
@@ -295,70 +331,100 @@ _ZEN_CATALOG = [
     "gpt-5.2",
     "gpt-5.1",
     "gpt-5",
-    "claude-sonnet-4",
+    "gpt-5-codex",
     "claude-sonnet-4-5",
     "claude-sonnet-4-6",
     "claude-sonnet-5",
+    "claude-sonnet-5-5",
     "gpt-5.1-codex",
     "gpt-5.2-codex",
     "gpt-5.3-codex",
     "gpt-5.1-codex-max",
     "gpt-5.3-codex-spark",
     "gpt-6-astra",
+    "gpt-6-luna",
+    "gpt-6-sol",
+    "gpt-6.1-sol",
     "gpt-5.5-pro",
     "gpt-5.4-pro",
     "gpt-5.6-sol",
     "gpt-5.6-terra",
     "gpt-5.6-luna",
-    "gemini-3.1-pro",
     "claude-opus-4-5",
     "claude-opus-4-6",
     "claude-opus-4-7",
     "claude-opus-4-8",
     "claude-opus-5",
+    "claude-opus-5-5",
     "claude-fable-5",
     "claude-fable-5-1",
-    # Muse Spark 1.3 — standard tier; the cheaper "-contributor" variant is
-    # only offered after an explicit opt-in (see _contributor_enabled below).
+    "claude-fable-5-2",
+    "gemini-4-argon",
+    "deepseek-v4-pro",
+    "deepseek-v4.1-flash",
+    "glm-5.3",
+    "glm-5.3-flash",
+    "kimi-k2.6",
+    "kimi-k2.7-code",
+    "kimi-k3",
+    "minimax-m2.5",
+    "minimax-m2.7",
+    "minimax-m3",
+    "mistral-large-4",
+    "qwen3.8-flash",
+    "qwen3.8-max",
+    "grok-4.6",
+    "grok-4.7",
+    # Muse family — verified live on Zen 2026-11-10 (models.dev + Zen
+    # /models): Ember is Meta's cheapest model ($0.10/$0.50 per 1M).
+    "muse-ember-1.0",
     "muse-spark-1.3",
     "muse-spark-1.2",
+    "muse-wonder-1.0",
+    # Removed 2026-11-10 — not in the live Zen list any more:
+    # claude-sonnet-4, gemini-3-flash, gemini-3.1-pro.
 ]
 
 # Curated Zen top models — the chat path rotates through these
 # when the configured Zen model fails (404, unsupported, rate limit).
 # These are NOT free — Zen requires OPENCODE_API_KEY since 2026-09.
+# Cheapest first; every entry verified live 2026-11-10.
 _ZEN_TOP_MODELS = [
-    "gemini-3.5-flash-lite",  # fastest/cheapest in live catalog
+    "muse-ember-1.0",  # $0.10/$0.50 per 1M — cheapest intelligence
+    "gemini-3.5-flash-lite",
+    "deepseek-v4.1-flash",  # $0.30/$1.20 peak
     "gpt-5-nano",
-    "gpt-5.4-nano",
-    "gpt-5.4-mini",
-    "claude-haiku-4-5",
-    "gemini-3.5-flash",
-    "gpt-5.1-codex-mini",
-    "claude-sonnet-4",
-    "gpt-5.1-codex",
-    "claude-opus-4-5",
+    "claude-haiku-5-5",
+    "gpt-6.1-sol",  # $2/$10 per 1M
+    "claude-sonnet-5-5",  # $2/$10 per 1M
+    "gemini-4-argon",  # $2/$10 per 1M
+    "gpt-6-astra",  # $10/$50 per 1M
+    "claude-opus-5-5",  # $4/$20 per 1M — top coding quality
 ]
 _ZEN_TOP_MODELS_SET = set(_ZEN_TOP_MODELS)
 
 # OpenRouter free fallback — the :free chat models plus the auto free-router,
-# used only when the live /models request fails. Kept roughly largest-first.
+# used only when the live /models request fails. Re-verified 2026-11-10
+# against GET https://openrouter.ai/api/v1/models (16 actually-free chat
+# models; audio-only lyria models excluded — not chat). Kept largest-first.
 _OPENROUTER_FREE_FALLBACK = [
     "openrouter/free",  # meta-router: auto-picks any available free model
     "nvidia/nemotron-3-ultra-550b-a55b:free",
-    "z-ai/glm-5.2:free",
-    "thinkingmachines/inkling:free",
-    "thinkingmachines/inkling-small:free",
+    "thinkingmachines/inkling-2-small:free",
     "google/gemma-4-31b-it:free",
     "google/gemma-4-26b-a4b-it:free",
     "dots-studio/dots-3-note-preview:free",
     "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
-    "nvidia/nemotron-3-super-120b-a12b:free",
     "nvidia/nemotron-3.5-lightning:free",
+    "nvidia/nemotron-3.5-super-vl:free",
     "cohere/north-mini-code:free",
     "liquid/lfm-2.5-2.6b:free",
-    "poolside/laguna-s-2.1:free",
-    "poolside/laguna-xs-2.1:free",
+    "liquid/lfm-3-1.7b:free",
+    "recursive/flint-v1.0:free",
+    "xingchen-agi/xing4.0-29b-a4b:free",
+    # Removed 2026-11-10 — no longer free on OpenRouter: z-ai/glm-5.2:free,
+    # thinkingmachines/inkling:free, inkling-small:free, nemotron-3-super,
+    # poolside/laguna-s-2.1:free, laguna-xs-2.1:free.
 ]
 
 # ── Curated Cline gateway top models (free/cheap first) ──
@@ -369,11 +435,15 @@ _OPENROUTER_FREE_FALLBACK = [
 # catalog in main.py) — deepseek/deepseek-chat, qwen/qwen3-8b and
 # kwaipilot/kat-coder-pro return upstream 404 on this gateway, so they
 # can never win a rotation; removed. minimax/minimax-m2.5 leads.
+# 2026-11-10: rotated stale ids to the current Pareto picks — every id
+# below was in the live GET https://api.cline.bot/api/v1/models list.
 _CLINE_GATEWAY_TOP_MODELS = [
     "minimax/minimax-m2.5",
+    "meta/muse-ember",
     "z-ai/glm-5.3-flash",
-    "cline-pass/deepseek-v4-flash",
-    "cline-pass/kimi-k3",
+    "deepseek/deepseek-v4.1-flash-1017",
+    "cline-pass/deepseek-v4.1-flash-1017",
+    "cline-pass/kimi-k3.1-pro",
     "cline-pass/glm-5.3",
     "cline-pass/claude-sonnet-4",
 ]
@@ -381,11 +451,16 @@ _CLINE_GATEWAY_TOP_MODELS_SET = set(_CLINE_GATEWAY_TOP_MODELS)
 
 # Cline Usage (credit-billed / free tier) — same gateway, usage-based billing.
 # Free-tier models work at $0.00 but are rate-limited; credit models deduct
-# from your Cline Credits balance.   Sources: Cline API docs, 2026-09 (v9.1:
-# added kat-coder-pro, glm-5, glm-5.3-flash, laguna-s-2.1:free.
+# from your Cline Credits balance. Sources: live GET
+# https://api.cline.bot/api/v1/models (448 models, 2026-11-10) + ClinePass
+# docs reference-pricing table (2026-10-30) + OpenRouter live prices.
 # 10.7.8: removed deepseek/deepseek-v4-flash and cline-free/longcat-2.0 from
 # the usage gateway (real 403: "available only via Cline product surfaces");
 # they are ClinePass/IDE-only ids, so the picker must not offer them here.
+# 10.8.8 (2026-11-10): the 10.7.5 removal of paid Cline ids is REVERSED —
+# Dylan: paid models go back in WITH their cost visible. The picker shows
+# "$in/$out per 1M" next to every paid model (see _model_label in
+# browser/browser_ui/ai_sidebar.py); picking one still bills Cline Credits.
 _CLINE_USAGE_MODEL = "minimax/minimax-m2.5"
 _CLINE_USAGE_CATALOG = [
     # ── Free tier (rate-limited, $0.00 — needs non-negative credit balance)
@@ -394,17 +469,32 @@ _CLINE_USAGE_CATALOG = [
     # keep the two in sync). Removed as upstream-404 dead: deepseek/
     # deepseek-chat, meta-llama/llama-3.2-3b-instruct, qwen/qwen3-8b
     # (deprecated 2026-10-09), kwaipilot/kat-coder-pro.
+    # NOTE: deepseek-r1 and laguna-s-2.1:free were NOT in the gateway's
+    # Nov 10 /models list — they are NOT removed here; a live re-probe
+    # with Dylan's Cline session is still needed before pruning them.
     "minimax/minimax-m2.5",
     "deepseek/deepseek-r1",  # DeepSeek R1 — reasoning model
     "google/gemini-2.5-flash",  # Google Gemini free tier
     "z-ai/glm-5",  # Z-AI free tier
     "z-ai/glm-5.3-flash",  # Z-AI flash free
     "poolside/laguna-s-2.1:free",  # poolside free
+    # ── Paid — Pareto frontier, cheapest first. Every id verified live
+    # on the Cline gateway 2026-11-10; prices $/1M in/out (see _MODEL_PRICES).
+    # AA = Artificial Analysis Intelligence Index v5 (Nov 2026).
+    "meta/muse-ember",  # $0.10/$0.50 — AA 36, ~$0.14/task, 1M context
+    "deepseek/deepseek-v4.1-flash-1017",  # $0.15/$0.60 off-peak, DeepSWE 77.0
+    "deepseek/deepseek-v4.1-flash",  # $0.30/$1.20 peak
+    "z-ai/glm-5.3",  # $1.40/$4.40 — LMArena value pick
+    "moonshotai/kimi-k3.1-pro",  # $2/$10 — AA 46
+    "anthropic/claude-sonnet-5.5",  # $2/$10 — AA 56, best frontier value
+    "openai/gpt-6.1-sol",  # $2/$10 — ~$1.27/task
+    "google/gemini-4-argon",  # $2/$10 — LMArena coding #2 area
+    "anthropic/claude-opus-5.5",  # $4/$20 — AA 58, best usable flagship
+    "meta/muse-wonder",  # $4/$20 — frontier agentic/coding
+    "openai/gpt-6-astra",  # $10/$50 — AA 57
 ]
-# The bridge catalog is free-tier only (credit-billed ids were removed in
-# 10.7.5), so the free tier is the whole catalog — but spell it out as an
-# explicit set, never a positional slice, and pin it to the catalog (and
-# to main.py's free tier) with regression tests.
+# Free tier = the six audited $0 ids above. Paid ids are in the catalog but
+# NOT in the free tier — pin both sets with regression tests.
 _CLINE_USAGE_FREE_TIER = frozenset(
     {
         "minimax/minimax-m2.5",
@@ -415,10 +505,45 @@ _CLINE_USAGE_FREE_TIER = frozenset(
         "poolside/laguna-s-2.1:free",
     }
 )
-# 10.7.5: credit-billed ids (gemini-2.5-pro, claude-sonnet-4-6, gpt-4o, ...)
-# were removed from this catalog — the picker presented them next to the $0
-# models and picking one silently billed Cline Credits. Paid Cline models
-# remain reachable by typing the exact id as a model override.
+# Paid Cline-gateway prices ($/1M tokens in/out) — the picker shows these
+# next to the model so a credit-billed pick is never a surprise.
+# Sources: ClinePass docs reference pricing (2026-10-30) for the
+# cline-pass/* ids; OpenRouter live /api/v1/models (2026-11-10) for the
+# usage ids (Cline ref used where the two disagree, e.g. glm-5.3).
+# Off-peak shown where Cline splits peak/off-peak (V4.1 Flash, V4 Pro).
+_MODEL_PRICES: dict[str, tuple[float, float]] = {
+    # ── Cline Usage paid ──
+    "meta/muse-ember": (0.10, 0.50),
+    "deepseek/deepseek-v4.1-flash-1017": (0.15, 0.60),
+    "deepseek/deepseek-v4.1-flash": (0.30, 1.20),
+    "z-ai/glm-5.3": (1.40, 4.40),
+    "moonshotai/kimi-k3.1-pro": (2.00, 10.00),
+    "anthropic/claude-sonnet-5.5": (2.00, 10.00),
+    "openai/gpt-6.1-sol": (2.00, 10.00),
+    "google/gemini-4-argon": (2.00, 10.00),
+    "anthropic/claude-opus-5.5": (4.00, 20.00),
+    "meta/muse-wonder": (4.00, 20.00),
+    "openai/gpt-6-astra": (10.00, 50.00),
+    # ── ClinePass subscription reference prices (per ClinePass docs) ──
+    "cline-pass/muse-spark-1.3-contributor": (0.10, 0.20),
+    "cline-pass/mimo-v2.6-flash": (0.14, 0.28),
+    "cline-pass/deepseek-v4.1-flash-1017": (0.15, 0.60),
+    "cline-pass/deepseek-v4.1-flash": (0.15, 0.60),
+    "cline-pass/glm-5.3-flash": (0.15, 0.50),
+    "cline-pass/minimax-m3.1-flash": (0.15, 0.60),
+    "cline-pass/minimax-m3": (0.30, 1.20),
+    "cline-pass/qwen3.7-plus": (0.40, 1.60),
+    "cline-pass/mimo-v2.6-pro": (0.435, 0.87),
+    "cline-pass/deepseek-v4-pro": (0.66, 1.98),
+    "cline-pass/glm-5.3": (1.40, 4.40),
+    "cline-pass/kimi-k3.1-pro": (2.00, 10.00),
+    "cline-pass/qwen3.8-max": (2.00, 6.00),
+    "cline-pass/qwen3.7-max": (2.50, 7.50),
+    "cline-pass/kimi-k3": (3.00, 15.00),
+}
+# The paid ids in the usage catalog — everything in the catalog that is
+# NOT in the free tier. Pinned by tests: every paid id must have a price.
+_CLINE_USAGE_PAID = frozenset(set(_CLINE_USAGE_CATALOG) - set(_CLINE_USAGE_FREE_TIER))
 
 # Cline gateway catalog (usage-billed free tier + flat subscription):
 # the picker fallback when the live /models request fails, and the rotation
@@ -479,6 +604,13 @@ class AIBridge:
         # LiteLLM router over the providers registered above (never raises;
         # None when the router module or the feature is unavailable).
         self._router = self._build_router(env)
+        # Live free detection (10.8.8): refresh the cached free list in the
+        # background (never block startup on the network). The rotation
+        # reads the cache only — until the first refresh lands, the static
+        # priority in core.free_rotation is the list in force.
+        if _ensure_fresh_detection is not None:
+            with contextlib.suppress(Exception):
+                _ensure_fresh_detection(background=True)
 
     def _detect_clinepass(self, env) -> None:
         """Register ClinePass subscription + Cline Usage (credit-billed/free tier).
@@ -698,42 +830,98 @@ class AIBridge:
         """
         return self._cline_usable() and not _cline_credit_exhausted()
 
-    def default_provider(self) -> str | None:
-        """Return the highest-priority available provider.
+    def _is_free_provider(self, name: str) -> bool:
+        """True when a provider's route costs $0 / needs no card.
 
-        Preference order — the 10.4 free-model priority (best free first):
-          1. cline-usage — Cline free tier, when auth actually exists
-             (API key or a logged-in Cline CLI session) — the free default
-             (OpenCode Zen is back in the mesh but keyed, not free)
-          2. google — Gemini free tier (GOOGLE_API_KEY)
-          3. Local keyless servers (Ollama, LM Studio) — free, unlimited,
-             offline, no key or login needed
-          4. Other free providers (OpenRouter free catalog, Groq free tier)
-          5. Remaining cloud keyed providers, in registration order
+        Local keyless servers (Ollama, LM Studio) plus the router's free
+        tier (Cline free tier, Gemini free tier, OpenRouter free catalog,
+        Groq free tier). Everything else — ClinePass ($9.99/mo), Zen
+        (keyed), Anthropic/OpenAI/DeepSeek/… (pay-per-token) — is a
+        switchable option only, never auto-selected.
 
-        10.4: while a Cline 402 marker is valid (an exhausted Cline Credits
-        balance 402s every usage-billed call), both Cline gateways are
-        skipped here just like providers without auth.
+        Local servers are read from the LIVE _LOCAL_SPECS, not the
+        __init__-time _local_names snapshot: a server registered after
+        startup (post-startup local) is still a free local route.
         """
-        cline_ok = self._cline_usable_now()
-        if "cline-usage" in self._configs and cline_ok:
-            return "cline-usage"
-        # Gemini free tier (registered under the "google" id in this bridge).
-        if "google" in self._configs:
-            return "google"
-        for name, *_ in _LOCAL_SPECS:
-            if name in self._configs:
-                return name
-        for name in ("openrouter", "groq"):
-            if name in self._configs:
-                return name
-        # clinepass/cline-usage register with empty tokens for the
-        # fetch_models() catalog fallback — never default to that dead end.
+        local_ids = {spec[0] for spec in _LOCAL_SPECS}
+        return name in self._local_names or name in local_ids or name in self._ROUTER_FREE_PROVIDERS
+
+    def _auto_free_order(self) -> list[str]:
+        """Free providers in live-rotation order for auto mode.
+
+        The same live-detected, benchmark re-ranked list the terminal's
+        free rotation uses (core.free_rotation.effective_free_priority —
+        cached, re-probed at startup and at most daily), restricted to
+        providers this bridge has registered and viable. Paid providers
+        are never in this list.
+        """
+        pairs: list[tuple[str, str]] = []
+        if _effective_free_priority is not None:
+            try:
+                pairs = list(_effective_free_priority())
+            except Exception:
+                pairs = []
+        if not pairs:
+            try:
+                from core.free_rotation import FREE_MODEL_PRIORITY
+
+                pairs = list(FREE_MODEL_PRIORITY)
+            except Exception:
+                pairs = []
+        order: list[str] = []
+        for provider, _model in pairs:
+            if provider not in order and self._is_viable_provider(provider):
+                order.append(provider)
+        # Any other registered viable FREE provider not in the rotation
+        # list (e.g. newly detected) — registration order, locals first.
         for name in self._configs:
-            if name in ("clinepass", "cline-usage") and not cline_ok:
-                continue
-            return name
-        return None
+            if (
+                name not in order
+                and self._is_free_provider(name)
+                and self._is_viable_provider(name)
+            ):
+                order.append(name)
+        return order
+
+    def free_detection_report(self) -> str:
+        """Cached live free-detection report ('' when never probed)."""
+        try:
+            from core.free_detection import cached_detection
+
+            cached = cached_detection()
+            return cached.report if cached else ""
+        except Exception:
+            return ""
+
+    def free_fallback_note(self) -> str:
+        """One-line fallback state for the sidebar status (Auto mode).
+
+        "" when the default IS LuckyD itself (local Ollama); otherwise
+        "LuckyD (offline) — using <provider> (<model>)" so the user sees
+        the fallback instead of silently getting another model; and a
+        no-free-provider line when Auto has nothing to use.
+        """
+        default = self.default_provider()
+        if default is None:
+            return "LuckyD (offline) — no free provider available"
+        if default in self._local_names:
+            return ""
+        model = self.model_for(default)
+        return f"LuckyD (offline) — using {default} ({model})"
+
+    def default_provider(self) -> str | None:
+        """Return the highest-priority available FREE provider.
+
+        10.8.8 (Dylan 2026-11-10): the default is his own model — Ollama
+        (luckyd:8b) when its startup probe succeeded. Otherwise the
+        live-detected free rotation (same list the terminal uses:
+        OpenRouter free, Gemini, Groq, Cline last). Paid providers are
+        NEVER the auto default (his $0/month line): when no free route
+        is usable this returns None and the UI says so — pick a provider
+        explicitly (one tap) instead of silently billing.
+        """
+        order = self._auto_free_order()
+        return order[0] if order else None
 
     def _cline_usable(self) -> bool:
         """True when Cline auth exists (API key or logged-in CLI session).
@@ -1181,7 +1369,13 @@ class AIBridge:
             name = getattr(decision.model, "provider", "") or ""
         except Exception:
             return None
-        return name if name and self._is_viable_provider(name) else None
+        # Auto mode never routes to a paid provider (Dylan's $0/month
+        # line): the router picks by task fit, not by cost, so a paid pick
+        # is ignored and the free chain runs instead. An explicit provider
+        # pick bypasses routing entirely.
+        if not name or not self._is_free_provider(name):
+            return None
+        return name if self._is_viable_provider(name) else None
 
     async def chat(self, messages, provider=None, on_token=None):
         # Auto (no provider) uses the free unlimited rotation first: local
@@ -1200,7 +1394,7 @@ class AIBridge:
         # Initialized before the free-pool fast path so a real failure there
         # (e.g. Ollama connection refused) survives to the final error when
         # the generic fallback has nothing left to try — otherwise it was
-        # swallowed and replaced by a misleading "no AI providers configured".
+        # swallowed and replaced by a misleading "no free AI provider available".
         last_err: Exception | None = None
         if is_auto and routed is None and getattr(self, "_router", None) is not None:
             # LiteLLM router (optional): config-driven tier chain
@@ -1270,12 +1464,16 @@ class AIBridge:
                     # local rarely 429 — if it does, try the Cline gateway next
                     continue
             # No free unlimited succeeded — fall through to full provider fallback
-        # Auto mode offers only providers that can serve right now —
+        # Auto mode offers only FREE providers that can serve right now —
         # a dead Cline gateway (no auth / live 402 marker) is never
-        # attempted, it just fails the call and burns the rotation.
-        order = [provider] if provider else self.usable_providers()
-        if routed is not None:
-            # Routed provider goes first; the rest of today's chain follows
+        # attempted, and a paid provider is never auto-picked (Dylan's
+        # $0/month line): paid models stay switchable by explicit pick.
+        # The order is the live-detected free rotation (same list the
+        # terminal uses), locals first. An explicit provider pick uses
+        # exactly that provider and skips this chain.
+        order = [provider] if provider is not None else self._auto_free_order()
+        if routed is not None and routed in order:
+            # Routed provider goes first; the rest of the free chain follows
             # as fallback (free pool included — still reachable on failure).
             order = [routed] + [p for p in order if p != routed]
         # last_err already holds any free-pool fast-path failure (see above).
@@ -1283,7 +1481,7 @@ class AIBridge:
             if provider is None and not self._is_viable_provider(name):
                 # Auto mode never burns a call on a provider that can't work
                 # (e.g. clinepass registered with an empty token) — the
-                # honest end state is "no AI providers configured".
+                # honest end state is "no free AI provider available".
                 continue
             # Skip members already tried in the free unlimited fast-path above
             # (only when the fast path actually ran — routing skips it).
@@ -1340,10 +1538,14 @@ class AIBridge:
                             last_err = inner_exc
                             continue
         if last_err is not None:
-            raise RuntimeError(f"all providers failed — last error: {last_err}")
+            if provider is not None:
+                raise RuntimeError(f"provider {provider} failed — last error: {last_err}")
+            raise RuntimeError(f"all free providers failed — last error: {last_err}")
         raise RuntimeError(
-            "no AI providers configured — install Ollama and run "
-            "`ollama pull qwen3:4b`, or add cloud keys to the repo .env"
+            "no free AI provider available — start Ollama (or `ollama pull "
+            "qwen3:4b` for a starter model), or add a free-tier key "
+            "(GOOGLE_API_KEY / OPENROUTER_API_KEY) to the repo .env. Paid "
+            "providers work by explicit pick, never in Auto mode."
         )
 
     async def _call(self, name, info, messages, on_token):

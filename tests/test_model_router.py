@@ -335,8 +335,25 @@ class TestBridgeIntegration:
             return "legacy answer"
 
         bridge._call = _legacy  # type: ignore[method-assign]
-        text, used = await bridge.chat(MSGS)
+        # 10.8.8: Auto never routes to a paid provider — the legacy chain
+        # is exercised here through an EXPLICIT pick, which still works.
+        text, used = await bridge.chat(MSGS, provider="deepseek")
         assert (text, used) == ("legacy answer", "deepseek")
+
+    async def test_auto_with_only_paid_provider_refuses(self, bridge_env, no_litellm) -> None:
+        """10.8.8 guardrail: Auto with only a paid key configured raises
+        the no-free error instead of silently billing."""
+        import pytest
+
+        bridge = bridge_env({"DEEPSEEK_API_KEY": "test-key"})
+        bridge._configs = {"deepseek": bridge._configs["deepseek"]}
+
+        async def _legacy(name, info, messages, on_token):
+            return "legacy answer"
+
+        bridge._call = _legacy  # type: ignore[method-assign]
+        with pytest.raises(RuntimeError, match="no free AI provider available"):
+            await bridge.chat(MSGS)
 
     async def test_router_disabled_by_env_uses_legacy(self, bridge_env, fake_litellm) -> None:
         bridge = bridge_env({"DEEPSEEK_API_KEY": "test-key", "LUCKYD_MODEL_ROUTER": "off"})
@@ -347,7 +364,8 @@ class TestBridgeIntegration:
             return "legacy answer"
 
         bridge._call = _legacy  # type: ignore[method-assign]
-        text, used = await bridge.chat(MSGS)
+        # 10.8.8: same as above — explicit pick, not Auto.
+        text, used = await bridge.chat(MSGS, provider="deepseek")
         assert (text, used) == ("legacy answer", "deepseek")
         assert fake_litellm.calls == []
         assert bridge.router_status()["enabled"] is False

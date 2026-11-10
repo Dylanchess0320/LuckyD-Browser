@@ -62,7 +62,11 @@ def test_opencode_registers_when_keyed(no_local_no_keys, monkeypatch: pytest.Mon
     monkeypatch.setattr(ai_bridge, "_load_env", lambda: {"OPENCODE_API_KEY": "zk-test"})
     bridge = AIBridge()
     assert "opencode" in bridge.providers()
-    assert bridge.default_provider() == "opencode"
+    # 10.8.8: Zen is a keyed PAID gateway — it registers, but it is never
+    # the Auto default (only $0/no-card routes are auto-selected).
+    assert bridge.default_provider() is None
+    # Pre-existing Zen default, unchanged by this refresh.
+    assert bridge.model_for("opencode") == "gemini-3.5-flash-lite"
 
     monkeypatch.setattr(
         ai_bridge,
@@ -73,7 +77,7 @@ def test_opencode_registers_when_keyed(no_local_no_keys, monkeypatch: pytest.Mon
     assert "xai" in bridge.providers()
     assert "moonshot" in bridge.providers()
     assert bridge.model_for("xai") == "grok-4.7"
-    assert bridge.model_for("moonshot") == "kimi-k3"
+    assert bridge.model_for("moonshot") == "kimi-k3.1-pro"
 
     monkeypatch.setattr(
         ai_bridge,
@@ -122,13 +126,13 @@ def test_cline_registers_when_keyed(no_local_no_keys, monkeypatch: pytest.Monkey
     assert model in ai_bridge._CLINE_GATEWAY_CATALOG
 
 
-def test_cline_free_tier_beats_local_server(monkeypatch: pytest.MonkeyPatch) -> None:
-    """10.4 free-model priority: Cline (free tier) beats local Ollama.
+def test_local_luckyd_beats_cline_free_tier(monkeypatch: pytest.MonkeyPatch) -> None:
+    """10.8.8 free-model priority: local Ollama (luckyd:8b) beats Cline.
 
-    Supersedes the old local-first order — the mandated default priority is
-    Cline free tier -> Gemini free tier -> Ollama local -> other free
-    providers. (Ollama remains the terminal fallback when nothing with
-    better priority is usable.)
+    Supersedes the 10.4 order — the mandated default priority is now
+    Ollama local -> OpenRouter free -> Gemini free -> Groq -> Cline LAST
+    (free credits ending). Cline stays a switchable option, never the
+    default when anything better is usable.
     """
     monkeypatch.setattr(ai_bridge, "_load_env", lambda: {"CLINEPASS_API_KEY": "k"})
     monkeypatch.setattr(
@@ -137,4 +141,4 @@ def test_cline_free_tier_beats_local_server(monkeypatch: pytest.MonkeyPatch) -> 
         staticmethod(lambda env: {"ollama": ("llama3", "http://localhost:11434/v1", "", "openai")}),
     )
     bridge = AIBridge()
-    assert bridge.default_provider() == "cline-usage"
+    assert bridge.default_provider() == "ollama"

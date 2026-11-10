@@ -67,12 +67,13 @@ class TestListProviders:
         assert set(PROVIDER_ORDER) == set(VALID_PROVIDERS)
         # 2026-09-24 latest-AI refresh: xAI (Grok 4.7) + Moonshot (Kimi K3)
         # join the roster, and flagship defaults move to current models.
+        # 2026-11-10 (10.8.8): Moonshot default is now Kimi K3.1 Pro.
         assert "xai" in ids and "moonshot" in ids
         assert PROVIDER_NAMES["xai"] == "xAI (Grok)"
         assert PROVIDER_NAMES["moonshot"] == "Moonshot (Kimi)"
         assert PROVIDER_DEFAULTS["xai"]["default_model"] == "grok-4.7"
         assert PROVIDER_DEFAULTS["xai"]["default_base"] == "https://api.x.ai/v1"
-        assert PROVIDER_DEFAULTS["moonshot"]["default_model"] == "kimi-k3"
+        assert PROVIDER_DEFAULTS["moonshot"]["default_model"] == "kimi-k3.1-pro"
         assert PROVIDER_DEFAULTS["moonshot"]["default_base"] == "https://api.moonshot.ai/v1"
         # 2026-10-12 latest-AI refresh: Meta (Muse Wonder, launched Oct 12) +
         # Mistral (Large 4, public preview Oct 6) join the roster.
@@ -101,7 +102,7 @@ class TestListProviders:
         assert catalog["xai"]["env_key"] == "XAI_API_KEY"
         assert catalog["xai"]["recommended"] == "grok-4.7"
         assert catalog["moonshot"]["env_key"] == "MOONSHOT_API_KEY"
-        assert catalog["moonshot"]["recommended"] == "kimi-k3"
+        assert catalog["moonshot"]["recommended"] == "kimi-k3.1-pro"
         assert catalog["meta"]["env_key"] == "META_API_KEY"
         assert catalog["meta"]["recommended"] == "muse-wonder-1.0"
         assert catalog["meta"]["base_url"] == "https://api.meta.ai/v1"
@@ -150,7 +151,7 @@ class TestListProviders:
         assert by_id["xai"]["model"] == "grok-4.7"
         assert by_id["moonshot"]["configured"] is True
         assert by_id["moonshot"]["key_present"] is True
-        assert by_id["moonshot"]["model"] == "kimi-k3"
+        assert by_id["moonshot"]["model"] == "kimi-k3.1-pro"
 
         monkeypatch.setenv("META_API_KEY", "meta-test")
         monkeypatch.setenv("MISTRAL_API_KEY", "mistral-test")

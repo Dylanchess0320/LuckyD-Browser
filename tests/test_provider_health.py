@@ -98,7 +98,13 @@ class TestHealthFields:
 
     def test_rotation_order_matches_free_priority(self, health_env):
         by_id = _by_id(list_providers())
-        for order, (pid, _model) in enumerate(FREE_MODEL_PRIORITY):
+        # Deduped provider order: a provider with two pairs in the
+        # priority list (openrouter's router + :free legs) holds one slot.
+        seen: list[str] = []
+        for pid, _model in FREE_MODEL_PRIORITY:
+            if pid not in seen:
+                seen.append(pid)
+        for order, pid in enumerate(seen):
             assert by_id[pid]["rotation_order"] == order, pid
         assert by_id["openai"]["rotation_order"] is None
         assert by_id["anthropic"]["rotation_order"] is None

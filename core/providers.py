@@ -211,15 +211,17 @@ PROVIDER_DEFAULTS: dict[str, ProviderDefaults] = {
         "default_base": "https://api.x.ai/v1",
         "default_model": "grok-4.7",
     },
-    # Moonshot AI (Kimi K3, OpenAI-compatible chat API). 2026-09-24: huge
-    # open-weight multimodal MoE, 1M context, $3/$15 per 1M. Key:
+    # Moonshot AI (Kimi K3.1 Pro, OpenAI-compatible chat API). 2026-09-24: huge
+    # open-weight multimodal MoE, 1M context, $2/$10 per 1M. Key:
     # MOONSHOT_API_KEY from platform.kimi.ai. Base: https://api.moonshot.ai/v1.
+    # 10.8.8: default is now Kimi K3.1 Pro (was K3, $3/$15) — cheaper and
+    # better (AA 46); K3 stays reachable as an override.
     "moonshot": {
         "env_key": "MOONSHOT_API_KEY",
         "env_base": "MOONSHOT_BASE_URL",
         "env_model": "MOONSHOT_MODEL",
         "default_base": "https://api.moonshot.ai/v1",
-        "default_model": "kimi-k3",
+        "default_model": "kimi-k3.1-pro",
     },
     # Meta (Muse Wonder, OpenAI-compatible chat API). 2026-10-12: frontier
     # agentic/coding model launched Oct 12, 2026, ~1M context, Active Memory /
@@ -316,10 +318,15 @@ def detect_provider() -> str | None:
 
     10.4 free-first: after an explicit CODING_AGENT_PROVIDER (which always
     wins), the free-model priority is walked first
-    (``core.free_rotation.best_free_provider``: Cline free tier -> Gemini
-    free tier -> local Ollama -> other free providers) — a usable $0 option
-    always beats a paid key by default. Keyed/paid providers follow in the
-    historical priority order.
+    (``core.free_rotation.best_free_provider``: local Ollama luckyd:8b ->
+    OpenRouter free -> Gemini free tier -> Groq -> Cline free tier last)
+    — a usable $0 option always beats a paid key by default. Keyed/paid
+    providers follow in the historical priority order.
+
+    10.8.8: the default is Dylan's own model (Ollama luckyd:8b); Cline is
+    demoted to last — it is stopping free credits. The free list itself is
+    live-detected (see core/free_detection.py): re-probed at startup and
+    at most daily, re-ranked by live benchmarks.
 
     9.8: a logged-in Cline CLI session is detected FIRST and returns
     ``cline-usage`` — Cline's usage-billed gateway carries free agent models and
@@ -748,10 +755,12 @@ def list_providers() -> list[dict[str, object]]:
     now", consumed by the web ``/api/providers`` endpoint, the agents bridge,
     the HQ Models view, and ``lucky-code providers``):
     ``status`` (``"ready"`` | ``"needs_key"`` | ``"exhausted"`` — the badge
-    the UI renders), ``rotation_order`` (0-based index into
-    ``core.free_rotation.FREE_MODEL_PRIORITY``, None when the provider is not
-    in the rotation), ``next_in_rotation`` (True for the single provider
-    ``best_free_provider()`` would pick), ``credit_ttl_remaining_sec`` (whole
+    the UI renders), ``rotation_order`` (0-based position in the
+    free-provider rotation, deduped — a provider with two pairs in
+    ``core.free_rotation.FREE_MODEL_PRIORITY`` keeps its first position;
+    None when the provider is not in the rotation), ``next_in_rotation``
+    (True for the single provider ``best_free_provider()`` would pick),
+    ``credit_ttl_remaining_sec`` (whole
     seconds until the Cline 402 marker expires on the Cline rows, else 0 —
     the UI renders "retry in ~Nh"), ``last_working`` (True when this provider
     last answered successfully), ``last_working_ago`` ("worked 2h ago", else
@@ -775,7 +784,13 @@ def list_providers() -> list[dict[str, object]]:
     try:
         from core.free_rotation import FREE_MODEL_PRIORITY, best_free_provider
 
-        rotation_order = {p: i for i, (p, _m) in enumerate(FREE_MODEL_PRIORITY)}
+        # First occurrence wins, densely packed: a provider with two pairs
+        # in the priority list (e.g. openrouter's router + :free legs) keeps
+        # one rotation slot — a last-occurrence dict would leave a gap.
+        rotation_order = {}
+        for p, _m in FREE_MODEL_PRIORITY:
+            if p not in rotation_order:
+                rotation_order[p] = len(rotation_order)
         next_free = best_free_provider()
     except Exception:
         rotation_order, next_free = {}, None

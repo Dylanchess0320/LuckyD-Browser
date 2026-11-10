@@ -7,12 +7,26 @@ No user config is required. Explicit picks always win over this default:
 ``CODING_AGENT_PROVIDER``, ``--provider``, and the browser sidebar's
 persisted provider are never overridden by rotation.
 
-Default priority — best free first::
+Default priority — best free first (10.8.8, Dylan 2026-11-10)::
 
-    1. Cline (free tier)  — ``cline-usage`` via the logged-in Cline CLI session
-    2. Gemini (free tier) — ``gemini`` via ``GOOGLE_API_KEY``
-    3. Ollama local      — ``luckyd:8b`` (terminal fallback, always listed)
-    4. Other free tiers  — OpenRouter free catalog, Groq free tier
+    1. Ollama local      — ``luckyd:8b`` — Dylan's OWN model. The default:
+       private, unlimited, offline, no key or login needed. It is BOTH
+       the first pick when reachable AND the terminal fallback when
+       everything else fails (it may just be starting up).
+    2. OpenRouter free  — ``openrouter/free`` meta-router (auto-picks any
+       available $0 model — never 404s on a rotated id) + the best
+       live-verified ``:free`` model (currently nemotron-3-ultra).
+    3. Gemini (free tier) — ``gemini`` via ``GOOGLE_API_KEY``
+    4. Groq free tier    — ``groq/compound-mini``
+    5. Cline (free tier) — LAST. Cline is stopping free credits, so the
+       free tier is demoted to a legacy fallback that only wins when
+       nothing else is usable.
+
+The order above is the STATIC fallback. At startup (and at most daily)
+:mod:`core.free_detection` re-probes the free gateways and rebuilds the
+list from what is actually being served — see
+:func:`effective_free_priority`. The detected list never changes the
+default (ollama/luckyd:8b) and never admits a paid route.
 
 Rotation triggers: HTTP 402 (quota/balance exhausted), 403 (auth/entitlement
 dead on this provider), 429 (rate-limited), 408, 5xx, plus timeouts and
@@ -37,6 +51,7 @@ __all__ = [
     "active_pair_label",
     "available_free_models",
     "best_free_provider",
+    "effective_free_priority",
     "free_provider_usable",
     "get_active_pair",
     "reset_active_pair",
@@ -46,20 +61,42 @@ __all__ = [
 ]
 
 #: (provider, model) pairs in default priority order — best free first.
-#: 10.8.3: the lead Cline pair was deepseek/deepseek-chat until the
-#: 2026-10-22 live-probe audit proved the gateway 404s that id (it maps to
-#: an upstream "deepseek-v3" that no longer exists) — minimax-m2.5 is the
-#: audited-working free lead (and the config's recommended Cline model).
+#: 10.8.8 (Dylan 2026-11-10): the DEFAULT is Dylan's own model —
+#: Ollama ``luckyd:8b`` leads. Cline is demoted to LAST: it is stopping
+#: free credits, so its free tier is a legacy fallback only. OpenRouter's
+#: ``openrouter/free`` meta-router is the cloud lead (it auto-picks any
+#: available $0 model, so it never 404s when the free roster rotates).
 FREE_MODEL_PRIORITY: tuple[tuple[str, str], ...] = (
-    ("cline-usage", "minimax/minimax-m2.5"),
-    ("gemini", "gemini-2.5-flash"),
     ("ollama", "luckyd:8b"),
-    # 10.7.5: the old "deepseek/deepseek-chat-v3.1:free" id never existed in
-    # the OpenRouter free catalog (it 404'd on rotation). "openrouter/free"
-    # is the live meta-router that auto-picks any available $0 model.
     ("openrouter", "openrouter/free"),
+    ("openrouter", "nvidia/nemotron-3-ultra-550b-a55b:free"),
+    ("gemini", "gemini-2.5-flash"),
     ("groq", "groq/compound-mini"),
+    ("cline-usage", "minimax/minimax-m2.5"),
 )
+
+
+def effective_free_priority() -> list[tuple[str, str]]:
+    """The free priority actually in force right now.
+
+    The live-detected list (see :mod:`core.free_detection` — re-probed at
+    startup, at most daily, cached on disk) when one is cached and fresh;
+    otherwise the static :data:`FREE_MODEL_PRIORITY`. The detected list
+    never changes the default (ollama/luckyd:8b leads it too) and never
+    admits a paid route. Reads the cache only — no network on this path.
+    """
+    try:
+        from core.free_detection import cached_detection
+    except Exception:
+        return list(FREE_MODEL_PRIORITY)
+    try:
+        cached = cached_detection()
+    except Exception:
+        return list(FREE_MODEL_PRIORITY)
+    if cached is not None and cached.pairs:
+        return list(cached.pairs)
+    return list(FREE_MODEL_PRIORITY)
+
 
 #: HTTP codes that trigger a rotation to the next free model. 401 is
 #: excluded on purpose (a dead key fails everywhere — surface the error).
@@ -231,16 +268,21 @@ def free_provider_usable(provider: str) -> bool:
 
 
 def best_free_provider() -> str | None:
-    """First usable provider id in :data:`FREE_MODEL_PRIORITY` order.
+    """First usable provider id in :func:`effective_free_priority` order.
 
     Used by ``core.providers.detect_provider`` so a usable $0 option always
     beats a paid key by default. Returns None when nothing free is usable.
 
-    10.5: the last-known-working provider (``core.last_working``) is
-    preferred when it is usable right now — a pair that provably answered
-    beats an untried one. The priority order itself is unchanged.
+    10.8.8: Dylan's own model is the default — Ollama wins whenever it
+    can serve right now, ahead of the last-known-working preference (the
+    10.5 preference still applies among the cloud fallbacks). Cline is
+    last: it only wins when it is the only usable free provider left.
     """
-    for provider, _model in _last_working_first(list(FREE_MODEL_PRIORITY)):
+    if free_provider_usable("ollama"):
+        return "ollama"
+    for provider, _model in _last_working_first(effective_free_priority()):
+        if provider == "ollama":
+            continue  # already checked above (unusable right now)
         if free_provider_usable(provider):
             return provider
     return None
@@ -248,43 +290,61 @@ def best_free_provider() -> str | None:
 
 def available_free_models(
     failed: Iterable[tuple[str, str]] | None = None,
+    pairs: Iterable[tuple[str, str]] | None = None,
 ) -> list[tuple[str, str]]:
     """Usable free ``(provider, model)`` pairs in priority order.
 
     Skips providers that aren't usable right now (no key/session, Cline
     while a 402 marker is valid) and pairs already in ``failed``. Ollama
-    (``luckyd:8b``) is always appended last as the terminal fallback —
-    ``list_providers()`` treats local Ollama as always configured, and the
-    agent's escape legs probe it before attempting.
+    (``luckyd:8b``) is the DEFAULT — first when its probe answers — and is
+    still always appended last as the terminal fallback (``list_providers``
+    treats local Ollama as always configured, and the agent's escape legs
+    probe it before attempting; it may just be starting up). ``pairs``
+    overrides the priority list (the rotator snapshots it at construction
+    so a mid-conversation cache refresh never swaps the active pick).
 
-    10.5: the last-known-working pair moves to the front when present.
+    10.5: the last-known-working pair moves to the front when present —
+    among the cloud fallbacks only; the Ollama default stays pinned first
+    when it is usable.
     """
     failed_set = set(failed or ())
+    ordered = list(pairs if pairs is not None else effective_free_priority())
+    ollama_pair = ("ollama", "luckyd:8b")
     usable: list[tuple[str, str]] = []
-    for pair in FREE_MODEL_PRIORITY:
-        if pair in failed_set or pair[0] == "ollama":
+    if ollama_pair not in failed_set and free_provider_usable("ollama"):
+        usable.append(ollama_pair)
+    for pair in ordered:
+        if pair in failed_set or pair == ollama_pair:
             continue
         if free_provider_usable(pair[0]):
             usable.append(pair)
-    ollama_pair = ("ollama", "luckyd:8b")
-    if ollama_pair not in failed_set:
+    if ollama_pair not in failed_set and ollama_pair not in usable:
         usable.append(ollama_pair)
-    # 10.5: prefer the last-known-working pair (membership unchanged;
-    # with no record this is a no-op and Ollama stays the terminal fallback).
+    if usable and usable[0] == ollama_pair:
+        # Default pinned: last-working reorders only the cloud tail.
+        return [usable[0], *_last_working_first(usable[1:])]
     return _last_working_first(usable)
 
 
 class FreeModelRotator:
-    """Walks :data:`FREE_MODEL_PRIORITY`, skipping failed/unusable pairs.
+    """Walks the effective free priority, skipping failed/unusable pairs.
 
     A fresh rotator is cheap: seed it with the just-failed pair (or whole
     provider) and take ``candidates()[0]`` — or drive it with ``rotate()``
-    across several failures. Ollama is always the terminal fallback.
+    across several failures. Ollama is the default (first when it can
+    serve) and the terminal fallback.
+
+    The priority list is SNAPSHOT at construction (see
+    :func:`effective_free_priority`): a mid-conversation cache refresh
+    from the live detector never swaps the active pick — the new list
+    applies to the NEXT conversation / rotator, or when the current pair
+    fails and the rotator advances.
     """
 
     def __init__(self, failed: Iterable[tuple[str, str]] | None = None) -> None:
         self._failed: set[tuple[str, str]] = set(failed or ())
         self._current: tuple[str, str] | None = None
+        self._pairs: list[tuple[str, str]] = effective_free_priority()
 
     @property
     def current(self) -> tuple[str, str] | None:
@@ -307,13 +367,13 @@ class FreeModelRotator:
         retrying it with a different model would fail identically.
         """
         pid = (provider or "").lower()
-        for p, m in FREE_MODEL_PRIORITY:
+        for p, m in self._pairs:
             if p == pid:
                 self._failed.add((p, m))
 
     def candidates(self) -> list[tuple[str, str]]:
         """Usable pairs in priority order, excluding failed ones."""
-        return available_free_models(self._failed)
+        return available_free_models(self._failed, pairs=self._pairs)
 
     def rotate(self) -> tuple[str, str] | None:
         """Advance past the current pair; None when every option is exhausted."""

@@ -127,36 +127,51 @@ _PROVIDER_DISPLAY_NAMES = {
 
 # ── Cline model catalogs ───────────────────────────────────────────────
 # Mirror of browser/browser_core/ai_bridge.py — keep the two in sync.
-# Source of truth: https://docs.cline.bot/getting-started/clinepass
-# (api.cline.bot has no public model-list endpoint, so these are curated.)
+# The gateway HAS a public model list (GET https://api.cline.bot/api/v1/models,
+# verified 2026-11-10: 448 models); the ClinePass table is the subscription
+# docs table (updated 2026-10-30).
 
 # ClinePass flat-subscription models — these work with a $0 (even negative)
 # credit balance; usage counts against the subscription quota.
-# Source: https://docs.cline.bot/getting-started/clinepass (2026-09, v9.1:
-# added glm-5.3, glm-5.2, qwen3.8-max from live docs).
+# Source: https://docs.cline.bot/getting-started/clinepass (2026-10-30 table).
 _CLINEPASS_CATALOG = [
-    "cline-pass/glm-5.3",
-    "cline-pass/glm-5.2",
-    "cline-pass/kimi-k3",
-    "cline-pass/deepseek-v4-flash",
-    "cline-pass/kimi-k2.7-code",
-    "cline-pass/kimi-k2.6",
-    "cline-pass/deepseek-v4-pro",
-    "cline-pass/mimo-v2.5",
-    "cline-pass/mimo-v2.5-pro",
+    "cline-pass/deepseek-v4.1-flash-1017",
+    "cline-pass/deepseek-v4.1-flash",
+    "cline-pass/mimo-v2.6-flash",
+    "cline-pass/glm-5.3-flash",
+    "cline-pass/minimax-m3.1-flash",
+    "cline-pass/muse-spark-1.3-contributor",
     "cline-pass/minimax-m3",
+    "cline-pass/mimo-v2.6-pro",
+    "cline-pass/qwen3.7-plus",
+    "cline-pass/deepseek-v4-pro",
+    "cline-pass/glm-5.3",
+    "cline-pass/kimi-k3.1-pro",
     "cline-pass/qwen3.8-max",
     "cline-pass/qwen3.7-max",
-    "cline-pass/qwen3.7-plus",
+    "cline-pass/kimi-k3",
+    # Legacy ids from the Sept 2026 catalog, KEPT 2026-11-10: the Oct 30
+    # ClinePass docs table is a pricing reference, not a serving list, and
+    # cline-pass/* ids cannot be verified against the gateway listing
+    # (client-side namespace), so none is proven dead — Dylan's rule keeps
+    # them offered. Keep in sync with browser_core/ai_bridge.py.
+    "cline-pass/kimi-k2.7-code",
+    "cline-pass/kimi-k2.6",
+    "cline-pass/deepseek-v4-flash",
+    "cline-pass/mimo-v2.5",
+    "cline-pass/mimo-v2.5-pro",
+    "cline-pass/glm-5.2",
 ]
 
 # Cline Usage (credit-billed / free tier) — same gateway, usage-based billing.
 # Free-tier models work at $0.00 but are rate-limited; credit models deduct
 # from your Cline Credits balance.
-# Sources: https://docs.cline.bot/api/models + /getting-started/free-models
-# (2026-09, v9.1: added kat-coder-pro, glm-5, deepseek-v4-flash, glm-5.3-flash,
-# laguna-s-2.1:free, longcat-2.0 — all FREE in CLI/IDE with Cline account;
-# 2026-10-22: live-probe audit pruned the free tier — see _CLINE_USAGE_FREE_TIER).
+# Sources: live GET https://api.cline.bot/api/v1/models (448 models,
+# 2026-11-10) + ClinePass docs reference pricing (2026-10-30).
+# 2026-10-22: live-probe audit pruned the free tier — see _CLINE_USAGE_FREE_TIER.
+# 10.8.8 (2026-11-10): the 10.7.5 paid-removal is REVERSED — Dylan: paid
+# models go back in WITH their cost visible. Prices live in
+# browser/browser_core/ai_bridge.py _MODEL_PRICES; the sidebar shows them.
 _CLINE_USAGE_CATALOG = [
     # ── Free tier (rate-limited, $0.00 — needs non-negative credit balance)
     "minimax/minimax-m2.5",
@@ -165,12 +180,18 @@ _CLINE_USAGE_CATALOG = [
     "z-ai/glm-5",
     "z-ai/glm-5.3-flash",
     "poolside/laguna-s-2.1:free",
-    # ── Credit-billed — deduct from Cline Credits balance
-    "google/gemini-2.5-pro",
-    "anthropic/claude-sonnet-4-6",
-    "openai/gpt-4o",
-    "openai/gpt-4o-mini",
-    "mistral/mistral-large",
+    # ── Paid — Pareto frontier, cheapest first (verified live 2026-11-10)
+    "meta/muse-ember",  # $0.10/$0.50 per 1M — AA 36, ~$0.14/task
+    "deepseek/deepseek-v4.1-flash-1017",  # $0.15/$0.60 off-peak
+    "deepseek/deepseek-v4.1-flash",  # $0.30/$1.20 peak
+    "z-ai/glm-5.3",  # $1.40/$4.40
+    "moonshotai/kimi-k3.1-pro",  # $2/$10 — AA 46
+    "anthropic/claude-sonnet-5.5",  # $2/$10 — AA 56
+    "openai/gpt-6.1-sol",  # $2/$10
+    "google/gemini-4-argon",  # $2/$10
+    "anthropic/claude-opus-5.5",  # $4/$20 — AA 58
+    "meta/muse-wonder",  # $4/$20
+    "openai/gpt-6-astra",  # $10/$50 — AA 57
 ]
 
 # 10.8.3 audit (2026-10-22, live gateway probes with a real Cline session):
@@ -197,10 +218,11 @@ _CLINE_USAGE_FREE_TIER = frozenset(
 # flat-subscription quota.
 _CLINEPASS_FREE_TIER = frozenset()
 
-# OpenCode Zen was RETIRED in 9.8 — its keyless $0 tier died in 2026-09 and the
-# gateway now blocks these accounts, so nothing in LuckyD offers it any more
-# (provider, catalog entry, or Agent Mesh peer). Cline's usage-billed free tier
-# + the logged-in Cline CLI session is the free default that replaced it.
+# OpenCode Zen is keyed-only since 2026-09 (its $0 tier is gone) but back in
+# the mesh as a paid provider. 10.8.8 (Dylan 2026-11-10): the FREE default is
+# no longer Cline — Cline is stopping free credits. The default is Dylan's
+# own model, Ollama luckyd:8b; the free rotation is OpenRouter free / Gemini
+# / Groq, Cline last (see core/free_rotation.py + core/free_detection.py).
 # Keep the Cline catalogs below in sync with browser/browser_core/ai_bridge.py.
 
 # Aliases accepted in "/model <provider> <name>" on top of canonical names.
@@ -208,8 +230,8 @@ _PROVIDER_ALIASES = {
     "cline-pass": "clinepass",
     "cline": "cline-usage",
     "gemini": "google",
-    # 9.8 migration: a stale alias still routes to Cline instead of erroring.
-    "opencode": "cline-usage",
+    # 10.8.8: the 9.8 "opencode" -> "cline-usage" alias is removed — Zen is
+    # its own provider again, so "opencode" resolves to opencode itself.
 }
 
 
@@ -332,18 +354,28 @@ def _build_free_groups(free_only: bool, cline_free: list[str]) -> list[dict]:
 
 
 def _build_paid_groups(cline_paid: list[str], clinepass_paid: list[str]) -> list[dict]:
+    # 10.8.8 Pareto refresh (verified live 2026-11-10): GPT-6.1 Sol replaces
+    # GPT-6 Sol, Sonnet 5.5 + Gemini 4 Argon join the $2/$10 tier, DeepSeek
+    # V4.1 Flash replaces V4/V4-flash, OpenRouter lists the verified Pareto
+    # ids. Superseded ids stay reachable by exact-id override.
     return [
         {
             "provider": "OpenAI",
-            "models": ["gpt-6-sol", "gpt-6-astra"],
+            "models": ["gpt-6.1-sol", "gpt-6-astra"],
         },
         {
             "provider": "Anthropic",
-            "models": ["claude-opus-5-5", "claude-fable-5-1", "claude-sonnet-5"],
+            "models": [
+                "claude-opus-5-5",
+                "claude-sonnet-5.5",
+                "claude-fable-5-1",
+                "claude-sonnet-5",
+            ],
         },
         {
             "provider": "Google Gemini",
             "models": [
+                "gemini-4-argon",
                 "gemini-3.8-flash",
                 "gemini-3.5-flash",
                 "gemini-3.5-flash-lite",
@@ -353,12 +385,22 @@ def _build_paid_groups(cline_paid: list[str], clinepass_paid: list[str]) -> list
         },
         {
             "provider": "DeepSeek",
-            "models": ["deepseek-v4", "deepseek-v4-flash", "deepseek-v4-pro"],
+            "models": ["deepseek-v4.1-flash-1017", "deepseek-v4.1-flash", "deepseek-v4-pro"],
         },
-        {"provider": "Z.ai", "models": ["glm-5.3", "glm-5.3-flash", "glm-5.2"]},
+        {"provider": "Z.ai", "models": ["glm-5.3", "glm-5.3-flash"]},
         {
             "provider": "OpenRouter",
-            "models": ["openrouter/free"],
+            "models": [
+                "openrouter/free",
+                "deepseek/deepseek-v4.1-flash-1017",
+                "meta/muse-ember",
+                "moonshotai/kimi-k3.1-pro",
+                "anthropic/claude-sonnet-5.5",
+                "openai/gpt-6.1-sol",
+                "google/gemini-4-argon",
+                "anthropic/claude-opus-5.5",
+                "meta/muse-wonder",
+            ],
         },
         {
             "provider": "Cline Usage (Muse Spark)",
@@ -1513,6 +1555,19 @@ async def run_repl(agent: CodingAgent):
         _lw = read_last_working()
         if _lw is not None:
             print(f"  Last worked: {_lw.provider}/{_lw.model} ({last_working_age_label()})")
+    except Exception:
+        pass
+    # 10.8.8: show the live-detected free rotation (one line) so a changed
+    # pick is visible at startup, with its benchmark source. Cached only —
+    # the background refresh in main() updates it for the next start.
+    try:
+        from core.free_detection import cached_detection
+
+        _det = cached_detection()
+        if _det is not None and _det.pairs:
+            _chain = " → ".join(f"{p}/{m}" for p, m in _det.pairs)
+            _bench = "live benchmarks" if _det.live_benchmarks else "benchmark snapshot"
+            print(f"  Free rotation: {_chain} ({_bench})")
     except Exception:
         pass
     # Hub slice 9: show the latest shared handoff note at session start
@@ -2678,6 +2733,17 @@ def main():
 
     # Agent path: everything below may use the heavy modules.
     _ensure_all_heavy()
+
+    # Live free detection (10.8.8): refresh the cached free list in the
+    # background (never block startup on the network). The rotation reads
+    # the cache only — until the first refresh lands, the static priority
+    # in core.free_rotation is the list in force.
+    try:
+        from core.free_detection import ensure_fresh_detection
+
+        ensure_fresh_detection(background=True)
+    except Exception:
+        pass
 
     # Parse arguments for the agent
     cfg = get_config()

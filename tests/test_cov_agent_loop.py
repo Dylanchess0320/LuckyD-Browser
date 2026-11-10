@@ -912,7 +912,7 @@ class TestRunLoop:
             [
                 {"content": "[API Error: 429 rate limited]"},
                 {"content": "[API Error: still down]"},  # minimax-m2.5 fails too
-                RuntimeError("gateway exploded"),  # deepseek-v4-flash raises
+                RuntimeError("gateway exploded"),  # deepseek-v4.1-flash raises
                 {"content": "recovered via fallback"},  # glm-5.3-flash works
             ]
         )
@@ -930,12 +930,12 @@ class TestRunLoop:
         ag.llm_client = FakeLLMClient(
             [
                 {"content": "[API Error: 429]"},
-                {"content": "ok on v4-flash"},
+                {"content": "ok on v4.1-flash"},
             ]
         )
         result = await ag.run("hello", max_turns=5)
-        assert result == "ok on v4-flash"
-        assert ag.model == "deepseek/deepseek-v4-flash"
+        assert result == "ok on v4.1-flash"
+        assert ag.model == "deepseek/deepseek-v4.1-flash"
 
     @pytest.mark.asyncio
     async def test_free_model_all_fallbacks_fail(self):

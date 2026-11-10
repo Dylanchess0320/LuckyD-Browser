@@ -172,16 +172,16 @@ def test_empty_token_cline_never_routed(
 ) -> None:
     """clinepass registered with an empty token is not a viable router pick.
 
-    With no other providers available, auto chat must fail honestly ("no AI
-    providers configured") rather than burn a call on the dead clinepass
-    entry — and the recorder proves no such call was attempted.
+    With no other providers available, auto chat must fail honestly ("no
+    free AI provider available") rather than burn a call on the dead
+    clinepass entry — and the recorder proves no such call was attempted.
     """
     _hermetic(monkeypatch, env={})
     monkeypatch.setattr(ai_bridge, "_route_task", _fake_route_task("clinepass"))
 
     bridge = AIBridge()
     assert not bridge._is_viable_provider("clinepass")
-    with pytest.raises(RuntimeError, match="no AI providers configured"):
+    with pytest.raises(RuntimeError, match="no free AI provider available"):
         asyncio.run(bridge.chat([{"role": "user", "content": "hi"}]))
 
     assert "clinepass" not in recorder.names

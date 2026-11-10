@@ -115,7 +115,9 @@ def test_usable_providers_includes_cline_when_usable(hermetic, tmp_path, monkeyp
     b = _bridge_with({}, local=_LOCAL_LUCKYD, session=True)
     assert "cline-usage" in b.usable_providers()
     assert "clinepass" in b.usable_providers()
-    assert b.default_provider() == "cline-usage"
+    # 10.8.8: the default is Dylan's own model — local Ollama beats Cline
+    # now (Cline is last in the free rotation, credits ending).
+    assert b.default_provider() == "ollama"
 
 
 def test_usable_providers_excludes_cline_with_live_marker(hermetic, tmp_path, monkeypatch) -> None:
@@ -140,9 +142,11 @@ def test_is_viable_provider_allows_usable_cline(hermetic, tmp_path, monkeypatch)
     assert b._is_viable_provider("nope") is False
 
 
-def test_default_provider_keyed_clouds_in_spec_order(hermetic) -> None:
+def test_default_provider_never_picks_paid_keyed_clouds(hermetic) -> None:
+    """10.8.8: paid models are NEVER auto-picked as default — with only
+    paid keys configured, Auto has no default (explicit pick only)."""
     b = _bridge_with({"DEEPSEEK_API_KEY": "k", "OPENAI_API_KEY": "k2"})
-    assert b.default_provider() == "deepseek"  # _PROVIDER_SPECS order
+    assert b.default_provider() is None
 
 
 def test_provider_env_overrides(hermetic) -> None:
@@ -446,7 +450,7 @@ def test_chat_auto_reports_fast_path_error_not_configured(hermetic, monkeypatch)
     monkeypatch.setattr(b, "_call", _boom)
     # clinepass/cline-usage register with empty tokens → skipped in auto mode,
     # so only ollama is tried; nothing else configured.
-    with pytest.raises(RuntimeError, match="all providers failed"):
+    with pytest.raises(RuntimeError, match="all free providers failed"):
         asyncio.run(b.chat([{"role": "user", "content": "hi"}]))
     with pytest.raises(RuntimeError) as excinfo:
         asyncio.run(b.chat([{"role": "user", "content": "hi"}]))
@@ -455,25 +459,27 @@ def test_chat_auto_reports_fast_path_error_not_configured(hermetic, monkeypatch)
 
 def test_chat_auto_honest_when_nothing_configured(hermetic) -> None:
     b = _bridge_with({})
-    with pytest.raises(RuntimeError, match="no AI providers configured"):
+    with pytest.raises(RuntimeError, match="no free AI provider available"):
         asyncio.run(b.chat([{"role": "user", "content": "hi"}]))
 
 
 def test_chat_auto_falls_back_across_chain(hermetic, monkeypatch) -> None:
-    """Auto mode: first keyed provider fails → next in the chain is tried."""
-    b = _bridge_with({"OPENAI_API_KEY": "k", "DEEPSEEK_API_KEY": "k2"})
+    """Auto mode: first free provider fails → next free leg is tried.
+    10.8.8: the chain is free-only — OpenRouter fails, Gemini answers;
+    paid providers are never in the chain."""
+    b = _bridge_with({"OPENROUTER_API_KEY": "k", "GOOGLE_API_KEY": "k2"})
     seen = []
 
     async def _call(name, info, messages, on_token):
         seen.append(name)
-        if name == "deepseek":
-            raise RuntimeError("deepseek down")
+        if name == "openrouter":
+            raise RuntimeError("openrouter down")
         return "ok-text"
 
     monkeypatch.setattr(b, "_call", _call)
     text, name = asyncio.run(b.chat([{"role": "user", "content": "hi"}]))
-    assert (text, name) == ("ok-text", "openai")
-    assert seen == ["deepseek", "openai"]
+    assert (text, name) == ("ok-text", "google")
+    assert seen == ["openrouter", "google"]
 
 
 def test_chat_explicit_provider_failure_surfaces(hermetic, monkeypatch) -> None:
@@ -483,7 +489,7 @@ def test_chat_explicit_provider_failure_surfaces(hermetic, monkeypatch) -> None:
         raise RuntimeError("deepseek down")
 
     monkeypatch.setattr(b, "_call", _boom)
-    with pytest.raises(RuntimeError, match="all providers failed — last error: deepseek down"):
+    with pytest.raises(RuntimeError, match="provider deepseek failed — last error: deepseek down"):
         asyncio.run(b.chat([{"role": "user", "content": "hi"}], provider="deepseek"))
 
 
