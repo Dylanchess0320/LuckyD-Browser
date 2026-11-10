@@ -11,7 +11,7 @@ from typing import Any
 
 ACP_VERSION = "0.1"
 AGENT_NAME = "LuckyD Code"
-AGENT_VERSION = "v10.8.7"
+AGENT_VERSION = "v10.8.8"
 
 
 def _log(msg: str) -> None:

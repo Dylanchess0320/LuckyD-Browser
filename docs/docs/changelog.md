@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [10.8.8] - 2026-11-10
+
+Model refresh: LuckyD models by default, live free detection, Pareto catalogs.
+
+### Model refresh — LuckyD models by default, live free detection
+- LuckyD models are now the default: the Browser assistant and LuckyD Code start on Ollama `luckyd:8b`; OpenCode stays a one-tap switchable option, with automatic fallback to OpenCode's free DeepSeek V4.1 when the PC / Ollama is off.
+- Dead Cline usage is never offered as the current or default provider any more — when Cline credits are exhausted, Auto routes to `luckyd:8b` instead; Cline stays selectable when it is usable.
+- Live free-model detection: the Browser re-probes the free gateways (OpenRouter `:free`, Cline gateway, OpenCode Zen, the local OpenCode roster, RankLLMs benchmarks) and refreshes its cached free list at most daily — dead or capped ids drop out, new free ids appear, so the free pick never goes stale.
+- Pareto catalogs rebuilt from live LMArena + Artificial Analysis scores: best overall, best bang-for-buck, cheapest — with $/1M prices shown in the picker. New picks include Muse Ember 1.0 and DeepSeek V4.1 Flash.
+- Auto is now free-only; paid models stay in the catalog with their prices shown.
+
+### Fixes
+- Fixed a mypy type error in the new live free-detection module (benchmark indices could be missing).
+
 ## [10.8.7] - 2026-11-10
 
 Hub unification: one chat, one memory, one-tap providers.

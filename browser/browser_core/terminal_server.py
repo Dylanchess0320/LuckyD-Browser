@@ -1049,7 +1049,7 @@ def _spawn_pty(
     if shell == "agent":
         env["LUCKYD_AGENT_SLOT"] = "1"
         env["LUCKYD_AGENT_NAME"] = "Agent 1"
-        env["LUCKYD_AGENT_VERSION"] = "v10.8.7"
+        env["LUCKYD_AGENT_VERSION"] = "v10.8.8"
         # Hub slice 9: where this CLI reads/writes the shared handoff
         # note (core/hub_handoff.py). Only the LuckyD Code CLIs get it —
         # mesh shells are third-party CLIs that would ignore it.
@@ -1057,7 +1057,7 @@ def _spawn_pty(
     elif shell == "agent2":
         env["LUCKYD_AGENT_SLOT"] = "2"
         env["LUCKYD_AGENT_NAME"] = "Agent 2"
-        env["LUCKYD_AGENT_VERSION"] = "v10.8.7"
+        env["LUCKYD_AGENT_VERSION"] = "v10.8.8"
         env["LUCKYD_HUB_URL"] = (hub_url or "").strip() or DEFAULT_HUB_URL
     # Slice 8: drop any override inherited from the browser process env
     # first, then pin the shared pick — agent shells only.

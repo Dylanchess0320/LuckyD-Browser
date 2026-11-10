@@ -75,7 +75,7 @@ Then start chatting. That's it. Want everything on your own machine? Add Ollama 
 
 ## What's new
 
-**v10.8.7** — Hub unification: one chat, one memory, one-tap providers
+**v10.8.8** — Model refresh: LuckyD models by default, live free detection, Pareto catalogs
 
 **v10.8.5** — Settings fixed: with retired tools hidden, the Connections settings page painted over the Settings dialog and hid the Privacy, Appearance, and Updates tabs — all five tabs now show in both switch states. Plus a security update for the AI provider library (litellm 1.88.6, closing a critical authentication-bypass alert). Known limitation: Twitch video and some game audio still don't work — the web engine ships without H.264/AAC decoders
 

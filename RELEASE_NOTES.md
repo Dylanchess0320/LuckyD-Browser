@@ -1,25 +1,23 @@
-# LuckyD Browser v10.8.7 — Release Notes
+# LuckyD Browser v10.8.8 — Release Notes
 
-> **The AI browser that doesn't need an API key.** The Hub unification release:
-> one chat, one memory, one-tap providers across Browser, Hub, terminal and Code.
+> **The AI browser that doesn't need an API key.** The model refresh release:
+> LuckyD models by default, live free-model detection, and Pareto-ranked catalogs.
 
-**[⬇ Download `LuckyDBrowserSetup-10.8.7.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.7/LuckyDBrowserSetup-10.8.7.exe)** — Windows 10/11 x64 · per-user install · no admin needed
+**[⬇ Download `LuckyDBrowserSetup-10.8.8.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.8/LuckyDBrowserSetup-10.8.8.exe)** — Windows 10/11 x64 · per-user install · no admin needed
 
 ---
 
-## What's new in 10.8.7 — Hub unification
+## What's new in 10.8.8 — Model refresh
 
-- **One Hub status surface** — Browser, Hub, Claw and puck reachability now show in one place on the Chat page.
-- **One-tap provider switching** — pick a provider once on the Chat page and the terminal boots its agents on the same provider; the pick survives restarts.
-- **Shared handoff note** — a note written in Browser Chat shows in LuckyD Code and vice versa, so work carries across surfaces.
-- **Growth watch as a proactive card** — GitHub stars and Discord joins arrive as a dismissible card on Chat; a no-change day stays silent.
-- **Retired tools removed** — HQ, Workflows, Deep Researcher and Deck Studio are gone; the Hub is the one surface now.
-- **Security Scan green** — the filelock CVEs are fixed (scan now runs on Python 3.11), plus Dependabot bumps for langgraph, vite, undici and fast-uri.
+- **LuckyD models are now the default** — the Browser assistant and LuckyD Code start on Ollama `luckyd:8b`; OpenCode stays a one-tap switchable option, with automatic fallback to OpenCode's free DeepSeek V4.1 when the PC / Ollama is off.
+- **Dead Cline usage is never offered as the current or default provider any more** — when Cline credits are exhausted, Auto routes to `luckyd:8b` instead; Cline stays selectable when it is usable.
+- **Live free-model detection** — the Browser re-probes the free gateways (OpenRouter `:free`, Cline gateway, OpenCode Zen, the local OpenCode roster, RankLLMs benchmarks) and refreshes its cached free list at most daily, so dead or capped ids drop out and new free ids appear; the free pick never goes stale.
+- **Pareto catalogs rebuilt from live LMArena + Artificial Analysis scores** — best overall, best bang-for-buck, cheapest, with $/1M prices shown in the picker. New picks include Muse Ember 1.0 and DeepSeek V4.1 Flash. Auto is now free-only; paid models stay in the catalog with their prices shown.
 - **Known limitation — Twitch and some game sites:** Twitch video still won't play in this build, and some web games (for example on Poki) still have no sound. Different cause: the web engine LuckyD is built on ships without the H.264 and AAC decoders those sites use, and no app setting can add them. It's being worked on as a separate engine project — please use another browser for Twitch and affected games meanwhile.
 
-On top of everything from 10.8.6 (Agent mode: stable while it works — switch tabs mid-task, no glitches), 10.8.5 (Settings fixed + AI library security update) and 10.8.4 (Gmail sign-in fixed: one consistent browser identity instead of contradictory ones).
+On top of everything from 10.8.7 (Hub unification: one chat, one memory, one-tap providers), 10.8.6 (Agent mode: stable while it works — switch tabs mid-task, no glitches) and 10.8.5 (Settings fixed + AI library security update).
 
-3,511 tests passing · full CI green.
+3,544 tests passing · full CI green.
 
 ---
 
