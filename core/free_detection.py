@@ -230,9 +230,12 @@ def cached_detection() -> DetectionResult | None:
 
 
 def _http_get_json(url: str, timeout: float = _HTTP_TIMEOUT) -> dict | None:
+    # nosec B310: every caller passes one of the hardcoded https:// module
+    # constants above — no user input ever reaches urlopen (same convention
+    # as browser/browser_core/updater.py and tools/jules_delegate.py).
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "LuckyD-free-detect/1.0"})
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:  # nosec B310
             if resp.status != 200:
                 return None
             data = json.loads(resp.read().decode("utf-8", "replace"))
