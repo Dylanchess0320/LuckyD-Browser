@@ -37,7 +37,7 @@ SESSION_VERSION = 1
 MAX_WINDOWS = 5
 MAX_TABS_PER_WINDOW = 50
 
-# Schemes worth restoring. Internal pages (dashboard, terminal, HQ) are plain
+# Schemes worth restoring. Internal pages (dashboard, terminal) are plain
 # localhost http URLs, so they ride along naturally; about:/view-source: and
 # friends are deliberately dropped.
 _RESTORABLE_PREFIXES = ("http://", "https://", "file://")

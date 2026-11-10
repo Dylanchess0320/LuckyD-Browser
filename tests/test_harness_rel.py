@@ -22,7 +22,6 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.append(str(_REPO_ROOT))
 
 from browser_core.harness_bridge import _python_executable
-from browser_core.research_page import SwarmManager
 
 
 class TestPythonResolver:
@@ -57,19 +56,3 @@ class TestPythonResolver:
             assert "LUCKYD_PYTHON" in str(exc)
         else:
             raise AssertionError("expected FileNotFoundError")
-
-
-class TestUniqueRunIds:
-    def test_sequential_runs_get_unique_ids(self, monkeypatch):
-        import browser_core.research_page as rp
-
-        # Freeze the clock: without a unique suffix both runs would share
-        # an id even across seconds.
-        monkeypatch.setattr(rp.time, "strftime", lambda fmt: "20200101-000000")
-        mgr = SwarmManager()
-        id1 = mgr.start_research("first?", provider="mock", dry_run=True)
-        assert mgr.wait_for_completion(timeout=120)
-        id2 = mgr.start_research("second?", provider="mock", dry_run=True)
-        assert mgr.wait_for_completion(timeout=120)
-        assert id1.startswith("run-") and id2.startswith("run-")
-        assert id1 != id2

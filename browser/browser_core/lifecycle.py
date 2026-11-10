@@ -19,7 +19,7 @@ DISCARDED = "discarded"
 
 
 def is_protected_url(url: str) -> bool:
-    """Never sleep Control API / HQ / terminal / file pages."""
+    """Never sleep Control API / terminal / file pages."""
     try:
         parts = urlsplit(url or "")
     except Exception:
@@ -31,7 +31,7 @@ def is_protected_url(url: str) -> bool:
     if host in ("127.0.0.1", "localhost", "::1"):
         return True
     path = (parts.path or "").lower()
-    return path.startswith(("/dashboard", "/hq", "/terminal", "/research", "/network"))
+    return path.startswith(("/dashboard", "/terminal", "/mesh", "/chat", "/network"))
 
 
 def should_protect(

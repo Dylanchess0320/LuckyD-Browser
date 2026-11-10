@@ -1,7 +1,7 @@
 """Single source of truth for the LuckyD product's visual identity.
 
 Every surface — Qt chrome (via browser_ui.theme), the live dashboard, the
-HQ splash, the fallback new-tab page, and the AI sidebar — pulls its colors
+the fallback new-tab page, and the AI sidebar — pulls its colors
 from the active theme's palette so the whole browser reads as one product
 instead of a pile of parts.
 
@@ -119,8 +119,8 @@ def _rgba(hex_color: str, alpha: float) -> str:
 def active_name(settings=None) -> str:
     """The configured theme key, validated against the known palettes.
 
-    Settings-less HTML surfaces (the proxy pages the Control API serves for
-    HQ) fall back to the persisted settings store, so they pick up the same
+    Settings-less HTML surfaces (the proxy pages the Control API serves)
+    fall back to the persisted settings store, so they pick up the same
     theme the Qt chrome is using even when no SettingsStore was passed in.
     """
     if settings is None:

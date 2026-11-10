@@ -271,19 +271,6 @@ class SettingsDialog(QDialog):
         self.dash.setChecked(bool(settings.get("dashboard_newtab", True)))
         gform.addRow(self.dash)
 
-        self.retired_tools = QCheckBox(
-            "Show retired tools (HQ, Workflows, Deep Researcher, Deck Studio, LuckyD Chat)",
-            self,
-        )
-        self.retired_tools.setToolTip(
-            "These tools are hidden by default but fully built in.\n"
-            "Turn this on to bring back their menu items, palette entries,\n"
-            "dashboard tiles and shortcuts. Takes effect on restart.\n"
-            "(Settings tabs are always shown either way.)"
-        )
-        self.retired_tools.setChecked(bool(settings.get("show_retired_tools", False)))
-        gform.addRow(self.retired_tools)
-
         self.assistant_startup = QCheckBox(
             "Remember my setup (reopen the AI assistant on startup)", self
         )
@@ -420,14 +407,11 @@ class SettingsDialog(QDialog):
         tabs.addTab(_scrollable(appearance), "Appearance")
 
         # ── Connections (LuckyD Chat: Hub + Claw on Dylan's PC) ────
-        # This tab is a SETTINGS surface, not a tool surface: it is
-        # always added, in both show_retired_tools states. The switch
-        # governs retired TOOL surfaces only (tiles, menus, pages).
-        # It used to be gated on the switch (2026-10-22), which was a
-        # live bug: the page widget is built either way, and a page
-        # that is never handed to the tab stack is never hidden — it
-        # floated visible over the tab bar and the current page,
-        # burying the other tabs. accept() saves the fields either
+        # This tab is always added. It used to be gated on the retired-tools
+        # switch (2026-10-22), which was a live bug: the page widget is built
+        # either way, and a page that is never handed to the tab stack is
+        # never hidden — it floated visible over the tab bar and the current
+        # page, burying the other tabs. accept() saves the fields either
         # way, so stored Hub/Claw tokens and addresses are preserved.
         connections = QWidget(tabs)
         cform = QFormLayout(connections)
@@ -504,7 +488,6 @@ class SettingsDialog(QDialog):
         self._settings.set("cdp_debugging", self.cdp_debug.isChecked())
         self._settings.set("harness_autostart", self.autostart.isChecked())
         self._settings.set("dashboard_newtab", self.dash.isChecked())
-        self._settings.set("show_retired_tools", self.retired_tools.isChecked())
         self._settings.set("assistant_visible_startup", self.assistant_startup.isChecked())
         self._settings.set("bookmark_bar_visible", self.bm_bar.isChecked())
         self._settings.set("download_dir", self.dl_dir.text().strip())

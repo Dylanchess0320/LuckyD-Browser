@@ -36,6 +36,14 @@ _CHAT_CSS = """  :root{color-scheme:dark}
   .state{padding:10px 16px;color:var(--ld-muted);font-size:12px;
     border-bottom:1px solid var(--ld-border)}
   .state:empty{display:none}
+  #cards-state{display:flex;flex-direction:column;gap:6px}
+  #cards-state:empty{display:none}
+  .card{display:flex;gap:10px;align-items:baseline}
+  .card .ct{font-weight:650;color:var(--ld-text)}
+  .card .cd{color:var(--ld-muted)}
+  .card button{margin-left:auto;flex:none}
+  .hub-status{grid-column:1/-1;border:1px solid var(--ld-border);
+    border-radius:var(--ld-r-md);background:var(--ld-card)}
   #chat-log{height:380px;overflow:auto;padding:14px 16px;display:flex;
     flex-direction:column;gap:10px}
   .msg{max-width:88%;padding:9px 12px;border-radius:12px;white-space:pre-wrap;
@@ -49,6 +57,10 @@ _CHAT_CSS = """  :root{color-scheme:dark}
   input[type=text],textarea{background:var(--ld-panel2);color:var(--ld-text);
     border:1px solid var(--ld-border);border-radius:9px;padding:8px 11px;
     font:inherit;box-sizing:border-box}
+  select{background:var(--ld-panel2);color:var(--ld-text);
+    border:1px solid var(--ld-border);border-radius:9px;padding:8px 11px;font:inherit}
+  .prov{display:flex;gap:8px;align-items:center;padding:10px 16px;
+    border-bottom:1px solid var(--ld-border);color:var(--ld-muted);font-size:12px}
   input[type=text]{flex:1}
   textarea{width:100%;min-height:64px;resize:vertical}
   button{background:var(--ld-accent);color:#fff;border:0;border-radius:9px;
@@ -90,15 +102,23 @@ _CHAT_CSS = """  :root{color-scheme:dark}
 _CHAT_BODY = r"""<body>
 <header><h1><span>💬</span> LuckyD Chat</h1></header>
 <main>
+  <div class="state hub-status" id="hub-status"></div>
+  <div class="state hub-status" id="handoff-state"></div>
+  <div class="state hub-status" id="cards-state"></div>
   <section id="hub-sec">
     <div class="sec-head"><h2>Hub chat</h2><span class="sp"></span>
       <button class="ghost" id="chat-clear" type="button">Clear</button></div>
     <div class="state" id="hub-state"></div>
+    <div class="prov"><label for="provider-select">Provider</label>
+      <select id="provider-select"><option value="auto">Auto</option></select></div>
     <div id="chat-log"></div>
     <form class="send" id="chat-form">
       <input type="text" id="chat-input" placeholder="Message the Hub" autocomplete="off">
       <button type="submit" id="chat-send">Send</button>
     </form>
+    <div class="prov"><label for="handoff-input">Handoff</label>
+      <input type="text" id="handoff-input" placeholder="Note for the next surface" autocomplete="off">
+      <button class="ghost" id="handoff-save" type="button">Save</button></div>
   </section>
 
   <section id="claw-sec">
@@ -139,6 +159,37 @@ const STATE_LINES = {
   }
 };
 function stateLine(el, svc, state){ el.textContent = (!state || state === 'ok') ? '' : (STATE_LINES[svc][state] || ''); }
+
+// ── one Hub status block: reachability + last-seen for all 4 parts ──
+const HUB_STATUS_LABELS = {
+  ok: 'live',
+  unreachable: 'unreachable',
+  no_token: 'off — no token',
+  bad_token: 'token rejected',
+  error: 'error',
+  not_running: 'not running'
+};
+function fmtSeen(ts){
+  if (!ts) return 'never seen';
+  const d = new Date(ts * 1000);
+  return 'last seen ' + String(d.getHours()).padStart(2, '0') + ':'
+    + String(d.getMinutes()).padStart(2, '0');
+}
+function renderHubStatus(components){
+  const el = $('#hub-status');
+  if (!components) { el.textContent = ''; return; }
+  const names = {browser: 'Browser', hub: 'Hub', claw: 'Claw', puck: 'Puck bridge'};
+  const parts = [];
+  for (const key of ['browser', 'hub', 'claw', 'puck']) {
+    const c = components[key];
+    if (!c) continue;
+    const label = HUB_STATUS_LABELS[c.state] || c.state || 'unknown';
+    let bit = names[key] + ': ' + label;
+    if (c.state !== 'ok') bit += ' (' + fmtSeen(c.last_seen) + ')';
+    parts.push(bit);
+  }
+  el.textContent = parts.join('  ·  ');
+}
 
 async function api(path, body){
   const opt = body ? {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)} : {};
@@ -226,6 +277,7 @@ function renderTasks(tasks){
     box.appendChild(d); return;
   }
   for (const t of tasks) {
+    if (TERMINAL.includes(String(t.state))) postClawReceipt(t);
     const row = document.createElement('div'); row.className = 'task';
     const head = document.createElement('div'); head.className = 't';
     const pr = document.createElement('span'); pr.className = 'prompt'; pr.textContent = t.prompt || '';
@@ -277,9 +329,102 @@ $('#task-run').addEventListener('click', async () => {
   btn.disabled = false; refreshTasks();
 });
 
+// ── one-tap provider switching (slice 2) ──────────────────────────
+// The picker lists the providers /chat/state reports; one change pins
+// the pick (POST /chat/provider, persisted server-side) and every later
+// /chat/send goes to that provider until "Auto" is picked again.
+function renderProviders(p){
+  const sel = $('#provider-select');
+  if (!p || !sel) return;
+  const current = p.current || 'auto';
+  sel.innerHTML = '';
+  const auto = document.createElement('option');
+  auto.value = 'auto'; auto.textContent = 'Auto' + (p.default ? ' (' + p.default + ')' : '');
+  sel.appendChild(auto);
+  for (const name of (p.available || [])) {
+    const o = document.createElement('option');
+    o.value = name; o.textContent = name;
+    sel.appendChild(o);
+  }
+  // The server is the source of truth: a pinned provider that is no
+  // longer available falls back to Auto in the picker (the pin itself
+  // is only cleared by picking Auto or another provider).
+  sel.value = Array.from(sel.options).some(o => o.value === current) ? current : 'auto';
+}
+$('#provider-select').addEventListener('change', async ev => {
+  const sel = ev.target; sel.disabled = true;
+  try {
+    const r = await api('/chat/provider', {provider: sel.value});
+    if (r.state === 'ok' && r.providers) renderProviders(r.providers);
+    else await refreshState();
+  } catch (_) { await refreshState(); }
+  sel.disabled = false;
+});
+
+// ── shared handoff note (slice 3) ───────────────────────────────────
+// The latest note from any surface (Chat, Claw receipts, terminal) is
+// shown under the status block; the input below the chat saves a note
+// for the next surface. Finished Claw receipts post themselves once.
+function renderHandoff(h){
+  const el = $('#handoff-state');
+  if (!el) return;
+  const latest = h && h.latest;
+  el.textContent = latest ? 'Handoff (' + (latest.source || 'chat') + '): ' + (latest.text || '') : '';
+}
+$('#handoff-save').addEventListener('click', async () => {
+  const input = $('#handoff-input');
+  const text = input.value.trim();
+  if (!text) return;
+  try { await api('/chat/handoff', {source: 'chat', text: text}); } catch (_) {}
+  input.value = '';
+  refreshState();
+});
+let postedReceipts = new Set();
+try { postedReceipts = new Set(JSON.parse(localStorage.getItem('luckyd-handoff-posted-v1') || '[]')); } catch (_) { postedReceipts = new Set(); }
+function postClawReceipt(t){
+  if (!t.id || postedReceipts.has(t.id)) return;
+  const note = (t.summary || t.result || '').trim();
+  if (!note) return;
+  postedReceipts.add(t.id);
+  try { localStorage.setItem('luckyd-handoff-posted-v1', JSON.stringify(Array.from(postedReceipts).slice(-100))); } catch (_) {}
+  const text = (t.project ? t.project + ': ' : '') + note.slice(0, 500);
+  api('/chat/handoff', {source: 'claw', text: text}).catch(() => {});
+}
+
+// ── proactive growth-watch cards (slice 5) ──────────────────────────
+// One card per real change (GitHub star / Discord join), posted by the
+// watch adapter. No changes = no cards = nothing rendered. Dismissing
+// removes the card for good — it never reappears.
+function renderCards(cards){
+  const el = $('#cards-state');
+  if (!el) return;
+  el.innerHTML = '';
+  for (const c of (cards || [])) {
+    const row = document.createElement('div'); row.className = 'card';
+    const t = document.createElement('span'); t.className = 'ct'; t.textContent = c.title || '';
+    row.appendChild(t);
+    if (c.detail) {
+      const d = document.createElement('span'); d.className = 'cd'; d.textContent = c.detail;
+      row.appendChild(d);
+    }
+    const b = document.createElement('button'); b.className = 'ghost'; b.type = 'button'; b.textContent = 'Dismiss';
+    b.addEventListener('click', async () => {
+      b.disabled = true;
+      try { await api('/chat/cards/dismiss', {id: c.id}); } catch (_) {}
+      refreshState();
+    });
+    row.appendChild(b);
+    el.appendChild(row);
+  }
+}
+
 async function refreshState(){
   try {
     const s = await api('/chat/state');
+    renderHubStatus(s.components);
+    if (s.handoff) renderHandoff(s.handoff);
+    if (s.cards) renderCards(s.cards.cards);
+    if (s.providers) renderProviders(s.providers);
     stateLine($('#hub-state'), 'hub', s.hub && s.hub.state);
     stateLine($('#claw-state'), 'claw', s.claw && s.claw.state);
     clawOk = !!(s.claw && s.claw.state === 'ok' && s.claw.enabled !== false);

@@ -1,8 +1,8 @@
 """Night-1 browser-core audit: settings.py, permissions.py, session.py,
-storage.py, scheduler.py (browser-side).
+storage.py.
 
 Load/save/defaults, permission decisions, session safety rails, history and
-bookmark storage, workflow-schedule timing.
+bookmark storage.
 """
 
 from __future__ import annotations
@@ -18,7 +18,6 @@ if str(_BROWSER_DIR) not in sys.path:
 if str(_REPO_ROOT) not in sys.path:
     sys.path.append(str(_REPO_ROOT))
 
-from browser_core import scheduler as bkscheduler
 from browser_core.permissions import (
     ALLOW,
     ASK,
@@ -28,7 +27,6 @@ from browser_core.permissions import (
     feature_label,
     origin_of,
 )
-from browser_core.scheduler import ScheduleStore, is_due, next_run_at
 from browser_core.session import (
     MAX_TABS_PER_WINDOW,
     MAX_WINDOWS,
@@ -306,50 +304,3 @@ def test_storage_import_from_html(tmp_path: Path) -> None:
     assert s.import_from_html(f) == 2
     assert s.is_bookmarked("https://a.com") and s.is_bookmarked("https://b.com")
     assert not s.is_bookmarked("javascript:alert(1)")
-
-
-# ── browser-side scheduler ───────────────────────────────────────────
-
-
-def test_next_run_at_and_is_due() -> None:
-    assert next_run_at(60, from_ts=1000.0) == 4600.0
-    assert is_due({"every_min": 60, "next_run": 100}, now=200.0)
-    assert not is_due({"every_min": 60, "next_run": 300}, now=200.0)
-    assert not is_due({"every_min": 0, "next_run": 0}, now=999.0)
-    assert not is_due({}, now=999.0)
-
-
-def test_schedule_store_set_disable_due(tmp_path: Path) -> None:
-    store = ScheduleStore(tmp_path / "sched.json")
-    entry = store.set("wf1", 60)
-    assert entry["every_min"] == 60 and entry["next_run"] > 0
-    assert store.set("wf1", 0) == {"every_min": 0}  # disable removes
-    assert store.list() == []
-    store.set("wf2", 15)
-    rows = store.list()
-    assert rows[0]["name"] == "wf2" and rows[0]["label"] == "Every 15 min"
-    assert "wf2" not in store.due(now=0.0)  # next_run is in the future
-    store.set("wf3", 15)
-    # force wf3 due by backdating
-    data = json.loads((tmp_path / "sched.json").read_text(encoding="utf-8"))
-    data["wf3"]["next_run"] = 1.0
-    (tmp_path / "sched.json").write_text(json.dumps(data), encoding="utf-8")
-    assert store.due(now=100.0) == ["wf3"]
-
-
-def test_schedule_mark_run_advances_next(tmp_path: Path) -> None:
-    store = ScheduleStore(tmp_path / "sched.json")
-    store.set("wf1", 60)
-    store.mark_run("wf1", "ok " * 200, now=1000.0)  # result truncated at 200 chars
-    rows = store.list()
-    assert rows[0]["last_run"] == 1000.0
-    assert len(rows[0]["last_result"]) == 200
-    assert rows[0]["next_run"] == 4600.0
-    store.mark_run("ghost", "x")  # unknown name: no crash, no entry
-    assert len(store.list()) == 1
-
-
-def test_schedule_intervals_labels() -> None:
-    assert bkscheduler.INTERVALS[0] == "Off"
-    assert bkscheduler.INTERVALS[1440] == "Daily"
-    assert bkscheduler.INTERVALS.get(999, bkscheduler.INTERVALS[0]) == "Off"
