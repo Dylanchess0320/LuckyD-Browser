@@ -10,7 +10,6 @@ from browser_core.adblock import AdBlockInterceptor
 from browser_core.harness_bridge import HarnessSupervisor
 from browser_core.permissions import PermissionStore
 from browser_core.profile import default_profile
-from browser_core.scheduler import ScheduleStore
 from browser_core.scripts import ScriptEngine
 from browser_core.session import SessionStore
 from browser_core.settings import SettingsStore
@@ -29,7 +28,6 @@ class _AppBus(QObject):
     """Thread-safe signal bus — worker threads emit, the GUI thread receives."""
 
     harness_booted = Signal(bool, str)  # (ok, error_message)
-    schedule_done = Signal(str, bool, str)  # (workflow, ok, detail)
 
 
 class BrowserApp:
@@ -65,12 +63,11 @@ class BrowserApp:
         self.scripts = ScriptEngine(self.profile, self.settings)
 
         # One harness backend for the whole app: the sidebar's harness mode,
-        # the /hq gateway and the dashboard all share this supervisor.
+        # the dashboard all share this supervisor.
         self.harness = HarnessSupervisor()
 
         self.bus = _AppBus()
         self.bus.harness_booted.connect(self._on_harness_boot)
-        self.bus.schedule_done.connect(self._on_schedule_done)
 
         # Browser Control API — localhost HTTP control of the live browser
         # (the luckyd-code.exe harness and local scripts drive tabs with it).
@@ -90,16 +87,6 @@ class BrowserApp:
         self.qapp.aboutToQuit.connect(self.stop_control_server)
         self.qapp.aboutToQuit.connect(self.stop_terminal_server)
         self.qapp.aboutToQuit.connect(self.stop_harness)
-
-        # Workflow schedules: a 30s tick replays whatever is due (in a worker
-        # thread — replays drive the GUI through the backend's invoker).
-        self.schedule_store = ScheduleStore()
-        self.control_backend = None
-        self._schedule_running = False
-        self._schedule_timer = QTimer(self.qapp)
-        self._schedule_timer.setInterval(30_000)
-        self._schedule_timer.timeout.connect(self._run_due_schedules)
-        self._schedule_timer.start(30_000)
 
         self.windows: list[MainWindow] = []
         first_window = self.new_window()
@@ -216,7 +203,7 @@ class BrowserApp:
         """Seed the HttpOnly session cookies for our own loopback servers (4.0).
 
         Called for every WebEngine profile (the default window and each
-        incognito window). The in-browser dashboard/terminal/research/mesh/HQ
+        incognito window). The in-browser dashboard/terminal/mesh/chat
         tabs authenticate to the local servers with these cookies, so no
         bearer token is ever injected into served HTML or the WebSocket URL.
         Safe to call when a server isn't running yet — that cookie is simply
@@ -249,14 +236,6 @@ class BrowserApp:
             from browser_core.terminal_server import TERM_COOKIE
 
             _set(TERM_COOKIE, str(self.settings.get("terminal_token", "") or ""))
-        except Exception:
-            pass
-        try:
-            from browser_core.harness_bridge import _hq_token
-
-            # Must match web_server.HQ_COOKIE (repo-root module; the literal
-            # keeps this importable in the frozen browser too).
-            _set("luckyd_hq", _hq_token() or "")
         except Exception:
             pass
 
@@ -292,19 +271,12 @@ class BrowserApp:
             print(f"[browser] Harness up at {self.harness.url} ({tools} tools)")
             kind = "ok"
         else:
-            msg = f"Coding agent backend didn't start{': ' + err if err else ''} — try Tools > Coding Agent or restart the browser"
+            msg = f"Coding agent backend didn't start{': ' + err if err else ''} — try restarting the browser"
             print(f"[browser] Harness boot failed: {err}")
             kind = "warn"
         for win in list(self.windows):
-            try:
-                # First boot creates .luckyd-code/hq_token *after* the app's
-                # initial cookie seeding, so refresh the HQ cookie now. Without
-                # this the first HQ visit 401s until the next restart.
-                if ok:
-                    self.install_local_auth_cookies(win.profile)
+            with contextlib.suppress(Exception):
                 win.toasts.show(msg, kind=kind)
-            except Exception:
-                pass
 
     # ── Session restore ("continue where you left off") ─────────────────
 
@@ -360,40 +332,6 @@ class BrowserApp:
             self.settings.set("last_seen_version", __version__)
         except Exception:
             pass
-
-    # ── Workflow schedules (autopilot) ─────────────────────────────────
-
-    def _run_due_schedules(self) -> None:
-        backend = self.control_backend
-        if backend is None or self._schedule_running:
-            return
-        due = self.schedule_store.due()
-        if not due:
-            return
-        self._schedule_running = True
-
-        def _work() -> None:
-            try:
-                for name in due:
-                    try:
-                        result = backend.replay_workflow(name)
-                        ok = result.get("succeeded") == result.get("total")
-                        detail = f"{result.get('succeeded')}/{result.get('total')} steps"
-                    except Exception as exc:
-                        ok, detail = False, str(exc)[:120]
-                    self.schedule_store.mark_run(name, detail)
-                    self.bus.schedule_done.emit(name, ok, detail)
-            finally:
-                self._schedule_running = False
-
-        threading.Thread(target=_work, name="workflow-scheduler", daemon=True).start()
-
-    def _on_schedule_done(self, name: str, ok: bool, detail: str) -> None:
-        kind = "ok" if ok else "warn"
-        msg = f"⏰ Scheduled workflow “{name}” {'finished' if ok else 'had issues'} — {detail}"
-        for win in list(self.windows):
-            with contextlib.suppress(Exception):
-                win.toast(msg, kind)
 
     def run(self) -> int:
         return self.qapp.exec()

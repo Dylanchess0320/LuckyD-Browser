@@ -34,8 +34,8 @@ def _export_env_to_os() -> None:
     """Push .env keys into os.environ so spawned tile services inherit them.
 
     The AI bridge loads .env into its own dict; child processes launched by
-    the TileRegistry (e.g. Deck Studio's node pipeline, which needs
-    GOOGLE_API_KEY for image generation) only see real environment variables.
+    the TileRegistry (e.g. a tile service that needs GOOGLE_API_KEY for image
+    generation) only see real environment variables.
     Never overrides anything already set.
     """
     try:
@@ -61,13 +61,7 @@ from browser_core.agent import (
     ActionUndoStack,
 )
 from browser_core.chat_page import chat_html
-from browser_core.dashboard import (
-    dashboard_html,
-    hq_shell_html,
-    hq_splash_html,
-    netmon_html,
-    workflows_html,
-)
+from browser_core.dashboard import dashboard_html, netmon_html
 from browser_core.extract import build_messages, parse_json_loose
 from browser_core.hub_memory import HandoffStore, handoff_state
 from browser_core.hub_providers import (
@@ -87,26 +81,28 @@ from browser_core.luckyd_services import (
     puck_state,
 )
 from browser_core.netmon import NetMonitor, to_har
-from browser_core.research_page import research_html, swarm_manager
-from browser_core.scheduler import INTERVALS, ScheduleStore
 from browser_core.terminal_page import STATIC_DIR, mesh_html, terminal_html
 from browser_core.terminal_server import mesh_doctor
-from browser_core.workflows import (
-    INDEXED_ACTIONS,
-    WorkflowRecorder,
-    WorkflowStore,
-    action_index,
-    elements_js,
-    fingerprint_js,
-    normalize_generated_steps,
-    resolve_index,
-    step_record,
-)
 
 API_NAME = "Browser Control API"
 API_VERSION = "1.4.0"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 9777
+
+
+def action_index(action: dict) -> int:
+    """Element index for an indexed action.
+
+    Index 0 is valid (the first tagged element) — only a missing or blank
+    index maps to -1 ("none given"). The old ``int(x or -1)`` idiom treated
+    0 as missing, so clicks/types on the first element of every snapshot
+    were silently dropped.
+    """
+    raw = action.get("index", -1)
+    if raw is None or raw == "":
+        return -1
+    return int(raw)
+
 
 # Snapshot sizing — matches agent.JsDriver defaults.
 _MAX_ELS = 80
@@ -119,7 +115,6 @@ _SETTLE_JS = "(location.href + '|' + document.readyState)"
 _ROUTES = (
     ("GET  /help", "this route list"),
     ("GET  /dashboard", "live new-tab dashboard (HTML hub of the platform)"),
-    ("GET  /hq", "coding agent workspace — opens the exe UI (auto-starts if needed)"),
     ("GET  /mesh", "Multi Agent Terminal — four parallel terminal sessions in one workspace"),
     ("GET  /mesh/doctor", "per-backend Multi Agent Terminal health check + tier labels (JSON)"),
     ("GET  /chat", "LuckyD Chat — Hub chat + Claw tasks in one page"),
@@ -178,16 +173,6 @@ _ROUTES = (
     ("GET  /screenshot?url=", "base64 JPEG of a tab (CDP; needs websockets)"),
     ("POST /eval", '{"js": "…"} — run JavaScript in the active tab'),
     ("POST /ask", '{"question": "…", "provider": "…" (optional)} — AI + page context'),
-    ("GET  /workflows", "workflow manager page (record/replay saved automations)"),
-    ("GET  /workflows/list", "saved workflows + recorder status (JSON)"),
-    ("POST /workflow/record", '{"name": "…"} — start recording /navigate + /act traffic'),
-    ("POST /workflow/stop", "stop recording and save the workflow"),
-    (
-        "POST /workflow/generate",
-        '{"name": "…", "description": "…"} — AI-generate a saved workflow from plain English',
-    ),
-    ("POST /workflow/replay", '{"name": "…"} — replay with self-healing element match'),
-    ("POST /workflow/delete", '{"name": "…"}'),
     (
         "POST /extract",
         '{"instruction": "…", "schema": {…} (optional), "provider": "…" (optional)}'
@@ -200,17 +185,6 @@ _ROUTES = (
     ("POST /network/start", '{"url": "…" (optional — defaults to the active tab)}'),
     ("POST /network/stop", "stop capturing"),
     ("POST /network/clear", "clear captured rows"),
-    ("GET  /schedules", "workflow schedules with last-run results"),
-    ("POST /schedule", '{"name": "…", "every_min": 0|15|30|60|360|1440} — auto-replay a workflow'),
-    ("GET  /research", "Deep Researcher Swarm interactive tool"),
-    (
-        "POST /research/start",
-        '{"query": "…", "depth": "…", "backend": "…", "provider": "…"} — launch swarm',
-    ),
-    ("GET  /research/status", "poll status, stages, and events of active swarm"),
-    ("GET  /research/runs", "list historical research reports"),
-    ("GET  /research/run", "load past report markdown and evidence"),
-    ("POST /research/cancel", "cancel the currently active research swarm"),
 )
 
 
@@ -230,7 +204,7 @@ display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
 background:#16202f;text-align:center}h1{color:#7c5cff;margin:0 0 12px}p{color:#9fb0c9}</style>
 </head><body><div class="card"><h1>🔒 Unauthorized</h1>
 <p>This LuckyD page needs the browser's session cookie. Open it from inside
-LuckyD (dashboard, terminal, research…) instead of pasting the URL
+LuckyD (dashboard, terminal, mesh…) instead of pasting the URL
 elsewhere.</p></div></body></html>"""
 
 
@@ -246,10 +220,10 @@ def make_handler(
     activate_tab(), close_tab(), snapshot(), act(), eval_js(), screenshot(),
     ask(). Each returns a JSON-serializable value or raises.
 
-    ``harness`` is an optional HarnessSupervisor: it powers the /hq gateway
-    (redirect-or-autostart) and enriches /status with harness + AI details.
-    ``settings`` (optional) lets the HTML surfaces render with the active
-    theme so the dashboard/HQ splash match the rest of the product.
+    ``harness`` is an optional HarnessSupervisor: it enriches /status with
+    harness + AI details. ``settings`` (optional) lets the HTML surfaces
+    render with the active theme so the dashboard matches the rest of the
+    product.
     """
 
     class ControlHandler(BaseHTTPRequestHandler):
@@ -388,41 +362,6 @@ def make_handler(
             }.get(fs_path.suffix.lower(), "application/octet-stream")
             return self._send_file(fs_path, mime)
 
-        def _hq(self, query: dict) -> None:
-            """Gateway to the coding agent workspace (the exe's web UI).
-
-            Healthy  → 302 straight to it.  Down → background-start the exe
-            and show an auto-refreshing splash.  Missing/broken → a clear
-            error page with a manual Retry link (/?retry=1 forces a retry).
-            """
-            if harness is None:
-                return self._send_html(
-                    hq_splash_html(
-                        "",
-                        "error",
-                        "No harness supervisor is wired into this Control API instance.",
-                        settings=settings,
-                    )
-                )
-            if harness.probe()["up"]:
-                # Serve the workspace in the branded shell (theme header bar +
-                # theme-synced iframe) instead of a bare 302 to the exe UI.
-                return self._send_html(hq_shell_html(harness.url, settings=settings))
-            st = harness.status()
-            if query.get("retry"):
-                harness.ensure_started(force=True)
-                st = harness.status()
-            elif not st.get("starting") and not st.get("error"):
-                harness.ensure_started()
-                st = harness.status()
-            if st.get("starting"):
-                return self._send_html(hq_splash_html(st["url"], "starting", settings=settings))
-            return self._send_html(
-                hq_splash_html(
-                    st["url"], "error", st.get("error") or "unknown error", settings=settings
-                )
-            )
-
         def _ok(self, **fields) -> None:
             self._send(200, {"ok": True, **fields})
 
@@ -482,13 +421,10 @@ def make_handler(
             "/",
             "/help",
             "/dashboard",
-            "/hq",
             "/mesh",
             "/chat",
             "/terminal",
-            "/workflows",
             "/network",
-            "/research",
         )
 
         def do_GET(self):
@@ -513,8 +449,6 @@ def make_handler(
                     )
                 if path == "/dashboard":
                     return self._send_html(dashboard_html(settings))
-                if path == "/hq":
-                    return self._hq(query)
                 if path == "/mesh":
                     return self._send_html(mesh_html())
                 if path == "/chat":
@@ -610,8 +544,7 @@ def make_handler(
                     return self._terminal_asset(path)
                 if path == "/status":
                     # Platform heartbeat: also revive any enabled+autostart
-                    # tile services (rate-limited inside the registry, which
-                    # also keeps retired tiles off while their switch is off).
+                    # tile services (rate-limited inside the registry).
                     from browser_core import tile_registry
 
                     tile_registry.ensure_autostart()
@@ -621,12 +554,6 @@ def make_handler(
                 if path == "/screenshot":
                     url = (query.get("url") or [""])[0]
                     return self._ok(image_b64=backend.screenshot(url), mime="image/jpeg")
-                if path == "/workflows":
-                    return self._send_html(workflows_html())
-                if path == "/workflows/list":
-                    return self._ok(**backend.list_workflows())
-                if path == "/schedules":
-                    return self._ok(**backend.schedule_list())
                 if path == "/network":
                     return self._send_html(netmon_html())
                 if path == "/network/events":
@@ -638,16 +565,6 @@ def make_handler(
                 if path == "/network/har":
                     har = json.dumps(backend.netmon_har(), indent=1)
                     return self._send_download(har, "luckyd-capture.har", "application/json")
-                if path == "/research":
-                    return self._send_html(research_html())
-                if path == "/research/status":
-                    run_id = (query.get("run_id") or [""])[0]
-                    return self._ok(**swarm_manager.get_status(run_id))
-                if path == "/research/runs":
-                    return self._ok(runs=swarm_manager.list_runs())
-                if path == "/research/run":
-                    run_id = (query.get("id") or [""])[0]
-                    return self._ok(**swarm_manager.get_run(run_id))
                 return self._send(404, {"ok": False, "error": f"unknown route {path}"})
             except Exception as exc:
                 return self._fail(500, exc)
@@ -778,39 +695,6 @@ def make_handler(
                         # Older/custom backends with the 2-arg ask().
                         answer = backend.ask(question, provider)
                     return self._ok(answer=answer)
-                if path == "/workflow/record":
-                    name = str(body.get("name", "")).strip()
-                    if not name:
-                        return self._send(400, {"ok": False, "error": "name required"})
-                    return self._ok(name=backend.start_recording(name))
-                if path == "/workflow/stop":
-                    return self._ok(**backend.stop_recording())
-                if path == "/workflow/replay":
-                    name = str(body.get("name", "")).strip()
-                    if not name:
-                        return self._send(400, {"ok": False, "error": "name required"})
-                    return self._ok(**backend.replay_workflow(name))
-                if path == "/workflow/delete":
-                    name = str(body.get("name", "")).strip()
-                    if not name:
-                        return self._send(400, {"ok": False, "error": "name required"})
-                    return self._ok(deleted=backend.delete_workflow(name))
-                if path == "/workflow/generate":
-                    description = str(body.get("description", "")).strip()
-                    if not description:
-                        return self._send(400, {"ok": False, "error": "description required"})
-                    name = str(body.get("name", "")).strip()
-                    provider = str(body.get("provider", "")).strip() or None
-                    return self._ok(**backend.generate_workflow(name, description, provider))
-                if path == "/schedule":
-                    name = str(body.get("name", "")).strip()
-                    if not name:
-                        return self._send(400, {"ok": False, "error": "name required"})
-                    try:
-                        every = int(body.get("every_min", 0) or 0)
-                    except (TypeError, ValueError):
-                        every = 0
-                    return self._ok(**backend.schedule_set(name, every))
                 if path == "/extract":
                     instruction = str(body.get("instruction", "")).strip()
                     if not instruction:
@@ -829,24 +713,6 @@ def make_handler(
                     return self._ok(**backend.netmon_stop())
                 if path == "/network/clear":
                     return self._ok(**backend.netmon_clear())
-                if path == "/research/start":
-                    q = str(body.get("query", "")).strip()
-                    if not q:
-                        return self._send(400, {"ok": False, "error": "query required"})
-                    try:
-                        rid = swarm_manager.start_research(
-                            query=q,
-                            depth=str(body.get("depth", "standard")),
-                            backend=str(body.get("backend", "auto")),
-                            provider=str(body.get("provider", "auto")),
-                            context=str(body.get("context", "")),
-                            dry_run=bool(body.get("dry_run", False)),
-                        )
-                        return self._ok(run_id=rid)
-                    except Exception as err:
-                        return self._send(400, {"ok": False, "error": str(err)})
-                if path == "/research/cancel":
-                    return self._ok(cancelled=swarm_manager.cancel_run())
                 return self._send(404, {"ok": False, "error": f"unknown route {path}"})
             except Exception as exc:
                 return self._fail(500, exc)
@@ -979,31 +845,6 @@ def _ask_needs_page(question: str) -> bool:
     return any(phrase in q for phrase in _PAGE_REF_PHRASES)
 
 
-# "Generate with AI" for the Workflows page (10.7.6). Turns a plain-English
-# description into replayable workflow steps — same free-model chain as Ask
-# Lucky (the bridge's keyless locals → Cline gateways → keyed clouds), so it
-# works with no key at all.
-_WORKFLOW_GEN_SYSTEM = (
-    "You convert a plain-English description into a browser workflow the "
-    "LuckyD browser can replay. Respond with ONLY a JSON array of steps — "
-    "no prose, no code fences. Each step is one object:\n"
-    '  {"action": "navigate", "url": "https://full-url"}\n'
-    '  {"action": "click", "index": N, "target": {"tag": "button", "text": "its visible label"}}\n'
-    '  {"action": "type", "index": N, "text": "text to type", "target": {"tag": "input", "text": "field label"}}\n'
-    '  {"action": "select", "index": N, "text": "option value"}\n'
-    '  {"action": "press", "text": "Enter"}\n'
-    '  {"action": "scroll", "text": "down"}\n'
-    '  {"action": "wait", "text": "2"}\n'
-    '  {"action": "back"}\n'
-    "Rules: always use full https:// URLs for navigate. N is the element's "
-    "index on the page — use 0 when unknown. Include the optional "
-    '"target" fingerprint (tag + visible text/label) on click/type/select '
-    "steps whenever you know it: replay re-resolves the real element by "
-    "that fingerprint even if the page re-rendered (self-healing). One step "
-    "per user action, in order, as few steps as possible."
-)
-
-
 def _on_gui_thread() -> bool:
     """True when the caller already runs on Qt's GUI thread.
 
@@ -1076,11 +917,7 @@ class QtBrowserBackend:
         self._app = app
         self._invoker = GuiInvoker()
         self._ai = None  # lazy AIBridge for /ask and /extract
-        self._recorder = WorkflowRecorder()
-        self._wf_store = WorkflowStore()
-        self._replaying = False  # replayed steps must not re-record
         self._netmon: NetMonitor | None = None  # lazy network capture
-        self._schedules: ScheduleStore | None = None  # lazy schedule store
         self._undo_stack = ActionUndoStack()
 
     # ── GUI-thread helpers ────────────────────────────────────────────
@@ -1243,10 +1080,7 @@ class QtBrowserBackend:
                 view = win.tabs.current_view()
             return view.url().toString() if view else url
 
-        result = self._invoker.run(_do)
-        if self._recorder.active and not self._replaying:
-            self._recorder.add(step_record({"action": "navigate", "url": url}))
-        return result
+        return self._invoker.run(_do)
 
     def new_tab(self, url: str | None = None) -> int:
         def _do():
@@ -1367,23 +1201,8 @@ class QtBrowserBackend:
     _FAILED_PREFIXES = ("element not found", "refused", "unknown action", "no target")
 
     def act(self, action: dict) -> str:
-        """Record (when active) + execute one agent-style action."""
-        fingerprint = None
-        kind = str(action.get("action", "")).strip().lower()
-        index = action_index(action)
-        if self._recorder.active and not self._replaying and kind in INDEXED_ACTIONS and index >= 0:
-            # Fingerprint BEFORE acting: a click may destroy/navigate the node.
-            with contextlib.suppress(Exception):
-                raw = self.run_js(fingerprint_js(index))
-                fingerprint = json.loads(raw) if raw else None
-        result = self._perform_act(action)
-        if (
-            self._recorder.active
-            and not self._replaying
-            and not str(result).startswith(self._FAILED_PREFIXES)
-        ):
-            self._recorder.add(step_record(action, fingerprint))
-        return result
+        """Execute one agent-style action."""
+        return self._perform_act(action)
 
     def _perform_act(self, action: dict) -> str:
         """One agent-style action (click/type/press/select/scroll/navigate/undo/…)."""
@@ -1562,117 +1381,6 @@ class QtBrowserBackend:
             )
         return text
 
-    # ── workflows: record / replay with self-healing ───────────────────
-
-    def start_recording(self, name: str) -> str:
-        return self._recorder.start(name)
-
-    def stop_recording(self) -> dict:
-        name, steps = self._recorder.stop()
-        if name is None:
-            return {"saved": False, "name": "", "steps": 0}
-        saved = self._wf_store.save(name, steps) if steps else ""
-        return {"saved": bool(saved), "name": saved or name, "steps": len(steps)}
-
-    def list_workflows(self) -> dict:
-        return {"recording": self._recorder.status(), "workflows": self._wf_store.list()}
-
-    def delete_workflow(self, name: str) -> bool:
-        return self._wf_store.delete(name)
-
-    def generate_workflow(self, name: str, description: str, provider: str | None = None) -> dict:
-        """AI-generate a saved workflow from plain English (10.7.6).
-
-        Rides the same free-model chain as Ask Lucky (the bridge's keyless
-        locals → Cline gateways → keyed clouds) — no key required. The
-        model's step list goes through ``normalize_generated_steps`` (same
-        validity rules as recorded steps), so generated workflows replay,
-        self-heal and schedule exactly like recorded ones. The stored name
-        slug is returned; ``preview`` holds the first steps for the UI log.
-        """
-        from browser_core.ai_bridge import AIBridge
-
-        if self._ai is None:
-            self._ai = AIBridge()
-        elif not self._ai.providers() or (provider is None and self._ai.default_provider() is None):
-            with contextlib.suppress(Exception):
-                self._ai = AIBridge()
-        messages = [
-            {"role": "system", "content": _WORKFLOW_GEN_SYSTEM},
-            {"role": "user", "content": description},
-        ]
-        text, _used = asyncio.run(self._ai.chat(messages, provider=provider))
-        steps = normalize_generated_steps(parse_json_loose(text or ""))
-        if not steps:
-            raise RuntimeError(
-                "the AI did not return usable workflow steps — rephrase the "
-                "description (one action per step, full https:// URLs) and "
-                "try again, or switch free model in Settings → Models"
-            )
-        slug = self._wf_store.save(name or f"ai-workflow-{int(time.time())}", steps)
-        return {"saved": True, "name": slug, "steps": len(steps), "preview": steps[:20]}
-
-    def replay_workflow(self, name: str) -> dict:
-        """Replay a saved workflow against the live tab.
-
-        Indexed steps re-resolve their target on a fresh snapshot: the
-        recorded fingerprint is scored against the current elements and the
-        best match wins (self-healing), falling back to the recorded index.
-        Stops at the first broken element step rather than clicking blind.
-        """
-        data = self._wf_store.load(name)
-        if data is None:
-            raise KeyError(f"workflow {name!r} not found")
-        steps = data.get("steps", [])
-        results: list[dict] = []
-        self._replaying = True
-        try:
-            for i, step in enumerate(steps):
-                self._wait_ready(timeout=4.0)  # never act into a mid-reload page
-                kind = str(step.get("action", ""))
-                action: dict = {"action": kind}
-                healed = False
-                if kind in INDEXED_ACTIONS:
-                    candidates: list[dict] = []
-                    with contextlib.suppress(Exception):
-                        self.snapshot()  # retags data-ld-agent on the live page
-                        raw = self.run_js(elements_js())
-                        candidates = json.loads(raw) if raw else []
-                    index, healed = resolve_index(
-                        step.get("target"), candidates, int(step.get("index", 0) or 0)
-                    )
-                    action["index"] = index
-                if "text" in step:
-                    action["text"] = step["text"]
-                if "url" in step:
-                    action["url"] = step["url"]
-                try:
-                    detail = self.act(action)
-                    ok = not str(detail).startswith(self._FAILED_PREFIXES)
-                except Exception as exc:
-                    detail, ok = str(exc), False
-                results.append(
-                    {
-                        "step": i + 1,
-                        "action": kind,
-                        "ok": ok,
-                        "healed": healed,
-                        "detail": str(detail)[:200],
-                    }
-                )
-                time.sleep(0.25)  # let the page breathe between steps
-                if not ok and kind in INDEXED_ACTIONS:
-                    break
-        finally:
-            self._replaying = False
-        done = sum(1 for r in results if r["ok"])
-        return {
-            "workflow": data.get("name", name),
-            "total": len(steps),
-            "succeeded": done,
-            "results": results,
-        }
-
     def _wait_ready(self, timeout: float = 4.0) -> None:
         """Block until the active page reports readyState complete (bounded)."""
         deadline = time.monotonic() + timeout
@@ -1754,17 +1462,3 @@ class QtBrowserBackend:
         if self._netmon is None:
             return to_har([])
         return to_har(self._netmon.rows(0)["rows"], self._netmon.target)
-
-    # ── workflow schedules ────────────────────────────────────────────
-
-    def schedule_list(self) -> dict:
-        if self._schedules is None:
-            self._schedules = ScheduleStore()
-        return {"schedules": self._schedules.list(), "intervals": INTERVALS}
-
-    def schedule_set(self, name: str, every_min: int) -> dict:
-        if self._schedules is None:
-            self._schedules = ScheduleStore()
-        entry = self._schedules.set(name, every_min)
-        every = int(entry.get("every_min", 0) or 0)
-        return {"name": name, "every_min": every, "label": INTERVALS.get(every, "Off")}

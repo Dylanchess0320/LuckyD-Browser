@@ -1,7 +1,7 @@
 """Coverage push for browser_core/control_server.py — helpers, GuiInvoker, QtBrowserBackend.
 
 Earlier suites covered the HTTP auth model, host/origin defenses, the main
-route table, the /hq gateway, /status enrichment, research-swarm routes and
+route table, /status enrichment and
 the BrowserControlServer lifecycle (test_night1_control.py,
 test_night4_control_routes.py). This file covers the rest:
 
@@ -10,9 +10,8 @@ test_night4_control_routes.py). This file covers the rest:
   _send_download, _body's size caps and malformed-body paths, _fail's repr
   fallback, log_message, _status with a raising harness/ai_info;
 - the remaining GET routes (/, /mesh, /terminal?shell=, /static/terminal/
-  success + mime mapping, /network, /research, /research/status|runs|run
-  against the real swarm manager), the do_GET 500 path, POST origin
-  rejection, and the /hq error-splash path;
+  success + mime mapping, /network), the do_GET 500 path and POST origin
+  rejection;
 - GuiInvoker as a REAL QObject subclass (PySide6.QtCore ships a real stub
   QObject and a working Signal factory in this file, so the classes under
   test are real, not mocks): _execute success/error, run()
@@ -21,10 +20,9 @@ test_night4_control_routes.py). This file covers the rest:
   page: _window/_view errors, run_js value + timeout paths, _wait_settled
   change/timeout paths, _normalize_url, navigate/new_tab/activate_tab/
   close_tab, snapshot ok/empty/parse-error, act/_perform_act for every
-  action kind, recording behavior, replay_workflow (healed/failed/exception
-  steps, early break, _replaying reset), _wait_ready, extract's snapshot
+  action kind, _wait_ready, extract's snapshot
   failure, set_theme's missing browser_ui.theme, screenshot's unreachable
-  CDP, netmon_* lazy + live paths, schedule_list/schedule_set.
+  CDP, netmon_* lazy + live paths.
 
 No network beyond loopback, no sleeps over a second.
 """
@@ -122,8 +120,6 @@ from browser_core.control_server import (
     _QuietHTTPServer,
     make_handler,
 )
-from browser_core.scheduler import INTERVALS, ScheduleStore
-from browser_core.workflows import WorkflowStore, elements_js, fingerprint_js
 
 TOKEN = "cov-control-token"
 
@@ -158,7 +154,6 @@ class _ScriptedPage:
             "elements": [],
             "text": "hello",
         }
-        self._candidates = []
 
     def runJavaScript(self, js, cb):  # noqa: N802
         self.calls.append(js)
@@ -174,16 +169,12 @@ class _ScriptedPage:
                 if self._snapshot_raw is not None
                 else json.dumps(self._snapshot_doc)
             )
-        elif js == elements_js():
-            cb(json.dumps(self._candidates))
         elif js == _SETTLE_JS:
             if self._settle_fixed is not None:
                 cb(self._settle_fixed)
             else:
                 self._settle_n += 1
                 cb(f"state-{self._settle_n}")
-        elif js == fingerprint_js(0):
-            cb(json.dumps({"tag": "button", "text": "Go"}))
         else:
             for i in range(64):
                 if js == _CLICK_JS.format(i=i):
@@ -352,27 +343,6 @@ class _HttpBackend:
 
     def ask(self, question, provider):
         return "answer!"
-
-    def list_workflows(self):
-        return {"workflows": ["w1"]}
-
-    def start_recording(self, name):
-        return name
-
-    def stop_recording(self):
-        return {"name": "w1", "steps": 2}
-
-    def replay_workflow(self, name):
-        return {"replayed": name}
-
-    def delete_workflow(self, name):
-        return True
-
-    def schedule_list(self):
-        return {"schedules": [], "intervals": {"0": "Off"}}
-
-    def schedule_set(self, name, every_min):
-        return {"name": name, "every_min": every_min}
 
     def extract(self, instruction, schema, provider):
         return {"field": "value"}
@@ -772,47 +742,6 @@ def test_get_network_page_is_html(server):
     assert b"<html" in data.lower()
 
 
-def test_get_workflows_page_is_html(server):
-    status, ctype, _ = _req(server, "GET", "/workflows", headers=_authz())
-    assert status == 200
-    assert "text/html" in ctype
-
-
-def test_get_research_page_is_html(server):
-    status, ctype, _ = _req(server, "GET", "/research", headers=_authz())
-    assert status == 200
-    assert "text/html" in ctype
-
-
-def test_research_status_real_manager_idle(server):
-    status, _, data = _req(server, "GET", "/research/status", headers=_authz())
-    assert status == 200
-    body = json.loads(data)
-    assert body["ok"] is True
-    assert body["status"] == "idle"
-    assert body["active"] is False
-
-
-def test_research_runs_real_manager(server):
-    status, _, data = _req(server, "GET", "/research/runs", headers=_authz())
-    assert status == 200
-    assert isinstance(json.loads(data)["runs"], list)
-
-
-def test_research_run_real_manager_not_found(server):
-    status, _, data = _req(server, "GET", "/research/run?id=does-not-exist", headers=_authz())
-    assert status == 200
-    body = json.loads(data)
-    assert body["ok"] is False
-    assert "not found" in body["error"]
-
-
-def test_research_run_rejects_traversal(server):
-    status, _, data = _req(server, "GET", "/research/run?id=../../secret", headers=_authz())
-    assert status == 200
-    assert json.loads(data)["ok"] is False
-
-
 def test_get_backend_error_is_500():
     class _Bad:
         def tabs(self):
@@ -841,21 +770,6 @@ def test_post_forbidden_origin_403(server):
     )
     assert status == 403
     assert json.loads(data)["error"] == "forbidden origin"
-
-
-def test_hq_error_splash_when_harness_broken():
-    h = _Harness(up=False, error="port busy", autostart=False)
-    handler = make_handler(_HttpBackend(), token=TOKEN, harness=h)
-    srv, t, port = _serve(handler)
-    try:
-        status, ctype, data = _req(port, "GET", "/hq", headers=_authz())
-        assert status == 200
-        assert "text/html" in ctype
-        assert b"port busy" in data
-        assert h.ensure_calls == []  # error state → straight to the error page
-    finally:
-        srv.shutdown()
-        t.join(timeout=5)
 
 
 # ── _export_env_to_os ────────────────────────────────────────────────
@@ -1304,32 +1218,6 @@ def test_perform_act_unknown_action():
     assert be._perform_act({"action": "dance"}) == "unknown action: 'dance'"
 
 
-def test_act_records_click_with_fingerprint():
-    be, *_ = _qt_backend()
-    be.start_recording("demo")
-    assert be.act({"action": "click", "index": 0}) == "clicked"
-    _, steps = be._recorder.stop()
-    assert steps == [{"action": "click", "index": 0, "target": {"tag": "button", "text": "Go"}}]
-
-
-def test_act_skips_recording_failed_result():
-    be, *_, page = _qt_backend()
-    page._click_results = {0: "refused: stale element"}
-    be.start_recording("demo")
-    assert be.act({"action": "click", "index": 0}) == "refused: stale element"
-    _, steps = be._recorder.stop()
-    assert steps == []
-
-
-def test_navigate_records_when_recording(monkeypatch):
-    be, _app, _win, _view, _page = _qt_backend(monkeypatch=monkeypatch)
-    assert be.start_recording("demo") == "demo"
-    be.navigate("example.com")
-    name, steps = be._recorder.stop()
-    assert name == "demo"
-    assert steps == [{"action": "navigate", "url": "https://example.com"}]
-
-
 def test_eval_js_passthrough():
     be, *_ = _qt_backend()
     assert be.eval_js("document.title") == "ok"
@@ -1367,78 +1255,7 @@ def test_set_theme_applies_to_every_window():
     assert win.themed == 1
 
 
-# ── QtBrowserBackend: workflows / replay ─────────────────────────────
-
-
-def test_stop_recording_without_start(tmp_path):
-    be, *_ = _qt_backend()
-    be._wf_store = WorkflowStore(directory=tmp_path / "wf")
-    assert be.stop_recording() == {"saved": False, "name": "", "steps": 0}
-
-
-def test_record_stop_save_list_delete_roundtrip(tmp_path, monkeypatch):
-    be, _app, _win, _view, _page = _qt_backend(monkeypatch=monkeypatch)
-    be._wf_store = WorkflowStore(directory=tmp_path / "wf")
-    assert be.start_recording("Demo Flow") == "Demo-Flow"
-    be.navigate("example.com")
-    assert be.stop_recording() == {"saved": True, "name": "Demo-Flow", "steps": 1}
-    assert (tmp_path / "wf" / "Demo-Flow.json").is_file()
-    listed = be.list_workflows()
-    assert listed["recording"]["recording"] is False
-    assert any(w["name"] == "Demo-Flow" for w in listed["workflows"])
-    assert be.delete_workflow("Demo-Flow") is True
-    assert not (tmp_path / "wf" / "Demo-Flow.json").is_file()
-
-
-def test_replay_missing_workflow_raises_keyerror(tmp_path):
-    be, *_ = _qt_backend()
-    be._wf_store = WorkflowStore(directory=tmp_path / "wf")
-    with pytest.raises(KeyError, match="nope"):
-        be.replay_workflow("nope")
-
-
-def test_replay_workflow_heals_breaks_and_reports(tmp_path):
-    be, *_, page = _qt_backend()
-    be._wf_store = WorkflowStore(directory=tmp_path / "wf")
-    page._candidates = [{"index": 5, "el_id": "go", "tag": "button", "text": "Go"}]
-    page._click_results = {9: "element not found: gone"}
-    be._wf_store.save(
-        "flow",
-        [
-            {"action": "wait", "text": "0.2"},
-            {
-                "action": "click",
-                "index": 3,
-                "target": {"el_id": "go", "tag": "button", "text": "Go"},
-            },
-            {"action": "click", "index": 9},
-        ],
-    )
-    out = be.replay_workflow("flow")
-    assert out["workflow"] == "flow"
-    assert out["total"] == 3
-    assert out["succeeded"] == 2
-    assert [r["ok"] for r in out["results"]] == [True, True, False]
-    assert out["results"][1]["healed"] is True
-    assert out["results"][2]["healed"] is False
-    assert "element not found" in out["results"][2]["detail"]
-    assert be._replaying is False  # reset even after the early break
-
-
-def test_replay_act_exception_is_recorded_not_raised(tmp_path):
-    be, *_, page = _qt_backend()
-    be._wf_store = WorkflowStore(directory=tmp_path / "wf")
-    page._raise_on = ("history.back",)
-    be._wf_store.save("flow", [{"action": "back"}])
-    out = be.replay_workflow("flow")
-    assert out["total"] == 1
-    assert out["succeeded"] == 0
-    assert out["results"][0]["ok"] is False
-    assert "timed out" in out["results"][0]["detail"]
-    assert be._replaying is False
-
-
-# ── QtBrowserBackend: netmon / schedules ─────────────────────────────
+# ── QtBrowserBackend: netmon ─────────────────────────────
 
 
 def test_netmon_lazy_paths():
@@ -1457,19 +1274,6 @@ def test_netmon_start_stop_roundtrip():
     assert be.netmon_stop() == {"stopped": True}
     assert be.netmon_clear() == {"cleared": True}
     assert be.netmon_har()["log"]["entries"] == []
-
-
-def test_schedule_list_and_set(tmp_path):
-    be, *_ = _qt_backend()
-    be._schedules = ScheduleStore(path=tmp_path / "sched.json")
-    out = be.schedule_list()
-    assert out["schedules"] == []
-    assert out["intervals"] == INTERVALS
-    entry = be.schedule_set("morning", 60)
-    assert entry == {"name": "morning", "every_min": 60, "label": "Hourly"}
-    assert be.schedule_list()["schedules"][0]["name"] == "morning"
-    assert be.schedule_set("morning", 0)["label"] == "Off"
-    assert be.schedule_list()["schedules"] == []
 
 
 # ── gap-fillers for the remaining uncovered backend/handler branches ──────
@@ -1500,16 +1304,6 @@ def test_wait_ready_waits_out_incomplete_state():
     assert time.monotonic() - t0 >= 0.4
 
 
-def test_replay_workflow_copies_url_hint(tmp_path, monkeypatch):
-    be, *_ = _qt_backend(monkeypatch=monkeypatch)
-    be._wf_store = WorkflowStore(directory=tmp_path / "wf")
-    be._wf_store.save("demo", [{"action": "wait", "text": "0.01", "url": "https://x.com/"}])
-    out = be.replay_workflow("demo")
-    assert out["total"] == 1
-    assert out["succeeded"] == 1
-    assert out["results"][0]["ok"] is True
-
-
 def test_netmon_start_with_explicit_filter_and_restart():
     be, *_ = _qt_backend()
     first = be.netmon_start("https://x.com")
@@ -1517,19 +1311,6 @@ def test_netmon_start_with_explicit_filter_and_restart():
     second = be.netmon_start("https://y.com")  # restarts the existing monitor
     assert second == {"started": True, "target": "https://y.com"}
     assert be.netmon_stop() == {"stopped": True}
-
-
-def test_schedule_store_created_once(tmp_path):
-    be, *_ = _qt_backend()
-    be.schedule_list()
-    store = be._schedules
-    assert store is not None
-    be.schedule_list()  # store already present → no second ScheduleStore()
-    assert be._schedules is store
-    be._schedules = ScheduleStore(path=tmp_path / "sched.json")
-    store = be._schedules
-    be.schedule_set("nightly", 1440)
-    assert be._schedules is store
 
 
 def test_control_server_start_is_idempotent():
@@ -1625,15 +1406,6 @@ def test_extract_rejects_unparseable_model_output():
         be.extract("get the title")
 
 
-def test_schedule_set_creates_store_lazily(tmp_path, monkeypatch):
-    be, *_ = _qt_backend()
-    assert be._schedules is None
-    monkeypatch.setattr(cs, "ScheduleStore", lambda: ScheduleStore(path=tmp_path / "sched.json"))
-    entry = be.schedule_set("nightly", 1440)
-    assert entry == {"name": "nightly", "every_min": 1440, "label": "Daily"}
-    assert be._schedules is not None
-
-
 def test_status_harness_probe_success(monkeypatch):
     be, *_ = _qt_backend()
 
@@ -1691,105 +1463,6 @@ def test_get_dashboard_renders(server):
     assert status == 200
     assert "text/html" in ctype
     assert b"LuckyD" in data
-
-
-def test_workflow_delete_requires_name(server):
-    status, _, data = _req(server, "POST", "/workflow/delete", {}, headers=_authz())
-    assert status == 400
-    assert json.loads(data)["error"] == "name required"
-
-
-# ── 10.7.6: workflow AI generation + Ask Lucky page detection ────────────
-
-
-def test_generate_workflow_saves_valid_steps(tmp_path):
-    from browser_core.workflows import WorkflowStore
-
-    reply = (
-        '[{"action": "navigate", "url": "https://example.com"},'
-        ' {"action": "click", "index": 0, "target": {"tag": "a", "text": "Docs"}}]'
-    )
-    stub = SimpleNamespace(_ai=_FakeAI(reply), _wf_store=WorkflowStore(directory=tmp_path))
-    result = QtBrowserBackend.generate_workflow(stub, "my-flow", "open example.com and click Docs")
-    assert result["saved"] is True
-    assert result["name"] == "my-flow"
-    assert result["steps"] == 2
-    assert len(result["preview"]) == 2
-    data = stub._wf_store.load("my-flow")
-    assert data is not None and len(data["steps"]) == 2
-    messages, _provider = stub._ai.seen[0]
-    assert "workflow" in messages[0]["content"].lower()
-    assert messages[1]["content"] == "open example.com and click Docs"
-
-
-def test_generate_workflow_cleans_junk_and_names_fallback(tmp_path):
-    from browser_core.workflows import WorkflowStore
-
-    reply = (
-        '```json\n{"steps": [{"action": "navigate", "url": "https://a.io"},'
-        ' {"action": "explode"}, {"action": "wait", "text": "1"}]}\n```'
-    )
-    stub = SimpleNamespace(_ai=_FakeAI(reply), _wf_store=WorkflowStore(directory=tmp_path))
-    result = QtBrowserBackend.generate_workflow(stub, "", "do a thing")
-    assert result["steps"] == 2  # junk step dropped
-    assert result["name"].startswith("ai-workflow-")  # name fallback
-
-
-def test_generate_workflow_rejects_unusable_output(tmp_path):
-    from browser_core.workflows import WorkflowStore
-
-    stub = SimpleNamespace(
-        _ai=_FakeAI("sorry, I cannot help with that"),
-        _wf_store=WorkflowStore(directory=tmp_path),
-    )
-    with pytest.raises(RuntimeError, match="did not return usable workflow steps"):
-        QtBrowserBackend.generate_workflow(stub, "x", "do a thing")
-    assert stub._wf_store.list() == []  # nothing half-saved
-
-
-class _GenBackend:
-    def __init__(self):
-        self.calls = []
-
-    def status(self):
-        return {"ok": True}
-
-    def generate_workflow(self, name, description, provider=None):
-        self.calls.append((name, description, provider))
-        return {"saved": True, "name": name or "auto", "steps": 1, "preview": []}
-
-
-@pytest.fixture()
-def gen_server():
-    backend = _GenBackend()
-    handler = make_handler(backend, token=TOKEN)
-    srv = ThreadingHTTPServer(("127.0.0.1", 0), handler)
-    port = srv.server_address[1]
-    t = threading.Thread(target=srv.serve_forever, daemon=True)
-    t.start()
-    yield port, backend
-    srv.shutdown()
-    t.join(timeout=5)
-
-
-def test_workflow_generate_route_roundtrip(gen_server):
-    port, backend = gen_server
-    status, _, data = _req(
-        port, "POST", "/workflow/generate", {"name": "n1", "description": "open a site"}, _authz()
-    )
-    assert status == 200
-    out = json.loads(data)
-    assert out["ok"] is True and out["name"] == "n1"
-    assert out["steps"] == 1
-    assert backend.calls == [("n1", "open a site", None)]
-
-
-def test_workflow_generate_route_requires_description(gen_server):
-    port, backend = gen_server
-    status, _, data = _req(port, "POST", "/workflow/generate", {"name": "n1"}, _authz())
-    assert status == 400
-    assert "description" in json.loads(data)["error"]
-    assert backend.calls == []
 
 
 def test_ask_general_questions_never_page_snapshotted():

@@ -415,10 +415,6 @@ class MainWindow(QMainWindow):
         self.ai_act.setCheckable(True)
         self.ai_act.triggered.connect(self._toggle_assistant)
 
-        hq_act = QAction("⌘", self)
-        hq_act.setToolTip("Coding Agent workspace — 70+ tools, auto-start (Ctrl+Shift+H)")
-        hq_act.triggered.connect(self.open_hq)
-
         mesh_act = QAction("🕸", self)
         mesh_act.setToolTip("Multi Agent Terminal — four parallel sessions (Ctrl+Alt+M)")
         mesh_act.triggered.connect(self.open_agent_mesh)
@@ -696,16 +692,13 @@ class MainWindow(QMainWindow):
         view_menu.addAction(ai_toggle)
 
         tools_menu = QMenu("&Tools", self)
-        if self._show_retired_tools():
-            self._add(tools_menu, "Coding Agent", self.open_hq, "Ctrl+Shift+H")
         self._add(
             tools_menu,
             "Multi Agent Terminal (4 parallel sessions)",
             self.open_agent_mesh,
             "Ctrl+Alt+M",
         )
-        if self._show_retired_tools():
-            self._add(tools_menu, "LuckyD Chat", self.open_luckyd_chat)
+        self._add(tools_menu, "LuckyD Chat", self.open_luckyd_chat)
         self._add(tools_menu, "Agent 1 Terminal", lambda: self.open_terminal("agent"), "Ctrl+`")
         self._add(tools_menu, "Agent 2 Terminal", lambda: self.open_terminal("agent2"))
         self._add(
@@ -714,12 +707,8 @@ class MainWindow(QMainWindow):
             lambda: self.open_terminal("powershell"),
             "Ctrl+Shift+`",
         )
-        if self._show_retired_tools():
-            self._add(tools_menu, "Workflows…", self.open_workflows)
         self._add(tools_menu, "Network Monitor", self.open_network_monitor)
         self._add(tools_menu, "Organize Tabs with AI", self.organize_tabs_with_ai)
-        if self._show_retired_tools():
-            self._add(tools_menu, "Deep Researcher Swarm…", self.open_deep_research, "Ctrl+Shift+R")
         self._add(tools_menu, "Summarize This Page", self.summarize_page, "Ctrl+Shift+U")
         self._add(tools_menu, "Site Permissions…", self.open_site_permissions)
         tools_menu.addSeparator()
@@ -892,28 +881,6 @@ class MainWindow(QMainWindow):
             return QUrl(server.base_url + "/dashboard")
         return QUrl.fromLocalFile(str(NEWTAB_PATH))
 
-    def open_hq(self) -> None:
-        """Open the Coding Agent HQ (the exe's full UI) in a tab.
-
-        Goes through the Control API's /hq gateway: instant redirect when the
-        backend is up, auto-start + splash when it isn't. Falls back to the
-        raw harness URL when the Control API is disabled.
-        """
-        server = getattr(self._app, "control_server", None)
-        if server is not None and server.running:
-            self.open_in_new_tab(QUrl(server.base_url + "/hq"))
-            return
-        harness = getattr(self._app, "harness", None)
-        if harness is not None:
-            harness.ensure_started()
-            self.open_in_new_tab(QUrl(harness.url))
-        else:
-            self.toasts.show(
-                "Coding agent backend unavailable — turn on 'Start the coding-agent "
-                "backend on launch' in Settings > General, then restart the browser",
-                kind="error",
-            )
-
     def open_terminal(self, shell: str = "agent") -> None:
         """Open a NEW independent terminal tab (agent CLI, PowerShell, or CMD).
 
@@ -967,17 +934,6 @@ class MainWindow(QMainWindow):
                 kind="error",
             )
 
-    def open_workflows(self) -> None:
-        """Open the workflow manager (record/replay saved automations)."""
-        server = getattr(self._app, "control_server", None)
-        if server is not None and server.running:
-            self.open_in_new_tab(QUrl(server.base_url + "/workflows"))
-        else:
-            self.toasts.show(
-                "Workflows need the Browser Control API (Tools → Browser Control API)",
-                kind="error",
-            )
-
     def open_network_monitor(self) -> None:
         """Open the live network monitor tab (CDP Network domain)."""
         server = getattr(self._app, "control_server", None)
@@ -986,43 +942,6 @@ class MainWindow(QMainWindow):
         else:
             self.toasts.show(
                 "Network Monitor needs the Browser Control API (Tools → Browser Control API)",
-                kind="error",
-            )
-
-    def open_deep_research(self, query: str = "") -> None:
-        """Open the dedicated Deep Researcher Swarm tool workspace in a tab.
-
-        Pre-populates current tab URL/title as context and query if provided.
-        Runs the multi-agent swarm: planner -> parallel research workers ->
-        citation synthesizer -> critic & verifier -> final report.
-        """
-        server = getattr(self._app, "control_server", None)
-        if server is None or not server.running:
-            starter = getattr(self._app, "set_browser_api_enabled", None)
-            if callable(starter):
-                starter(True)
-            server = getattr(self._app, "control_server", None)
-
-        from urllib.parse import urlencode
-
-        params = {}
-        if query:
-            params["q"] = query
-
-        try:
-            view = self.tabs.current_view()
-            if view is not None and view.url().scheme() in ("http", "https"):
-                params["context_url"] = view.url().toString()
-                params["context_title"] = view.title() or ""
-        except Exception:
-            pass
-
-        if server is not None and server.running:
-            qs = ("?" + urlencode(params)) if params else ""
-            self.open_in_new_tab(QUrl(server.base_url + "/research" + qs))
-        else:
-            self.toasts.show(
-                "Deep Research Swarm needs the Browser Control API (Tools → Browser Control API)",
                 kind="error",
             )
 
@@ -1973,13 +1892,6 @@ class MainWindow(QMainWindow):
             self.bm_bar_act.setChecked(bool(self.settings.get("bookmark_bar_visible", True)))
             self._app.apply_adblock(bool(self.settings.get("adblock_enabled", True)))
 
-    def _show_retired_tools(self) -> bool:
-        """Retired tools (LuckyD HQ, Workflows, Deep Researcher, Deck Studio,
-        LuckyD Chat) stay hidden from every UI surface unless the user flips
-        the show_retired_tools setting back on. The tools themselves — pages,
-        routes, modules — remain fully built in."""
-        return bool(self.settings.get("show_retired_tools", False))
-
     def open_internal_page(self, name: str) -> None:
         """Handle luckyd:// internal links (dashboard tiles, new-tab footer)."""
         actions = {
@@ -1993,8 +1905,6 @@ class MainWindow(QMainWindow):
             "permissions": self.open_site_permissions,
             "dashboard": lambda: self.open_in_new_tab(self._newtab_url()),
         }
-        if self._show_retired_tools():
-            actions["hq"] = self.open_hq
         handler = actions.get(name.strip("/").lower())
         if handler:
             handler()
@@ -2052,7 +1962,6 @@ class MainWindow(QMainWindow):
                 ("Ctrl+Shift+U", "Summarize this page"),
                 ("Ctrl+Shift+F", "Focus mode (hide all chrome)"),
                 ("Ctrl+Shift+A", "AI assistant"),
-                ("Ctrl+Shift+H", "Coding agent"),
                 ("Ctrl+Alt+M", "Multi Agent Terminal (4 parallel sessions)"),
                 ("Ctrl+`", "Agent 1 terminal"),
                 ("Ctrl+Shift+`", "PowerShell terminal"),
@@ -2082,13 +1991,10 @@ class MainWindow(QMainWindow):
         from PySide6.QtWidgets import QDialog, QDialogButtonBox, QTextBrowser, QVBoxLayout
 
         pal = palette(self.settings)
-        show_retired = self._show_retired_tools()
 
         def section_html(title: str, rows: tuple) -> str:
             parts = [f"<tr><th colspan='2'>{_html.escape(title)}</th></tr>"]
             for keys, desc in rows:
-                if keys == "Ctrl+Shift+H" and not show_retired:
-                    continue  # retired tool: row hidden with the tool
                 parts.append(
                     f"<tr><td><span class='kbd'>{_html.escape(keys)}</span></td>"
                     f"<td>{_html.escape(desc)}</td></tr>"

@@ -17,11 +17,7 @@ if str(_BROWSER_DIR) not in sys.path:
 if str(_REPO_ROOT) not in sys.path:
     sys.path.append(str(_REPO_ROOT))
 
-from browser_core.dashboard import (
-    dashboard_html,
-    hq_shell_html,
-    hq_splash_html,
-)
+from browser_core.dashboard import dashboard_html
 
 from core.router import (
     ComplexityEstimator,
@@ -160,20 +156,3 @@ def test_dashboard_html_never_embeds_tokens() -> None:
     html = dashboard_html(_fake_settings())
     assert "SECRET-TOKEN-ABC" not in html
     assert "Bearer" not in html
-
-
-def test_hq_splash_states() -> None:
-    err = hq_splash_html("http://127.0.0.1:8000", "error", "boot failed")
-    assert "Coding agent backend unavailable" in err
-    assert "boot failed" in err
-    assert "refresh" not in err.lower()
-    starting = hq_splash_html("http://127.0.0.1:8000", "starting")
-    assert "refresh" in starting and "content='3'" in starting
-
-
-def test_hq_shell_embeds_url_and_theme() -> None:
-    html = hq_shell_html("http://127.0.0.1:8000", _fake_settings())
-    assert 'src="http://127.0.0.1:8000"' in html
-    assert "__HARNESS_URL__" not in html
-    assert "--ld-grad" in html
-    assert "SECRET-TOKEN-ABC" not in html

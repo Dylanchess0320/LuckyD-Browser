@@ -14,7 +14,7 @@ Robustness notes:
   * Every HTTP call builds a FRESH httpx.AsyncClient. A long-lived client
     binds to whichever asyncio event loop created it, and this bridge is
     used from several loops (the sidebar's harness worker, the app's boot
-    thread, the /hq splash handler…) — reusing one across loops crashes
+    thread…) — reusing one across loops crashes
     the second task with "Event loop is closed".
   * Process spawn is guarded by a threading lock so two workers can never
     start duplicate exes.
@@ -406,7 +406,7 @@ class HarnessSupervisor:
     status for the UI, and thread-safe background start.
 
     The browser uses a single supervisor (created by BrowserApp) so the
-    sidebar, the /hq gateway and the dashboard all see the same state.
+    sidebar and the dashboard all see the same state.
     Every method is safe to call from any thread; none touch Qt.
     """
 
@@ -515,8 +515,7 @@ class HarnessSupervisor:
     def ensure_started(self, timeout: float = 25.0, force: bool = False) -> None:
         """Kick off a background start (idempotent — returns immediately).
 
-        ``force=True`` skips the health probe and clears the last error —
-        used by the /hq gateway's manual Retry link.
+        ``force=True`` skips the health probe and clears the last error.
         """
         if self.last.get("starting"):
             return

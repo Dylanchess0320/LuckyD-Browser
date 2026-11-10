@@ -2,11 +2,10 @@
 
 Covers the headline 4.0 hardening:
 
-- Control API nav pages (/dashboard, /research, /mesh) require auth and no
+- Control API nav pages (/dashboard, /chat, /mesh) require auth and no
   longer embed the bearer token in served HTML — in-browser tabs use the
   HttpOnly ``luckyd_ctl`` session cookie instead.
 - The HQ landing page (/) requires auth and hides its token (``luckyd_hq``).
-- Deep Research markdown rendering escapes HTML and allowlists link schemes.
 - The terminal WebSocket accepts the ``luckyd_term`` cookie; ``?token=`` is gone.
 - ``CheckpointManager.undo_to()`` terminates when a checkpoint's file is gone.
 - ``_host_ok()`` accepts bracketed IPv6 loopback (``[::1]:port``).
@@ -17,7 +16,6 @@ from __future__ import annotations
 
 import http.client
 import json
-import subprocess
 import sys
 import threading
 from http.server import ThreadingHTTPServer
@@ -37,7 +35,7 @@ for _mod in (
     if _mod not in sys.modules:
         sys.modules[_mod] = MagicMock()
 
-# Ensure browser/ is importable for `browser_core` (same as test_browser_research).
+# Ensure browser/ is importable for `browser_core`.
 # conftest already puts the repo root first; append (never prepend) so the
 # repo-root `main.py` (coding agent) is never shadowed by `browser/main.py`.
 _REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -115,7 +113,7 @@ class TestControlCookieAuth:
     def test_nav_pages_require_auth(self):
         server, thread = _control_server(SENTINEL)
         try:
-            for path in ("/dashboard", "/research", "/mesh"):
+            for path in ("/dashboard", "/chat", "/mesh"):
                 status, body = _get(server.server_port, path)
                 assert status == 401, f"{path} was reachable without auth"
                 assert SENTINEL not in body
@@ -127,7 +125,7 @@ class TestControlCookieAuth:
     def test_nav_pages_accept_session_cookie_and_hide_token(self):
         server, thread = _control_server(SENTINEL)
         try:
-            for path in ("/dashboard", "/research", "/mesh"):
+            for path in ("/dashboard", "/chat", "/mesh"):
                 status, body = _get(
                     server.server_port,
                     path,
@@ -215,97 +213,18 @@ class TestHQCookieAuth:
 class TestTokenNonDisclosure:
     def test_pages_never_embed_tokens(self):
         from browser_core.dashboard import dashboard_html
-        from browser_core.research_page import research_html
         from browser_core.terminal_page import mesh_html, terminal_html
 
         for html in (
             dashboard_html(),
-            research_html(),
             mesh_html(),
             terminal_html(),
         ):
             assert SENTINEL not in html
         # No JS-visible token constants remain in any served page.
-        combined = dashboard_html() + research_html() + mesh_html() + terminal_html()
+        combined = dashboard_html() + mesh_html() + terminal_html()
         for const in ("DASH_TOKEN", "MESH_TOKEN", "WS_TOKEN", "HQ_TOKEN", "const TOKEN"):
             assert const not in combined, f"{const} still embedded in served HTML"
-
-
-# ── Deep Research markdown XSS ─────────────────────────────────────────────
-
-
-def _extract_js_function(html: str, name: str) -> str:
-    start = html.index(f"function {name}")
-    i = html.index("{", start)
-    depth = 0
-    for j in range(i, len(html)):
-        if html[j] == "{":
-            depth += 1
-        elif html[j] == "}":
-            depth -= 1
-            if depth == 0:
-                return html[start : j + 1]
-    raise AssertionError(f"unbalanced braces in {name}")
-
-
-def _run_parse_markdown(payloads: list[str]) -> list[str]:
-    """Execute the real parseMarkdown from the served page in node."""
-    from browser_core.research_page import research_html
-
-    html = research_html()
-    src = (
-        _extract_js_function(html, "escapeHtml")
-        + "\n"
-        + _extract_js_function(html, "parseMarkdown")
-    )
-    script = (
-        src
-        + "\nconst payloads = JSON.parse(require('fs').readFileSync(0, 'utf8'));\n"
-        + "console.log(JSON.stringify(payloads.map(parseMarkdown)));"
-    )
-    proc = subprocess.run(
-        ["node", "-e", script],
-        input=json.dumps(payloads).encode(),
-        capture_output=True,
-        timeout=30,
-    )
-    assert proc.returncode == 0, proc.stderr.decode()
-    return json.loads(proc.stdout.decode())
-
-
-class TestResearchMarkdownXSS:
-    def test_report_markdown_is_escaped(self):
-        out = _run_parse_markdown(
-            [
-                "<img src=x onerror=alert(1)>",
-                "<script>alert(1)</script>",
-                "a < b && c > d",
-            ]
-        )
-        for rendered in out:
-            assert "<img" not in rendered
-            assert "<script>" not in rendered
-        assert "&lt;img" in out[0]
-        assert "&lt;script&gt;" in out[1]
-
-    def test_dangerous_link_schemes_are_neutralized(self):
-        out = _run_parse_markdown(
-            [
-                "[click](javascript:alert(1))",
-                "[data](data:text/html,<script>alert(1)</script>)",
-                "[ok](https://example.com/report)",
-            ]
-        )
-        assert "javascript:" not in out[0]
-        assert 'href="#"' in out[0]
-        assert "data:text/html" not in out[1]
-        assert 'href="https://example.com/report"' in out[2]
-
-    def test_legit_markdown_still_renders(self):
-        out = _run_parse_markdown(["**bold** and *italic*", "# Title"])
-        assert "<b>bold</b>" in out[0]
-        assert "<i>italic</i>" in out[0]
-        assert "<h1>Title</h1>" in out[1]
 
 
 # ── Terminal WebSocket: cookie auth, no query token ────────────────────────

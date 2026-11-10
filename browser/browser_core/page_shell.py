@@ -1,7 +1,7 @@
 """Shared HTML head shell for browser_core pages.
 
-Every HTML page the Control API serves (dashboard, workflows, network
-monitor, terminal, agent mesh, HQ splash, deep research) used to embed its
+Every HTML page the Control API serves (dashboard, network
+monitor, terminal, agent mesh) used to embed its
 own near-duplicate dark color vars and base styles. This module emits one
 shared ``<head>`` block instead:
 

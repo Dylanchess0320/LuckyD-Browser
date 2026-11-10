@@ -1,5 +1,5 @@
 """Night-1 browser-core audit: skills.py (registry, matching, doc loading)
-and research_page.py SwarmManager (run-id traversal guard, run storage)."""
+and the Deep Research engine (run storage)."""
 
 from __future__ import annotations
 

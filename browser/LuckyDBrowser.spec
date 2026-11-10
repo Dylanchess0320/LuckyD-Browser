@@ -112,13 +112,7 @@ a = Analysis(
            # exes default to free local Ollama on end-user machines.
            ('../.env.example', '.env.example'),
            ('installer/env/.env', '.'),
-           # Bundled Deck Studio (Marp pipeline UI + decks + themes). The
-            # TileRegistry autostarts it from %RESDIR%\studio, i.e. this
-            # build's _internal\studio — NOT %APPDIR%\studio, which is only
-            # the exe's own folder and made the spawn die with winerror 267;
-            # ai.js falls back to the app-injected GOOGLE_API_KEY, so no
-            # secret ships in here.
-            ('studio', 'studio')] + wp_datas + _swarm_datas + _pd_datas,
+           ] + wp_datas + _swarm_datas + _pd_datas,
     # websockets + winpty are imported lazily (CDP driver / screenshots /
     # terminal bridge) - pin them. assets/ ships recursively, including
     # assets/terminal/ (the vendored xterm.js page the /terminal tab needs).
