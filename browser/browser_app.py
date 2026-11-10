@@ -186,8 +186,16 @@ class BrowserApp:
             # lives. Prefer the live server's own URL (it already
             # resolved LUCKYD_API_PORT vs the setting); fall back to the
             # same port expression start_control_server uses.
-            if self.control_server is not None and getattr(self.control_server, "base_url", ""):
-                hub_url = str(self.control_server.base_url)
+            # NOTE: the getattr default must NOT sit as the right operand
+            # of `and` in the if below — mypy 1.20 infers its type var
+            # from the boolean context and demands a bool default.
+            control_base_url = (
+                getattr(self.control_server, "base_url", "")
+                if self.control_server is not None
+                else ""
+            )
+            if control_base_url:
+                hub_url = str(control_base_url)
             else:
                 import os
 
