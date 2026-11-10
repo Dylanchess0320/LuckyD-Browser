@@ -132,6 +132,9 @@ _SNAPSHOT_FULL = _SNAPSHOT_JS.replace("__MAXELS__", str(_MAX_ELS)).replace(
 
 
 class _FakeQUrl:
+    """Stand-in for QUrl: navigate/new_tab hand the fake window a QUrl
+    whose .spec the tests assert on."""
+
     def __init__(self, spec):
         self.spec = spec
 
@@ -279,7 +282,18 @@ class _FakeApp:
 def _qt_backend(url="https://example.com/", monkeypatch=None):
     """Real QtBrowserBackend driving the fake Qt app; returns (be, app, win, view, page)."""
     if monkeypatch is not None:
-        monkeypatch.setattr(sys.modules["PySide6.QtCore"], "QUrl", _FakeQUrl)
+        # raising=False is REQUIRED, not cosmetic. QUrl on this MagicMock
+        # is only dynamically resolved (cached in _mock_children, never in
+        # __dict__), and pytest 9.2.0 (#10644) snapshots setattr's old
+        # value from the instance __dict__ and deletes the attribute on
+        # undo when it was never genuinely there — MagicMock then marks it
+        # _deleted, so the next raising=True setattr raises
+        # AttributeError ("has no attribute 'QUrl'"). With raising=False
+        # each call re-sets it and the tests self-heal on both 9.1 and 9.2.
+        # NOTE: do NOT "fix" this by assigning QUrl at import time above:
+        # the mock is shared across test modules, and test_98 reads
+        # QUrl.call_args off the MagicMock — a real class here breaks it.
+        monkeypatch.setattr(sys.modules["PySide6.QtCore"], "QUrl", _FakeQUrl, raising=False)
     page = _ScriptedPage()
     view = _FakeView(url, page)
     win = _FakeWindow([view])
