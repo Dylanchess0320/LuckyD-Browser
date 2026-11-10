@@ -36,6 +36,8 @@ _CHAT_CSS = """  :root{color-scheme:dark}
   .state{padding:10px 16px;color:var(--ld-muted);font-size:12px;
     border-bottom:1px solid var(--ld-border)}
   .state:empty{display:none}
+  .hub-status{grid-column:1/-1;border:1px solid var(--ld-border);
+    border-radius:var(--ld-r-md);background:var(--ld-card)}
   #chat-log{height:380px;overflow:auto;padding:14px 16px;display:flex;
     flex-direction:column;gap:10px}
   .msg{max-width:88%;padding:9px 12px;border-radius:12px;white-space:pre-wrap;
@@ -90,6 +92,7 @@ _CHAT_CSS = """  :root{color-scheme:dark}
 _CHAT_BODY = r"""<body>
 <header><h1><span>💬</span> LuckyD Chat</h1></header>
 <main>
+  <div class="state hub-status" id="hub-status"></div>
   <section id="hub-sec">
     <div class="sec-head"><h2>Hub chat</h2><span class="sp"></span>
       <button class="ghost" id="chat-clear" type="button">Clear</button></div>
@@ -139,6 +142,37 @@ const STATE_LINES = {
   }
 };
 function stateLine(el, svc, state){ el.textContent = (!state || state === 'ok') ? '' : (STATE_LINES[svc][state] || ''); }
+
+// ── one Hub status block: reachability + last-seen for all 4 parts ──
+const HUB_STATUS_LABELS = {
+  ok: 'live',
+  unreachable: 'unreachable',
+  no_token: 'off — no token',
+  bad_token: 'token rejected',
+  error: 'error',
+  not_running: 'not running'
+};
+function fmtSeen(ts){
+  if (!ts) return 'never seen';
+  const d = new Date(ts * 1000);
+  return 'last seen ' + String(d.getHours()).padStart(2, '0') + ':'
+    + String(d.getMinutes()).padStart(2, '0');
+}
+function renderHubStatus(components){
+  const el = $('#hub-status');
+  if (!components) { el.textContent = ''; return; }
+  const names = {browser: 'Browser', hub: 'Hub', claw: 'Claw', puck: 'Puck bridge'};
+  const parts = [];
+  for (const key of ['browser', 'hub', 'claw', 'puck']) {
+    const c = components[key];
+    if (!c) continue;
+    const label = HUB_STATUS_LABELS[c.state] || c.state || 'unknown';
+    let bit = names[key] + ': ' + label;
+    if (c.state !== 'ok') bit += ' (' + fmtSeen(c.last_seen) + ')';
+    parts.push(bit);
+  }
+  el.textContent = parts.join('  ·  ');
+}
 
 async function api(path, body){
   const opt = body ? {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)} : {};
@@ -280,6 +314,7 @@ $('#task-run').addEventListener('click', async () => {
 async function refreshState(){
   try {
     const s = await api('/chat/state');
+    renderHubStatus(s.components);
     stateLine($('#hub-state'), 'hub', s.hub && s.hub.state);
     stateLine($('#claw-state'), 'claw', s.claw && s.claw.state);
     clawOk = !!(s.claw && s.claw.state === 'ok' && s.claw.enabled !== false);

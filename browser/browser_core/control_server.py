@@ -70,6 +70,7 @@ from browser_core.dashboard import (
 )
 from browser_core.extract import build_messages, parse_json_loose
 from browser_core.luckyd_services import (
+    STATUS_TIMEOUT,
     claw_cancel,
     claw_state,
     claw_submit,
@@ -77,6 +78,7 @@ from browser_core.luckyd_services import (
     claw_tasks,
     hub_chat,
     hub_state,
+    puck_state,
 )
 from browser_core.netmon import NetMonitor, to_har
 from browser_core.research_page import research_html, swarm_manager
@@ -115,7 +117,10 @@ _ROUTES = (
     ("GET  /mesh", "Multi Agent Terminal — four parallel terminal sessions in one workspace"),
     ("GET  /mesh/doctor", "per-backend Multi Agent Terminal health check + tier labels (JSON)"),
     ("GET  /chat", "LuckyD Chat — Hub chat + Claw tasks in one page"),
-    ("GET  /chat/state", "Hub + Claw reachability and the Claw project allowlist (JSON)"),
+    (
+        "GET  /chat/state",
+        "Hub status surface: reachability + last-seen for Browser, Hub, Claw, puck bridge (JSON)",
+    ),
     ("POST /chat/send", '{"messages": [{"role", "content"}...]} — send to the Hub chat route'),
     ("GET  /chat/tasks", "Claw task list (JSON, proxied)"),
     (
@@ -497,14 +502,36 @@ def make_handler(
                 if path == "/chat":
                     return self._send_html(chat_html(settings))
                 if path == "/chat/state":
-                    hub = hub_state(settings)
-                    claw = claw_state(settings)
+                    # One Hub status surface: live reachability + last-seen
+                    # for all four components. Probes use the short status
+                    # timeout so the endpoint stays under ~1s even when a
+                    # service black-holes; the shape of the existing hub /
+                    # claw / projects fields is unchanged. The browser is
+                    # "ok" by definition — it is serving this response.
+                    hub = hub_state(settings, timeout=STATUS_TIMEOUT)
+                    claw = claw_state(settings, timeout=STATUS_TIMEOUT)
+                    puck = puck_state(settings, timeout=STATUS_TIMEOUT)
+                    components = {
+                        "browser": {"state": "ok", "last_seen": time.time()},
+                        "hub": {
+                            "state": hub.get("state"),
+                            "last_seen": hub.get("last_seen"),
+                        },
+                        "claw": {
+                            "state": claw.get("state"),
+                            "last_seen": claw.get("last_seen"),
+                        },
+                        "puck": {
+                            "state": puck.get("state"),
+                            "last_seen": puck.get("last_seen"),
+                        },
+                    }
                     projects = list(claw.get("projects") or [])
                     if not projects and claw.get("state") == "ok":
                         # Older Claw builds don't publish the allowlist
                         # on /healthz — fall back to projects seen in the
                         # task history so the picker still works.
-                        listed = claw_tasks(settings)
+                        listed = claw_tasks(settings, timeout=STATUS_TIMEOUT)
                         if listed.get("state") == "ok":
                             projects = sorted(
                                 {
@@ -513,7 +540,13 @@ def make_handler(
                                     if isinstance(t, dict) and t.get("project")
                                 }
                             )
-                    return self._ok(hub=hub, claw=claw, projects=projects)
+                    return self._ok(
+                        hub=hub,
+                        claw=claw,
+                        puck=puck,
+                        projects=projects,
+                        components=components,
+                    )
                 if path == "/chat/tasks":
                     return self._send(200, claw_tasks(settings))
                 if path == "/chat/task":
