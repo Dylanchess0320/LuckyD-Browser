@@ -181,8 +181,28 @@ class BrowserApp:
             cli = str(self.settings.get("terminal_cli", "") or "")
             cli2 = str(self.settings.get("terminal_cli2", "") or "")
             token = str(self.settings.get("terminal_token", "") or "")
+            # Hub slice 9: the control server's base URL, so agent CLIs
+            # spawned on the PTY know where the shared handoff note
+            # lives. Prefer the live server's own URL (it already
+            # resolved LUCKYD_API_PORT vs the setting); fall back to the
+            # same port expression start_control_server uses.
+            if self.control_server is not None and getattr(self.control_server, "base_url", ""):
+                hub_url = str(self.control_server.base_url)
+            else:
+                import os
+
+                hub_port = int(
+                    os.environ.get("LUCKYD_API_PORT")
+                    or int(self.settings.get("browser_api_port", 9777))
+                )
+                hub_url = f"http://127.0.0.1:{hub_port}"
             server = TerminalServer(
-                port=port, cli_path=cli, cli2_path=cli2, token=token, settings=self.settings
+                port=port,
+                cli_path=cli,
+                cli2_path=cli2,
+                token=token,
+                settings=self.settings,
+                hub_url=hub_url,
             )
             if not server.start():
                 print("[browser] terminal bridge not started (pywinpty/websockets?)")

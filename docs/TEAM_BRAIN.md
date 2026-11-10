@@ -1,7 +1,7 @@
 # The team brain — one page
 
-*Hub slices 1–6, 2026-11-10. Ground truth: the code in this repo, not the vision.
-One page = 54 lines / 542 words (`wc -l -w`). Count in `TEAM_BRAIN_SCORECARD.md`.*
+*Hub slices 1–6 + 9, 2026-11-10. Ground truth: the code in this repo, not the vision.
+One page = 53 lines / 529 words (`wc -l -w`). Count in `TEAM_BRAIN_SCORECARD.md`.*
 
 ## The pieces, and who owns what
 
@@ -10,7 +10,7 @@ One page = 54 lines / 542 words (`wc -l -w`). Count in `TEAM_BRAIN_SCORECARD.md`
 | **LuckyD Browser — Chat page** | The Hub: status, provider switching, handoff note, cards | `browser/browser_core/chat_page.py`, `control_server.py` |
 | **Memory** | The handoff note (one short note + append-only log) and the card store — plain JSON files the Browser owns (atomic writes; corrupt file reads as empty) | `hub_memory.py` (`hub_handoff.json`), `hub_cards.py` (`hub_cards.json`) |
 | **Provider pin** | The pinned provider (`ai_provider` setting; empty = "auto", chain decides). Survives restarts | `hub_providers.py` |
-| **Terminal / LuckyD Code** | Code work on the PC. Not yet wired to Hub memory (see Gap) | PC-side, outside this repo's Hub modules |
+| **Terminal / LuckyD Code** | Code work on the PC. Wired to Hub memory since slice 9 | `core/hub_handoff.py`, `main.py` (`/handoff`, session start/end), `terminal_server.py` (`LUCKYD_HUB_URL`) |
 | **Claw** | Overnight jobs, PR-only, never main. Hub reports liveness only (`/healthz` + allowlist) | `luckyd_services.py: claw_state()` |
 | **Puck** | Standalone: talks to Muse cloud directly, firmware 175ag / Flash #16. Hub does **not** control it — `/chat/state` reports "no puck bridge configured" | `luckyd_services.py: puck_state()` |
 | **Growth watch** | GitHub stars / Discord joins (cloud `luckyd-watch/check.py`). Adapter POSTs each real change to `/chat/cards`; a no-change day posts nothing | `scripts/hub_growth_watch.py` |
@@ -38,17 +38,16 @@ in a worktree and opens a PR; nothing merges itself. The puck needs no PC at
 all. The Hub does nothing overnight unless a watch fires: no polling loop,
 no scheduled job in this repo wakes it.
 
-## The gap — and the fix
+## The gap — closed by slice 9
 
-**Gap: the handoff note is Browser-only.** Only the Chat page reads/writes
-it. Terminal / LuckyD Code and Claw cannot see it, so a note left in chat
-never reaches the code layer and a Code session's context never comes back
-— one brain cell, in the Browser. (Same shape as the puck: reported, not wired.)
+**Was: the handoff note is Browser-only.** Only the Chat page read/wrote
+it. Terminal / LuckyD Code could not see it, so a note left in chat
+never reached the code layer and a Code session's context never came back.
 
-**Fix (next slice, small):** wire the Terminal / LuckyD Code layer to the
-endpoints that already exist — `GET /chat/handoff` at session start,
-`POST /chat/handoff` at session end — against the same control-server port
-the Chat page uses. No new store or protocol: one reader + one writer on the
-Code side, gated by the Hub tests plus one round-trip test. Same size as
-slice 3 (~100 lines + tests). Until then, the honest statement is: memory
-lives in the Browser.
+**Fix (slice 9, done):** the Code layer reads/writes the endpoints that
+already exist — `GET /chat/handoff` at REPL start (shown as one line),
+`POST /chat/handoff` at session end (a short receipt, only when the
+session did work), plus `/handoff [text]` in the REPL for manual
+read/write. The bridge hands the CLI the control-server URL as
+`LUCKYD_HUB_URL`. No new store or protocol: one reader + one writer on
+the Code side, gated by the Hub tests plus one round-trip test.

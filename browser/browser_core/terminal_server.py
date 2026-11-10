@@ -43,6 +43,11 @@ TERMINAL_PROVIDER_ENV = "CODING_AGENT_PROVIDER"
 # Agent shells only — the shared pick governs LuckyD Code. System
 # shells and third-party mesh CLIs have their own auth and never see it.
 _AGENT_SHELLS = ("agent", "agent2")
+# Hub (Browser Control API) base URL the agent CLIs talk to for the
+# shared handoff note (Hub slice 9). The browser passes its live
+# control-server URL in; the default matches the control server's
+# default port (browser_core/control_server.py DEFAULT_PORT).
+DEFAULT_HUB_URL = "http://127.0.0.1:9777"
 
 # Name of the HttpOnly session cookie the browser sets on its own profile.
 # The terminal credential travels in this cookie (sent automatically on the
@@ -1015,6 +1020,7 @@ def _spawn_pty(
     rows: int = _ROWS,
     cli2_path: str = "",
     provider: str = "",
+    hub_url: str = "",
 ):
     """Spawn the chosen shell on a ConPTY. Returns a pywinpty PTY handle.
 
@@ -1044,10 +1050,15 @@ def _spawn_pty(
         env["LUCKYD_AGENT_SLOT"] = "1"
         env["LUCKYD_AGENT_NAME"] = "Agent 1"
         env["LUCKYD_AGENT_VERSION"] = "v10.8.6"
+        # Hub slice 9: where this CLI reads/writes the shared handoff
+        # note (core/hub_handoff.py). Only the LuckyD Code CLIs get it —
+        # mesh shells are third-party CLIs that would ignore it.
+        env["LUCKYD_HUB_URL"] = (hub_url or "").strip() or DEFAULT_HUB_URL
     elif shell == "agent2":
         env["LUCKYD_AGENT_SLOT"] = "2"
         env["LUCKYD_AGENT_NAME"] = "Agent 2"
         env["LUCKYD_AGENT_VERSION"] = "v10.8.6"
+        env["LUCKYD_HUB_URL"] = (hub_url or "").strip() or DEFAULT_HUB_URL
     # Slice 8: drop any override inherited from the browser process env
     # first, then pin the shared pick — agent shells only.
     env.pop(TERMINAL_PROVIDER_ENV, None)
@@ -1084,6 +1095,7 @@ class TerminalServer:
         cli2_path: str = "",
         token: str = "",
         settings=None,
+        hub_url: str = "",
     ):
         self.host = host
         self.port = int(port)
@@ -1094,6 +1106,9 @@ class TerminalServer:
         # fresh agent PTY boots on the provider the Chat page picked.
         # None keeps the old behavior (no provider pin in the child env).
         self._settings = settings
+        # Hub slice 9: control-server base URL handed to agent CLIs as
+        # LUCKYD_HUB_URL so they can read/write the shared handoff note.
+        self.hub_url = (hub_url or "").strip() or DEFAULT_HUB_URL
         self._server: object = None
         self._thread: threading.Thread | None = None
         self._clients: set = set()
@@ -1140,6 +1155,7 @@ class TerminalServer:
                 rows=rows,
                 cli2_path=self.cli2_path,
                 provider=terminal_provider(self._settings),
+                hub_url=self.hub_url,
             )
         except Exception as exc:  # pywinpty missing or spawn failed
             # Don't leak internal paths to WS client — log detail server-side.
