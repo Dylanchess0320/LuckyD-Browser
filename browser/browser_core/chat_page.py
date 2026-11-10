@@ -51,6 +51,10 @@ _CHAT_CSS = """  :root{color-scheme:dark}
   input[type=text],textarea{background:var(--ld-panel2);color:var(--ld-text);
     border:1px solid var(--ld-border);border-radius:9px;padding:8px 11px;
     font:inherit;box-sizing:border-box}
+  select{background:var(--ld-panel2);color:var(--ld-text);
+    border:1px solid var(--ld-border);border-radius:9px;padding:8px 11px;font:inherit}
+  .prov{display:flex;gap:8px;align-items:center;padding:10px 16px;
+    border-bottom:1px solid var(--ld-border);color:var(--ld-muted);font-size:12px}
   input[type=text]{flex:1}
   textarea{width:100%;min-height:64px;resize:vertical}
   button{background:var(--ld-accent);color:#fff;border:0;border-radius:9px;
@@ -97,6 +101,8 @@ _CHAT_BODY = r"""<body>
     <div class="sec-head"><h2>Hub chat</h2><span class="sp"></span>
       <button class="ghost" id="chat-clear" type="button">Clear</button></div>
     <div class="state" id="hub-state"></div>
+    <div class="prov"><label for="provider-select">Provider</label>
+      <select id="provider-select"><option value="auto">Auto</option></select></div>
     <div id="chat-log"></div>
     <form class="send" id="chat-form">
       <input type="text" id="chat-input" placeholder="Message the Hub" autocomplete="off">
@@ -311,10 +317,43 @@ $('#task-run').addEventListener('click', async () => {
   btn.disabled = false; refreshTasks();
 });
 
+// ── one-tap provider switching (slice 2) ──────────────────────────
+// The picker lists the providers /chat/state reports; one change pins
+// the pick (POST /chat/provider, persisted server-side) and every later
+// /chat/send goes to that provider until "Auto" is picked again.
+function renderProviders(p){
+  const sel = $('#provider-select');
+  if (!p || !sel) return;
+  const current = p.current || 'auto';
+  sel.innerHTML = '';
+  const auto = document.createElement('option');
+  auto.value = 'auto'; auto.textContent = 'Auto' + (p.default ? ' (' + p.default + ')' : '');
+  sel.appendChild(auto);
+  for (const name of (p.available || [])) {
+    const o = document.createElement('option');
+    o.value = name; o.textContent = name;
+    sel.appendChild(o);
+  }
+  // The server is the source of truth: a pinned provider that is no
+  // longer available falls back to Auto in the picker (the pin itself
+  // is only cleared by picking Auto or another provider).
+  sel.value = Array.from(sel.options).some(o => o.value === current) ? current : 'auto';
+}
+$('#provider-select').addEventListener('change', async ev => {
+  const sel = ev.target; sel.disabled = true;
+  try {
+    const r = await api('/chat/provider', {provider: sel.value});
+    if (r.state === 'ok' && r.providers) renderProviders(r.providers);
+    else await refreshState();
+  } catch (_) { await refreshState(); }
+  sel.disabled = false;
+});
+
 async function refreshState(){
   try {
     const s = await api('/chat/state');
     renderHubStatus(s.components);
+    if (s.providers) renderProviders(s.providers);
     stateLine($('#hub-state'), 'hub', s.hub && s.hub.state);
     stateLine($('#claw-state'), 'claw', s.claw && s.claw.state);
     clawOk = !!(s.claw && s.claw.state === 'ok' && s.claw.enabled !== false);

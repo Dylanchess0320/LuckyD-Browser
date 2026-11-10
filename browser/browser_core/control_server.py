@@ -69,6 +69,11 @@ from browser_core.dashboard import (
     workflows_html,
 )
 from browser_core.extract import build_messages, parse_json_loose
+from browser_core.hub_providers import (
+    current_provider,
+    pin_provider,
+    provider_state,
+)
 from browser_core.luckyd_services import (
     STATUS_TIMEOUT,
     claw_cancel,
@@ -119,7 +124,11 @@ _ROUTES = (
     ("GET  /chat", "LuckyD Chat — Hub chat + Claw tasks in one page"),
     (
         "GET  /chat/state",
-        "Hub status surface: reachability + last-seen for Browser, Hub, Claw, puck bridge (JSON)",
+        "Hub status surface: reachability + last-seen for Browser, Hub, Claw, puck bridge, plus provider state (JSON)",
+    ),
+    (
+        "POST /chat/provider",
+        '{"provider": "…|auto"} — pin the chat provider (persisted, survives restart)',
     ),
     ("POST /chat/send", '{"messages": [{"role", "content"}...]} — send to the Hub chat route'),
     ("GET  /chat/tasks", "Claw task list (JSON, proxied)"),
@@ -546,6 +555,7 @@ def make_handler(
                         puck=puck,
                         projects=projects,
                         components=components,
+                        providers=provider_state(settings, backend),
                     )
                 if path == "/chat/tasks":
                     return self._send(200, claw_tasks(settings))
@@ -639,7 +649,22 @@ def make_handler(
                     messages = body.get("messages")
                     if not isinstance(messages, list) or not messages:
                         return self._send(400, {"state": "error", "error": "messages required"})
-                    return self._send(200, hub_chat(settings, messages))
+                    return self._send(
+                        200, hub_chat(settings, messages, provider=current_provider(settings))
+                    )
+                if path == "/chat/provider":
+                    # One-tap provider switch: validate against the list
+                    # /chat/state just reported, persist the pin, and hand
+                    # the fresh provider state back so the page re-renders.
+                    providers = provider_state(settings, backend)
+                    result = pin_provider(
+                        settings, body.get("provider"), providers.get("available")
+                    )
+                    if result.get("state") != "ok":
+                        return self._send(400, result)
+                    return self._send(
+                        200, {"state": "ok", "providers": provider_state(settings, backend)}
+                    )
                 if path == "/chat/task":
                     project = str(body.get("project", "")).strip()
                     prompt = str(body.get("prompt", "")).strip()

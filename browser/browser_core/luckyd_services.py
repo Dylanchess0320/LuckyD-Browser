@@ -132,16 +132,25 @@ def hub_state(settings, opener=None, timeout=_QUICK_TIMEOUT) -> dict:
     return {"state": "ok", "ollama": bool(obj.get("ollama")), "last_seen": _note_seen("hub")}
 
 
-def hub_chat(settings, messages, opener=None) -> dict:
+def hub_chat(settings, messages, opener=None, provider=None) -> dict:
     """Send the conversation to the Hub's /chat route (stateless: the
-    caller passes the full message list, the Hub routes local-first)."""
+    caller passes the full message list, the Hub routes local-first).
+
+    ``provider`` is the pinned provider name (slice 2): when set and not
+    "auto" it is passed through in the payload so the Hub answers with
+    the provider Dylan picked; the Hub is free to ignore an unknown
+    field, so an older Hub keeps working unchanged.
+    """
     token = _token(settings, "hub_token")
     if not token:
         return {"state": "no_token"}
+    payload: dict = {"token": token, "messages": messages}
+    if provider and str(provider).strip() not in ("", "auto"):
+        payload["provider"] = str(provider).strip()
     status, obj = _request(
         f"{hub_base(settings)}/chat",
         method="POST",
-        payload={"token": token, "messages": messages},
+        payload=payload,
         timeout=_CHAT_TIMEOUT,
         opener=opener,
     )
