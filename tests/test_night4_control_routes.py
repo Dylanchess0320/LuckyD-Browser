@@ -3,8 +3,8 @@
 Night-1 covered: auth model, host/origin defenses, body-size cap, basic
 dispatch (/tabs, /navigate, /tab/close, /help), traversal guard.
 This file extends into the remaining route handlers: tab lifecycle,
-snapshot/act/eval/ask, workflows, schedules, network capture, extract,
-theme, research swarm, /hq gateway, /status enrichment, and the
+snapshot/act/eval/ask, network capture, extract,
+theme, /status enrichment, and the
 BrowserControlServer lifecycle. Mocked at the HTTP boundary — real
 ThreadingHTTPServer, fake backend object.
 """
@@ -98,31 +98,6 @@ class _Backend:
     def ask(self, question, provider):
         self._rec("ask", question, provider)
         return "answer!"
-
-    def list_workflows(self):
-        return {"workflows": ["w1"]}
-
-    def start_recording(self, name):
-        self._rec("start_recording", name)
-        return name
-
-    def stop_recording(self):
-        return {"name": "w1", "steps": 2}
-
-    def replay_workflow(self, name):
-        self._rec("replay_workflow", name)
-        return {"replayed": name}
-
-    def delete_workflow(self, name):
-        self._rec("delete_workflow", name)
-        return True
-
-    def schedule_list(self):
-        return {"schedules": [], "intervals": {"0": "Off"}}
-
-    def schedule_set(self, name, every_min):
-        self._rec("schedule_set", name, every_min)
-        return {"name": name, "every_min": every_min}
 
     def extract(self, instruction, schema, provider):
         self._rec("extract", instruction, schema, provider)
@@ -327,18 +302,6 @@ def test_screenshot_get(server) -> None:
     assert body["image_b64"] == "aGVsbG8=" and body["mime"] == "image/jpeg"
 
 
-def test_workflows_list(server) -> None:
-    status, _, _, data = _req(server, "GET", "/workflows/list", headers=_authz())
-    assert status == 200
-    assert json.loads(data)["workflows"] == ["w1"]
-
-
-def test_schedules_get(server) -> None:
-    status, _, _, data = _req(server, "GET", "/schedules", headers=_authz())
-    assert status == 200
-    assert json.loads(data)["schedules"] == []
-
-
 def test_network_events_bad_since_defaults_to_zero(server) -> None:
     status, _, _, data = _req(server, "GET", "/network/events?since=nope", headers=_authz())
     assert status == 200
@@ -410,87 +373,6 @@ def test_body_non_dict_json_is_ignored(server) -> None:
     conn.close()
 
 
-# ── workflows / schedules / misc POST ────────────────────────────────
-
-
-def test_workflow_record(server) -> None:
-    status, _, _, data = _req(
-        server, "POST", "/workflow/record", body={"name": "w1"}, headers=_authz()
-    )
-    assert status == 200
-    assert json.loads(data)["name"] == "w1"
-
-
-def test_workflow_record_requires_name(server) -> None:
-    status, _, _, _data = _req(server, "POST", "/workflow/record", body={}, headers=_authz())
-    assert status == 400
-
-
-def test_workflow_stop(server) -> None:
-    status, _, _, data = _req(server, "POST", "/workflow/stop", body={}, headers=_authz())
-    assert status == 200
-    assert json.loads(data)["steps"] == 2
-
-
-def test_workflow_replay(server) -> None:
-    status, _, _, data = _req(
-        server, "POST", "/workflow/replay", body={"name": "w1"}, headers=_authz()
-    )
-    assert status == 200
-    assert json.loads(data)["replayed"] == "w1"
-
-
-def test_workflow_replay_requires_name(server) -> None:
-    status, _, _, _data = _req(server, "POST", "/workflow/replay", body={}, headers=_authz())
-    assert status == 400
-
-
-def test_workflow_delete(server) -> None:
-    status, _, _, data = _req(
-        server, "POST", "/workflow/delete", body={"name": "w1"}, headers=_authz()
-    )
-    assert status == 200
-    assert json.loads(data)["deleted"] is True
-
-
-def test_schedule_set(server) -> None:
-    status, _, _, data = _req(
-        server,
-        "POST",
-        "/schedule",
-        body={"name": "morning", "every_min": 60},
-        headers=_authz(),
-    )
-    assert status == 200
-    body = json.loads(data)
-    assert body["name"] == "morning" and body["every_min"] == 60
-
-
-def test_schedule_requires_name(server) -> None:
-    status, _, _, _data = _req(server, "POST", "/schedule", body={}, headers=_authz())
-    assert status == 400
-
-
-def test_schedule_bad_every_min_becomes_zero(server) -> None:
-    handler = make_handler(be := _Backend(), token=TOKEN)
-    srv = ThreadingHTTPServer(("127.0.0.1", 0), handler)
-    t = threading.Thread(target=srv.serve_forever, daemon=True)
-    t.start()
-    try:
-        status, _, _, _ = _req(
-            srv.server_address[1],
-            "POST",
-            "/schedule",
-            body={"name": "n", "every_min": "abc"},
-            headers=_authz(),
-        )
-        assert status == 200
-        assert ("schedule_set", "n", 0) in be.calls
-    finally:
-        srv.shutdown()
-        t.join(timeout=5)
-
-
 def test_extract_roundtrip(server) -> None:
     status, _, _, data = _req(
         server,
@@ -548,93 +430,7 @@ def test_network_start_stop_clear(server) -> None:
     assert s3 == 200 and json.loads(d3)["cleared"] is True
 
 
-# ── research swarm routes (swarm_manager mocked) ─────────────────────
-
-
-class _Swarm:
-    def __init__(self):
-        self.start_calls = []
-
-    def get_status(self, run_id):
-        return {"run_id": run_id, "state": "running"}
-
-    def list_runs(self):
-        return [{"run_id": "r1"}]
-
-    def get_run(self, run_id):
-        return {"run_id": run_id, "report": "# hi"}
-
-    def start_research(self, **kw):
-        self.start_calls.append(kw)
-        if kw["query"] == "explode":
-            raise ValueError("bad query")
-        return "rid-9"
-
-    def cancel_run(self):
-        return True
-
-
-@pytest.fixture()
-def swarm(monkeypatch):
-    fake = _Swarm()
-    monkeypatch.setattr(control_server, "swarm_manager", fake)
-    return fake
-
-
-def test_research_status(server, swarm) -> None:
-    status, _, _, data = _req(server, "GET", "/research/status?run_id=r1", headers=_authz())
-    assert status == 200
-    body = json.loads(data)
-    assert body["run_id"] == "r1" and body["state"] == "running"
-
-
-def test_research_runs(server, swarm) -> None:
-    status, _, _, data = _req(server, "GET", "/research/runs", headers=_authz())
-    assert status == 200
-    assert json.loads(data)["runs"] == [{"run_id": "r1"}]
-
-
-def test_research_run(server, swarm) -> None:
-    status, _, _, data = _req(server, "GET", "/research/run?id=r1", headers=_authz())
-    assert status == 200
-    assert json.loads(data)["report"] == "# hi"
-
-
-def test_research_start(server, swarm) -> None:
-    status, _, _, data = _req(
-        server,
-        "POST",
-        "/research/start",
-        body={"query": "cheap laptops", "depth": "deep"},
-        headers=_authz(),
-    )
-    assert status == 200
-    assert json.loads(data)["run_id"] == "rid-9"
-    assert swarm.start_calls[0]["query"] == "cheap laptops"
-    assert swarm.start_calls[0]["depth"] == "deep"
-    assert swarm.start_calls[0]["dry_run"] is False
-
-
-def test_research_start_requires_query(server, swarm) -> None:
-    status, _, _, _data = _req(server, "POST", "/research/start", body={}, headers=_authz())
-    assert status == 400
-
-
-def test_research_start_error_is_400(server, swarm) -> None:
-    status, _, _, data = _req(
-        server, "POST", "/research/start", body={"query": "explode"}, headers=_authz()
-    )
-    assert status == 400
-    assert "bad query" in json.loads(data)["error"]
-
-
-def test_research_cancel(server, swarm) -> None:
-    status, _, _, data = _req(server, "POST", "/research/cancel", body={}, headers=_authz())
-    assert status == 200
-    assert json.loads(data)["cancelled"] is True
-
-
-# ── /status enrichment + /hq gateway ─────────────────────────────────
+# ── /status enrichment ─────────────────────────────────
 
 
 class _Harness:
@@ -714,64 +510,6 @@ def test_status_harness_exception_suppressed(monkeypatch) -> None:
         status, _, _, data = _req(port, "GET", "/status", headers=_authz())
         assert status == 200
         assert json.loads(data)["ok"] is True  # backend status still served
-    finally:
-        srv.shutdown()
-        t.join(timeout=5)
-
-
-def test_hq_no_harness_gives_error_page() -> None:
-    srv, t, port = _srv_with()
-    try:
-        status, ctype, _, data = _req(port, "GET", "/hq", headers=_authz())
-        assert status == 200
-        assert "text/html" in ctype
-        assert b"No harness supervisor" in data
-    finally:
-        srv.shutdown()
-        t.join(timeout=5)
-
-
-def test_hq_up_serves_workspace_shell() -> None:
-    srv, t, port = _srv_with(harness=_Harness(up=True))
-    try:
-        status, ctype, _, data = _req(port, "GET", "/hq", headers=_authz())
-        assert status == 200
-        assert "text/html" in ctype
-        assert b"http://127.0.0.1:8000" in data
-    finally:
-        srv.shutdown()
-        t.join(timeout=5)
-
-
-def test_hq_starting_shows_splash() -> None:
-    srv, t, port = _srv_with(harness=_Harness(up=False, starting=True))
-    try:
-        status, ctype, _, _data = _req(port, "GET", "/hq", headers=_authz())
-        assert status == 200
-        assert "text/html" in ctype
-    finally:
-        srv.shutdown()
-        t.join(timeout=5)
-
-
-def test_hq_retry_forces_restart() -> None:
-    h = _Harness(up=False, error="died")
-    srv, t, port = _srv_with(harness=h)
-    try:
-        status, _, _, _ = _req(port, "GET", "/hq?retry=1", headers=_authz())
-        assert status == 200
-        assert h.ensure_calls == [True]  # force=True from the retry link
-    finally:
-        srv.shutdown()
-        t.join(timeout=5)
-
-
-def test_hq_auto_starts_when_idle() -> None:
-    h = _Harness(up=False)
-    srv, t, port = _srv_with(harness=h)
-    try:
-        _req(port, "GET", "/hq", headers=_authz())
-        assert h.ensure_calls == [False]
     finally:
         srv.shutdown()
         t.join(timeout=5)

@@ -1137,6 +1137,7 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
     False otherwise.
     """
     _ensure_all_heavy()
+    raw = cmd  # original casing — /handoff note text is case-sensitive
     cmd = cmd[1:].strip().lower()  # strip leading '/'
 
     if cmd in ("q", "quit", "exit"):
@@ -1314,6 +1315,29 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
         agent_name = os.environ.get("LUCKYD_AGENT_NAME", "Agent 1")
         ui.info(f"LuckyD Code {agent_version} ({agent_name})")
 
+    elif cmd == "handoff" or cmd.startswith("handoff "):
+        # ── Shared Hub handoff note (slice 9) ──
+        # /handoff          → show the latest note from any surface
+        # /handoff <text>   → append a note (visible in Browser Chat)
+        # The note text keeps its original casing: this function
+        # lowercases `cmd`, so re-read it from the raw command line.
+        from core.hub_handoff import read_latest, write_note
+
+        text = raw[1:].strip()[len("handoff") :].strip()
+        if not text:
+            latest = read_latest()
+            if latest:
+                ui.markdown(f"**Handoff** ({latest.get('source', '?')}): {latest.get('text', '')}")
+            else:
+                ui.info("No handoff note yet — /handoff <text> leaves one for Chat.")
+            return False
+        ok, reason = write_note(text)
+        if ok:
+            ui.success("Handoff note saved — it shows in Browser Chat.")
+        else:
+            ui.warn(f"Could not save the handoff note: {reason}")
+        return False
+
     elif cmd == "":
         pass  # Empty command
 
@@ -1438,6 +1462,22 @@ async def run_one_shot_json(agent: CodingAgent, message: str):
     sys.stdout.flush()
 
 
+def _post_handoff_receipt(agent: CodingAgent) -> None:
+    """Post the session-end receipt to the shared handoff note (slice 9).
+
+    Best-effort and silent: a down Hub (or a session that did nothing)
+    posts nothing and prints nothing.
+    """
+    try:
+        from core.hub_handoff import session_end_note, write_note
+
+        note = session_end_note(agent)
+        if note:
+            write_note(note)
+    except Exception:
+        pass
+
+
 async def run_repl(agent: CodingAgent):
     """Interactive REPL with streaming and session info."""
     _ensure_all_heavy()
@@ -1475,6 +1515,20 @@ async def run_repl(agent: CodingAgent):
             print(f"  Last worked: {_lw.provider}/{_lw.model} ({last_working_age_label()})")
     except Exception:
         pass
+    # Hub slice 9: show the latest shared handoff note at session start
+    # so a note left in Browser Chat reaches this Code session. Silent
+    # when there is no note or the Hub is down.
+    try:
+        from core.hub_handoff import read_latest
+
+        _latest = read_latest()
+        if _latest:
+            _text = str(_latest.get("text", ""))
+            if len(_text) > 120:
+                _text = _text[:117] + "..."
+            print(f"  [Hub] Handoff ({_latest.get('source', '?')}): {_text}")
+    except Exception:
+        pass
 
     while True:
         try:
@@ -1482,6 +1536,7 @@ async def run_repl(agent: CodingAgent):
         except (KeyboardInterrupt, EOFError):
             cost = agent.cost_tracker.summary() if hasattr(agent, "cost_tracker") else ""
             ui.goodbye(cost_summary=cost)
+            _post_handoff_receipt(agent)
             break
 
         user_input = user_input.strip()
@@ -1494,6 +1549,7 @@ async def run_repl(agent: CodingAgent):
             if should_exit:
                 cost = agent.cost_tracker.summary() if hasattr(agent, "cost_tracker") else ""
                 ui.goodbye(cost_summary=cost)
+                _post_handoff_receipt(agent)
                 break
             continue
 

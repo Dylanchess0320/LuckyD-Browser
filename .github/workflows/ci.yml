@@ -69,7 +69,9 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          # 3.11, not ${{ env.PYTHON_VERSION }} (3.10): filelock fix 4.2.1 needs Python >=3.11
+          # No clean filelock exists for 3.10 (CVE-2026-112909/112910 hit 3.20.3).
+          python-version: "3.11"
           cache: "pip"
 
       - name: Install Dependencies
@@ -85,7 +87,10 @@ jobs:
       - name: Dependency Scanning (pip-audit)
         # safety>=3.0 requires an interactive platform login, which can never
         # succeed in CI; pip-audit (PyPA, OSV DB) needs no auth and stays a hard gate.
-        run: pip-audit -r requirements.txt
+        # requirements-audit.txt pins filelock because it is not in
+        # requirements.txt tree otherwise (transitive dev dep). Fix line 4.2.1
+        # needs Python >=3.11, so this job runs on 3.11 - see Setup Python above.
+        run: pip-audit -r requirements.txt -r requirements-audit.txt
 
       - name: SAST (Bandit)
         run: bandit -r tools llm memory project features core browser --severity medium --quiet

@@ -166,6 +166,7 @@ SLASH_COMMANDS: list[tuple[str, str]] = [
     ("/sessions", "List saved sessions"),
     ("/resume", "Resume a saved session"),
     ("/mcp", "Show MCP server status"),
+    ("/handoff [text]", "Read/write the shared Hub handoff note"),
     ("/version", "Show version"),
     ("/quit", "Exit"),
 ]

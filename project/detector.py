@@ -283,9 +283,8 @@ class ProjectDetector:
         elif language == "Rust":
             if (root / "Cargo.toml").exists():
                 return "cargo"
-        elif language == "Go":
-            if (root / "go.mod").exists():
-                return "go mod"
+        elif language == "Go" and (root / "go.mod").exists():
+            return "go mod"
         return ""
 
     def _detect_test_framework(self, root: Path, language: str) -> str:
