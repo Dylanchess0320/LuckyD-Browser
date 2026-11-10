@@ -32,6 +32,18 @@ from urllib.parse import parse_qs, urlparse
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 9881
 
+# Env var the agent CLI reads as its explicit provider override
+# (core/providers.py: resolve_provider_config — "an explicit
+# CODING_AGENT_PROVIDER always wins"). Hub slice 8: a fresh Agent PTY
+# is spawned with the shared ``ai_provider`` pick pinned here, so the
+# terminal runs on exactly the provider the Chat page / sidebar picked.
+# "auto" (no pin) sets nothing — the CLI's mirror/auto logic runs clean.
+TERMINAL_PROVIDER_ENV = "CODING_AGENT_PROVIDER"
+
+# Agent shells only — the shared pick governs LuckyD Code. System
+# shells and third-party mesh CLIs have their own auth and never see it.
+_AGENT_SHELLS = ("agent", "agent2")
+
 # Name of the HttpOnly session cookie the browser sets on its own profile.
 # The terminal credential travels in this cookie (sent automatically on the
 # WebSocket handshake) — never in the URL, where it would leak into logs,
@@ -42,6 +54,26 @@ TERM_COOKIE = "luckyd_term"
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
 _COLS, _ROWS = 120, 30
+
+
+def terminal_provider(settings) -> str:
+    """The pinned provider for a fresh agent PTY, or ``""`` for Auto.
+
+    Reads the same shared ``ai_provider`` pick slice 2 pins from the
+    Chat page (``browser_core.hub_providers.current_provider``); a
+    missing/broken settings object means Auto. Never raises.
+    """
+    try:
+        from browser_core import hub_providers
+
+        pin = hub_providers.current_provider(settings)
+    except Exception:
+        try:
+            raw = str(settings.get("ai_provider", "") or "").strip() if settings is not None else ""
+        except Exception:
+            raw = ""
+        pin = raw or "auto"
+    return "" if pin in ("", "auto") else str(pin)
 
 
 def _expand(path: str) -> Path:
@@ -982,8 +1014,17 @@ def _spawn_pty(
     cols: int = _COLS,
     rows: int = _ROWS,
     cli2_path: str = "",
+    provider: str = "",
 ):
-    """Spawn the chosen shell on a ConPTY. Returns a pywinpty PTY handle."""
+    """Spawn the chosen shell on a ConPTY. Returns a pywinpty PTY handle.
+
+    ``provider`` is the shared ``ai_provider`` pick ("" = Auto). For the
+    Agent shells it is pinned into the child env as the CLI's explicit
+    provider override, so a fresh agent boots on the picked provider.
+    A stale override inherited from the browser process env never leaks
+    into any PTY: Auto agent sessions and non-agent shells get none, so
+    the CLI's mirror/auto logic runs clean.
+    """
     from winpty import PTY  # lazy import so the module loads without pywinpty
 
     pty = PTY(cols, rows)
@@ -1007,6 +1048,13 @@ def _spawn_pty(
         env["LUCKYD_AGENT_SLOT"] = "2"
         env["LUCKYD_AGENT_NAME"] = "Agent 2"
         env["LUCKYD_AGENT_VERSION"] = "v10.8.6"
+    # Slice 8: drop any override inherited from the browser process env
+    # first, then pin the shared pick — agent shells only.
+    env.pop(TERMINAL_PROVIDER_ENV, None)
+    if shell in _AGENT_SHELLS:
+        pin = (provider or "").strip()
+        if pin and pin != "auto":
+            env[TERMINAL_PROVIDER_ENV] = pin
     # pywinpty's PTY.spawn() expects the environment as a NUL-joined block
     # string ("name=value\0name=value\0…"), NOT a dict — passing a dict
     # raises cffi's "argument env: 'dict' object is not an instance of str",
@@ -1035,12 +1083,17 @@ class TerminalServer:
         cli_path: str = "",
         cli2_path: str = "",
         token: str = "",
+        settings=None,
     ):
         self.host = host
         self.port = int(port)
         self.cli_path = cli_path  # explicit CLI override (browser `terminal_cli` setting)
         self.cli2_path = cli2_path  # 2nd-agent override (browser `terminal_cli2` setting)
         self._token = token
+        # Slice 8: the shared ai_provider pick, read at spawn time so a
+        # fresh agent PTY boots on the provider the Chat page picked.
+        # None keeps the old behavior (no provider pin in the child env).
+        self._settings = settings
         self._server: object = None
         self._thread: threading.Thread | None = None
         self._clients: set = set()
@@ -1086,6 +1139,7 @@ class TerminalServer:
                 cols=cols,
                 rows=rows,
                 cli2_path=self.cli2_path,
+                provider=terminal_provider(self._settings),
             )
         except Exception as exc:  # pywinpty missing or spawn failed
             # Don't leak internal paths to WS client — log detail server-side.

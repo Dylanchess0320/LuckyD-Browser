@@ -181,7 +181,9 @@ class BrowserApp:
             cli = str(self.settings.get("terminal_cli", "") or "")
             cli2 = str(self.settings.get("terminal_cli2", "") or "")
             token = str(self.settings.get("terminal_token", "") or "")
-            server = TerminalServer(port=port, cli_path=cli, cli2_path=cli2, token=token)
+            server = TerminalServer(
+                port=port, cli_path=cli, cli2_path=cli2, token=token, settings=self.settings
+            )
             if not server.start():
                 print("[browser] terminal bridge not started (pywinpty/websockets?)")
                 self.terminal_server = None
