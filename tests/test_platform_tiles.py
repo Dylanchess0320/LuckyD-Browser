@@ -1,14 +1,15 @@
-"""Regression tests for platform-tile launch paths (Deck Studio).
+"""Regression tests for platform-tile launch paths.
 
-The Deck Studio tile shipped with ``cwd: "%APPDIR%\\studio"`` while the
-PyInstaller spec collects that payload into ``<app>\\_internal\\studio``
+The Deck Studio tile used to ship with ``cwd: "%APPDIR%\\studio"`` while the
+PyInstaller spec collected that payload into ``<app>\\_internal\\studio``
 (``sys._MEIPASS``). The configured directory therefore never existed in an
 installed build, ``subprocess.Popen`` died with
-``NotADirectoryError(winerror 267)`` and the tile stayed dark -- the browser
-showed "Deck Studio is not responding" no matter how often it retried.
+``NotADirectoryError(winerror 267)`` and the tile stayed dark.
 
-These tests pin the bundled-data token (``%RESDIR%``) and the fallback that
-keeps a stale cwd from killing the launch.
+Deck Studio was removed with the other retired tools (Hub slice 4), but the
+registry mechanics it exposed are still live — the bundled-data token
+(``%RESDIR%``) and the fallback that keeps a stale cwd from killing a
+launch — so these tests pin the mechanism with a generic payload instead.
 """
 
 from __future__ import annotations
@@ -40,47 +41,52 @@ from browser_core.tile_registry import (
     load_tiles,
 )
 
+# ── the shipped config: retired tiles are gone ───────────────────────
+
+
+def test_shipped_config_has_no_retired_tiles():
+    """Hub slice 4: hq / deep-research / deck-studio are removed entirely."""
+    raw = json.loads(CONFIG_PATH.read_text(encoding="utf-8-sig"))
+    ids = [t["id"] for t in raw["tiles"]]
+    for gone in ("hq", "deep-research", "deck-studio"):
+        assert gone not in ids, f"retired tile {gone!r} still configured"
+    assert ids == ["luckyd-chat"]  # the live Hub chat tile stays
+
+
 # ── the bundled-data folder ──────────────────────────────────────────
-
-
-def test_resource_dir_holds_the_bundled_studio_payload():
-    """%RESDIR% must point at the folder that actually has studio/."""
-    res = Path(_resource_dir())
-    assert res.is_dir()
-    assert (res / "studio" / "studio-server.js").is_file()
 
 
 def test_resdir_token_is_not_hijacked_by_an_env_var(monkeypatch):
     """A stray RESDIR env var must not win over the bundle location."""
     monkeypatch.setenv("RESDIR", os.path.join(os.sep, "nope"))
-    assert Path(_expand(r"%RESDIR%\studio")) == Path(_resource_dir()) / "studio"
-    assert Path(_expand("{resdir}/studio")) == Path(_resource_dir()) / "studio"
+    assert Path(_expand(r"%RESDIR%\payload")) == Path(_resource_dir()) / "payload"
+    assert Path(_expand("{resdir}/payload")) == Path(_resource_dir()) / "payload"
 
 
 # ── cwd resolution ───────────────────────────────────────────────────
 
 
 def test_existing_configured_cwd_is_used_as_is(tmp_path):
-    real = tmp_path / "studio"
+    real = tmp_path / "payload"
     real.mkdir()
     tile = Tile(
         id="t",
         name="t",
         icon="",
         url="http://127.0.0.1:1/",
-        command=("node", "studio-server.js"),
+        command=("node", "server.js"),
         cwd=str(real),
     )
     assert _resolve_cwd(tile) == str(real)
 
 
 def test_missing_cwd_falls_back_to_the_bundle(tmp_path, monkeypatch):
-    """The exact v9.0.0 bug: %APPDIR%\\studio does not exist once installed."""
+    """The v9.0.0 bug, generalized: a %APPDIR% payload dir does not exist once installed."""
     appdir = tmp_path / "app"
     resdir = appdir / "_internal"
     appdir.mkdir()
-    (resdir / "studio").mkdir(parents=True)
-    (resdir / "studio" / "studio-server.js").write_text("// stub", encoding="utf-8")
+    (resdir / "payload").mkdir(parents=True)
+    (resdir / "payload" / "server.js").write_text("// stub", encoding="utf-8")
     (appdir / "LuckyDBrowser.exe").write_text("", encoding="utf-8")
 
     monkeypatch.setattr(sys, "frozen", True, raising=False)
@@ -91,18 +97,18 @@ def test_missing_cwd_falls_back_to_the_bundle(tmp_path, monkeypatch):
     assert _resource_dir() == str(resdir)
 
     stale = Tile(
-        id="deck-studio",
-        name="Deck Studio",
+        id="t",
+        name="T",
         icon="",
         url="http://127.0.0.1:8770/",
         health_url="http://127.0.0.1:8770/health",
         autostart=True,
-        command=("node", "studio-server.js", "8770"),
-        cwd=_expand(r"%APPDIR%\studio"),  # what the shipped config said
+        command=("node", "server.js", "8770"),
+        cwd=_expand(r"%APPDIR%\payload"),  # what a stale config would say
     )
-    assert stale.cwd == str(appdir / "studio")
+    assert stale.cwd == str(appdir / "payload")
     assert not Path(stale.cwd).is_dir(), "this is what made Popen raise 267"
-    assert _resolve_cwd(stale) == str(resdir / "studio")
+    assert _resolve_cwd(stale) == str(resdir / "payload")
 
 
 def test_cwd_fallback_ignores_a_folder_without_the_script(tmp_path):
@@ -179,7 +185,7 @@ def test_command_args_expand_tokens(tmp_path):
                         "icon": "x",
                         "url": "http://127.0.0.1:1/",
                         "autostart": True,
-                        "command": [r"%RESDIR%\node.exe", "studio-server.js"],
+                        "command": [r"%RESDIR%\node.exe", "server.js"],
                     }
                 ]
             }
@@ -188,14 +194,3 @@ def test_command_args_expand_tokens(tmp_path):
     )
     tiles = load_tiles(cfg)
     assert Path(tiles[0].command[0]) == Path(_resource_dir()) / "node.exe"
-
-
-def test_shipped_deck_studio_tile_targets_the_bundle_dir():
-    """The config that ships with the app must not use %APPDIR%\\studio."""
-    raw = json.loads(CONFIG_PATH.read_text(encoding="utf-8-sig"))
-    entry = next(t for t in raw["tiles"] if t["id"] == "deck-studio")
-    assert "%RESDIR%" in entry["cwd"]
-    assert entry["health_url"].endswith("/health")
-    resolved = Path(_expand(entry["cwd"]))
-    assert resolved.is_dir()
-    assert (resolved / "studio-server.js").is_file()

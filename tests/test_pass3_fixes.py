@@ -422,7 +422,10 @@ def test_chat_page_structure_and_quiet_states() -> None:
     assert "Hub chat" in page and "Tasks" in page
     for route in ("/chat/state", "/chat/send", "/chat/tasks", "/chat/task", "/chat/task/cancel"):
         assert route in page, route
-    assert "<select" not in page  # no dropdown controls at all
+    # Slice 2: the provider picker is the page's one deliberate dropdown
+    # (one-tap provider switching); no other dropdown controls exist.
+    assert page.count("<select") == 1
+    assert 'id="provider-select"' in page
     assert "tip:" not in page.lower()
     # The one-line graceful states are baked in.
     assert "add your Hub token in Settings → Connections" in page

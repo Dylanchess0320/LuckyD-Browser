@@ -12,6 +12,7 @@ rule): ``ok`` | ``no_token`` | ``bad_token`` | ``unreachable`` | ``error``.
 from __future__ import annotations
 
 import json
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -27,6 +28,28 @@ TASK_PROFILES = ("look", "build")
 
 _QUICK_TIMEOUT = 8
 _CHAT_TIMEOUT = 180
+
+#: Short timeout for the /chat/state status probes. Two sequential probes
+#: at this budget keep the status endpoint under ~1s even when a service
+#: black-holes instead of refusing the connection; healthy local services
+#: answer in milliseconds and refused connections fail instantly.
+STATUS_TIMEOUT = 0.4
+
+#: Last time (epoch seconds) each component answered a probe with "ok".
+#: Lives in-process in the browser — the Hub status surface reads it so
+#: an unreachable component can still show when it was last seen alive.
+_LAST_SEEN: dict[str, float] = {}
+
+
+def _note_seen(name: str) -> float:
+    now = time.time()
+    _LAST_SEEN[name] = now
+    return now
+
+
+def last_seen(name: str):
+    """Epoch seconds the named component was last seen ok, or None."""
+    return _LAST_SEEN.get(name)
 
 
 def _base(settings, key: str, default: str) -> str:
@@ -88,37 +111,46 @@ def _service_state(status, obj) -> str:
     return "ok"
 
 
-def _get_authed(base: str, path: str, token: str, opener=None):
+def _get_authed(base: str, path: str, token: str, opener=None, timeout=_QUICK_TIMEOUT):
     sep = "&" if "?" in path else "?"
     url = f"{base}{path}{sep}token={urllib.parse.quote(token, safe='')}"
-    return _request(url, opener=opener)
+    return _request(url, opener=opener, timeout=timeout)
 
 
 # ── Hub ────────────────────────────────────────────────────────────────
 
 
-def hub_state(settings, opener=None) -> dict:
+def hub_state(settings, opener=None, timeout=_QUICK_TIMEOUT) -> dict:
     """Hub liveness for the Chat page's one-line status."""
     token = _token(settings, "hub_token")
     if not token:
-        return {"state": "no_token"}
-    status, obj = _get_authed(hub_base(settings), "/healthz", token, opener)
+        return {"state": "no_token", "last_seen": _LAST_SEEN.get("hub")}
+    status, obj = _get_authed(hub_base(settings), "/healthz", token, opener, timeout)
     state = _service_state(status, obj)
     if state != "ok":
-        return {"state": state}
-    return {"state": "ok", "ollama": bool(obj.get("ollama"))}
+        return {"state": state, "last_seen": _LAST_SEEN.get("hub")}
+    return {"state": "ok", "ollama": bool(obj.get("ollama")), "last_seen": _note_seen("hub")}
 
 
-def hub_chat(settings, messages, opener=None) -> dict:
+def hub_chat(settings, messages, opener=None, provider=None) -> dict:
     """Send the conversation to the Hub's /chat route (stateless: the
-    caller passes the full message list, the Hub routes local-first)."""
+    caller passes the full message list, the Hub routes local-first).
+
+    ``provider`` is the pinned provider name (slice 2): when set and not
+    "auto" it is passed through in the payload so the Hub answers with
+    the provider Dylan picked; the Hub is free to ignore an unknown
+    field, so an older Hub keeps working unchanged.
+    """
     token = _token(settings, "hub_token")
     if not token:
         return {"state": "no_token"}
+    payload: dict = {"token": token, "messages": messages}
+    if provider and str(provider).strip() not in ("", "auto"):
+        payload["provider"] = str(provider).strip()
     status, obj = _request(
         f"{hub_base(settings)}/chat",
         method="POST",
-        payload={"token": token, "messages": messages},
+        payload=payload,
         timeout=_CHAT_TIMEOUT,
         opener=opener,
     )
@@ -138,28 +170,55 @@ def hub_chat(settings, messages, opener=None) -> dict:
 # ── Claw ───────────────────────────────────────────────────────────────
 
 
-def claw_state(settings, opener=None) -> dict:
+def claw_state(settings, opener=None, timeout=_QUICK_TIMEOUT) -> dict:
     """Claw liveness + the project allowlist (from /healthz)."""
     token = _token(settings, "claw_token")
     if not token:
-        return {"state": "no_token"}
-    status, obj = _get_authed(claw_base(settings), "/healthz", token, opener)
+        return {"state": "no_token", "last_seen": _LAST_SEEN.get("claw")}
+    status, obj = _get_authed(claw_base(settings), "/healthz", token, opener, timeout)
     state = _service_state(status, obj)
     if state != "ok":
-        return {"state": state}
+        return {"state": state, "last_seen": _LAST_SEEN.get("claw")}
     projects = obj.get("projects")
     return {
         "state": "ok",
         "enabled": bool(obj.get("enabled", True)),
         "projects": [str(p) for p in projects] if isinstance(projects, list) else [],
+        "last_seen": _note_seen("claw"),
     }
 
 
-def claw_tasks(settings, opener=None) -> dict:
+def puck_state(settings, opener=None, timeout=_QUICK_TIMEOUT) -> dict:
+    """Puck-bridge liveness for the Hub status surface.
+
+    No puck bridge exists yet — zero puck code in the repo, no puck
+    process on the PC — so with no bridge URL configured this honestly
+    reports ``not_running`` and never fakes a green status. If a bridge
+    URL is ever configured (settings key ``puck_url``) its /healthz is
+    probed like the other services, so the status turns live for real
+    the day a bridge exists.
+    """
+    base = _base(settings, "puck_url", "")
+    if not base:
+        return {
+            "state": "not_running",
+            "last_seen": _LAST_SEEN.get("puck"),
+            "detail": "no puck bridge configured",
+        }
+    status, obj = _request(f"{base}/healthz", timeout=timeout, opener=opener)
+    state = _service_state(status, obj)
+    if state == "ok":
+        return {"state": "ok", "last_seen": _note_seen("puck")}
+    if status is None:
+        state = "not_running"
+    return {"state": state, "last_seen": _LAST_SEEN.get("puck")}
+
+
+def claw_tasks(settings, opener=None, timeout=_QUICK_TIMEOUT) -> dict:
     token = _token(settings, "claw_token")
     if not token:
         return {"state": "no_token"}
-    status, obj = _get_authed(claw_base(settings), "/tasks", token, opener)
+    status, obj = _get_authed(claw_base(settings), "/tasks", token, opener, timeout)
     state = _service_state(status, obj)
     if state != "ok":
         return {"state": state}
@@ -196,12 +255,16 @@ def claw_submit(settings, project, prompt, profile, opener=None) -> dict:
     return {"state": "ok", "job_id": obj.get("job_id")}
 
 
-def claw_task(settings, job_id, opener=None) -> dict:
+def claw_task(settings, job_id, opener=None, timeout=_QUICK_TIMEOUT) -> dict:
     token = _token(settings, "claw_token")
     if not token:
         return {"state": "no_token"}
     status, obj = _get_authed(
-        claw_base(settings), f"/task/{urllib.parse.quote(str(job_id), safe='')}", token, opener
+        claw_base(settings),
+        f"/task/{urllib.parse.quote(str(job_id), safe='')}",
+        token,
+        opener,
+        timeout,
     )
     state = _service_state(status, obj)
     if state != "ok":

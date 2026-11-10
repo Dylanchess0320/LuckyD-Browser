@@ -18,7 +18,8 @@ Path tokens usable in url/command/cwd:
     %RESDIR% / {resdir} -> folder bundled *data* lives in (frozen: _MEIPASS,
                            which is <app>/_internal for a onedir build)
 Use %RESDIR% for anything the PyInstaller spec ships: %APPDIR% is only the
-exe's own folder, so %APPDIR%\studio does not exist in an installed build.
+exe's own folder, so a payload subfolder addressed via %APPDIR% does not
+exist in an installed build.
 
 A tile with enabled=false is hidden but remembered — flipping it on later
 is a JSON edit, not a code change.
@@ -119,8 +120,8 @@ def _resource_dir() -> str:
     """Folder the app's bundled *data* files land in.
 
     Frozen: sys._MEIPASS -- for a PyInstaller onedir build that is
-    <app>/_internal, exactly where the spec's datas entries (studio/,
-    assets/, project/, ...) are collected. Dev: the browser package root,
+    <app>/_internal, exactly where the spec's datas entries (assets/,
+    project/, ...) are collected. Dev: the browser package root,
     which holds the same payloads, so one config entry serves both layouts.
     """
     meipass = getattr(sys, "_MEIPASS", None)
@@ -162,8 +163,8 @@ def _resolve_exe(name: str) -> str:
 
 
 def _script_arg(command: tuple[str, ...]) -> str:
-    """The script a tile command runs (e.g. studio-server.js in
-    ``node studio-server.js 8770``), used to validate a fallback cwd."""
+    """The script a tile command runs (e.g. ``server.js`` in
+    ``node server.js 8770``), used to validate a fallback cwd."""
     for arg in command[1:]:
         if not arg.startswith("-") and Path(arg).suffix:
             return arg
@@ -173,12 +174,11 @@ def _script_arg(command: tuple[str, ...]) -> str:
 def _resolve_cwd(tile: Tile) -> str | None:
     """Working directory to launch a tile command in.
 
-    Prefers the configured cwd. When it does not exist -- the frozen case is
-    ``cwd: "%APPDIR%\\studio"`` while PyInstaller collected the payload into
-    ``<app>\\_internal\\studio``, which made Popen die with
-    NotADirectoryError(winerror 267) so the tile never came up -- fall back to
-    the bundled-data folder (then the app folder) whenever the command's
-    script actually lives there.
+    Prefers the configured cwd. When it does not exist -- e.g. a frozen
+    build where the payload moved from ``%APPDIR%`` into ``_internal``,
+    which made Popen die with NotADirectoryError(winerror 267) so the tile
+    never came up -- fall back to the bundled-data folder (then the app
+    folder) whenever the command's script actually lives there.
     """
     if tile.cwd:
         if Path(tile.cwd).is_dir():
@@ -192,7 +192,7 @@ def _resolve_cwd(tile: Tile) -> str | None:
     for root in roots:
         candidates.append(root)
         # An older config may point at a payload subfolder that moved with the
-        # bundle (e.g. %APPDIR%\studio whose files now live in _internal\).
+        # bundle (e.g. a %APPDIR% path whose files now live in _internal\).
         if base and base not in ("", ".", ".."):
             candidates.append(root / base)
     for cand in dict.fromkeys(candidates):  # dedupe, keep order
@@ -223,7 +223,7 @@ def _expand(p: str) -> str:
             appdir = str(Path(__file__).resolve().parent.parent)
         out = out.replace("%APPDIR%", appdir)
         out = out.replace("{app}", appdir)
-    # Tile configs are authored with Windows separators ("%RESDIR%\studio").
+    # Tile configs are authored with Windows separators ("%RESDIR%\subdir").
     # Normalize them so the path resolves on POSIX too (Linux CI / dev).
     # On Windows os.sep == "\\", so this is a no-op where it matters.
     if os.sep != "\\":
@@ -274,8 +274,7 @@ def load_tiles(config_path: Path | None = None) -> list[Tile]:
 
 def load_all_tiles(config_path: Path | None = None) -> list[Tile]:
     """Load every configured tile, including disabled ones (each Tile keeps
-    its own ``enabled`` flag). Callers that apply their own visibility rules
-    on top of the registry — e.g. the retired-tools switch — use this."""
+    its own ``enabled`` flag)."""
     return _parse_tiles(config_path, include_disabled=True)
 
 
@@ -350,29 +349,6 @@ def shutdown_autostart() -> None:
 atexit.register(shutdown_autostart)
 
 
-# Retired 2026-10-22: these tiles are hidden by the show_retired_tools
-# setting (keep in sync with dashboard.RETIRED_TILE_IDS). While the switch
-# is off, their services must not autostart either.
-RETIRED_TILE_IDS = frozenset({"hq", "deep-research", "deck-studio", "luckyd-chat"})
-
-
-def _show_retired_tools() -> bool:
-    """Read the retired-tools switch from the persisted settings file (the
-    same store SettingsStore writes; resolved lazily, like brand.py)."""
-    try:
-        if getattr(sys, "frozen", False):
-            path = Path(sys.executable).resolve().parent / "data" / "settings.json"
-        else:
-            path = Path(__file__).resolve().parent.parent / "data" / "settings.json"
-        if path.exists():
-            data = json.loads(path.read_text(encoding="utf-8"))
-            if isinstance(data, dict):
-                return bool(data.get("show_retired_tools", False))
-    except Exception:
-        pass
-    return False
-
-
 def ensure_autostart(tiles: list[Tile] | None = None) -> None:
     """Launch any enabled+autostart tile whose service is down.
 
@@ -380,14 +356,10 @@ def ensure_autostart(tiles: list[Tile] | None = None) -> None:
     every 5s); internally rate-limited so each tile gets at most one launch
     attempt per AUTOSTART_RETRY_SEC. Never raises.
 
-    The default (registry-loaded) tile set excludes retired tiles while
-    show_retired_tools is off; an explicitly passed list is respected
-    as-is.
+    An explicitly passed list is respected as-is.
     """
     if tiles is None:
         tiles = load_tiles()
-        if not _show_retired_tools():
-            tiles = [t for t in tiles if t.id not in RETIRED_TILE_IDS]
     _debug_log(f"ensure_autostart: {len(tiles)} tile(s) {[t.id for t in tiles]}")
     now = time.monotonic()
     with _registry_lock:
