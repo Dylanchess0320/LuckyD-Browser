@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [10.8.7] - 2026-11-10
+
+Hub unification: one chat, one memory, one-tap providers.
+
+### Hub unification — one chat, one memory, one-tap providers
+- One Hub status surface: Browser, Hub, Claw and puck reachability on `/chat/state`.
+- One-tap provider switching on the Chat page and in the terminal, sharing the same `ai_provider` pick; fresh Agent PTYs boot on the picked provider.
+- Shared handoff note: a note written in Browser Chat shows in LuckyD Code and vice versa (`/chat/handoff`).
+- Growth watch arrives as a dismissible proactive card on Chat; a no-change day stays silent.
+- Retired tools removed: HQ, Workflows, Deep Researcher, Deck Studio.
+- Eval set run for the first time (4/16) with a team-brain doc (`docs/TEAM_BRAIN.md`).
+
+### Security and maintenance
+- Security Scan green: filelock CVEs fixed (scan now runs on Python 3.11).
+- Dependabot: langgraph 1.2.14, vite 6.4.5, undici 6.29.1, fast-uri 3.1.9.
+- Fixes: pytest 9.2 `QUrl` monkeypatch failure and a mypy `getattr` type-inference error in the terminal bridge.
+
+
 ## [10.8.6] - 2026-10-25
 
 Agent-mode tab switching, fixed: switching tabs while the AI Assistant's agent was working no longer glitches the screen.

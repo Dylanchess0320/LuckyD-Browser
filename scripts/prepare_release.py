@@ -101,9 +101,13 @@ def main() -> None:
 
     plan_sub("pyproject.toml", f'version = "{old}"', f'version = "{new}"', 1)
     plan_sub("browser/__init__.py", f'__version__ = "{old}"', f'__version__ = "{new}"', 1)
-    # (?s): WHATS_NEW spans multiple lines; .*? must match newlines too.
+    # (?s): WHATS_NEW spans multiple lines in tuple form; .*? must match
+    # newlines too. ruff format collapses a short banner to a plain string
+    # (10.8.7), so accept either form — the replacement is always the tuple.
     plan_sub_re(
-        "browser/__init__.py", r"(?s)WHATS_NEW = \(.*?\)\n", wrap_banner(new, headline) + "\n"
+        "browser/__init__.py",
+        r"(?s)WHATS_NEW = (\(.*?\)|\".*?\")\n",
+        wrap_banner(new, headline) + "\n",
     )
 
     plan_sub("browser/version_info.txt", f"filevers={old_tup}", f"filevers={new_tup}")

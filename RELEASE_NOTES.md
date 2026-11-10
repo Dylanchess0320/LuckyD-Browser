@@ -1,21 +1,25 @@
-# LuckyD Browser v10.8.6 — Release Notes
+# LuckyD Browser v10.8.7 — Release Notes
 
-> **The AI browser that doesn't need an API key.** A focused fix release:
-> Agent mode is stable while it works — switch tabs mid-task, no glitches.
+> **The AI browser that doesn't need an API key.** The Hub unification release:
+> one chat, one memory, one-tap providers across Browser, Hub, terminal and Code.
 
-**[⬇ Download `LuckyDBrowserSetup-10.8.6.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.6/LuckyDBrowserSetup-10.8.6.exe)** — Windows 10/11 x64 · per-user install · no admin needed
+**[⬇ Download `LuckyDBrowserSetup-10.8.7.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.7/LuckyDBrowserSetup-10.8.7.exe)** — Windows 10/11 x64 · per-user install · no admin needed
 
 ---
 
-## What's new in 10.8.6 — Agent mode: stable while it works
+## What's new in 10.8.7 — Hub unification
 
-- **Switching tabs mid-task no longer glitches the screen** — in AI Assistant Agent mode, the agent used to follow whichever tab was visible: switch tabs while it was working and the new tab would scroll itself and flash highlight badges under your cursor. The agent now stays locked to the tab it started on for the whole run — switch away, watch something else, come back — and if you close its tab mid-run, the run ends quietly instead of hijacking another tab. Undo still lands on the tab where the action happened.
-- **The memory saver leaves the working tab alone** — the tab the agent is driving can no longer be frozen (which stalled its steps) or discarded (which left a blank frame when you switched back) while the run is in flight.
+- **One Hub status surface** — Browser, Hub, Claw and puck reachability now show in one place on the Chat page.
+- **One-tap provider switching** — pick a provider once on the Chat page and the terminal boots its agents on the same provider; the pick survives restarts.
+- **Shared handoff note** — a note written in Browser Chat shows in LuckyD Code and vice versa, so work carries across surfaces.
+- **Growth watch as a proactive card** — GitHub stars and Discord joins arrive as a dismissible card on Chat; a no-change day stays silent.
+- **Retired tools removed** — HQ, Workflows, Deep Researcher and Deck Studio are gone; the Hub is the one surface now.
+- **Security Scan green** — the filelock CVEs are fixed (scan now runs on Python 3.11), plus Dependabot bumps for langgraph, vite, undici and fast-uri.
 - **Known limitation — Twitch and some game sites:** Twitch video still won't play in this build, and some web games (for example on Poki) still have no sound. Different cause: the web engine LuckyD is built on ships without the H.264 and AAC decoders those sites use, and no app setting can add them. It's being worked on as a separate engine project — please use another browser for Twitch and affected games meanwhile.
 
-On top of everything from 10.8.5 (Settings fixed + AI library security update), 10.8.4 (Gmail sign-in fixed: one consistent browser identity instead of contradictory ones) and 10.8.3 (the cleanup pass: Ctrl+K palette rebuilt, model pickers list only working models, status bar slimmed with the hover address kept, LuckyD Chat retired for now, Discord invite back: discord.gg/CmvErK8bkM).
+On top of everything from 10.8.6 (Agent mode: stable while it works — switch tabs mid-task, no glitches), 10.8.5 (Settings fixed + AI library security update) and 10.8.4 (Gmail sign-in fixed: one consistent browser identity instead of contradictory ones).
 
-3,582 tests passing · full CI green.
+3,511 tests passing · full CI green.
 
 ---
 

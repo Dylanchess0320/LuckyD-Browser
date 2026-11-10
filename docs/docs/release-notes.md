@@ -1,5 +1,23 @@
 # LuckyD Browser — Release Notes
 
+## [10.8.7] — Hub unification — 2026-11-10
+
+**[`LuckyDBrowserSetup-10.8.7.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.7/LuckyDBrowserSetup-10.8.7.exe)** — Windows 10/11 x64 · per-user install · no admin needed.
+**[`LuckyDBrowser-Portable-10.8.7.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.7/LuckyDBrowser-Portable-10.8.7.zip)** — unzip and run, for locked-down PCs.
+
+- One Hub status surface: Browser, Hub, Claw and puck reachability on `/chat/state`.
+- One-tap provider switching on the Chat page and in the terminal, sharing the same `ai_provider` pick; fresh Agent PTYs boot on the picked provider.
+- Shared handoff note: a note written in Browser Chat shows in LuckyD Code and vice versa (`/chat/handoff`).
+- Growth watch arrives as a dismissible proactive card on Chat; a no-change day stays silent.
+- Retired tools removed: HQ, Workflows, Deep Researcher, Deck Studio.
+- Eval set run for the first time (4/16) with a team-brain doc (`docs/TEAM_BRAIN.md`).
+
+- Security Scan green: filelock CVEs fixed (scan now runs on Python 3.11).
+- Dependabot: langgraph 1.2.14, vite 6.4.5, undici 6.29.1, fast-uri 3.1.9.
+- Fixes: pytest 9.2 `QUrl` monkeypatch failure and a mypy `getattr` type-inference error in the terminal bridge.
+
+On top of everything from 10.8.6 below.
+
 ## [10.8.6] — Agent mode: stable while it works — 2026-10-25
 
 **[`LuckyDBrowserSetup-10.8.6.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.6/LuckyDBrowserSetup-10.8.6.exe)** — Windows 10/11 x64 · per-user install · no admin needed.
