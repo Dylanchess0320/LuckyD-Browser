@@ -339,9 +339,13 @@ def fetch_rankllms_scores() -> dict[str, dict[str, float]]:
     for row in data.get("rankings") or []:
         if not isinstance(row, dict):
             continue
+        intel_raw = row.get("intelligence_index")
+        coding_raw = row.get("coding_index")
+        if intel_raw is None or coding_raw is None:
+            continue
         try:
-            intel = float(row.get("intelligence_index"))
-            coding = float(row.get("coding_index"))
+            intel = float(intel_raw)
+            coding = float(coding_raw)
         except (TypeError, ValueError):
             continue
         keys = {
