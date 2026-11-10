@@ -14,7 +14,7 @@ uvicorn==0.51.0
 # image gen and Veo video gen (browser/models/gemini_media.py).
 # google-api-python-client + google-auth-oauthlib power the 2TB Drive backup
 # (browser/browser_core/drive_backup.py).
-langgraph==1.2.11
+langgraph==1.2.14
 google-genai==2.17.0
 google-api-python-client==2.200.0
 google-auth-oauthlib==1.4.1
