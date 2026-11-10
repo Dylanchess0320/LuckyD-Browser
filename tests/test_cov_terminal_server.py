@@ -43,6 +43,7 @@ if str(_REPO_ROOT) not in sys.path:
 import browser_core.terminal_server as ts
 import pytest
 from browser_core.terminal_server import (
+    DEFAULT_HUB_URL,
     MUSE_WSL_BOOT,
     MUSE_WSL_DISTRO,
     TERM_COOKIE,
@@ -712,6 +713,32 @@ def test_spawn_pty_agent2_gets_slot2_env(monkeypatch, tmp_path) -> None:
     assert "LUCKYD_AGENT_SLOT=2" in parts
     assert "LUCKYD_AGENT_NAME=Agent 2" in parts
     assert "LUCKYD_AGENT_VERSION=v10.8.6" in parts
+
+
+def test_spawn_pty_agent_gets_hub_url_env(monkeypatch, tmp_path) -> None:
+    """Hub slice 9: agent CLIs learn the Hub URL via LUCKYD_HUB_URL."""
+    _install_fake_winpty(monkeypatch)
+    exe = tmp_path / "cli.exe"
+    exe.touch()
+    _spawn_pty(shell="agent", cli_path=str(exe), hub_url="http://127.0.0.1:9999")
+    parts = _env_parts(_FakePTYFactory.instances[-1].spawn_kwargs["env"])
+    assert "LUCKYD_HUB_URL=http://127.0.0.1:9999" in parts
+
+
+def test_spawn_pty_agent_hub_url_defaults_when_unset(monkeypatch, tmp_path) -> None:
+    _install_fake_winpty(monkeypatch)
+    exe = tmp_path / "cli.exe"
+    exe.touch()
+    _spawn_pty(shell="agent", cli_path=str(exe))
+    parts = _env_parts(_FakePTYFactory.instances[-1].spawn_kwargs["env"])
+    assert f"LUCKYD_HUB_URL={DEFAULT_HUB_URL}" in parts
+
+
+def test_spawn_pty_system_shell_gets_no_hub_url(monkeypatch) -> None:
+    _install_fake_winpty(monkeypatch)
+    _spawn_pty(shell="powershell", hub_url="http://127.0.0.1:9999")
+    parts = _env_parts(_FakePTYFactory.instances[-1].spawn_kwargs["env"])
+    assert not any(p.startswith("LUCKYD_HUB_URL=") for p in parts)
 
 
 def test_spawn_pty_env_block_sanitizes_bad_entries(monkeypatch) -> None:

@@ -312,11 +312,8 @@ class CommandPalette(QWidget):
             ("Read Aloud", self._mw.read_aloud_page),
             ("Site Permissions…", self._mw.open_site_permissions),
             ("Save Current as Workspace…", self._mw.save_workspace),
-            ("Deep Researcher Swarm…", self._mw.open_deep_research),
-            ("Coding Agent", self._mw.open_hq),
             ("Agent Terminal", self._mw.open_terminal),
             ("PowerShell Terminal", lambda: self._mw.open_terminal("powershell")),
-            ("Workflows", self._mw.open_workflows),
             ("Save Screenshot", self._mw.save_screenshot),
             ("Focus Mode", self._mw.toggle_focus_mode),
             ("Toggle Bookmarks Bar", self._mw.bm_bar_act.toggle),
@@ -324,15 +321,6 @@ class CommandPalette(QWidget):
             ("History", self._mw.open_history),
             ("Settings", self._mw.open_settings),
         ]
-        # Retired tools (HQ, Workflows, Deep Researcher) stay out of the
-        # palette unless show_retired_tools is flipped back on.
-        try:
-            show_retired = bool(self._mw.settings.get("show_retired_tools", False))
-        except Exception:
-            show_retired = False
-        if not show_retired:
-            retired = {"Deep Researcher Swarm…", "Coding Agent", "Workflows"}
-            actions = [(label, act) for label, act in actions if label not in retired]
         for label, action in actions:
             self._items.append(
                 ("Action", label, "", _ACTION_SHORTCUTS.get(label, ""), None, action)

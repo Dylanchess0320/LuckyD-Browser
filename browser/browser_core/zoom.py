@@ -2,7 +2,7 @@
 
 Zoom factors are remembered per origin (scheme://host[:port]) in the
 `zoom_levels` settings dict. Only http/https pages participate; internal
-localhost pages (dashboard/terminal/HQ) share their origin like any other
+localhost pages (dashboard/terminal) share their origin like any other
 site, which is exactly what you want.
 """
 

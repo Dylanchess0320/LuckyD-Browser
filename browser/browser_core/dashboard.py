@@ -4,8 +4,8 @@ Served from the same origin as the Control API (127.0.0.1:9777 by default),
 so the page can call its endpoints directly — no CORS, no auth juggling,
 no external server. It is the one-window hub:
 
-  * one-tap tiles — the coding-agent workspace (the exe's web UI via /hq),
-    the AI assistant, bookmarks, history, downloads, settings, shortcuts
+  * one-tap tiles — the AI assistant, LuckyD Chat, terminal, bookmarks,
+    history, downloads, settings, shortcuts
   * web search box + user speed-dial tiles (localStorage, shared with the
     classic static new-tab page)
 
@@ -14,7 +14,6 @@ Everything is one self-contained HTML string (no build step, no assets).
 
 from __future__ import annotations
 
-import html
 import json
 
 try:
@@ -111,7 +110,6 @@ _CSS = r"""  .search { display: flex; background: var(--card); border: 1px solid
   .tile:hover .del, .tile:focus-within .del { opacity: 1; }
   .tile.add { color: var(--muted); font-size: 24px; justify-content: center; cursor: pointer; }
   .tile.add span { font-size: 11px; font-weight: 600; letter-spacing: .05em; }
-  .tile.hq { border-color: var(--accent); }
   .section { margin-top: 28px; font-size: 11px; font-weight: 700; letter-spacing: .18em;
     text-transform: uppercase; color: var(--muted); }
   #addform { margin-top: 14px; display: none; gap: 8px; }
@@ -175,13 +173,10 @@ _JS = r"""<script>
 const ENGINES = { bing: 'https://www.bing.com/search?q=',
   ddg: 'https://duckduckgo.com/?q=', brave: 'https://search.brave.com/search?q=' };
 const APPS = [
-  ['⌘', 'Agent HQ', '/hq'],
   ['🤖', 'AI Assistant', 'luckyd://assistant'],
   ['🖥️', 'Multi Agent Terminal', '/mesh'],
   ['💬', 'LuckyD Chat', '/chat'],
   ['🖥️', 'Agent Terminal', '/terminal'],
-  ['🔬', 'Deep Research', '/research'],
-  ['🎬', 'Workflows', '/workflows'],
   ['📡', 'Network', '/network'],
   ['🔖', 'Bookmarks', 'luckyd://bookmarks'],
   ['🕘', 'History', 'luckyd://history'],
@@ -249,18 +244,15 @@ async function unlockSynthwave() {
 """
 _JS2 = r"""// Platform tiles from browser_core/platform_tiles.json (TileRegistry).
 const PLATFORM_TILES = __PLATFORM_TILES__;
-// Built-in apps hidden by the retired-tools switch (server-injected).
-const RETIRED_APPS = __RETIRED_APPS__;
 function renderApps() {
   const g = document.getElementById('apps');
-  const visible = APPS.filter(([, name]) => !RETIRED_APPS.includes(name));
-  // A registry tile must never duplicate a built-in app (e.g. Deep Research
-  // lives in APPS and in platform_tiles.json) — skip platform tiles whose
-  // name already renders above, case-insensitively.
+  const visible = APPS;
+  // A registry tile must never duplicate a built-in app — skip platform
+  // tiles whose name already renders above, case-insensitively.
   const seen = new Set(visible.map(([, name]) => name.toLowerCase()));
   visible.concat(PLATFORM_TILES.filter(([, name]) => !seen.has(name.toLowerCase()))).forEach(([ico, name, href]) => {
     const a = document.createElement('a');
-    a.className = 'tile' + (name === 'Agent HQ' ? ' hq' : ''); a.href = href;
+    a.className = 'tile'; a.href = href;
     a.innerHTML = '<span class="ico">' + ico + '</span><span class="tname"></span>';
     a.querySelector('span:last-child').textContent = name;
     g.appendChild(a);
@@ -340,19 +332,6 @@ renderApps(); render();
 </html>
 """
 DASHBOARD_HTML = _HEAD + _BODY + _JS + _JS2
-
-
-# Retired 2026-10-22 (Dylan): hidden from the UI, fully built in. Flip the
-# "show_retired_tools" setting to True to restore every surface at once.
-RETIRED_APP_NAMES = ("Agent HQ", "Deep Research", "Workflows", "LuckyD Chat")
-RETIRED_TILE_IDS = frozenset({"hq", "deep-research", "deck-studio", "luckyd-chat"})
-
-
-def _show_retired_tools(settings) -> bool:
-    try:
-        return bool(settings.get("show_retired_tools", False)) if settings is not None else False
-    except Exception:
-        return False
 
 
 # ── Homepage animation (Feature 12, Dylan 2026-10-22) ─────────────────
@@ -471,7 +450,7 @@ def homepage_animation_html(mode: str) -> str:
 
 def dashboard_html(settings=None) -> str:
     """The dashboard with the active theme's design tokens injected, so the
-    new-tab hub matches the Qt chrome, sidebar and HQ splash exactly.
+    new-tab hub matches the Qt chrome and sidebar exactly.
 
     Authentication uses the HttpOnly session cookie the browser sets on its
     own profile (4.0) — no token is injected into the page, and the
@@ -483,19 +462,12 @@ def dashboard_html(settings=None) -> str:
     else:
         html = "<style>" + _css_vars(settings) + "</style>" + DASHBOARD_HTML
     # Platform tiles: registry-driven extras appended to the built-in Apps.
-    show_retired = _show_retired_tools(settings)
     try:
         from browser_core.tile_registry import load_all_tiles
 
-        tiles = [
-            t
-            for t in load_all_tiles()
-            if t.enabled and (show_retired or t.id not in RETIRED_TILE_IDS)
-        ]
-        extra = [[t.icon, t.name, t.url] for t in tiles]
+        extra = [[t.icon, t.name, t.url] for t in load_all_tiles() if t.enabled]
     except Exception:
         extra = []  # a broken config must never take the dashboard down
-    retired = [] if show_retired else list(RETIRED_APP_NAMES)
     # Custom display name (Settings → Appearance) for the greeting line.
     try:
         try:
@@ -509,401 +481,11 @@ def dashboard_html(settings=None) -> str:
     # The name lands inside a single-quoted JS string: escape quotes,
     # backslashes and "<" (a "</script>" in a name must never break out).
     name_js = name.replace("\\", "\\\\").replace("'", "\\'").replace("<", "\\u003c")
-    out = (
-        html.replace("__PLATFORM_TILES__", json.dumps(extra))
-        .replace("__RETIRED_APPS__", json.dumps(retired))
-        .replace("__DISPLAY_NAME__", name_js)
-    )
+    out = html.replace("__PLATFORM_TILES__", json.dumps(extra)).replace("__DISPLAY_NAME__", name_js)
     anim = homepage_animation_html(_homepage_animation(settings))
     if anim:
         out = out.replace("</body>", anim + "</body>", 1)
     return out
-
-
-_SPLASH_CSS = r"""
-  body { display: flex; min-height: 100vh; align-items: center; justify-content: center;
-    margin: 0; text-align: center; font-weight: 600; background: var(--ld-grad); }
-  .spin { font-size: 44px; animation: pulse 1.6s ease-in-out infinite; }
-  @keyframes pulse { 0%,100% { opacity: .55; transform: scale(.96); } 50% { opacity: 1; transform: scale(1.05); } }
-  h2 { font-size: 20px; margin: 14px 0 8px; }
-  .dim { color: var(--ld-muted); font-size: 13px; max-width: 420px; margin: 6px auto; line-height: 1.5; }
-  code { background: rgba(255,255,255,.08); border-radius: 6px; padding: 2px 8px; }
-  a { color: var(--ld-accent); text-decoration: none; }
-  .ld-err-card { background: var(--ld-card); border: 1px solid var(--ld-danger);
-    border-radius: var(--ld-r-lg); padding: 28px 36px; box-shadow: var(--ld-sh-2); }
-"""
-
-
-def hq_splash_html(harness_url: str, state: str, detail: str = "", settings=None) -> str:
-    """Auto-refreshing splash for /hq while the exe boots (or its error page).
-
-    Uses the active theme's tokens so the loading state matches the rest of
-    the product instead of falling back to a hard-coded gradient. The error
-    state renders as a proper error card; the starting state keeps its
-    3-second auto-refresh."""
-    if state == "error":
-        body = (
-            "<div class='ld-err-card'><div class='spin'>⚠️</div>"
-            "<h2>Coding agent backend unavailable</h2>"
-            f"<p class='dim'>{html.escape(str(detail), quote=True)}</p>"
-            "<p class='dim'>Start it manually, then reload:<br>"
-            "<code>luckyd-code.exe --web --port 8000</code></p>"
-            "<p><a href='/hq'>↻ Retry</a> · <a href='/dashboard'>Dashboard</a></p></div>"
-        )
-        refresh = ""
-    else:
-        body = (
-            "<div class='spin'>⌘</div><h2>Starting your coding agent…</h2>"
-            "<p class='dim'>This page opens automatically when it's ready.</p>"
-        )
-        refresh = "<meta http-equiv='refresh' content='3'>"
-    return (
-        page_head("Coding Agent", _SPLASH_CSS, settings=settings, extra_head=refresh)
-        + f"<body><div>{body}</div></body></html>"
-    )
-
-
-_HQ_SHELL_TMPL = r"""<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Coding Agent</title>
-<style>
-  __BRAND_VARS__
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { height: 100%; }
-  body {
-    display: flex; flex-direction: column; overflow: hidden;
-    font-family: 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
-    font-weight: 600;
-    background: var(--ld-grad); color: var(--ld-text);
-  }
-  #bar {
-    display: flex; align-items: center; gap: 10px; padding: 8px 14px;
-    background: var(--ld-panel); border-bottom: 1px solid var(--ld-border);
-    flex-shrink: 0;
-  }
-  #bar .mark {
-    width: 24px; height: 24px; border-radius: 7px; display: grid;
-    place-items: center; font-size: 12px; font-weight: 800; color: #fff;
-    background: linear-gradient(135deg, var(--ld-accent), var(--ld-accent2));
-    box-shadow: 0 2px 10px rgba(0,0,0,.35); flex-shrink: 0;
-  }
-  #bar .txt { display: flex; flex-direction: column; min-width: 0; }
-  #bar .t1 { font-size: 13px; font-weight: 650; letter-spacing: .2px; }
-  #bar .spacer { flex: 1; }
-  #bar a {
-    font-size: 11.5px; color: var(--ld-muted); text-decoration: none;
-    padding: 5px 10px; border: 1px solid var(--ld-border); border-radius: 8px;
-    background: var(--ld-card); white-space: nowrap;
-  }
-  #bar a:hover { color: var(--ld-text); border-color: var(--ld-accent); }
-  iframe { flex: 1; border: 0; width: 100%; background: var(--ld-window); }
-</style>
-</head>
-<body>
-<div id="bar">
-  <div class="mark">&#9889;</div>
-  <div class="txt">
-    <span class="t1">Coding Agent</span>
-  </div>
-  <div class="spacer"></div>
-  <a href="/dashboard">&#9666; Dashboard</a>
-  <a href="__HARNESS_URL__" target="_blank" rel="noopener">Open full window &#8599;</a>
-</div>
-<iframe id="hq" src="__HARNESS_URL__" allow="clipboard-read; clipboard-write"></iframe>
-<script>
-  // Keep the exe's UI painted in the browser's active theme. The harness
-  // page sets document.body.style.background from its own palette on load,
-  // so we re-apply our tokens shortly after every load (and on an interval
-  // for the first seconds while its JS settles).
-  const GRAD = getComputedStyle(document.documentElement).getPropertyValue('--ld-grad');
-  const TEXT = getComputedStyle(document.documentElement).getPropertyValue('--ld-text');
-  function paint() {
-    try {
-      const doc = document.getElementById('hq').contentDocument;
-      if (!doc || !doc.body) return;
-      doc.body.style.background = GRAD;
-      doc.body.style.backgroundAttachment = 'fixed';
-      doc.body.style.color = TEXT;
-    } catch (e) { /* cross-origin or not ready yet */ }
-  }
-  const frame = document.getElementById('hq');
-  frame.addEventListener('load', () => {
-    paint(); setTimeout(paint, 250); setTimeout(paint, 900); setTimeout(paint, 2200);
-  });
-</script>
-</body>
-</html>
-"""
-
-
-def hq_shell_html(harness_url: str, settings=None) -> str:
-    """The coding-agent workspace embedded in branded chrome: theme-token
-    header bar plus a same-origin iframe that re-paints the exe UI with the
-    browser's active theme gradient (JS can reach in because both pages are
-    127.0.0.1 loopback — treated as same-origin even across ports)."""
-    return _HQ_SHELL_TMPL.replace("__BRAND_VARS__", _css_vars(settings), 1).replace(
-        "__HARNESS_URL__", harness_url
-    )
-
-
-_WORKFLOWS_CSS = r"""  :root { color-scheme: dark; }
-  * { box-sizing: border-box; }
-  body { margin: 0; min-height: 100vh; background: var(--ld-window); color: var(--ld-text);
-         font: 14px/1.5 system-ui, "Segoe UI", sans-serif; padding: 28px 20px; }
-  main { max-width: 760px; margin: 0 auto; }
-  h1 { font-size: 22px; margin: 0 0 4px; }
-  .sub { color: var(--ld-muted); font-size: 12.5px; margin-bottom: 20px; }
-  .card { background: var(--ld-panel); border: 1px solid var(--ld-border); border-radius: var(--ld-r-lg);
-          padding: 16px; margin-bottom: 14px; }
-  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-  .row .sp { flex: 1; }
-  input[type=text] { flex: 1; min-width: 180px; background: var(--ld-card);
-      border: 1px solid var(--ld-border); border-radius: var(--ld-r-sm); padding: 9px 12px;
-      color: var(--ld-text); font: inherit; }
-  input[type=text]:focus { outline: none; border-color: var(--ld-accent); box-shadow: var(--ld-focus-ring); }
-  button { border: 1px solid var(--ld-border); background: var(--ld-card); color: var(--ld-text);
-      border-radius: var(--ld-r-sm); padding: 9px 14px; font: 600 13px system-ui;
-      cursor: pointer; }
-  button:hover { border-color: color-mix(in srgb, var(--ld-border) 55%, var(--ld-text)); }
-  button.rec { background: color-mix(in srgb, var(--ld-danger) 22%, transparent);
-      border-color: var(--ld-danger); color: var(--ld-danger); }
-  button.play { color: var(--ld-ok); }
-  button.del { color: var(--ld-danger); }
-  button:disabled { opacity: .45; cursor: default; }
-  .pill { font: 600 11.5px system-ui; padding: 4px 10px; border-radius: var(--ld-r-full);
-      background: var(--ld-card); border: 1px solid var(--ld-border); color: var(--ld-muted); }
-  .pill.on { color: var(--ld-danger); border-color: var(--ld-danger); }
-  .wf { display: flex; align-items: center; gap: 10px; padding: 10px 4px;
-        border-top: 1px solid var(--ld-border); }
-  .wf:first-of-type { border-top: none; }
-  .wf .name { font-weight: 600; }
-  .wf .meta { color: var(--ld-muted); font-size: 12px; }
-  .wf .sp { flex: 1; }
-  .wf .last { color: var(--ld-faint); font-size: 11px; width: 100%; padding-left: 2px; }
-  select.sched { background: var(--ld-card); border: 1px solid var(--ld-border); border-radius: var(--ld-r-sm);
-    color: var(--ld-text); padding: 6px 8px; font: 600 12px system-ui; }
-  select.sched.on { color: var(--ld-warn); border-color: var(--ld-warn); }
-  #log { font: 12px/1.6 ui-monospace, "Cascadia Mono", Consolas, monospace;
-      white-space: pre-wrap; color: var(--ld-muted); max-height: 260px; overflow: auto; }
-  #log .ok { color: var(--ld-ok); } #log .bad { color: var(--ld-danger); }
-  #log .heal { color: var(--ld-warn); }
-  .empty { color: var(--ld-faint); text-align: center; padding: 18px 0; }
-"""
-
-_WORKFLOWS_HTML = (
-    page_head("Workflows", _WORKFLOWS_CSS)
-    + r"""<body>
-<main>
-  <h1>🎬 Workflows</h1>
-  <div class="sub">Record Control-API actions (agent runs, scripts) into named
-    automations, then replay them — element targets re-resolve by fingerprint
-    when the page changes.</div>
-
-  <div class="card">
-    <div class="row">
-      <span id="recpill" class="pill">idle</span>
-      <input id="wfname" type="text" placeholder="workflow name (e.g. daily-report)" maxlength="60">
-      <button id="recbtn" class="rec">⏺ Start Recording</button>
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="row"><b>✨ Generate with AI</b><span class="sp"></span>
-      <button id="genbtn">✨ Generate</button></div>
-    <div class="row" style="margin-top:8px">
-      <input id="genname" type="text" placeholder="workflow name (optional)" maxlength="60">
-      <input id="gendesc" type="text" placeholder="Describe it — e.g. open github.com, click Search, type LuckyD, press Enter">
-    </div>
-    <div class="sub" style="margin:8px 0 0">Uses your best free AI model. Generated steps save just like
-      recorded ones — replay re-resolves targets by fingerprint (self-healing) and schedules work too.</div>
-  </div>
-
-  <div class="card" id="list-card">
-    <div class="row"><b>Saved workflows</b><span class="sp"></span>
-      <button id="refresh">↻ Refresh</button></div>
-    <div id="list"><div class="empty">No workflows yet — record one above.</div></div>
-  </div>
-
-  <div class="card" id="log-card" style="display:none">
-    <b>Replay log</b>
-    <div id="log"></div>
-  </div>
-</main>
-<script>
-const $ = id => document.getElementById(id);
-async function api(path, body) {
-  const opt = body === undefined ? {} : {
-    method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify(body)};
-  const r = await fetch(path, opt);
-  return await r.json();
-}
-let recording = false;
-
-function paintRecorder(st) {
-  recording = !!(st && st.recording);
-  $('recpill').textContent = recording
-    ? `⏺ recording "${st.name}" — ${st.steps} steps` : 'idle';
-  $('recpill').className = 'pill' + (recording ? ' on' : '');
-  $('recbtn').textContent = recording ? '⏹ Stop & Save' : '⏺ Start Recording';
-  $('wfname').disabled = recording;
-}
-
-async function refresh() {
-  try {
-    const data = await api('/workflows/list');
-    let schedData = {schedules: [], intervals: {0: 'Off'}};
-    try { schedData = await api('/schedules'); } catch (e) {}
-    const byName = {};
-    for (const s of schedData.schedules || []) byName[s.name] = s;
-    paintRecorder(data.recording);
-    const rows = data.workflows || [];
-    $('list').innerHTML = rows.length ? '' :
-      '<div class="empty">No workflows yet — record one above.</div>';
-    for (const wf of rows) {
-      const when = wf.created ? new Date(wf.created * 1000).toLocaleString() : '';
-      const div = document.createElement('div');
-      div.className = 'wf';
-      div.innerHTML = `<span class="name"></span>
-        <span class="meta">${wf.steps} steps · ${when}</span>
-        <span class="sp"></span>`;
-      div.querySelector('.name').textContent = wf.name;
-      const play = document.createElement('button');
-      play.className = 'play'; play.textContent = '▶ Replay';
-      play.onclick = () => replay(wf.name, play);
-      const sel = document.createElement('select');
-      sel.className = 'sched';
-      sel.title = 'Auto-replay this workflow on a schedule';
-      const cur = byName[wf.name];
-      for (const [mins, label] of Object.entries(schedData.intervals || {0: 'Off'})) {
-        const opt = document.createElement('option');
-        opt.value = mins; opt.textContent = label;
-        if (cur && Number(mins) === cur.every_min) opt.selected = true;
-        sel.appendChild(opt);
-      }
-      if (cur && cur.every_min > 0) sel.classList.add('on');
-      sel.onchange = async () => {
-        await api('/schedule', {name: wf.name, every_min: Number(sel.value)});
-        refresh();
-      };
-      const del = document.createElement('button');
-      del.className = 'del'; del.textContent = '🗑';
-      del.title = 'Delete workflow';
-      del.onclick = async () => {
-        if (confirm(`Delete workflow "${wf.name}"?`)) {
-          await api('/workflow/delete', {name: wf.name}); refresh();
-        }
-      };
-      div.append(play, sel, del);
-      if (cur && cur.last_result) {
-        const last = document.createElement('span');
-        last.className = 'last';
-        const ago = cur.last_run ? new Date(cur.last_run * 1000).toLocaleTimeString() : '';
-        last.textContent = `⏰ last: ${cur.last_result}${ago ? ' · ' + ago : ''}`;
-        div.appendChild(last);
-      }
-      $('list').appendChild(div);
-    }
-  } catch (e) { /* control API hiccup — retry on next tick */ }
-}
-
-$('recbtn').onclick = async () => {
-  if (recording) { await api('/workflow/stop', {}); refresh(); return; }
-  const name = $('wfname').value.trim() || 'workflow-' + Date.now();
-  await api('/workflow/record', {name});
-  $('wfname').value = '';
-  refresh();
-};
-$('refresh').onclick = refresh;
-
-$('genbtn').onclick = async () => {
-  const description = $('gendesc').value.trim();
-  if (!description) { $('gendesc').focus(); return; }
-  $('genbtn').disabled = true;
-  $('log-card').style.display = '';
-  $('log').innerHTML = '✨ generating workflow…\n';
-  try {
-    const r = await api('/workflow/generate',
-      {name: $('genname').value.trim(), description});
-    if (r.ok === false) throw new Error(r.error || 'generate failed');
-    const lines = (r.preview || []).map((s, i) => {
-      const extra = s.url ? ' ' + s.url :
-        ((s.text ? ' ' + JSON.stringify(s.text) : '') +
-         (s.index != null ? ' #' + s.index : ''));
-      return `  ${i + 1}. ${s.action}${extra}`;
-    });
-    $('log').innerHTML = `✨ saved "${r.name}" — ${r.steps} step(s):\n` + lines.join('\n');
-    $('genname').value = ''; $('gendesc').value = '';
-  } catch (e) {
-    $('log').innerHTML += 'generate failed: ' + e;
-  }
-  $('genbtn').disabled = false;
-  refresh();
-};
-
-async function replay(name, btn) {
-  btn.disabled = true;
-  $('log-card').style.display = '';
-  $('log').innerHTML = `▶ replaying "${name}"…\n`;
-  try {
-    const r = await api('/workflow/replay', {name});
-    const lines = (r.results || []).map(s => {
-      const cls = s.ok ? 'ok' : 'bad';
-      const heal = s.healed ? ' <span class="heal">⟲ healed</span>' : '';
-      return `<span class="${cls}">${s.ok ? '✓' : '✗'} step ${s.step} ${s.action}</span>${heal} — ${s.detail}`;
-    });
-    $('log').innerHTML = lines.join('\n') +
-      `\n\n<b>${r.succeeded}/${r.total}</b> steps succeeded`;
-    if (r.total > 0 && r.succeeded === r.total) confetti();  // flawless run
-  } catch (e) {
-    $('log').innerHTML += 'replay failed: ' + e;
-  }
-  btn.disabled = false;
-}
-
-function confetti() {
-  const cv = document.createElement('canvas');
-  cv.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:99';
-  document.body.appendChild(cv);
-  cv.width = innerWidth; cv.height = innerHeight;
-  const ctx = cv.getContext('2d');
-  const P = [];
-  for (let i = 0; i < 130; i++) P.push({
-    x: innerWidth / 2 + (Math.random() - 0.5) * 120, y: innerHeight * 0.3,
-    vx: (Math.random() - 0.5) * 10, vy: -Math.random() * 9 - 2, g: 0.24,
-    c: `hsl(${Math.random() * 360},92%,62%)`, s: 3 + Math.random() * 4,
-    r: Math.random() * Math.PI,
-  });
-  let frames = 0;
-  (function anim() {
-    ctx.clearRect(0, 0, cv.width, cv.height);
-    for (const p of P) {
-      p.x += p.vx; p.y += p.vy; p.vy += p.g; p.r += 0.12;
-      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.r);
-      ctx.fillStyle = p.c; ctx.fillRect(-p.s / 2, -p.s / 2, p.s, p.s); ctx.restore();
-    }
-    if (++frames < 150) requestAnimationFrame(anim); else cv.remove();
-  })();
-}
-
-refresh();
-setInterval(refresh, 2500);
-</script>
-</body></html>
-"""
-)
-
-
-def workflows_html() -> str:
-    """The workflow manager page (record / replay / delete saved automations).
-
-    Same-origin with the Control API, so it drives the JSON routes directly —
-    no auth juggling, no external assets.
-    """
-    return _WORKFLOWS_HTML
 
 
 _NETMON_CSS = r"""  :root { color-scheme: dark; }

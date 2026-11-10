@@ -225,8 +225,7 @@ check(
     _name,
 )
 
-# v1.5.0 — multi-terminal page + workflows manager page
-from browser_core.dashboard import workflows_html
+# v1.5.0 — multi-terminal page
 from browser_core.terminal_page import mesh_html, terminal_html
 
 _ps_page = terminal_html(None, shell="powershell")  # nosec B604
@@ -263,12 +262,6 @@ try:
     check("2nd agent CLI resolves", bool(_cmd2 and _cmd2[0]), " ".join(_cmd2)[:120])
 except FileNotFoundError as _exc:
     check("2nd agent CLI resolves", "terminal_cli2" in str(_exc), str(_exc)[:120])
-_wf_page = workflows_html()
-check(
-    "workflows page well-formed",
-    _wf_page.startswith("<!DOCTYPE html>") and "/workflow/replay" in _wf_page,
-)
-
 # masterpiece pass — userscript engine repair (was: every built-in script died
 # with "Unexpected token '.'" because @match globs never escaped "/")
 from browser_core.scripts import load_scripts, wrapped_source
@@ -309,7 +302,7 @@ check(
 )
 
 # dashboard module served by the Control API
-from browser_core.dashboard import DASHBOARD_HTML, hq_splash_html
+from browser_core.dashboard import DASHBOARD_HTML
 
 check(
     "dashboard html well-formed",
@@ -325,16 +318,14 @@ check(
 )
 check(
     "dashboard platform tiles",
-    "'/workflows'" in DASHBOARD_HTML
-    and "'/network'" in DASHBOARD_HTML
-    and "'/terminal'" in DASHBOARD_HTML,
+    "'/network'" in DASHBOARD_HTML
+    and "'/terminal'" in DASHBOARD_HTML
+    and "'/chat'" in DASHBOARD_HTML,
 )
 
-# v1.9.0 — schedules UI in workflows page + full-page capture entry point
+# v1.9.0 — full-page capture entry point
 from browser_core.screenshot import capture_full_b64
 
-_wf_page2 = workflows_html()
-check("workflows page schedules UI", "/schedules" in _wf_page2 and "sched" in _wf_page2)
 check("full-page screenshot entry point", callable(capture_full_b64))
 
 # v2.0.0 — youtube ad resume fix present in the shipped userscript
@@ -342,11 +333,6 @@ _yt = (BASE / "assets" / "userscripts" / "youtube-adblock.user.js").read_text(en
 check(
     "youtube ad resume-at-position fix",
     "trackAdBoundary" in _yt and "preAdTime" in _yt and "preAdMuted" in _yt,
-)
-check(
-    "hq splash states",
-    "Starting your coding agent" in hq_splash_html("u", "starting")
-    and "unavailable" in hq_splash_html("u", "error", "x"),
 )
 
 
@@ -437,26 +423,6 @@ def _api_checks(port: int) -> None:
     except Exception as exc:
         API_RESULTS.append(("control API /mesh", False, str(exc)))
     try:
-        # urllib follows the 302 to the exe UI when the harness is up;
-        # otherwise the auto-start splash is served — both say "Coding Agent".
-        with urllib.request.urlopen(base + "/hq", timeout=15) as r:  # nosec B310
-            hq = r.read().decode("utf-8", errors="replace")
-        API_RESULTS.append(("control API /hq gateway", "Coding Agent" in hq, ""))
-    except Exception as exc:
-        API_RESULTS.append(("control API /hq gateway", False, str(exc)))
-    try:
-        with urllib.request.urlopen(base + "/research", timeout=10) as r:  # nosec B310
-            res = r.read().decode("utf-8", errors="replace")
-        API_RESULTS.append(
-            (
-                "control API /research",
-                "LuckyD Deep Research" in res and "SWARM" in res,
-                "",
-            )
-        )
-    except Exception as exc:
-        API_RESULTS.append(("control API /research", False, str(exc)))
-    try:
         st = get("/status")
         API_RESULTS.append(
             (
@@ -468,9 +434,7 @@ def _api_checks(port: int) -> None:
     except Exception as exc:
         API_RESULTS.append(("control API /status enrichment", False, str(exc)))
 
-    # live theme switch through the API (restores the original afterwards) —
-    # runs BEFORE the workflow checks: repolishing the app competes with the
-    # replay's GUI-thread work, and client timeouts are cheap here.
+    # live theme switch through the API (restores the original afterwards).
     try:
         switched = post("/theme", {"name": "synthwave"}, timeout=35)
         bad = False
@@ -485,51 +449,6 @@ def _api_checks(port: int) -> None:
         )
     except Exception as exc:
         API_RESULTS.append(("theme switch via API", False, str(exc)))
-
-    # v1.5.0 — full workflow lifecycle against the live browser:
-    # record two scrolls → stop/save → listed → replay → delete.
-    # (Scrolls only: navigation replays depend on network timing — flaky
-    # in a smoke test. Indexed-element self-healing is unit-tested.)
-    try:
-        time.sleep(2.0)  # let the theme repolish finish before replaying
-        post("/workflow/record", {"name": "selftest-demo"})
-        post("/act", {"action": "scroll", "text": "down"})
-        post("/act", {"action": "scroll", "text": "up"})
-        stopped = post("/workflow/stop", {})
-        API_RESULTS.append(
-            (
-                "workflow record+save",
-                bool(stopped.get("saved")) and stopped.get("steps") == 2,
-                str(stopped),
-            )
-        )
-        listing = get("/workflows/list")
-        API_RESULTS.append(
-            (
-                "workflow listed",
-                any(w.get("name") == "selftest-demo" for w in listing.get("workflows", [])),
-                "",
-            )
-        )
-        replayed = post("/workflow/replay", {"name": "selftest-demo"}, timeout=45)
-        API_RESULTS.append(
-            (
-                "workflow replay",
-                replayed.get("total") == 2 and replayed.get("succeeded") == 2,
-                f"{replayed.get('succeeded')}/{replayed.get('total')}",
-            )
-        )
-        post("/workflow/delete", {"name": "selftest-demo"})
-        listing = get("/workflows/list")
-        API_RESULTS.append(
-            (
-                "workflow deleted",
-                not any(w.get("name") == "selftest-demo" for w in listing.get("workflows", [])),
-                "",
-            )
-        )
-    except Exception as exc:
-        API_RESULTS.append(("workflow lifecycle", False, str(exc)))
 
     # v1.7.0 — network monitor lifecycle: start → events → HAR → stop
     try:

@@ -249,6 +249,9 @@ _TERM_CSS = r"""  html,body{margin:0;height:100%;background:var(--ld-window);ove
   .sh:hover{color:var(--ld-text);border-color:color-mix(in srgb, var(--ld-border) 55%, var(--ld-text))}
   .sh.on{color:var(--ld-ok);border-color:var(--ld-ok);
       background:color-mix(in srgb, var(--ld-ok) 8%, transparent)}
+  #provider-select{border:1px solid var(--ld-border);background:var(--ld-panel);color:var(--ld-text);
+      font:600 11px/1 system-ui;padding:4px 6px;border-radius:6px;cursor:pointer;max-width:160px}
+  #provider-select:disabled{opacity:.5;cursor:wait}
   __MESH_CSS__
 """
 
@@ -258,6 +261,7 @@ _TERM_BODY = """<body>
   <button class="sh" data-sh="agent2" title="LuckyD Code __AGENT_VERSION__ Standalone Agent CLI (Agent 2)">Agent 2 (__AGENT_VERSION__)</button>
   <button class="sh" data-sh="powershell" title="Plain PowerShell console">PowerShell</button>
   <button class="sh" data-sh="cmd" title="Plain cmd.exe console">CMD</button>
+  <select id="provider-select" title="AI provider — shared with Chat and the sidebar; switching respawns the Agent session on the new provider"><option value="auto">Provider: Auto</option></select>
   <span id="status">connecting&hellip;</span>
   <span id="hint">Ctrl+Shift+C copy &middot; Ctrl+Shift+V paste &middot; right-click for menu</span></div>
 __MESH_DOCK__
@@ -291,14 +295,19 @@ function paintShell(){
   titleEl.innerHTML = '&#9000; Terminal — ' + label;
   document.title = 'Terminal — ' + label;
 }
-function switchShell(name){
-  if (!SHELL_LABELS[name] || name === SHELL) return;
-  SHELL = name;  // reconnect spawns a fresh, independent PTY for the shell
-  paintShell();
+function reconnect(){
+  // Drop the current PTY session and dial a fresh one — the new agent
+  // boots with the current shared provider pick in its environment.
   try { if (ws) ws.onclose = null, ws.close(); } catch(e) {}
   retry = 0;
   term.reset();
   connect();
+}
+function switchShell(name){
+  if (!SHELL_LABELS[name] || name === SHELL) return;
+  SHELL = name;  // reconnect spawns a fresh, independent PTY for the shell
+  paintShell();
+  reconnect();
 }
 document.querySelectorAll('.sh').forEach(b =>
   b.addEventListener('click', () => switchShell(b.dataset.sh)));
@@ -317,6 +326,56 @@ if (dock) {
   if (typeof ResizeObserver !== 'undefined')
     new ResizeObserver(() => { setDockH(); setTimeout(refit, 30); }).observe(dock);
 }
+// ── one-tap provider switching (Hub slice 8) ──────────────────────
+// The same shared ai_provider pick as the Chat page (slice 2): the
+// picker lists the providers /chat/state reports; one change pins the
+// pick (POST /chat/provider, persisted server-side so it survives
+// restart), and an Agent session respawns on the new provider. Other
+// shells keep their session — the pick still applies the next time an
+// Agent session starts.
+async function api(path, body){
+  const opt = body ? {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)} : {};
+  const r = await fetch(path, opt);
+  return r.json();
+}
+function renderProviders(p){
+  const sel = document.getElementById('provider-select');
+  if (!p || !sel) return;
+  const current = p.current || 'auto';
+  sel.innerHTML = '';
+  const auto = document.createElement('option');
+  auto.value = 'auto'; auto.textContent = 'Provider: Auto' + (p.default ? ' (' + p.default + ')' : '');
+  sel.appendChild(auto);
+  for (const name of (p.available || [])) {
+    const o = document.createElement('option');
+    o.value = name; o.textContent = 'Provider: ' + name;
+    sel.appendChild(o);
+  }
+  // The server is the source of truth: a pinned provider that is no
+  // longer available falls back to Auto in the picker (the pin itself
+  // is only cleared by picking Auto or another provider).
+  sel.value = Array.from(sel.options).some(o => o.value === current) ? current : 'auto';
+}
+async function loadProviders(){
+  try { const s = await api('/chat/state'); if (s.providers) renderProviders(s.providers); } catch (_) {}
+}
+document.getElementById('provider-select').addEventListener('change', async ev => {
+  const sel = ev.target; sel.disabled = true;
+  try {
+    const r = await api('/chat/provider', {provider: sel.value});
+    if (r.state === 'ok' && r.providers) {
+      renderProviders(r.providers);
+      if (SHELL === 'agent' || SHELL === 'agent2') {
+        flash('switched to ' + r.providers.current + ' — new Agent session');
+        reconnect();
+      } else {
+        flash('provider saved — applies to new Agent sessions');
+      }
+    } else { await loadProviders(); }
+  } catch (_) { await loadProviders(); }
+  sel.disabled = false;
+});
+loadProviders();
 paintShell();
 const term = new Terminal({
   cursorBlink: true, convertEol: false, fontSize: EMBED ? 13 : 14,
