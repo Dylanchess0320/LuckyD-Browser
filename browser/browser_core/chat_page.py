@@ -97,6 +97,7 @@ _CHAT_BODY = r"""<body>
 <header><h1><span>💬</span> LuckyD Chat</h1></header>
 <main>
   <div class="state hub-status" id="hub-status"></div>
+  <div class="state hub-status" id="handoff-state"></div>
   <section id="hub-sec">
     <div class="sec-head"><h2>Hub chat</h2><span class="sp"></span>
       <button class="ghost" id="chat-clear" type="button">Clear</button></div>
@@ -108,6 +109,9 @@ _CHAT_BODY = r"""<body>
       <input type="text" id="chat-input" placeholder="Message the Hub" autocomplete="off">
       <button type="submit" id="chat-send">Send</button>
     </form>
+    <div class="prov"><label for="handoff-input">Handoff</label>
+      <input type="text" id="handoff-input" placeholder="Note for the next surface" autocomplete="off">
+      <button class="ghost" id="handoff-save" type="button">Save</button></div>
   </section>
 
   <section id="claw-sec">
@@ -266,6 +270,7 @@ function renderTasks(tasks){
     box.appendChild(d); return;
   }
   for (const t of tasks) {
+    if (TERMINAL.includes(String(t.state))) postClawReceipt(t);
     const row = document.createElement('div'); row.className = 'task';
     const head = document.createElement('div'); head.className = 't';
     const pr = document.createElement('span'); pr.className = 'prompt'; pr.textContent = t.prompt || '';
@@ -349,10 +354,41 @@ $('#provider-select').addEventListener('change', async ev => {
   sel.disabled = false;
 });
 
+// ── shared handoff note (slice 3) ───────────────────────────────────
+// The latest note from any surface (Chat, Claw receipts, terminal) is
+// shown under the status block; the input below the chat saves a note
+// for the next surface. Finished Claw receipts post themselves once.
+function renderHandoff(h){
+  const el = $('#handoff-state');
+  if (!el) return;
+  const latest = h && h.latest;
+  el.textContent = latest ? 'Handoff (' + (latest.source || 'chat') + '): ' + (latest.text || '') : '';
+}
+$('#handoff-save').addEventListener('click', async () => {
+  const input = $('#handoff-input');
+  const text = input.value.trim();
+  if (!text) return;
+  try { await api('/chat/handoff', {source: 'chat', text: text}); } catch (_) {}
+  input.value = '';
+  refreshState();
+});
+let postedReceipts = new Set();
+try { postedReceipts = new Set(JSON.parse(localStorage.getItem('luckyd-handoff-posted-v1') || '[]')); } catch (_) { postedReceipts = new Set(); }
+function postClawReceipt(t){
+  if (!t.id || postedReceipts.has(t.id)) return;
+  const note = (t.summary || t.result || '').trim();
+  if (!note) return;
+  postedReceipts.add(t.id);
+  try { localStorage.setItem('luckyd-handoff-posted-v1', JSON.stringify(Array.from(postedReceipts).slice(-100))); } catch (_) {}
+  const text = (t.project ? t.project + ': ' : '') + note.slice(0, 500);
+  api('/chat/handoff', {source: 'claw', text: text}).catch(() => {});
+}
+
 async function refreshState(){
   try {
     const s = await api('/chat/state');
     renderHubStatus(s.components);
+    if (s.handoff) renderHandoff(s.handoff);
     if (s.providers) renderProviders(s.providers);
     stateLine($('#hub-state'), 'hub', s.hub && s.hub.state);
     stateLine($('#claw-state'), 'claw', s.claw && s.claw.state);

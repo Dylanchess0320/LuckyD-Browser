@@ -69,6 +69,7 @@ from browser_core.dashboard import (
     workflows_html,
 )
 from browser_core.extract import build_messages, parse_json_loose
+from browser_core.hub_memory import HandoffStore, handoff_state
 from browser_core.hub_providers import (
     current_provider,
     pin_provider,
@@ -129,6 +130,14 @@ _ROUTES = (
     (
         "POST /chat/provider",
         '{"provider": "…|auto"} — pin the chat provider (persisted, survives restart)',
+    ),
+    (
+        "GET  /chat/handoff",
+        "shared handoff log: latest note + count (JSON)",
+    ),
+    (
+        "POST /chat/handoff",
+        '{"source": "…", "text": "…"} — append a handoff note every surface can read',
     ),
     ("POST /chat/send", '{"messages": [{"role", "content"}...]} — send to the Hub chat route'),
     ("GET  /chat/tasks", "Claw task list (JSON, proxied)"),
@@ -556,6 +565,14 @@ def make_handler(
                         projects=projects,
                         components=components,
                         providers=provider_state(settings, backend),
+                        handoff=handoff_state(),
+                    )
+                if path == "/chat/handoff":
+                    store = HandoffStore()
+                    return self._ok(
+                        latest=store.latest(),
+                        count=store.count(),
+                        entries=store.list(10),
                     )
                 if path == "/chat/tasks":
                     return self._send(200, claw_tasks(settings))
@@ -665,6 +682,13 @@ def make_handler(
                     return self._send(
                         200, {"state": "ok", "providers": provider_state(settings, backend)}
                     )
+                if path == "/chat/handoff":
+                    result = HandoffStore().append(
+                        str(body.get("source", "chat")), str(body.get("text", ""))
+                    )
+                    if result.get("state") != "ok":
+                        return self._send(400, result)
+                    return self._send(200, result)
                 if path == "/chat/task":
                     project = str(body.get("project", "")).strip()
                     prompt = str(body.get("prompt", "")).strip()
