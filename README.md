@@ -18,7 +18,7 @@
 
 ## Why LuckyD?
 
-Most AI browsers rent you a chatbot on a subscription. LuckyD takes the other road: it's a full Chromium daily driver with an AI layer that **finds you a working model for free** — a rotating pool of free cloud models first, local models on your own machine when you want total privacy, and your own API keys only if you choose to add them.
+Most AI browsers rent you a chatbot on a subscription. LuckyD takes the other road: it's a full Chromium daily driver with an AI layer that **finds you a working model for free** — your own local model first, a rotating pool of free cloud models when it's off, and your own API keys only if you choose to add them.
 
 - 🆓 **Free AI, no catch** — no account, no API key, no subscription. The assistant works the moment you install.
 - 🌐 **A real browser** — Chromium engine, tabs, bookmarks, workspaces, built-in ad blocking, private mode.
@@ -36,7 +36,7 @@ Press `Ctrl+Shift+A` on any page. One input bar, two modes, toggled right where 
 - **Ask** — questions about the page or anything else. Summarize an article, explain a paragraph, draft a reply.
 - **Agent** — hand it a task. It works through the browser's toolset and reports back in the transcript, with a live status line while it runs.
 
-Behind both modes sits provider handling that tells the truth. Settings → Models shows every provider's live status — **Ready**, **Needs key**, or **Exhausted** (with a retry countdown) — read from the same health snapshot the backend uses. When a model dies mid-request, the run rotates to the next working one instead of ending in an empty reply. The free Cline rotation (MiMo v2.6 Pro among the models it serves) is the default path; plug in Ollama for fully local models, or add your own keys for Gemini, OpenAI, Anthropic, OpenRouter, DeepSeek, and more — cloud providers are always an explicit opt-in, never a silent fallback.
+Behind both modes sits provider handling that tells the truth. Settings → Models shows every provider's live status — **Ready**, **Needs key**, or **Exhausted** (with a retry countdown) — read from the same health snapshot the backend uses. When a model dies mid-request, the run rotates to the next working one instead of ending in an empty reply. Your local Ollama model **luckyd:8b** is the default — it runs on your own machine, so it costs nothing and stays private. At startup the assistant probes the free gateways live (OpenCode Zen, OpenRouter :free, Antigravity, and more; results cached 24 hours) and auto-routes the free rotation when the PC or Ollama is off, so there's always a working free path. Cline's credit-billed usage only shows up when it actually has credits — exhausted means hidden, not offered. Add your own keys for Gemini, OpenAI, Anthropic, OpenRouter, DeepSeek, and more — cloud providers are always an explicit opt-in, never a silent fallback.
 
 ---
 
@@ -75,13 +75,15 @@ Then start chatting. That's it. Want everything on your own machine? Add Ollama 
 
 ## What's new
 
-**v10.8.8** — Model refresh: LuckyD models by default, live free detection, Pareto catalogs
+**v10.8.8** — Model refresh + Cline fix: LuckyD models (Ollama luckyd:8b) are now the default, live free detection probes the free gateways at startup (24h cache) and auto-routes the free rotation, the model catalog is re-ranked on live benchmarks (best overall, best bang-for-buck, cheapest), the sidebar auto-routes to working providers, and Cline usage is only offered when it actually has credits — exhausted means hidden
+
+**v10.8.7** — Hub unification: one Hub status surface for Browser, chat, terminal, puck, and Claw; one-tap provider switching on Chat; a shared handoff note; retired tools removed (HQ, Workflows, Deep Researcher, Deck Studio); a proactive growth-watch card; the first eval-set run plus a team-brain doc; terminal provider parity; and LuckyD Code handoff
 
 **v10.8.5** — Settings fixed: with retired tools hidden, the Connections settings page painted over the Settings dialog and hid the Privacy, Appearance, and Updates tabs — all five tabs now show in both switch states. Plus a security update for the AI provider library (litellm 1.88.6, closing a critical authentication-bypass alert). Known limitation: Twitch video and some game audio still don't work — the web engine ships without H.264/AAC decoders
 
 **v10.8.4** — Gmail sign-in fixed: the browser was presenting Google contradictory identities (a stale Chrome 126 user-agent plus rewritten sign-in headers) and Google refused it as insecure; it now presents one consistent identity. Known limitation: Twitch video and some game audio still don't work — the web engine ships without H.264/AAC decoders
 
-**v10.8.3** — The cleanup pass: Ctrl+K palette rebuilt, model pickers list only working models (your luckyd models first), status bar slimmed down with the hover address kept, LuckyD Chat retired for now, GitHub page rewritten as a showcase with the Discord invite back
+**v10.8.3** — The cleanup pass: Ctrl+K palette rebuilt, model pickers list only working models (your luckyd models first), status bar slimmed down with the hover address kept, LuckyD Chat retired for now — since revived as live Hub chat in v10.8.7, GitHub page rewritten as a showcase with the Discord invite back
 
 **v10.8.2** — Agent mode fixed: AI Assistant agent runs use the provider + model you picked (Cline included), and a model that fails mid-request rotates to the next one instead of ending in an empty reply
 
