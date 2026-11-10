@@ -165,6 +165,14 @@ class TestDetectHonorsMarker:
         monkeypatch.setenv("CLINE_USAGE_MODEL", "deepseek/deepseek-chat")
         assert providers.detect_provider() is None  # still skipped
 
+    def test_model_var_alone_is_not_auth(self, credit_env, monkeypatch):
+        """CLINE_USAGE_MODEL names a model, it is not a credential: with
+        no session token and no key, detect_provider() must not return
+        cline-usage on the model var alone (10.8.8 — LuckyD Code kept
+        showing cline-usage as the default with $0 credits)."""
+        monkeypatch.setenv("CLINE_USAGE_MODEL", "minimax/minimax-m2.5")
+        assert providers.detect_provider() is None
+
     def test_explicit_provider_wins_while_exhausted(self, credit_env, monkeypatch):
         monkeypatch.setattr(providers, "cline_session_token", lambda: "tok-live")
         monkeypatch.setenv("CODING_AGENT_PROVIDER", "cline-usage")

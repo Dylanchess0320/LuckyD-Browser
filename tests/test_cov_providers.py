@@ -162,6 +162,17 @@ class TestDetectProvider:
         assert detect_provider() == "clinepass"
 
     def test_priority_order_cline_usage(self, clean_env):
+        """CLINE_USAGE_MODEL alone is not auth: with no session token and
+        no Cline key, the model var must not make dead Cline outrank a
+        keyed provider (10.8.8 — LuckyD Code kept showing cline-usage as
+        the default with $0 credits)."""
+        clean_env.setenv("CLINE_USAGE_MODEL", "deepseek/deepseek-chat")
+        clean_env.setenv("OPENAI_API_KEY", "sk-x")
+        assert detect_provider() == "openai"
+
+    def test_priority_order_cline_usage_with_session(self, clean_env, monkeypatch):
+        """With a real Cline session, cline-usage still outranks OpenAI."""
+        monkeypatch.setattr(providers, "cline_session_token", lambda: "tok-live")
         clean_env.setenv("CLINE_USAGE_MODEL", "deepseek/deepseek-chat")
         clean_env.setenv("OPENAI_API_KEY", "sk-x")
         assert detect_provider() == "cline-usage"

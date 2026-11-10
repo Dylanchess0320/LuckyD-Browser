@@ -1047,8 +1047,10 @@ class QtBrowserBackend:
 
             self._ai = AIBridge()
         try:
+            usable = getattr(self._ai, "usable_providers", None)
+            providers = usable() if callable(usable) else self._ai.providers()
             return {
-                "ai_providers": self._ai.providers(),
+                "ai_providers": providers,
                 "ai_default": self._ai.default_provider(),
                 "ai_local_status": self._ai.local_status(),
             }

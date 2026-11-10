@@ -300,8 +300,13 @@ class AiSidebar(QDockWidget):
         top = QHBoxLayout()
         self.provider_box = QComboBox(body)
         self.provider_box.addItem("✨ Auto (recommended)", None)
-        # Show providers with cline-usage first when available
-        ordered = list(self.bridge.providers())
+        # Only providers that can serve right now are offered — a dead
+        # Cline gateway (no auth / live 402 marker) is not listed at all,
+        # so the switcher can never show it as the current pick. (The raw
+        # providers() list still registers it for the model-catalog
+        # fallback; offering is what changes here.)
+        _usable = getattr(self.bridge, "usable_providers", None)
+        ordered = list(_usable()) if callable(_usable) else list(self.bridge.providers())
         default = self.bridge.default_provider()
         if default in ordered:
             ordered.remove(default)
@@ -309,8 +314,6 @@ class AiSidebar(QDockWidget):
         for name in ordered:
             display = self._provider_label(name)
             label = f"{display} — {self.bridge.model_for(name)}"
-            if name in ("clinepass", "cline-usage") and self._cline_credit_exhausted():
-                label += "  (credits exhausted)"
             self.provider_box.addItem(label, name)
         # Page context is always included (2026-10-22: the checkbox is
         # gone — capabilities stay, clutter goes).
@@ -765,13 +768,6 @@ class AiSidebar(QDockWidget):
             "mistral": "Mistral",
         }
         return labels.get(provider, provider)
-
-    def _cline_credit_exhausted(self) -> bool:
-        """True while a Cline 402 marker steers auto-selection away (10.4)."""
-        try:
-            return bool(self.bridge.cline_credit_exhausted())
-        except Exception:
-            return False
 
     @staticmethod
     def _model_label(provider: str, model: str) -> str:

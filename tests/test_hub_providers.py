@@ -211,6 +211,28 @@ def test_provider_state_from_backend_ai_info() -> None:
     assert state["local_status"] == {"ollama": "ok"}
 
 
+def test_provider_state_stale_pin_falls_back_to_auto() -> None:
+    """A pin for a provider the backend no longer offers (dead Cline
+    dropped from the usable list) is reported as Auto — the pin itself
+    is only cleared by picking Auto or another provider."""
+    state = hp.provider_state(_settings(ai_provider="cline-usage"), _fake_backend())
+    assert state["current"] == "auto"
+    assert state["available"] == ["ollama", "google"]
+    assert state["default"] == "ollama"
+
+
+def test_pin_provider_rejects_dead_cline() -> None:
+    """Pinning cline-usage against a usable list that no longer contains
+    it is rejected and saves nothing — the switcher can never make a
+    dead Cline current."""
+    store = _Store(ai_provider="ollama")
+    out = hp.pin_provider(store, "cline-usage", ["ollama", "google"])
+    assert out["state"] == "error"
+    assert "cline-usage" in out["error"]
+    assert store.get("ai_provider") == "ollama"
+    assert store.saved == 0
+
+
 def test_provider_state_without_ai_info_never_raises() -> None:
     state = hp.provider_state(_settings(), SimpleNamespace())
     assert state == {"current": "auto", "available": [], "default": None, "local_status": {}}
@@ -322,3 +344,22 @@ def test_chat_page_has_provider_picker() -> None:
     assert 'id="provider-select"' in page
     assert "/chat/provider" in page
     assert "renderProviders" in page
+
+
+def test_chat_provider_rejects_dead_cline(monkeypatch) -> None:
+    """End to end: the Hub offers only [ollama, google], so pinning a
+    dead cline-usage through the live switcher endpoint is a 400 and
+    nothing is persisted."""
+    settings = _Store(hub_token="x", claw_token="y")
+    httpd, base, _calls = _serve_ctl(settings, monkeypatch)
+    try:
+        status, raw = _req(base, "POST", "/chat/provider", {"provider": "cline-usage"})
+        body = json.loads(raw)
+        assert status == 400
+        assert body["state"] == "error"
+        assert "cline-usage" in body["error"]
+        assert settings.get("ai_provider") is None
+        assert settings.saved == 0
+    finally:
+        httpd.shutdown()
+        httpd.server_close()

@@ -1359,6 +1359,12 @@ class _FakeAI:
             raise RuntimeError("no providers configured")
         return ["fake"]
 
+    def usable_providers(self):
+        """The list ai_info() reports — providers that can serve now."""
+        if self.fail:
+            raise RuntimeError("no providers configured")
+        return ["fake-usable"]
+
     def default_provider(self):
         if self.fail:
             raise RuntimeError("no providers configured")
@@ -1378,7 +1384,7 @@ def test_ai_info_reports_providers():
     be, *_ = _qt_backend()
     be._ai = _FakeAI()
     assert be.ai_info() == {
-        "ai_providers": ["fake"],
+        "ai_providers": ["fake-usable"],
         "ai_default": "fake",
         "ai_local_status": {"fake": "ok"},
     }
@@ -1436,6 +1442,12 @@ def test_ai_info_builds_bridge_lazily():
     info = be.ai_info()
     assert be._ai is not None  # real AIBridge constructed and cached
     assert set(info) == {"ai_providers", "ai_default", "ai_local_status"}
+    # 10.8.8: the usable list never offers a dead Cline gateway — this
+    # environment has no Cline session/key, so cline-usage must be absent
+    # from the reported providers even though it stays registered for the
+    # model-catalog fallback.
+    assert "cline-usage" not in info["ai_providers"]
+    assert "clinepass" not in info["ai_providers"]
 
 
 def test_ask_builds_bridge_lazily(monkeypatch):

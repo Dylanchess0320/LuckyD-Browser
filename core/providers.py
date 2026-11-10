@@ -347,6 +347,16 @@ def detect_provider() -> str | None:
 
     cline_blocked = is_cline_credit_exhausted()
 
+    # A Cline entry needs auth, not just its model var: CLINE_USAGE_MODEL
+    # names a model, it is not a credential. Without a session token or a
+    # ClinePass key, Cline cannot serve — never default to it (10.8.8:
+    # LuckyD Code kept showing cline-usage as the default with $0 credits
+    # and no live session, because this loop returned it on the model var
+    # alone once the free rotation found nothing else).
+    cline_auth = bool(cline_session_token()) or bool(
+        (os.environ.get("CLINEPASS_API_KEY", "") or "").strip()
+    )
+
     # Check env vars in priority order (keyed/paid providers)
     checks = [
         ("clinepass", "CLINEPASS_API_KEY"),
@@ -365,6 +375,8 @@ def detect_provider() -> str | None:
     ]
     for provider, env_var in checks:
         if provider in ("clinepass", "cline-usage") and cline_blocked:
+            continue
+        if provider in ("clinepass", "cline-usage") and not cline_auth:
             continue
         if os.environ.get(env_var):
             return provider

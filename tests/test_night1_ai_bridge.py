@@ -22,6 +22,8 @@ if str(_REPO_ROOT) not in sys.path:
 from browser_core import ai_bridge, cline_session
 from browser_core.ai_bridge import AIBridge
 
+from core.cline_credit import record_cline_credit_exhausted
+
 
 @pytest.fixture()
 def hermetic(monkeypatch: pytest.MonkeyPatch):
@@ -36,22 +38,27 @@ def hermetic(monkeypatch: pytest.MonkeyPatch):
     return _fake_load_env
 
 
-def _bridge_with(env: dict, local: dict | None = None) -> AIBridge:
+def _bridge_with(env: dict, local: dict | None = None, session: bool = False) -> AIBridge:
     """Build a bridge with a fixed env and fixed local-server detections."""
-    orig_load, orig_detect, orig_session = (
+    orig_load, orig_detect, orig_session, orig_stored = (
         ai_bridge._load_env,
         AIBridge._detect_local,
         cline_session.has_session,
+        cline_session.stored_token,
     )
     ai_bridge._load_env = staticmethod(lambda: dict(env))  # type: ignore[assignment]
     AIBridge._detect_local = staticmethod(lambda e: dict(local or {}))  # type: ignore[assignment]
-    cline_session.has_session = lambda: False  # type: ignore[assignment]
+    cline_session.has_session = lambda: session  # type: ignore[assignment]
+    # Session on disk, access token expired (the 10.8.8 case: the login
+    # exists, so the bridge counts Cline as usable until a 402 says no).
+    cline_session.stored_token = lambda: (_ for _ in ()).throw(RuntimeError("expired"))  # type: ignore[assignment]
     try:
         return AIBridge()
     finally:
         ai_bridge._load_env = orig_load  # type: ignore[assignment]
         AIBridge._detect_local = orig_detect  # type: ignore[assignment]
         cline_session.has_session = orig_session  # type: ignore[assignment]
+        cline_session.stored_token = orig_stored  # type: ignore[assignment]
 
 
 # ── provider registration & defaults ─────────────────────────────────
@@ -80,6 +87,57 @@ def test_default_provider_skips_unusable_cline(hermetic) -> None:
     b = _bridge_with({})
     assert "cline-usage" in b.providers()
     assert b.default_provider() is None
+
+
+# ── usable providers: a dead Cline is never offered (10.8.8) ───────────
+# Dylan (2026-11-10, live on his PC): the switcher kept treating LuckyD
+# Code as cline-usage after Cline credits hit $0. Registration is not
+# usability — cline-usage registers with an empty token so fetch_models()
+# can fall back to the curated catalog, but the switcher, the Hub status
+# and auto routing must only ever see providers that can serve now.
+
+_LOCAL_LUCKYD = {"ollama": ("luckyd:8b", "http://127.0.0.1:11434/v1", "", "openai")}
+
+
+def test_usable_providers_excludes_cline_without_auth(hermetic) -> None:
+    b = _bridge_with({}, local=_LOCAL_LUCKYD)
+    assert "cline-usage" in b.providers()  # raw registration intact (catalog)
+    assert "clinepass" in b.providers()
+    assert b.usable_providers() == ["ollama"]
+    assert b.default_provider() == "ollama"
+
+
+def test_usable_providers_includes_cline_when_usable(hermetic, tmp_path, monkeypatch) -> None:
+    """Session on disk, no live 402 marker: Cline stays selectable."""
+    # Pin the marker file to a fresh path: a real ~/.luckyd marker on the
+    # dev machine must never flip this control case.
+    monkeypatch.setenv("LUCKYD_CLINE_CREDIT_STATE", str(tmp_path / "state.json"))
+    b = _bridge_with({}, local=_LOCAL_LUCKYD, session=True)
+    assert "cline-usage" in b.usable_providers()
+    assert "clinepass" in b.usable_providers()
+    assert b.default_provider() == "cline-usage"
+
+
+def test_usable_providers_excludes_cline_with_live_marker(hermetic, tmp_path, monkeypatch) -> None:
+    """Session on disk + a live 402 marker: Cline is unusable even though
+    the login exists — the luckyd model (Ollama) is the default."""
+    monkeypatch.setenv("LUCKYD_CLINE_CREDIT_STATE", str(tmp_path / "state.json"))
+    record_cline_credit_exhausted("HTTP 402 from api.cline.bot (test)")
+    b = _bridge_with({}, local=_LOCAL_LUCKYD, session=True)
+    assert b.providers() == ["ollama", "clinepass", "cline-usage"]
+    assert b.usable_providers() == ["ollama"]
+    assert b.default_provider() == "ollama"
+    assert b._is_viable_provider("cline-usage") is False
+    assert b._is_viable_provider("clinepass") is False
+    assert b._is_viable_provider("ollama") is True
+
+
+def test_is_viable_provider_allows_usable_cline(hermetic, tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("LUCKYD_CLINE_CREDIT_STATE", str(tmp_path / "state.json"))
+    b = _bridge_with({}, session=True)
+    assert b._is_viable_provider("cline-usage") is True
+    assert b._is_viable_provider("clinepass") is True
+    assert b._is_viable_provider("nope") is False
 
 
 def test_default_provider_keyed_clouds_in_spec_order(hermetic) -> None:

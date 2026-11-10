@@ -551,7 +551,26 @@ class AIBridge:
         return found
 
     def providers(self) -> list[str]:
+        """Configured providers (registration order).
+
+        Registration is not usability: clinepass/cline-usage register
+        with an empty token so fetch_models() can fall back to the
+        curated catalog. Callers that offer or select a provider use
+        usable_providers() instead.
+        """
         return list(self._configs)
+
+    def usable_providers(self) -> list[str]:
+        """Providers that can serve a call right now.
+
+        Cline gateways are listed only when usable (auth exists and no
+        live 402 marker); every other registered provider is usable by
+        construction (locals probe at startup, keyed clouds need a key).
+        This is the list the Hub switcher, the sidebar, and auto
+        routing offer — a dead Cline is never offered as current or
+        default, while fetch_models() keeps working from _configs.
+        """
+        return [name for name in self._configs if self._is_viable_provider(name)]
 
     def local_status(self) -> dict[str, str]:
         """Probe diagnosis per local server: ok | not_running | no_models."""
@@ -667,6 +686,18 @@ class AIBridge:
             return "Cline"
         return None
 
+    def _cline_usable_now(self) -> bool:
+        """True when Cline can actually serve a call right now.
+
+        Single source of truth for every surface that selects or
+        offers a provider (default_provider, _is_viable_provider):
+        auth must exist (API key or a logged-in Cline CLI session)
+        AND no live 402 credit-exhaustion marker may be active. A
+        session on disk alone is not proof — with $0 credits every
+        call 402s, so the marker is part of usability.
+        """
+        return self._cline_usable() and not _cline_credit_exhausted()
+
     def default_provider(self) -> str | None:
         """Return the highest-priority available provider.
 
@@ -684,7 +715,7 @@ class AIBridge:
         balance 402s every usage-billed call), both Cline gateways are
         skipped here just like providers without auth.
         """
-        cline_ok = self._cline_usable() and not _cline_credit_exhausted()
+        cline_ok = self._cline_usable_now()
         if "cline-usage" in self._configs and cline_ok:
             return "cline-usage"
         # Gemini free tier (registered under the "google" id in this bridge).
@@ -1080,14 +1111,15 @@ class AIBridge:
 
         Registration already encodes reachability/credentials: local servers
         are only registered when the startup probe succeeded, keyed clouds
-        only when a key exists. Cline entries
-        may be registered with an empty token, so they need the explicit
-        usability check.
+        only when a key exists. Cline entries may be registered with an
+        empty token, so they need the explicit usability check — auth
+        AND no live 402 marker (a $0 balance 402s every call, so a live
+        marker means unusable even with a session on disk).
         """
         if self._configs.get(name) is None:
             return False
         if name in ("clinepass", "cline-usage"):
-            return self._cline_usable()
+            return self._cline_usable_now()
         return True
 
     @staticmethod
@@ -1238,7 +1270,10 @@ class AIBridge:
                     # local rarely 429 — if it does, try the Cline gateway next
                     continue
             # No free unlimited succeeded — fall through to full provider fallback
-        order = [provider] if provider else self.providers()
+        # Auto mode offers only providers that can serve right now —
+        # a dead Cline gateway (no auth / live 402 marker) is never
+        # attempted, it just fails the call and burns the rotation.
+        order = [provider] if provider else self.usable_providers()
         if routed is not None:
             # Routed provider goes first; the rest of today's chain follows
             # as fallback (free pool included — still reachable on failure).

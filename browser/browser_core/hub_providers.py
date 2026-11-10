@@ -48,9 +48,20 @@ def provider_state(settings, backend=None) -> dict:
     except Exception:
         info = {}
     available = info.get("ai_providers") or []
+    available = [str(p) for p in available if str(p).strip()]
+    current = current_provider(settings)
+    # A pinned provider that is no longer offered (e.g. a dead Cline
+    # gateway dropped from the usable list) is reported as Auto — the
+    # pin itself is only cleared by picking Auto or another provider,
+    # mirroring the Chat page picker's own fallback. Without this the
+    # status surface keeps showing a dead provider as "current".
+    # (An empty available list means the backend told us nothing, so
+    # the pin is reported as-is rather than guessed away.)
+    if available and current != AUTO and current not in available:
+        current = AUTO
     return {
-        "current": current_provider(settings),
-        "available": [str(p) for p in available if str(p).strip()],
+        "current": current,
+        "available": available,
         "default": info.get("ai_default"),
         "local_status": dict(info.get("ai_local_status") or {}),
     }
