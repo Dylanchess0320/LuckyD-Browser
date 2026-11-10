@@ -63,6 +63,7 @@ from browser_core.agent import (
 from browser_core.chat_page import chat_html
 from browser_core.dashboard import dashboard_html, netmon_html
 from browser_core.extract import build_messages, parse_json_loose
+from browser_core.hub_cards import CardStore, card_from_watch_change, cards_state
 from browser_core.hub_memory import HandoffStore, handoff_state
 from browser_core.hub_providers import (
     current_provider,
@@ -133,6 +134,19 @@ _ROUTES = (
     (
         "POST /chat/handoff",
         '{"source": "…", "text": "…"} — append a handoff note every surface can read',
+    ),
+    (
+        "GET  /chat/cards",
+        "proactive Hub cards: current (undismissed) growth-watch cards (JSON)",
+    ),
+    (
+        "POST /chat/cards",
+        '{"type": "github_stars|discord_members", "from": N, "to": N, '
+        '"new_stargazers": […]} — ingest one growth-watch change as a card',
+    ),
+    (
+        "POST /chat/cards/dismiss",
+        '{"id": "…"} — dismiss a card so it stops rendering',
     ),
     ("POST /chat/send", '{"messages": [{"role", "content"}...]} — send to the Hub chat route'),
     ("GET  /chat/tasks", "Claw task list (JSON, proxied)"),
@@ -500,6 +514,13 @@ def make_handler(
                         components=components,
                         providers=provider_state(settings, backend),
                         handoff=handoff_state(),
+                        cards=cards_state(),
+                    )
+                if path == "/chat/cards":
+                    store = CardStore()
+                    return self._ok(
+                        cards=store.current(),
+                        count=store.count(),
                     )
                 if path == "/chat/handoff":
                     store = HandoffStore()
@@ -603,6 +624,25 @@ def make_handler(
                     result = HandoffStore().append(
                         str(body.get("source", "chat")), str(body.get("text", ""))
                     )
+                    if result.get("state") != "ok":
+                        return self._send(400, result)
+                    return self._send(200, result)
+                if path == "/chat/cards":
+                    # Ingest one growth-watch change as a proactive card.
+                    # The body is the check.py change shape:
+                    # {"type": "github_stars"|"discord_members",
+                    #  "from": N, "to": N, "new_stargazers": [...]}.
+                    # Unknown kinds / malformed payloads are rejected and
+                    # store nothing. No change = no POST = no card.
+                    built = card_from_watch_change(body)
+                    if built.get("state") != "ok":
+                        return self._send(400, built)
+                    result = CardStore().add(built["kind"], built["title"], built["detail"])
+                    if result.get("state") != "ok":
+                        return self._send(400, result)
+                    return self._send(200, result)
+                if path == "/chat/cards/dismiss":
+                    result = CardStore().dismiss(str(body.get("id", "")))
                     if result.get("state") != "ok":
                         return self._send(400, result)
                     return self._send(200, result)

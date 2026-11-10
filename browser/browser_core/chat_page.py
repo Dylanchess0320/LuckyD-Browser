@@ -36,6 +36,12 @@ _CHAT_CSS = """  :root{color-scheme:dark}
   .state{padding:10px 16px;color:var(--ld-muted);font-size:12px;
     border-bottom:1px solid var(--ld-border)}
   .state:empty{display:none}
+  #cards-state{display:flex;flex-direction:column;gap:6px}
+  #cards-state:empty{display:none}
+  .card{display:flex;gap:10px;align-items:baseline}
+  .card .ct{font-weight:650;color:var(--ld-text)}
+  .card .cd{color:var(--ld-muted)}
+  .card button{margin-left:auto;flex:none}
   .hub-status{grid-column:1/-1;border:1px solid var(--ld-border);
     border-radius:var(--ld-r-md);background:var(--ld-card)}
   #chat-log{height:380px;overflow:auto;padding:14px 16px;display:flex;
@@ -98,6 +104,7 @@ _CHAT_BODY = r"""<body>
 <main>
   <div class="state hub-status" id="hub-status"></div>
   <div class="state hub-status" id="handoff-state"></div>
+  <div class="state hub-status" id="cards-state"></div>
   <section id="hub-sec">
     <div class="sec-head"><h2>Hub chat</h2><span class="sp"></span>
       <button class="ghost" id="chat-clear" type="button">Clear</button></div>
@@ -384,11 +391,39 @@ function postClawReceipt(t){
   api('/chat/handoff', {source: 'claw', text: text}).catch(() => {});
 }
 
+// ── proactive growth-watch cards (slice 5) ──────────────────────────
+// One card per real change (GitHub star / Discord join), posted by the
+// watch adapter. No changes = no cards = nothing rendered. Dismissing
+// removes the card for good — it never reappears.
+function renderCards(cards){
+  const el = $('#cards-state');
+  if (!el) return;
+  el.innerHTML = '';
+  for (const c of (cards || [])) {
+    const row = document.createElement('div'); row.className = 'card';
+    const t = document.createElement('span'); t.className = 'ct'; t.textContent = c.title || '';
+    row.appendChild(t);
+    if (c.detail) {
+      const d = document.createElement('span'); d.className = 'cd'; d.textContent = c.detail;
+      row.appendChild(d);
+    }
+    const b = document.createElement('button'); b.className = 'ghost'; b.type = 'button'; b.textContent = 'Dismiss';
+    b.addEventListener('click', async () => {
+      b.disabled = true;
+      try { await api('/chat/cards/dismiss', {id: c.id}); } catch (_) {}
+      refreshState();
+    });
+    row.appendChild(b);
+    el.appendChild(row);
+  }
+}
+
 async function refreshState(){
   try {
     const s = await api('/chat/state');
     renderHubStatus(s.components);
     if (s.handoff) renderHandoff(s.handoff);
+    if (s.cards) renderCards(s.cards.cards);
     if (s.providers) renderProviders(s.providers);
     stateLine($('#hub-state'), 'hub', s.hub && s.hub.state);
     stateLine($('#claw-state'), 'claw', s.claw && s.claw.state);
