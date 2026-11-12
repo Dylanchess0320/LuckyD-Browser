@@ -75,6 +75,8 @@ Then start chatting. That's it. Want everything on your own machine? Add Ollama 
 
 ## What's new
 
+**v10.8.9** — Agent setup, built in, plus stability fixes: the installer now offers optional Local AI and Agent Mesh setup, a one-command bootstrap for Node.js, Git, GitHub CLI, Python 3.12, Ollama and the supported agent CLIs, and Start Menu entries for **Agent Setup** and the **Setup Guide**. This rebuild also stops the real crashes on legacy-encoding pages (ISO-8859-2, Windows-1251 and sites like hvg.hu) by pinning the web engine to **PySide6 6.11.3**, and fixes the stretched, forced-fullscreen window that could be left behind after element fullscreen or an AI-sidebar transition — window geometry and chrome visibility now restore exactly, with ownership tracking for nested fullscreen, F11 toggles and tab close.
+
 **v10.8.8** — Model refresh + Cline fix: LuckyD models (Ollama luckyd:8b) are now the default, live free detection probes the free gateways at startup (24h cache) and auto-routes the free rotation, the model catalog is re-ranked on live benchmarks (best overall, best bang-for-buck, cheapest), the sidebar auto-routes to working providers, and Cline usage is only offered when it actually has credits — exhausted means hidden
 
 **v10.8.7** — Hub unification: one Hub status surface for Browser, chat, terminal, puck, and Claw; one-tap provider switching on Chat; a shared handoff note; retired tools removed (HQ, Workflows, Deep Researcher, Deck Studio); a proactive growth-watch card; the first eval-set run plus a team-brain doc; terminal provider parity; and LuckyD Code handoff
