@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [10.8.9] - 2026-11-11
+
+Agent setup built into the installer, plus crash and fullscreen stability fixes.
+
+### Agent setup
+- Agent setup is now part of the installer: optional Local AI and Agent Mesh tasks, Start Menu shortcuts for Agent Setup and Setup Guide, and the complete setup guide bundled with the app.
+- One-command bootstrap installs or repairs Node.js, Git, GitHub CLI, Python 3.12, Ollama, and the supported agent CLIs; the Python user Scripts path is added to PATH so `hermes` and `aider` work in a fresh terminal.
+- GitHub Copilot CLI and Google Antigravity CLI are wired in through winget.
+
+### Fixes
+- Pinned PySide6 to 6.11.3 (Chromium 140.0.7339.264) to stop real crashes on legacy-encoding sites such as ISO-8859-2, Windows-1251, and hvg.hu. The 6.12.0 engine crashed on those pages.
+- Fixed the stretched, forced-fullscreen window left behind after element/video fullscreen or an AI-sidebar transition. Window geometry and chrome visibility are snapshotted and restored exactly, with ownership tracking for nested fullscreen, F11 toggles, and tab close.
+- The crash restore overlay is deferred until a page settles, ignores intentional terminations, and no longer starts retry loops.
+- Permission dialogs are guarded against stale tabs and shutdown.
+
 ## [10.8.8] - 2026-11-10
 
 Model refresh: LuckyD models by default, live free detection, Pareto catalogs.
