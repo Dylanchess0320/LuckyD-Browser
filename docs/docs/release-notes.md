@@ -1,5 +1,17 @@
 # LuckyD Browser — Release Notes
 
+## [10.8.9] — Agent setup + stability fixes — 2026-11-11
+
+**[`LuckyDBrowserSetup-10.8.9.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.9/LuckyDBrowserSetup-10.8.9.exe)** — Windows 10/11 x64 · per-user install · no admin needed.
+**[`LuckyDBrowser-Portable-10.8.9.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.9/LuckyDBrowser-Portable-10.8.9.zip)** — unzip and run, for locked-down PCs.
+
+- Agent setup is now part of the installer: optional Local AI and Agent Mesh tasks, Start Menu shortcuts for Agent Setup and Setup Guide, and the complete setup guide bundled with the app.
+- One-command bootstrap installs or repairs Node.js, Git, GitHub CLI, Python 3.12, Ollama, and the supported agent CLIs; the Python user Scripts path is added to PATH so `hermes` and `aider` work in a fresh terminal.
+- GitHub Copilot CLI and Google Antigravity CLI are wired in through winget.
+- Fixed the real crashes on legacy-encoding sites (ISO-8859-2, Windows-1251, hvg.hu) by pinning the web engine to PySide6 6.11.3 (Chromium 140.0.7339.264).
+- Fixed the stretched, forced-fullscreen window after element fullscreen or an AI-sidebar transition: window geometry and chrome visibility are snapshotted and restored, with ownership tracking for nested fullscreen, F11, and tab close.
+- The crash restore overlay is deferred until a page settles, ignores intentional terminations, and no longer starts retry loops.
+
 ## [10.8.8] — Model refresh — 2026-11-10
 
 **[`LuckyDBrowserSetup-10.8.8.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.8/LuckyDBrowserSetup-10.8.8.exe)** — Windows 10/11 x64 · per-user install · no admin needed.
