@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [10.9] - 2026-11-17
+
+Local-first Chat: Hub and Claw are optional.
+
+### Changed
+- LuckyD Chat opens in a local-only state: the provider pick and shared handoff note are always available, while the Hub chat and Claw task panels only render after both an address and a token are set in Settings → Connections. Unconfigured is treated as normal, not an error.
+- Removed the baked-in Tailscale/LAN service defaults (`100.96.167.54`) and the matching placeholder addresses from Settings → Connections, so a shipped build never points at a personal machine.
+- Dropped the stale Puck bridge row from the Chat status line; the status block now covers only connected services.
+- A configured-but-offline Hub or Claw shows one plain line naming the route to the fix.
+
 ## [10.8.9] - 2026-11-11
 
 Agent setup built into the installer, plus crash and fullscreen stability fixes.

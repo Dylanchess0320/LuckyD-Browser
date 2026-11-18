@@ -1,6 +1,6 @@
 # LuckyD Browser - New User Setup Guide
 
-Applies to **LuckyD Browser 10.8.9** on **Windows 10/11 x64**.
+Applies to **LuckyD Browser 10.9** on **Windows 10/11 x64**.
 Last verified against the installed build: 2026-11-11.
 
 This guide covers:
@@ -13,7 +13,7 @@ This guide covers:
 6. Verification, troubleshooting, and security notes.
 
 A companion script, `LuckyD-Bootstrap.ps1`, can automate the core installs.
-It never writes secrets and is safe to re-run. The 10.8.9 installer bundles
+It never writes secrets and is safe to re-run. The 10.9 installer bundles
 the script and this guide; the final installer page offers optional setup
 tasks, and a Start Menu shortcut lets you run them again later.
 
@@ -41,7 +41,7 @@ to run its core features.
 
 1. Obtain the installer from the author's official release channel. The expected
    filename is `LuckyDBrowserSetup-<version>.exe` (for example,
-   `LuckyDBrowserSetup-10.8.9.exe`), or use the portable ZIP if one is provided.
+   `LuckyDBrowserSetup-10.9.exe`), or use the portable ZIP if one is provided.
 2. Run the installer. It is a per-user install and does not require admin.
 3. Windows SmartScreen will show "Unknown publisher" because the executable is
    not code-signed. Choose **More info -> Run anyway** only if you trust the
@@ -58,7 +58,7 @@ to run its core features.
 - Open the install folder:
   `%LOCALAPPDATA%\Programs\LuckyDBrowser`
 - Right-click `LuckyDBrowser.exe` -> **Properties** -> **Details**.
-  `FileVersion` should match the release you downloaded (for example, `10.8.9.0`).
+  `FileVersion` should match the release you downloaded (for example, `10.9.0.0`).
 - Optional integrity check, if a checksum was published with your download:
 
 ```powershell
@@ -596,7 +596,7 @@ running those services yourself.
 
 ## 7. End-to-end verification checklist
 
-- [ ] Browser launches and shows version 10.8.9.
+- [ ] Browser launches and shows version 10.9.
 - [ ] `settings.json` contains non-empty `browser_api_token` and `terminal_token`.
 - [ ] `ollama list` shows `llama3.2:3b` (or your chosen model).
 - [ ] `Invoke-WebRequest http://127.0.0.1:11434/api/tags` returns JSON.

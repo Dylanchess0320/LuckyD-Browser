@@ -101,6 +101,8 @@ def _src(rel: str) -> str:
 
 
 def _fake_settings(**values):
+    values.setdefault("hub_url", "http://127.0.0.1:18790")
+    values.setdefault("claw_url", "http://127.0.0.1:18791")
     return SimpleNamespace(get=lambda key, default=None: values.get(key, default))
 
 
@@ -597,6 +599,29 @@ def test_chat_routes_without_tokens_stay_quiet(monkeypatch) -> None:
         httpd.server_close()
 
 
+def test_chat_routes_unconfigured_are_not_errors(monkeypatch) -> None:
+    import browser_core.control_server as cs
+
+    calls: list = []
+    monkeypatch.setattr(urllib.request, "urlopen", _opener([], calls))
+    settings = _fake_settings(hub_url="", claw_url="")
+    handler = cs.make_handler(SimpleNamespace(), token="", settings=settings)
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    try:
+        base = f"127.0.0.1:{httpd.server_address[1]}"
+        _status, raw = _req(base, "GET", "/chat/state")
+        state = json.loads(raw)
+        # No address is the normal local-only state, not an error.
+        assert state["hub"]["state"] == "not_configured"
+        assert state["claw"]["state"] == "not_configured"
+        assert calls == []
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+
+
 def test_chat_settings_fields_and_entry_points() -> None:
     dialogs = _src("browser_ui/dialogs.py")
     for field in ("hub_token", "claw_token", "hub_url", "claw_url"):
@@ -604,6 +629,9 @@ def test_chat_settings_fields_and_entry_points() -> None:
         assert f'set("{field}", self.{field}.text().strip())' in dialogs
     assert '"Connections"' in dialogs
     assert "EchoMode.Password" in dialogs
+    # 10.9: no personal LAN/Tailscale address in the shipped Settings UI.
+    assert "100.96.167.54" not in dialogs
+    assert 'setPlaceholderText("http://host:port")' in dialogs
     mw = _src("browser_ui/main_window.py")
     assert '"LuckyD Chat", self.open_luckyd_chat' in mw
     fn = _function_segment(mw, "open_luckyd_chat")

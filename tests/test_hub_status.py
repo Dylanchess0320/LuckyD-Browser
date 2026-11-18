@@ -92,7 +92,13 @@ def _clear_last_seen():
     ls._LAST_SEEN.clear()
 
 
+_TEST_HUB_URL = "http://127.0.0.1:18790"
+_TEST_CLAW_URL = "http://127.0.0.1:18791"
+
+
 def _settings(**values):
+    values.setdefault("hub_url", _TEST_HUB_URL)
+    values.setdefault("claw_url", _TEST_CLAW_URL)
     return SimpleNamespace(get=lambda key, default=None: values.get(key, default))
 
 
@@ -319,6 +325,10 @@ def test_chat_page_has_hub_status_block() -> None:
     page = chat_html(_settings())
     assert 'id="hub-status"' in page
     assert "renderHubStatus" in page
-    assert "Puck bridge" in page
-    assert "not running" in page
+    assert "showService" in page
+    assert "not_configured" in page
+    # The stale Puck bridge row is gone; only connected services render.
+    assert "Puck" not in page
+    # No personal service address ships in the page.
+    assert "100.96.167.54" not in page
     assert "/chat/state" in page

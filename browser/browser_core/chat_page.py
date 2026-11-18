@@ -1,8 +1,9 @@
 """LuckyD Chat — the built-in chat + tasks surface (Feature 13).
 
-One page, two sections, both backed by Dylan's own PC services through
-the control server's proxy routes (/chat/* in control_server.py, client
-in luckyd_services.py):
+The page is local-first: the provider pick and the shared handoff note
+work with no external service. Two optional panels talk to Dylan's own
+PC services through the control server's proxy routes (/chat/* in
+control_server.py, client in luckyd_services.py):
 
   * Hub chat — the conversation with the Lucky Hub's /chat route. The
     Hub is stateless, so the page keeps the thread (localStorage, this
@@ -10,8 +11,10 @@ in luckyd_services.py):
   * Tasks (Claw) — submit a task to Claw, watch live status, read the
     finished task's result.md receipt, cancel a running task.
 
-Failure states are ONE plain line per section with the route to the
-fix — no fake content, no error spam. No tips or hint text anywhere.
+A panel only renders when its service has an address AND a token in
+Settings → Connections. Unconfigured is the normal local-only state —
+no dead panel, no nag line. A configured-but-down service still shows
+one plain line with the route to the fix.
 """
 
 from __future__ import annotations
@@ -29,6 +32,7 @@ _CHAT_CSS = """  :root{color-scheme:dark}
   @media(max-width:900px){main{grid-template-columns:1fr}}
   section{border:1px solid var(--ld-border);border-radius:var(--ld-r-md);
     background:var(--ld-card);box-shadow:var(--ld-sh-1);overflow:hidden}
+  [hidden]{display:none!important}
   .sec-head{display:flex;align-items:center;gap:10px;padding:12px 16px;
     border-bottom:1px solid var(--ld-border);background:var(--ld-panel)}
   .sec-head h2{font-size:13px;margin:0;font-weight:650}
@@ -105,23 +109,27 @@ _CHAT_BODY = r"""<body>
   <div class="state hub-status" id="hub-status"></div>
   <div class="state hub-status" id="handoff-state"></div>
   <div class="state hub-status" id="cards-state"></div>
-  <section id="hub-sec">
-    <div class="sec-head"><h2>Hub chat</h2><span class="sp"></span>
-      <button class="ghost" id="chat-clear" type="button">Clear</button></div>
-    <div class="state" id="hub-state"></div>
+  <section id="local-sec">
+    <div class="sec-head"><h2>Local</h2></div>
     <div class="prov"><label for="provider-select">Provider</label>
       <select id="provider-select"><option value="auto">Auto</option></select></div>
-    <div id="chat-log"></div>
-    <form class="send" id="chat-form">
-      <input type="text" id="chat-input" placeholder="Message the Hub" autocomplete="off">
-      <button type="submit" id="chat-send">Send</button>
-    </form>
     <div class="prov"><label for="handoff-input">Handoff</label>
       <input type="text" id="handoff-input" placeholder="Note for the next surface" autocomplete="off">
       <button class="ghost" id="handoff-save" type="button">Save</button></div>
   </section>
 
-  <section id="claw-sec">
+  <section id="hub-sec" hidden>
+    <div class="sec-head"><h2>Hub chat</h2><span class="sp"></span>
+      <button class="ghost" id="chat-clear" type="button">Clear</button></div>
+    <div class="state" id="hub-state"></div>
+    <div id="chat-log"></div>
+    <form class="send" id="chat-form">
+      <input type="text" id="chat-input" placeholder="Message the Hub" autocomplete="off">
+      <button type="submit" id="chat-send">Send</button>
+    </form>
+  </section>
+
+  <section id="claw-sec" hidden>
     <div class="sec-head"><h2>Tasks</h2></div>
     <div class="state" id="claw-state"></div>
     <div class="pad">
@@ -147,12 +155,14 @@ const esc = s => String(s == null ? '' : s);
 const STATE_LINES = {
   hub: {
     no_token: 'Hub chat is off — add your Hub token in Settings → Connections.',
+    not_configured: 'Hub chat is off — add your Hub address and token in Settings → Connections.',
     bad_token: 'Hub token was rejected — check Settings → Connections.',
     unreachable: "Hub isn't reachable right now.",
     error: "Hub isn't reachable right now."
   },
   claw: {
     no_token: 'Tasks are off — add your Claw token in Settings → Connections.',
+    not_configured: 'Tasks are off — add your Claw address and token in Settings → Connections.',
     bad_token: 'Claw token was rejected — check Settings → Connections.',
     unreachable: "Claw isn't reachable right now.",
     error: "Claw isn't reachable right now."
@@ -160,11 +170,12 @@ const STATE_LINES = {
 };
 function stateLine(el, svc, state){ el.textContent = (!state || state === 'ok') ? '' : (STATE_LINES[svc][state] || ''); }
 
-// ── one Hub status block: reachability + last-seen for all 4 parts ──
+// ── status block: Browser always, optional services only when connected ──
 const HUB_STATUS_LABELS = {
   ok: 'live',
   unreachable: 'unreachable',
   no_token: 'off — no token',
+  not_configured: 'off — not configured',
   bad_token: 'token rejected',
   error: 'error',
   not_running: 'not running'
@@ -178,11 +189,11 @@ function fmtSeen(ts){
 function renderHubStatus(components){
   const el = $('#hub-status');
   if (!components) { el.textContent = ''; return; }
-  const names = {browser: 'Browser', hub: 'Hub', claw: 'Claw', puck: 'Puck bridge'};
+  const names = {browser: 'Browser', hub: 'Hub', claw: 'Claw'};
   const parts = [];
-  for (const key of ['browser', 'hub', 'claw', 'puck']) {
+  for (const key of ['browser', 'hub', 'claw']) {
     const c = components[key];
-    if (!c) continue;
+    if (!c || c.state === 'no_token' || c.state === 'not_configured') continue;
     const label = HUB_STATUS_LABELS[c.state] || c.state || 'unknown';
     let bit = names[key] + ': ' + label;
     if (c.state !== 'ok') bit += ' (' + fmtSeen(c.last_seen) + ')';
@@ -418,6 +429,18 @@ function renderCards(cards){
   }
 }
 
+// A service panel only exists when that service has an address + token.
+// Unconfigured is the normal local-only state, not an error.
+function serviceConnected(state){
+  return !!state && state !== 'no_token' && state !== 'not_configured';
+}
+function showService(id, state){
+  const on = serviceConnected(state);
+  const el = $(id);
+  if (el) el.hidden = !on;
+  return on;
+}
+
 async function refreshState(){
   try {
     const s = await api('/chat/state');
@@ -425,10 +448,12 @@ async function refreshState(){
     if (s.handoff) renderHandoff(s.handoff);
     if (s.cards) renderCards(s.cards.cards);
     if (s.providers) renderProviders(s.providers);
+    showService('#hub-sec', s.hub && s.hub.state);
+    const clawOn = showService('#claw-sec', s.claw && s.claw.state);
     stateLine($('#hub-state'), 'hub', s.hub && s.hub.state);
     stateLine($('#claw-state'), 'claw', s.claw && s.claw.state);
-    clawOk = !!(s.claw && s.claw.state === 'ok' && s.claw.enabled !== false);
-    if (s.claw && s.claw.state === 'ok' && s.claw.enabled === false)
+    clawOk = !!(clawOn && s.claw && s.claw.state === 'ok' && s.claw.enabled !== false);
+    if (clawOn && s.claw && s.claw.state === 'ok' && s.claw.enabled === false)
       $('#claw-state').textContent = 'Claw is stopped on the PC.';
     if (Array.isArray(s.projects) && s.projects.length) { projects = s.projects; renderProjects(); }
   } catch (_) {}
@@ -447,5 +472,5 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) { re
 
 
 def chat_html(settings=None) -> str:
-    """The LuckyD Chat page (Hub chat + Claw tasks)."""
+    """The LuckyD Chat page (local controls + optional Hub chat/Claw tasks)."""
     return page_head("LuckyD Chat — LuckyD", _CHAT_CSS, settings=settings) + _CHAT_BODY

@@ -416,8 +416,16 @@ class SettingsDialog(QDialog):
         connections = QWidget(tabs)
         cform = QFormLayout(connections)
 
+        info = QLabel(
+            "Optional. LuckyD Chat stays local until BOTH an address and a token "
+            "are set here. Hub chat and Claw tasks only appear when connected."
+        )
+        info.setWordWrap(True)
+        info.setObjectName("muted")
+        cform.addRow(info)
+
         self.hub_url = QLineEdit(settings.get("hub_url", ""))
-        self.hub_url.setPlaceholderText("http://100.96.167.54:18790")
+        self.hub_url.setPlaceholderText("http://host:port")
         cform.addRow("Hub address", self.hub_url)
         self.hub_token = QLineEdit(settings.get("hub_token", ""))
         self.hub_token.setEchoMode(QLineEdit.EchoMode.Password)
@@ -425,7 +433,7 @@ class SettingsDialog(QDialog):
         cform.addRow("Hub token", self.hub_token)
 
         self.claw_url = QLineEdit(settings.get("claw_url", ""))
-        self.claw_url.setPlaceholderText("http://100.96.167.54:18791")
+        self.claw_url.setPlaceholderText("http://host:port")
         cform.addRow("Claw address", self.claw_url)
         self.claw_token = QLineEdit(settings.get("claw_token", ""))
         self.claw_token.setEchoMode(QLineEdit.EchoMode.Password)

@@ -118,10 +118,10 @@ _ROUTES = (
     ("GET  /dashboard", "live new-tab dashboard (HTML hub of the platform)"),
     ("GET  /mesh", "Multi Agent Terminal — four parallel terminal sessions in one workspace"),
     ("GET  /mesh/doctor", "per-backend Multi Agent Terminal health check + tier labels (JSON)"),
-    ("GET  /chat", "LuckyD Chat — Hub chat + Claw tasks in one page"),
+    ("GET  /chat", "LuckyD Chat - local controls + optional Hub chat/Claw tasks"),
     (
         "GET  /chat/state",
-        "Hub status surface: reachability + last-seen for Browser, Hub, Claw, puck bridge, plus provider state (JSON)",
+        "Chat status: reachability + last-seen for Hub and Claw, plus provider state (JSON)",
     ),
     (
         "POST /chat/provider",
@@ -468,12 +468,12 @@ def make_handler(
                 if path == "/chat":
                     return self._send_html(chat_html(settings))
                 if path == "/chat/state":
-                    # One Hub status surface: live reachability + last-seen
-                    # for all four components. Probes use the short status
-                    # timeout so the endpoint stays under ~1s even when a
-                    # service black-holes; the shape of the existing hub /
-                    # claw / projects fields is unchanged. The browser is
-                    # "ok" by definition — it is serving this response.
+                    # Status for the optional services. Probes use the short
+                    # status timeout so the endpoint stays under ~1s even
+                    # when a service black-holes; unconfigured services
+                    # return immediately without a network call. The shape
+                    # of the existing hub / claw / projects fields is
+                    # unchanged for older clients.
                     hub = hub_state(settings, timeout=STATUS_TIMEOUT)
                     claw = claw_state(settings, timeout=STATUS_TIMEOUT)
                     puck = puck_state(settings, timeout=STATUS_TIMEOUT)

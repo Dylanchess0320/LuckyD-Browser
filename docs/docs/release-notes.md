@@ -1,5 +1,15 @@
 # LuckyD Browser — Release Notes
 
+## [10.9] - Local-first Chat - 2026-11-17
+
+**[`LuckyDBrowserSetup-10.9.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.9/LuckyDBrowserSetup-10.9.exe)** - Windows 10/11 x64 · per-user install · no admin needed.
+**[`LuckyDBrowser-Portable-10.9.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.9/LuckyDBrowser-Portable-10.9.zip)** - unzip and run, for locked-down PCs.
+
+- LuckyD Chat is local-first now: the provider pick and shared handoff note open immediately, and the Hub chat or Claw task panels only appear once that service has both an address and a token in Settings → Connections.
+- No personal LAN or Tailscale addresses ship with the app: the baked-in `100.96.167.54` defaults and matching Settings placeholders are gone.
+- The stale Puck bridge row is removed from the Chat status line; the status block lists only services that are actually connected.
+- A configured service that is offline shows one plain line with the route to the fix, and unconfigured stays quiet instead of nagging.
+
 ## [10.8.9] — Agent setup + stability fixes — 2026-11-11
 
 **[`LuckyDBrowserSetup-10.8.9.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.8.9/LuckyDBrowserSetup-10.8.9.exe)** — Windows 10/11 x64 · per-user install · no admin needed.

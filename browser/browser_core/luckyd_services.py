@@ -1,12 +1,15 @@
 """Client for Dylan's own PC services: the Lucky Hub (chat) and Claw (tasks).
 
-The LuckyD Chat page never talks to these services directly — the
-browser's control server proxies through this module, so the tokens
-(Settings → Connections) stay server-side and never reach page JS.
+Hub and Claw are OPTIONAL. Nothing is baked in: a service is only used
+when Settings → Connections has both an address and a token for it. The
+LuckyD Chat page never talks to these services directly — the browser's
+control server proxies through this module, so the tokens stay
+server-side and never reach page JS.
 
 Every function returns a plain dict and NEVER raises. Failures collapse
 to a ``state`` the UI renders as one quiet line (Dylan's failures-quiet
-rule): ``ok`` | ``no_token`` | ``bad_token`` | ``unreachable`` | ``error``.
+rule): ``ok`` | ``no_token`` | ``not_configured`` | ``bad_token`` |
+``unreachable`` | ``error``.
 """
 
 from __future__ import annotations
@@ -17,10 +20,12 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-#: Defaults match the services on Dylan's PC (Tailscale IP). Both are
-#: editable in Settings → Connections in case the addresses ever change.
-DEFAULT_HUB_URL = "http://100.96.167.54:18790"
-DEFAULT_CLAW_URL = "http://100.96.167.54:18791"
+#: No default endpoints: Hub and Claw are optional local services. The
+#: Chat panels only render after the user enters an address + token in
+#: Settings → Connections, so a shipped build never carries a personal
+#: LAN/Tailscale address.
+DEFAULT_HUB_URL = ""
+DEFAULT_CLAW_URL = ""
 
 #: Profiles the Chat page offers (Claw also accepts "full"; the page
 #: deliberately offers the two everyday ones).
@@ -111,6 +116,21 @@ def _service_state(status, obj) -> str:
     return "ok"
 
 
+def _service_target(settings, url_key: str, token_key: str):
+    """(base, token, state) for one optional service.
+
+    ``state`` is empty when the service is configured; otherwise it is
+    ``not_configured`` (no address) or ``no_token`` (address, no token).
+    """
+    base = _base(settings, url_key, "")
+    token = _token(settings, token_key)
+    if not base:
+        return base, token, "not_configured"
+    if not token:
+        return base, token, "no_token"
+    return base, token, ""
+
+
 def _get_authed(base: str, path: str, token: str, opener=None, timeout=_QUICK_TIMEOUT):
     sep = "&" if "?" in path else "?"
     url = f"{base}{path}{sep}token={urllib.parse.quote(token, safe='')}"
@@ -122,10 +142,10 @@ def _get_authed(base: str, path: str, token: str, opener=None, timeout=_QUICK_TI
 
 def hub_state(settings, opener=None, timeout=_QUICK_TIMEOUT) -> dict:
     """Hub liveness for the Chat page's one-line status."""
-    token = _token(settings, "hub_token")
-    if not token:
-        return {"state": "no_token", "last_seen": _LAST_SEEN.get("hub")}
-    status, obj = _get_authed(hub_base(settings), "/healthz", token, opener, timeout)
+    base, token, reason = _service_target(settings, "hub_url", "hub_token")
+    if reason:
+        return {"state": reason, "last_seen": _LAST_SEEN.get("hub")}
+    status, obj = _get_authed(base, "/healthz", token, opener, timeout)
     state = _service_state(status, obj)
     if state != "ok":
         return {"state": state, "last_seen": _LAST_SEEN.get("hub")}
@@ -141,14 +161,14 @@ def hub_chat(settings, messages, opener=None, provider=None) -> dict:
     the provider Dylan picked; the Hub is free to ignore an unknown
     field, so an older Hub keeps working unchanged.
     """
-    token = _token(settings, "hub_token")
-    if not token:
-        return {"state": "no_token"}
+    base, token, reason = _service_target(settings, "hub_url", "hub_token")
+    if reason:
+        return {"state": reason}
     payload: dict = {"token": token, "messages": messages}
     if provider and str(provider).strip() not in ("", "auto"):
         payload["provider"] = str(provider).strip()
     status, obj = _request(
-        f"{hub_base(settings)}/chat",
+        f"{base}/chat",
         method="POST",
         payload=payload,
         timeout=_CHAT_TIMEOUT,
@@ -172,10 +192,10 @@ def hub_chat(settings, messages, opener=None, provider=None) -> dict:
 
 def claw_state(settings, opener=None, timeout=_QUICK_TIMEOUT) -> dict:
     """Claw liveness + the project allowlist (from /healthz)."""
-    token = _token(settings, "claw_token")
-    if not token:
-        return {"state": "no_token", "last_seen": _LAST_SEEN.get("claw")}
-    status, obj = _get_authed(claw_base(settings), "/healthz", token, opener, timeout)
+    base, token, reason = _service_target(settings, "claw_url", "claw_token")
+    if reason:
+        return {"state": reason, "last_seen": _LAST_SEEN.get("claw")}
+    status, obj = _get_authed(base, "/healthz", token, opener, timeout)
     state = _service_state(status, obj)
     if state != "ok":
         return {"state": state, "last_seen": _LAST_SEEN.get("claw")}
@@ -215,10 +235,10 @@ def puck_state(settings, opener=None, timeout=_QUICK_TIMEOUT) -> dict:
 
 
 def claw_tasks(settings, opener=None, timeout=_QUICK_TIMEOUT) -> dict:
-    token = _token(settings, "claw_token")
-    if not token:
-        return {"state": "no_token"}
-    status, obj = _get_authed(claw_base(settings), "/tasks", token, opener, timeout)
+    base, token, reason = _service_target(settings, "claw_url", "claw_token")
+    if reason:
+        return {"state": reason}
+    status, obj = _get_authed(base, "/tasks", token, opener, timeout)
     state = _service_state(status, obj)
     if state != "ok":
         return {"state": state}
@@ -227,13 +247,13 @@ def claw_tasks(settings, opener=None, timeout=_QUICK_TIMEOUT) -> dict:
 
 
 def claw_submit(settings, project, prompt, profile, opener=None) -> dict:
-    token = _token(settings, "claw_token")
-    if not token:
-        return {"state": "no_token"}
+    base, token, reason = _service_target(settings, "claw_url", "claw_token")
+    if reason:
+        return {"state": reason}
     if profile not in TASK_PROFILES:
         profile = "build"
     status, obj = _request(
-        f"{claw_base(settings)}/task",
+        f"{base}/task",
         method="POST",
         payload={
             "token": token,
@@ -256,11 +276,11 @@ def claw_submit(settings, project, prompt, profile, opener=None) -> dict:
 
 
 def claw_task(settings, job_id, opener=None, timeout=_QUICK_TIMEOUT) -> dict:
-    token = _token(settings, "claw_token")
-    if not token:
-        return {"state": "no_token"}
+    base, token, reason = _service_target(settings, "claw_url", "claw_token")
+    if reason:
+        return {"state": reason}
     status, obj = _get_authed(
-        claw_base(settings),
+        base,
         f"/task/{urllib.parse.quote(str(job_id), safe='')}",
         token,
         opener,
@@ -274,11 +294,11 @@ def claw_task(settings, job_id, opener=None, timeout=_QUICK_TIMEOUT) -> dict:
 
 
 def claw_cancel(settings, job_id, opener=None) -> dict:
-    token = _token(settings, "claw_token")
-    if not token:
-        return {"state": "no_token"}
+    base, token, reason = _service_target(settings, "claw_url", "claw_token")
+    if reason:
+        return {"state": reason}
     status, obj = _request(
-        f"{claw_base(settings)}/task/{urllib.parse.quote(str(job_id), safe='')}/cancel",
+        f"{base}/task/{urllib.parse.quote(str(job_id), safe='')}/cancel",
         method="POST",
         payload={"token": token},
         opener=opener,

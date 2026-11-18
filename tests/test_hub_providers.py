@@ -76,7 +76,11 @@ class _Store:
     """Settings stand-in with get/set/save, recording persistence."""
 
     def __init__(self, **values):
-        self._data = dict(values)
+        self._data = {
+            "hub_url": "http://127.0.0.1:18790",
+            "claw_url": "http://127.0.0.1:18791",
+        }
+        self._data.update(values)
         self.saved = 0
 
     def get(self, key, default=None):
@@ -242,7 +246,7 @@ def test_provider_state_without_ai_info_never_raises() -> None:
 
 
 def test_hub_chat_passes_pinned_provider_and_omits_auto() -> None:
-    st = _settings(hub_token="t")
+    st = _settings(hub_url="http://127.0.0.1:18790", hub_token="t")
     seen: list = []
 
     def op(req, timeout=None):

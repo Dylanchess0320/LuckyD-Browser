@@ -928,7 +928,7 @@ class MainWindow(QMainWindow):
             )
 
     def open_luckyd_chat(self) -> None:
-        """Open LuckyD Chat — Hub chat + Claw tasks in one tab."""
+        """Open LuckyD Chat - local controls + optional Hub chat/Claw tasks."""
         server = getattr(self._app, "control_server", None)
         if server is not None and server.running:
             self.open_in_new_tab(QUrl(server.base_url + "/chat"))

@@ -71,7 +71,13 @@ if isinstance(getattr(_qtcore, "Signal", None), MagicMock):
 from browser_core import hub_memory as hm
 
 
+_TEST_HUB_URL = "http://127.0.0.1:18790"
+_TEST_CLAW_URL = "http://127.0.0.1:18791"
+
+
 def _settings(**values):
+    values.setdefault("hub_url", _TEST_HUB_URL)
+    values.setdefault("claw_url", _TEST_CLAW_URL)
     return SimpleNamespace(get=lambda key, default=None: values.get(key, default))
 
 
