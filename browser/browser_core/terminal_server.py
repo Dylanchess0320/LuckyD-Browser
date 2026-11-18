@@ -623,7 +623,7 @@ MESH_BACKEND_SPECS: dict[str, dict[str, object]] = {
         "exe": "agy",
         "tier": "free",
         "env_keys": (),
-        "install_hint": "Install Google Antigravity CLI (agy) to %LOCALAPPDATA%\\agy\\bin",
+        "install_hint": "winget install --id Google.AntigravityCLI -e",
     },
     "mesh-claude": {
         "label": "Claude",
@@ -644,7 +644,7 @@ MESH_BACKEND_SPECS: dict[str, dict[str, object]] = {
         "exe": "copilot",
         "tier": "credit-billed",
         "env_keys": ("GITHUB_TOKEN", "GH_TOKEN"),
-        "install_hint": "gh extension install github/gh-copilot",
+        "install_hint": "winget install --id GitHub.Copilot -e",
     },
     "mesh-qwen": {
         "label": "Qwen",
@@ -1049,7 +1049,7 @@ def _spawn_pty(
     if shell == "agent":
         env["LUCKYD_AGENT_SLOT"] = "1"
         env["LUCKYD_AGENT_NAME"] = "Agent 1"
-        env["LUCKYD_AGENT_VERSION"] = "v10.8.8"
+        env["LUCKYD_AGENT_VERSION"] = "v10.8.9"
         # Hub slice 9: where this CLI reads/writes the shared handoff
         # note (core/hub_handoff.py). Only the LuckyD Code CLIs get it —
         # mesh shells are third-party CLIs that would ignore it.
@@ -1057,7 +1057,7 @@ def _spawn_pty(
     elif shell == "agent2":
         env["LUCKYD_AGENT_SLOT"] = "2"
         env["LUCKYD_AGENT_NAME"] = "Agent 2"
-        env["LUCKYD_AGENT_VERSION"] = "v10.8.8"
+        env["LUCKYD_AGENT_VERSION"] = "v10.8.9"
         env["LUCKYD_HUB_URL"] = (hub_url or "").strip() or DEFAULT_HUB_URL
     # Slice 8: drop any override inherited from the browser process env
     # first, then pin the shared pick — agent shells only.

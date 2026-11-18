@@ -1,4 +1,8 @@
-PySide6>=6.6
+# Pin the runtime: PySide6 6.12.0 ships QtWebEngine 6.140.0 whose renderer
+# SIGTRAPs on pages declaring legacy charsets (iso-8859-2, windows-1251 —
+# QTBUG-149435 / qutebrowser #9003; hvg.hu reproduces it). 6.11.3 carries
+# Chromium 140.0.7339.264 and renders those pages correctly.
+PySide6==6.11.3
 httpx>=0.27
 websockets>=12
 pywinpty>=2.0; sys_platform == "win32"  # ConPTY for the in-browser terminal

@@ -25,6 +25,13 @@ class WebPage(QWebEnginePage):
     def __init__(self, profile, parent, main_window):
         super().__init__(profile, parent)
         self._mw = main_window
+        # URLs whose renderer already died in this tab. Kept so the generic
+        # "transient network error" retry never fights the crash overlay and
+        # loops a crashing page through setHtml/reload forever.
+        self._renderer_crashed_urls: set[str] = set()
+        self._crash_overlay_pending = False
+        self._showing_crash_overlay = False
+        self._crash_timer: QTimer | None = None
         with contextlib.suppress(Exception):
             self.featurePermissionRequested.connect(self._on_feature_permission)
         with contextlib.suppress(Exception):
@@ -46,27 +53,95 @@ class WebPage(QWebEnginePage):
         if callable(handler):
             handler(self, origin, feature)
 
+    @staticmethod
+    def _is_normal_termination(status) -> bool:
+        """Normal renderer shutdown (tab close/app exit) is not a crash.
+
+        Qt emits renderProcessTerminated with NormalTerminationStatus during
+        ordinary teardown. Showing the dead-tab overlay there replaced
+        perfectly good pages with "Tab crashed" while the browser closed.
+        """
+        try:
+            return status == QWebEnginePage.RenderProcessTerminationStatus.NormalTerminationStatus
+        except Exception:
+            return False
+
+    def _log_renderer_termination(self, status, exit_code, url: str) -> None:
+        """Record status/exit code/URL — the old handler discarded all three."""
+        try:
+            import time
+
+            from browser_core.settings import DATA_DIR
+
+            line = (
+                f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] renderer terminated: "
+                f"status={status!r} exit_code={exit_code!r} url={url or '(unknown)'}\n"
+            )
+            with (DATA_DIR / "crash.log").open("a", encoding="utf-8") as fh:
+                fh.write(line)
+        except Exception:
+            pass
+
     def _on_render_terminated(self, status, exit_code) -> None:
         """Dead-tab overlay + toast when the renderer process dies.
 
-        Crashes used to leave a frozen or blank tab with no recovery path.
-        The overlay's Reload link navigates to the crashed URL, which
-        spawns a fresh renderer. Never raises — this runs on a signal
-        from a half-torn-down page.
+        The overlay is shown on the next event-loop turn: Qt is still tearing
+        down the renderer inside this signal, and calling setHtml() from the
+        termination callback can race the teardown. The crashed URL is also
+        recorded so the transient-failure retry path cannot replace the crash
+        overlay with "Connecting…" and retry a page that deterministically
+        crashes this engine build.
         """
-        del status, exit_code
+        if self._is_normal_termination(status):
+            return
         try:
             crashed = self.url().toString()
         except Exception:
             crashed = ""
         if not crashed or crashed in ("about:blank", "chrome-error://chromewebdata/"):
             crashed = ""
+        if crashed:
+            self._renderer_crashed_urls.add(crashed)
+        self._log_renderer_termination(status, exit_code, crashed)
+
+        # Cancel any pending auto-retry for the dead renderer.
+        try:
+            view = self.view()
+            if view is not None:
+                view._connecting_for = None
+                timer = getattr(view, "_retry_timer", None)
+                if timer is not None:
+                    timer.stop()
+        except Exception:
+            pass
+
+        if self._crash_overlay_pending:
+            return
+        self._crash_overlay_pending = True
+        # Unparented single-shot timer, stored on the page. Parenting it to
+        # self is not possible in every embedding (and a page may be torn
+        # down before it fires); the callback validates the C++ object and
+        # bails out quietly if the tab is gone.
+        timer = QTimer()
+        timer.setSingleShot(True)
+        timer.timeout.connect(lambda: self._show_crash_overlay(crashed))
+        self._crash_timer = timer
+        timer.start(0)
+
+    def _show_crash_overlay(self, crashed: str) -> None:
+        """Render the post-crash recovery page (safe to call directly)."""
+        self._crash_overlay_pending = False
         try:
             palette = _theme_palette(self._mw.settings)
         except Exception:
             palette = _theme_palette(None)
-        with contextlib.suppress(Exception):
+        try:
+            self._showing_crash_overlay = True
             self.setHtml(_crash_html(palette, crashed), QUrl(crashed or "about:blank"))
+        except RuntimeError:
+            return
+        except Exception:
+            pass
         with contextlib.suppress(Exception):
             self._mw.toasts.show("Tab crashed — Reload to try again", kind="error")
 
@@ -338,17 +413,31 @@ class WebView(QWebEngineView):
 
     def _on_load_finished(self, ok: bool) -> None:
         url = self.url()
+        key = url.toString()
+        page = self.page()
+        crashed = getattr(page, "_renderer_crashed_urls", None)
         if ok:
+            if getattr(page, "_showing_crash_overlay", False):
+                # The crash overlay itself finishing a load is NOT proof the
+                # real site recovered — keep the URL marked until a genuine
+                # reload succeeds.
+                page._showing_crash_overlay = False
+            elif isinstance(crashed, set):
+                crashed.discard(key)
             # Don't count our own "Connecting…" placeholder as a success —
             # only a real page load resets the attempt counter.
             if self._connecting_for != url:
-                self._load_attempts.pop(url.toString(), None)
+                self._load_attempts.pop(key, None)
             self._connecting_for = None
             self._handle_google_sorry(url)
             return
         if url.scheme() not in ("http", "https"):
             return
-        key = url.toString()
+        if isinstance(crashed, set) and key in crashed:
+            # The renderer just died for this URL. The crash overlay is the
+            # recovery path; auto-retrying would loop the crash.
+            self._connecting_for = None
+            return
         if len(self._load_attempts) > 20:
             self._load_attempts.clear()
         attempts = self._load_attempts.get(key, 0) + 1

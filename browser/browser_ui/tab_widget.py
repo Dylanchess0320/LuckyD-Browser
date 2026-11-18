@@ -335,6 +335,9 @@ class BrowserTabWidget(QTabWidget):
             self._idle_since.pop(id(view), None)
             with contextlib.suppress(Exception):
                 view._ld_sleep = None
+        if view is not None:
+            with contextlib.suppress(Exception):
+                self._mw.on_view_closing(view)
         self.removeTab(index)
         # Groups with no members left dissolve.
         for dead in [g for g in self._groups if g not in self._tab_group.values()]:
@@ -756,7 +759,9 @@ class BrowserTabWidget(QTabWidget):
         view.loadProgress.connect(lambda p, v=view: self._mw.on_load_progress(v, p))
         page = view.page()
         page.linkHovered.connect(self._mw.on_link_hovered)
-        page.fullScreenRequested.connect(self._mw.on_fullscreen_requested)
+        page.fullScreenRequested.connect(
+            lambda request, v=view: self._mw.on_fullscreen_requested(request, v)
+        )
         # older Qt versions lack the media-audible signal
         with contextlib.suppress(AttributeError):
             page.recentlyAudibleChanged.connect(lambda audible, v=view: self._retitle(v, v.title()))

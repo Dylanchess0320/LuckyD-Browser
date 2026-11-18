@@ -1,9 +1,9 @@
 """LuckyD Browser - a full-featured Chromium-based web browser for Windows."""
 
-__version__ = "10.8.8"
+__version__ = "10.8.9"
 
 # Shown once after an update (first launch with a new version).
 WHATS_NEW = (
-    "LuckyD v10.8.8 - Model refresh: LuckyD models by default, live free "
-    "detection, Pareto catalogs "
+    "LuckyD v10.8.9 - New-user setup: bundled guide, one-click local AI "
+    "via Ollama, and optional Agent Mesh installers "
 )

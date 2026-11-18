@@ -111,11 +111,15 @@ class MainWindow(QMainWindow):
         self.resize(1280, 800)
         self._dev_window: QDialog | None = None
         self._dev_view: QWebEngineView | None = None
-        # Element fullscreen (a page's video player asked for the screen):
-        # tracks the state plus the chrome we hid, so exit restores exactly.
+        # Fullscreen state. Element fullscreen (a page's video player asked
+        # for the screen) and window fullscreen (F11) both save the exact
+        # window state/geometry and the chrome they hid, so exiting restores
+        # the window the user actually had instead of guessing "normal".
         self._video_fs = False
-        self._fs_hidden: list = []
-        self._fs_was_maximized = False
+        self._fs_view = None  # WebView that owns element fullscreen
+        self._fs_hidden: list = []  # chrome that was visible before we hid it
+        self._fs_prev_state = None  # (windowState, geometry, normalGeometry)
+        self._window_fs_prev = None  # same tuple, saved for F11
         # Per-view load progress (id(view) → fraction) so the status
         # strip's progress line survives tab switches mid-load.
         self._view_progress: dict[int, float] = {}
@@ -1108,18 +1112,18 @@ class MainWindow(QMainWindow):
         # 1) YouTube / HTML5 element fullscreen (video player) — must exit via
         # the page's Fullscreen API so Qt emits toggleOff and restores chrome.
         if self._video_fs:
-            view = self.tabs.current_view()
+            view = self._fs_view or self.tabs.current_view()
             if view is not None:
                 try:
                     view.page().triggerAction(QWebEnginePage.WebAction.ExitFullScreen)
                 except Exception:
-                    self._exit_video_fullscreen()
+                    self._exit_video_fullscreen(view)
             else:
                 self._exit_video_fullscreen()
             return
         # 2) Window fullscreen (F11) — Esc is expected to leave it too.
         if self.isFullScreen():
-            self.showNormal()
+            self._exit_window_fullscreen()
             return
         # 3) Normal Esc: stop loading + hide find bar
         view = self.tabs.current_view()
@@ -1161,6 +1165,11 @@ class MainWindow(QMainWindow):
         self._update_title(title)
 
     def on_tab_switched(self, view) -> None:
+        # The fullscreen video belongs to one tab. Switching away must
+        # restore the window/chrome instead of leaving another page
+        # trapped on a fullscreen surface it does not own.
+        if self._video_fs and view is not self._fs_view:
+            self._exit_video_fullscreen()
         self.on_url_changed(view.url())
         self._update_title(view.title())
         self._update_nav_state(view)
@@ -1172,12 +1181,45 @@ class MainWindow(QMainWindow):
     def on_link_hovered(self, text: str) -> None:
         self.status_bar.show_hover_url(text)
 
-    def on_fullscreen_requested(self, request) -> None:
-        request.accept()
+    def _view_for_page(self, page):
+        """Resolve the tab view that owns a QWebEnginePage (None if gone)."""
+        with contextlib.suppress(Exception):
+            for view in self.tabs.all_views():
+                if view.page() is page:
+                    return view
+        return None
+
+    def on_fullscreen_requested(self, request, view=None) -> None:
+        """A page asked to enter/leave the Fullscreen API.
+
+        The request carries no page pointer, so the tab widget passes the
+        owning view explicitly. Requests from a background tab are refused:
+        a hidden page must never be able to seize the screen or tear down
+        the fullscreen session owned by the visible tab.
+        """
+        if view is None:
+            with contextlib.suppress(Exception):
+                view = self._view_for_page(self.sender())
+        if view is None:
+            with contextlib.suppress(Exception):
+                view = self.tabs.current_view()
+        current = None
+        with contextlib.suppress(Exception):
+            current = self.tabs.current_view()
+        if view is not None and current is not None and view is not current:
+            with contextlib.suppress(Exception):
+                request.reject()
+            return
+        with contextlib.suppress(Exception):
+            request.accept()
         if request.toggleOn():
-            self._enter_video_fullscreen()
+            self._enter_video_fullscreen(view)
         else:
-            self._exit_video_fullscreen()
+            # Only the owning page may leave element fullscreen. A stray
+            # toggleOff used to call showNormal() and knock a maximized
+            # window out of shape.
+            if self._fs_view is None or view is None or view is self._fs_view:
+                self._exit_video_fullscreen(view, exit_page=False)
 
     def _fullscreen_chrome(self) -> list:
         """Every chrome surface that must vanish for element fullscreen."""
@@ -1194,30 +1236,105 @@ class MainWindow(QMainWindow):
         ]
         return [w for w in widgets if w is not None]
 
-    def _enter_video_fullscreen(self) -> None:
+    @staticmethod
+    def _window_state_snapshot(window) -> tuple:
+        """State + geometry needed to put the window back exactly as it was."""
+        return (
+            window.windowState(),
+            window.geometry(),
+            window.normalGeometry(),
+        )
+
+    def _restore_window_state(self, snapshot) -> None:
+        """Restore a saved window state, including the maximized case.
+
+        showNormal() alone was the fullscreen bug: exiting fullscreen from a
+        maximized window left it windowed, and Qt then re-applied the old
+        geometry unevenly — the "forced/stretched" window users saw.
+        """
+        if snapshot is None:
+            self.showNormal()
+            return
+        state, geometry, normal = snapshot
+        flags = state & (
+            Qt.WindowState.WindowMaximized | Qt.WindowState.WindowFullScreen
+        )
+        if flags & Qt.WindowState.WindowFullScreen:
+            self.showFullScreen()
+            return
+        if flags & Qt.WindowState.WindowMaximized:
+            # Drop out of fullscreen first so setGeometry is honoured, then
+            # re-maximize onto the exact pre-fullscreen restore rectangle.
+            # (setGeometry while still fullscreen is ignored by the platform.)
+            self.showNormal()
+            if normal is not None and normal.isValid():
+                self.setGeometry(normal)
+            self.showMaximized()
+            return
+        self.showNormal()
+        if geometry is not None and geometry.isValid():
+            self.setGeometry(geometry)
+
+    def _enter_video_fullscreen(self, view=None) -> None:
         """Hide ALL chrome, then go fullscreen — the video gets the whole
         screen, not just the window area left over after the toolbars."""
         if self._video_fs:
             return
         self._video_fs = True
-        self._fs_was_maximized = self.isMaximized()
+        self._fs_view = view
+        self._fs_prev_state = self._window_state_snapshot(self)
         self._fs_hidden = [w for w in self._fullscreen_chrome() if w.isVisible()]
         for w in self._fs_hidden:
             w.hide()
         self.showFullScreen()
 
-    def _exit_video_fullscreen(self) -> None:
+    def _exit_video_fullscreen(self, view=None, exit_page: bool = True) -> None:
+        """Leave element fullscreen and restore the pre-fullscreen window.
+
+        This is deliberately a no-op when element fullscreen is not active.
+        The old code called showNormal() even for an unmatched toggleOff,
+        which un-maximized (and visually distorted) the window when a site
+        exited fullscreen it never entered.
+        """
         if not self._video_fs:
-            self.showNormal()
+            return
+        if view is not None and self._fs_view is not None and view is not self._fs_view:
             return
         self._video_fs = False
-        if self._fs_was_maximized:
-            self.showMaximized()
-        else:
-            self.showNormal()
-        for w in self._fs_hidden:
-            w.show()
+        owner = self._fs_view
+        self._fs_view = None
+        hidden = self._fs_hidden
         self._fs_hidden = []
+        snapshot = self._fs_prev_state
+        self._fs_prev_state = None
+        self._restore_window_state(snapshot)
+        # Restore only the surfaces that WERE visible. Blindly show()-ing
+        # every dock used to re-open the AI assistant after the user closed
+        # it, changing the window layout when the video ended.
+        for w in hidden:
+            with contextlib.suppress(RuntimeError):
+                w.show()
+        # Let the page drop its own fullscreen flag. The resulting toggleOff
+        # request is harmless: _video_fs is already False.
+        if exit_page and owner is not None:
+            with contextlib.suppress(Exception):
+                owner.page().triggerAction(QWebEnginePage.WebAction.ExitFullScreen)
+
+    def _enter_window_fullscreen(self) -> None:
+        if self.isFullScreen():
+            return
+        self._window_fs_prev = self._window_state_snapshot(self)
+        self.showFullScreen()
+
+    def _exit_window_fullscreen(self) -> None:
+        snapshot = self._window_fs_prev
+        self._window_fs_prev = None
+        self._restore_window_state(snapshot)
+
+    def on_view_closing(self, view) -> None:
+        """A tab is about to be destroyed — never leave its fullscreen stuck."""
+        if self._video_fs and (view is None or view is self._fs_view):
+            self._exit_video_fullscreen(view, exit_page=False)
 
     def _update_title(self, title: str = "") -> None:
         suffix = " — Incognito" if self.incognito else ""
@@ -1420,14 +1537,19 @@ class MainWindow(QMainWindow):
         # engine emits the toggle-off request that restores the chrome — a
         # bare showNormal() would strand the video in fullscreen mode.
         if self._video_fs:
-            view = self.tabs.current_view()
+            view = self._fs_view or self.tabs.current_view()
             if view is not None:
-                view.page().triggerAction(QWebEnginePage.WebAction.ExitFullScreen)
+                try:
+                    view.page().triggerAction(QWebEnginePage.WebAction.ExitFullScreen)
+                except Exception:
+                    self._exit_video_fullscreen(view)
+            else:
+                self._exit_video_fullscreen()
             return
         if self.isFullScreen():
-            self.showNormal()
+            self._exit_window_fullscreen()
         else:
-            self.showFullScreen()
+            self._enter_window_fullscreen()
 
     # ── downloads / files ────────────────────────────────────────────
 
@@ -1722,10 +1844,12 @@ class MainWindow(QMainWindow):
         decision = store.get(host, key) if store is not None and host else ASK
         grant, deny_pol = self._permission_policies()
         if decision == ALLOW:
-            page.setFeaturePermission(origin, feature, grant)
+            with contextlib.suppress(RuntimeError):
+                page.setFeaturePermission(origin, feature, grant)
             return
         if decision == DENY:
-            page.setFeaturePermission(origin, feature, deny_pol)
+            with contextlib.suppress(RuntimeError):
+                page.setFeaturePermission(origin, feature, deny_pol)
             return
         label = feature_label(key)
         box = QMessageBox(self)
@@ -1736,7 +1860,10 @@ class MainWindow(QMainWindow):
         box.addButton("Block", QMessageBox.ButtonRole.RejectRole)
         box.exec()
         ok = box.clickedButton() is allow_btn
-        page.setFeaturePermission(origin, feature, grant if ok else deny_pol)
+        # The tab (and its page) may have been closed while the modal was
+        # open — calling into the deleted C++ object would crash the app.
+        with contextlib.suppress(RuntimeError):
+            page.setFeaturePermission(origin, feature, grant if ok else deny_pol)
         if store is not None and host:
             store.set(host, key, ALLOW if ok else DENY, persist=persist)
 

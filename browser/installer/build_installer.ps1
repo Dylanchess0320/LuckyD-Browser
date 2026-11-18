@@ -166,5 +166,9 @@ $issText = Get-Content $issScript -Raw
 $ver = if ($issText -match '#define AppVersion\s+"([^"]+)"') { $Matches[1] } else { throw 'Could not read AppVersion from LuckyDBrowser.iss' }
 $portableZip = Join-Path $PSScriptRoot ("output\LuckyDBrowser-Portable-{0}.zip" -f $ver)
 if (Test-Path $portableZip) { Remove-Item $portableZip -Force }
-Compress-Archive -Path (Join-Path $browserDir 'dist\LuckyDBrowser') -DestinationPath $portableZip -CompressionLevel Optimal
+$portableRoot = Join-Path $browserDir 'dist\LuckyDBrowser'
+foreach ($extra in @('LuckyD-Bootstrap.ps1', 'LuckyD-Browser-Setup-Guide.md', 'ollama_setup.ps1')) {
+    Copy-Item (Join-Path $PSScriptRoot $extra) (Join-Path $portableRoot $extra) -Force
+}
+Compress-Archive -Path $portableRoot -DestinationPath $portableZip -CompressionLevel Optimal
 Write-Ok ("Portable ZIP: $portableZip ({0:N1} MB)" -f ((Get-Item $portableZip).Length / 1MB))

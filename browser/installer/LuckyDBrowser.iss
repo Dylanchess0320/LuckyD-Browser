@@ -2,7 +2,7 @@
 ; LuckyD Browser - Windows installer script (Inno Setup 6)
 ;
 ; Produces a single, shareable setup file:
-;   browser\installer\output\LuckyDBrowserSetup-10.8.8.exe
+;   browser\installer\output\LuckyDBrowserSetup-10.8.9.exe
 ;
 ; Anyone can run it - it installs per-user (no admin needed) to
 ; %LOCALAPPDATA%\Programs\LuckyDBrowser with Start Menu / Desktop
@@ -13,7 +13,7 @@
 ; -----------------------------------------------------------------------------
 
 #define AppName      "LuckyD Browser"
-#define AppVersion   "10.8.8"
+#define AppVersion   "10.8.9"
 #define AppPublisher "LuckyD"
 #define AppExeName   "LuckyDBrowser.exe"
 #define AppURL       "https://github.com/Dylanchess0320/LuckyD-Browser"
@@ -27,12 +27,12 @@ AppPublisher={#AppPublisher}
 AppPublisherURL={#AppURL}
 AppSupportURL={#AppURL}
 AppUpdatesURL={#AppURL}
-VersionInfoVersion=10.8.8.0
+VersionInfoVersion=10.8.9.0
 VersionInfoCompany={#AppPublisher}
 VersionInfoDescription={#AppName} Setup
 VersionInfoProductName={#AppName}
-VersionInfoProductVersion=10.8.8.0
-; Per-user install â€” no admin rights required (admin users may opt into all-users).
+VersionInfoProductVersion=10.8.9.0
+; Per-user install - no admin rights required (admin users may opt into all-users).
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 DefaultDirName={localappdata}\Programs\LuckyDBrowser
@@ -42,7 +42,7 @@ MinVersion=10.0
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir=output
-OutputBaseFilename=LuckyDBrowserSetup-10.8.8
+OutputBaseFilename=LuckyDBrowserSetup-10.8.9
 SetupIconFile=..\assets\professional_icon.ico
 CloseApplications=yes
 RestartApplications=no
@@ -53,16 +53,20 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: checkedonce
+Name: "localai"; Description: "Set up free local AI (Ollama + llama3.2:3b, ~2 GB download)"; GroupDescription: "Agent setup (runs after install):"; Flags: checkedonce
+Name: "meshtools"; Description: "Install Agent Mesh CLIs (Node, Git, GitHub CLI, Python, coding agents; several GB)"; GroupDescription: "Agent setup (runs after install):"; Flags: unchecked
 
 [Files]
-; Everything PyInstaller produced â€” LuckyDBrowser.exe plus the _internal
+; Everything PyInstaller produced - LuckyDBrowser.exe plus the _internal
 ; folder (Qt WebEngine runtime, assets, bundled luckyd-code.exe backend).
 Source: "..\dist\LuckyDBrowser\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-; Free local AI bootstrap â€” bundled for MANUAL opt-in only (double-click it in
-; the install folder or run it from PowerShell). It is never executed by the
-; installer itself: silent post-install downloads that install third-party
-; software are a classic behavioral anti-ransomware flag.
+; Free local AI bootstrap - bundled for opt-in use. The installer runs it only
+; when the matching task is selected on the final page; silent installs skip it.
 Source: "ollama_setup.ps1"; DestDir: "{app}"; Flags: ignoreversion
+; New-user automation (10.8.9): idempotent bootstrap plus the setup guide.
+; No secrets are stored; re-run any time from Start Menu > Agent Setup.
+Source: "LuckyD-Bootstrap.ps1"; DestDir: "{app}"; Flags: ignoreversion
+Source: "LuckyD-Browser-Setup-Guide.md"; DestDir: "{app}"; Flags: ignoreversion
 
 [InstallDelete]
 ; Pre-2.5.8 installers used this legacy filename.  Inno only updates a
@@ -76,7 +80,9 @@ Type: files; Name: "{userprograms}\LuckyDBrowser\LuckyDBrowser.lnk"
 Type: files; Name: "{userprograms}\LuckyD Browser.lnk"
 
 [Icons]
-Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Comment: "{#AppName} â€” Chromium-based AI browser by LuckyD"
+Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Comment: "{#AppName} - Chromium-based AI browser by LuckyD"
+Name: "{group}\Agent Setup"; Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\LuckyD-Bootstrap.ps1"" -Groups all"; WorkingDir: "{app}"; Comment: "Install or repair optional agent tools (Ollama, Node, mesh CLIs)"
+Name: "{group}\Setup Guide"; Filename: "{sys}\notepad.exe"; Parameters: """{app}\LuckyD-Browser-Setup-Guide.md"""; Comment: "LuckyD Browser new-user setup guide"
 Name: "{group}\Uninstall {#AppName}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: desktopicon
 
@@ -98,14 +104,17 @@ Root: HKCU; Subkey: "Software\Classes\LuckyDHTML\DefaultIcon"; ValueType: string
 Root: HKCU; Subkey: "Software\Classes\LuckyDHTML\shell\open\command"; ValueType: string; ValueData: """{app}\{#AppExeName}"" ""%1"""; Flags: uninsdeletekey
 
 [Run]
-; NOTE (9.9): the Ollama bootstrap is intentionally NOT auto-run here.
-; A post-install step that downloads and installs third-party software is a
-; classic behavioral anti-ransomware flag (Halcyon/Defender). Users who want
-; free local AI can run {app}\ollama_setup.ps1 manually at any time.
+; New-user agent setup (10.8.9): opt-in only. The task page and the final
+; checkboxes are explicit consent, and silent installs skip these entries.
+; The old policy avoided auto-downloads because behavioral anti-ransomware
+; engines flag silent third-party installs; this stays user-visible and can
+; be unchecked, while the script never writes secrets and is safe to re-run.
+Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\LuckyD-Bootstrap.ps1"" -Groups ollama"; Description: "Set up free local AI (Ollama + llama3.2:3b, ~2 GB)"; Flags: postinstall nowait runascurrentuser skipifsilent; Tasks: localai
+Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\LuckyD-Bootstrap.ps1"" -Groups core,free,keyed"; Description: "Install Agent Mesh CLIs (several GB)"; Flags: postinstall nowait runascurrentuser skipifsilent; Tasks: meshtools
 Filename: "{app}\{#AppExeName}"; Description: "Launch {#AppName}"; Flags: nowait postinstall skipifsilent
 
 [Code]
-// A running browser would lock files during install/upgrade â€” stop it first.
+// A running browser would lock files during install/upgrade - stop it first.
 procedure KillRunningApp;
 var
   ResultCode: Integer;
