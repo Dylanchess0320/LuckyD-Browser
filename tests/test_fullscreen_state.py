@@ -147,9 +147,7 @@ def test_restore_returns_to_exact_normal_geometry() -> None:
     QRect, Qt = _qt()
     win = _FakeWindow(Qt.WindowState.WindowFullScreen)
     saved = QRect(64, 32, 1234, 777)
-    _main_window_class()._restore_window_state(
-        win, (Qt.WindowState.WindowNoState, saved, saved)
-    )
+    _main_window_class()._restore_window_state(win, (Qt.WindowState.WindowNoState, saved, saved))
     assert win.calls[0] == "normal"
     assert ("geometry", saved) in win.calls
 

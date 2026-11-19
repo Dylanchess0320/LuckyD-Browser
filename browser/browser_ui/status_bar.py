@@ -74,7 +74,7 @@ class StatusBar(QStatusBar):
 
     # ── text display (the QStatusBar message API, rerouted) ────────
 
-    def showMessage(self, text: str, timeout: int = 0) -> None:  # noqa: N802 — Qt slot name
+    def showMessage(self, text: str, timeout: int | None = 0) -> None:  # noqa: N802 - Qt slot name
         """Plain status text on the strip (escaped; never markup)."""
         self._label.setText(html.escape(text or ""))
         self._arm_clear_timer(timeout)
@@ -91,7 +91,7 @@ class StatusBar(QStatusBar):
     def current_text(self) -> str:
         return self._label.text()
 
-    def _arm_clear_timer(self, timeout: int) -> None:
+    def _arm_clear_timer(self, timeout: int | None) -> None:
         self._clear_timer.stop()
         if timeout and timeout > 0:
             self._clear_timer.start(timeout)

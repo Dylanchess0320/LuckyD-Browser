@@ -143,6 +143,9 @@ allowed-confusables = ["›", "＋", "𝕏"]
 # research_page's HTML template is an f-string with no placeholders on purpose:
 # the f-prefix collapses the JS's doubled braces ({{ }}) to single braces.
 "browser/browser_core/research_page.py" = ["F541"]
+# This test intentionally mirrors Qt's camelCase API (fake window methods) and
+# imports QRect/Qt inside tests so PySide6 stays optional at module import.
+"tests/test_fullscreen_state.py" = ["N802", "N806", "RUF059"]
 
 [tool.ruff.format]
 quote-style = "double"

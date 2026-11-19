@@ -118,8 +118,8 @@ class MainWindow(QMainWindow):
         self._video_fs = False
         self._fs_view = None  # WebView that owns element fullscreen
         self._fs_hidden: list = []  # chrome that was visible before we hid it
-        self._fs_prev_state = None  # (windowState, geometry, normalGeometry)
-        self._window_fs_prev = None  # same tuple, saved for F11
+        self._fs_prev_state: tuple | None = None  # (windowState, geometry, normalGeometry)
+        self._window_fs_prev: tuple | None = None  # same tuple, saved for F11
         # Per-view load progress (id(view) → fraction) so the status
         # strip's progress line survives tab switches mid-load.
         self._view_progress: dict[int, float] = {}
@@ -1256,9 +1256,7 @@ class MainWindow(QMainWindow):
             self.showNormal()
             return
         state, geometry, normal = snapshot
-        flags = state & (
-            Qt.WindowState.WindowMaximized | Qt.WindowState.WindowFullScreen
-        )
+        flags = state & (Qt.WindowState.WindowMaximized | Qt.WindowState.WindowFullScreen)
         if flags & Qt.WindowState.WindowFullScreen:
             self.showFullScreen()
             return

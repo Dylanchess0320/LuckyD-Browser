@@ -356,12 +356,14 @@ class AiSidebar(QDockWidget):
             ("📋 Copy chat", "Copy this conversation as Markdown", self._copy_chat),
         ):
             act = actions_menu.addAction(label)
-            act.setToolTip(tip)
-            act.triggered.connect(slot)
+            if act is not None:
+                act.setToolTip(tip)
+                act.triggered.connect(slot)
         actions_menu.addSeparator()
         clear_act = actions_menu.addAction("Clear conversation")
-        clear_act.setToolTip("Clear this conversation")
-        clear_act.triggered.connect(self._clear_chat)
+        if clear_act is not None:
+            clear_act.setToolTip("Clear this conversation")
+            clear_act.triggered.connect(self._clear_chat)
         self._actions_menu = actions_menu
         self.actions_btn = QPushButton("Actions", body)
         self.actions_btn.setToolTip("Assistant actions")

@@ -70,7 +70,6 @@ if isinstance(getattr(_qtcore, "Signal", None), MagicMock):
 
 from browser_core import hub_memory as hm
 
-
 _TEST_HUB_URL = "http://127.0.0.1:18790"
 _TEST_CLAW_URL = "http://127.0.0.1:18791"
 

@@ -23,6 +23,7 @@ poster's RGB, so it can be re-keyed directly (``--from-png``).
 
 from collections import deque
 from pathlib import Path
+from typing import cast
 
 from PIL import Image
 
@@ -61,9 +62,10 @@ def transparent_background(img: Image.Image) -> Image.Image:
     img = img.convert("RGBA")
     w, h = img.size
     px = img.load()
+    assert px is not None  # RGBA load always succeeds; stubs keep the None.
 
     def maxch(x: int, y: int) -> int:
-        r, g, b, _a = px[x, y]
+        r, g, b, _a = cast(tuple[int, int, int, int], px[x, y])
         return max(r, g, b)
 
     cand = [[maxch(x, y) <= _BG_MAX_CHANNEL for x in range(w)] for y in range(h)]
@@ -89,9 +91,10 @@ def transparent_background(img: Image.Image) -> Image.Image:
     span = _BG_MAX_CHANNEL - _RAMP_LO
     out = Image.new("RGBA", (w, h))
     op = out.load()
+    assert op is not None  # freshly created RGBA image; stubs keep the None.
     for y in range(h):
         for x in range(w):
-            r, g, b, _a = px[x, y]
+            r, g, b, _a = cast(tuple[int, int, int, int], px[x, y])
             if bg[y][x]:
                 d = max(r, g, b)
                 a = 0 if d <= _RAMP_LO else int(_RAMP_HI * (d - _RAMP_LO) / span)

@@ -1,7 +1,11 @@
 # ── LuckyD Browser Windows installer ────────────────────────────────────
 # Builds LuckyDBrowserSetup-<version>.exe on a real Windows runner and
-# attaches it to the GitHub Release. Run manually from the Actions tab
-# (workflow_dispatch) or automatically on version tags (v*).
+# attaches it to the GitHub Release. Manual-only on purpose: the release
+# installer and portable ZIP are built and verified by
+# browser/installer/build_installer.ps1 on the release machine, and that is
+# what gets attached. Auto-building on every v* tag used to replace the
+# verified asset with a CI build from a different dependency set (missing
+# root requirements -> a much smaller installer).
 #
 # One-command equivalent on your own PC:
 #   powershell -NoProfile -ExecutionPolicy Bypass -File browser/installer/build_installer.ps1
@@ -15,8 +19,6 @@ on:
         description: "Release tag to attach the installer to (e.g. v9.0.0)"
         required: true
         default: "v9.0.0"
-  push:
-    tags: ["v*"]
 
 permissions:
   contents: write
@@ -38,6 +40,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
+          pip install -r requirements.txt
           pip install -r browser/requirements.txt
           pip install pyinstaller
 
