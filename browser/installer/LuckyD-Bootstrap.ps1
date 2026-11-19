@@ -27,10 +27,10 @@
     Print the actions without running them.
 
 .EXAMPLE
-    powershell -NoProfile -ExecutionPolicy Bypass -File .\LuckyD-Bootstrap.ps1
+    powershell -NoProfile -ExecutionPolicy RemoteSigned -File .\LuckyD-Bootstrap.ps1
 
 .EXAMPLE
-    powershell -NoProfile -ExecutionPolicy Bypass -File .\LuckyD-Bootstrap.ps1 -Groups all -OllamaModel qwen3:8b
+    powershell -NoProfile -ExecutionPolicy RemoteSigned -File .\LuckyD-Bootstrap.ps1 -Groups all -OllamaModel qwen3:8b
 
 .NOTES
     Read LuckyD-Browser-Setup-Guide.md before running. Review the commands.

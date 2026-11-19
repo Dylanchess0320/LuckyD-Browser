@@ -14,8 +14,8 @@ This guide covers:
 
 A companion script, `LuckyD-Bootstrap.ps1`, can automate the core installs.
 It never writes secrets and is safe to re-run. The 10.9 installer bundles
-the script and this guide; the final installer page offers optional setup
-tasks, and a Start Menu shortcut lets you run them again later.
+the script and this guide but downloads nothing itself; Start Menu shortcuts
+let you run any optional setup when you choose.
 
 ---
 
@@ -47,10 +47,11 @@ to run its core features.
    not code-signed. Choose **More info -> Run anyway** only if you trust the
    source. If you are on a managed work PC and the installer is blocked, use the
    portable ZIP.
-4. On the final installer page, leave **Set up free local AI (Ollama +
-   llama3.2:3b)** checked if you want a working offline agent (about 2 GB
-   download). **Install Agent Mesh CLIs** is optional and downloads several GB;
-   leave it unchecked unless you need all coding-agent CLIs.
+4. The installer does not download optional tools. After installation, open
+   the LuckyD Browser folder in the Start Menu and choose **Set up Local AI**
+   (about 2 GB) if you want a working offline agent, or **Install Agent Mesh
+   CLIs** (several GB) if you need all coding-agent CLIs. Both are optional
+   and can be run later.
 5. Launch **LuckyD Browser**.
 
 ### 1.2 Verify what you installed

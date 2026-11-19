@@ -53,18 +53,16 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: checkedonce
-Name: "localai"; Description: "Set up free local AI (Ollama + llama3.2:3b, ~2 GB download)"; GroupDescription: "Agent setup (runs after install):"; Flags: checkedonce
-Name: "meshtools"; Description: "Install Agent Mesh CLIs (Node, Git, GitHub CLI, Python, coding agents; several GB)"; GroupDescription: "Agent setup (runs after install):"; Flags: unchecked
 
 [Files]
 ; Everything PyInstaller produced - LuckyDBrowser.exe plus the _internal
 ; folder (Qt WebEngine runtime, assets, bundled luckyd-code.exe backend).
 Source: "..\dist\LuckyDBrowser\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-; Free local AI bootstrap - bundled for opt-in use. The installer runs it only
-; when the matching task is selected on the final page; silent installs skip it.
+; Free local AI bootstrap - bundled for manual opt-in only. The installer
+; never runs it; use Start Menu > Set up Local AI after installation.
 Source: "ollama_setup.ps1"; DestDir: "{app}"; Flags: ignoreversion
 ; New-user automation (10.8.9): idempotent bootstrap plus the setup guide.
-; No secrets are stored; re-run any time from Start Menu > Agent Setup.
+; No secrets are stored; run it manually from Start Menu > Agent Setup.
 Source: "LuckyD-Bootstrap.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "LuckyD-Browser-Setup-Guide.md"; DestDir: "{app}"; Flags: ignoreversion
 
@@ -81,7 +79,9 @@ Type: files; Name: "{userprograms}\LuckyD Browser.lnk"
 
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Comment: "{#AppName} - Chromium-based AI browser by LuckyD"
-Name: "{group}\Agent Setup"; Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\LuckyD-Bootstrap.ps1"" -Groups all"; WorkingDir: "{app}"; Comment: "Install or repair optional agent tools (Ollama, Node, mesh CLIs)"
+Name: "{group}\Agent Setup"; Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy RemoteSigned -File ""{app}\LuckyD-Bootstrap.ps1"" -Groups all"; WorkingDir: "{app}"; Comment: "Install or repair optional agent tools (Ollama, Node, mesh CLIs)"
+Name: "{group}\Set up Local AI"; Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy RemoteSigned -File ""{app}\LuckyD-Bootstrap.ps1"" -Groups ollama"; WorkingDir: "{app}"; Comment: "Install Ollama and a small local model (about 2 GB download)"
+Name: "{group}\Install Agent Mesh CLIs"; Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy RemoteSigned -File ""{app}\LuckyD-Bootstrap.ps1"" -Groups core,free,keyed"; WorkingDir: "{app}"; Comment: "Install Node, Git, GitHub CLI, Python and the agent CLIs (several GB)"
 Name: "{group}\Setup Guide"; Filename: "{sys}\notepad.exe"; Parameters: """{app}\LuckyD-Browser-Setup-Guide.md"""; Comment: "LuckyD Browser new-user setup guide"
 Name: "{group}\Uninstall {#AppName}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: desktopicon
@@ -104,13 +104,9 @@ Root: HKCU; Subkey: "Software\Classes\LuckyDHTML\DefaultIcon"; ValueType: string
 Root: HKCU; Subkey: "Software\Classes\LuckyDHTML\shell\open\command"; ValueType: string; ValueData: """{app}\{#AppExeName}"" ""%1"""; Flags: uninsdeletekey
 
 [Run]
-; New-user agent setup (10.8.9): opt-in only. The task page and the final
-; checkboxes are explicit consent, and silent installs skip these entries.
-; The old policy avoided auto-downloads because behavioral anti-ransomware
-; engines flag silent third-party installs; this stays user-visible and can
-; be unchecked, while the script never writes secrets and is safe to re-run.
-Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\LuckyD-Bootstrap.ps1"" -Groups ollama"; Description: "Set up free local AI (Ollama + llama3.2:3b, ~2 GB)"; Flags: postinstall nowait runascurrentuser skipifsilent; Tasks: localai
-Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\LuckyD-Bootstrap.ps1"" -Groups core,free,keyed"; Description: "Install Agent Mesh CLIs (several GB)"; Flags: postinstall nowait runascurrentuser skipifsilent; Tasks: meshtools
+; 10.9: no post-install downloads. Agent setup is manual from the Start Menu
+; shortcuts above (Agent Setup / Set up Local AI / Install Agent Mesh CLIs)
+; or from the bundled setup guide.
 Filename: "{app}\{#AppExeName}"; Description: "Launch {#AppName}"; Flags: nowait postinstall skipifsilent
 
 [Code]
