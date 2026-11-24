@@ -28,7 +28,10 @@ from browser_core.skills import (
 from PySide6.QtCore import QBuffer, QIODevice, Qt, QThread, QTimer, QUrl, Signal
 from PySide6.QtWidgets import (
     QComboBox,
+    QDialog,
+    QDialogButtonBox,
     QDockWidget,
+    QFormLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -252,6 +255,53 @@ class _ShotWorker(QThread):
             self.failed.emit(str(exc))
 
 
+class _KeyDialog(QDialog):
+    """Provider + API-key entry (masked input) for the /key command.
+
+    Saving goes through ``core.credentials`` so the key lands in the same
+    per-user .env LuckyD Code reads — one paste connects both surfaces.
+    """
+
+    def __init__(self, parent=None, provider: str = "") -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Add an API key")
+        self.setMinimumWidth(460)
+        from core import credentials
+
+        form = QFormLayout(self)
+        self.provider_box = QComboBox(self)
+        for pid in credentials.key_providers():
+            self.provider_box.addItem(f"{credentials.provider_display(pid)} ({pid})", pid)
+        if provider:
+            idx = self.provider_box.findData(provider)
+            if idx >= 0:
+                self.provider_box.setCurrentIndex(idx)
+        self.key_edit = QLineEdit(self)
+        self.key_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        self.key_edit.setPlaceholderText("Paste the key — it is never shown or logged")
+        form.addRow("Provider:", self.provider_box)
+        form.addRow("API key:", self.key_edit)
+        hint = QLabel(
+            "Saved to %LOCALAPPDATA%\\LuckyDBrowser\\.env — LuckyD Code and "
+            "this browser both read it, so no manual .env editing.",
+            self,
+        )
+        hint.setWordWrap(True)
+        form.addRow(hint)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel,
+            self,
+        )
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        form.addRow(buttons)
+        self.key_edit.returnPressed.connect(self.accept)
+
+    def values(self) -> tuple[str, str]:
+        """(provider id, key) from the dialog's current state."""
+        return str(self.provider_box.currentData() or ""), self.key_edit.text().strip()
+
+
 class AiSidebar(QDockWidget):
     def __init__(self, main_window):
         super().__init__("AI Assistant", main_window)
@@ -329,8 +379,10 @@ class AiSidebar(QDockWidget):
         layout.addLayout(model_row)
         self.provider_box.currentIndexChanged.connect(self._provider_changed)
 
+        self._setup_hint = None
         if not self.bridge.providers():
             warn = QLabel(self._setup_hint_html(), body)
+            self._setup_hint = warn
             warn.setTextFormat(Qt.TextFormat.RichText)
             warn.setWordWrap(True)
             # Setup links open as browser tabs — same as chat links.
@@ -354,6 +406,11 @@ class AiSidebar(QDockWidget):
             ),
             ("🛡️ Audit", "Security and privacy review of this page", self._security_audit),
             ("📋 Copy chat", "Copy this conversation as Markdown", self._copy_chat),
+            (
+                "🔑 Add API key…",
+                "Paste a provider key (e.g. OpenRouter) — saved to the shared .env",
+                lambda: self._key_dialog(),
+            ),
         ):
             act = actions_menu.addAction(label)
             if act is not None:
@@ -500,6 +557,10 @@ class AiSidebar(QDockWidget):
 
     def _submit(self) -> None:
         """Enter / Send: dispatch to chat or the agent by the active mode."""
+        text = self.input.text().strip()
+        if text.startswith("/") and self._handle_slash(text):
+            self.input.clear()
+            return
         if getattr(self, "_mode", "ask") == "agent":
             self._start_agent()
         else:
@@ -581,8 +642,9 @@ class AiSidebar(QDockWidget):
                 "run <code>ollama pull llama3.2:3b</code>, then restart LuckyD."
             )
             steps.append(
-                "• <b>Prefer cloud?</b> Add a key (e.g. <code>OPENAI_API_KEY</code>) "
-                "to the app's <code>.env</code> file and restart."
+                "• <b>Prefer cloud?</b> Type <code>/key</code> below "
+                f"(or <a href='luckyd://add-key' style='color:{accent}'>paste a key now</a>) "
+                "— e.g. OpenRouter. It is saved to the shared .env, no manual editing."
             )
         return (
             f"<div style='color:{muted};padding:8px 10px;line-height:1.55'>"
@@ -688,12 +750,123 @@ class AiSidebar(QDockWidget):
 
     def _open_link(self, url) -> None:
         """Chat links open as browser tabs — the user never leaves the app."""
-        if getattr(url, "scheme", lambda: "")() == "luckyd" and (
-            getattr(url, "host", lambda: "")() == "ollama-pull"
-        ):
-            self._pull_default_ollama_model()
-            return
+        if getattr(url, "scheme", lambda: "")() == "luckyd":
+            host = getattr(url, "host", lambda: "")()
+            if host == "ollama-pull":
+                self._pull_default_ollama_model()
+                return
+            if host == "add-key":
+                self._key_dialog()
+                return
         self._mw.open_in_new_tab(url)
+
+    # ── API keys (10.9.2) ────────────────────────────────────────────
+
+    def _handle_slash(self, text: str) -> bool:
+        """Handle a ``/command`` typed into the chat input.
+
+        Returns True when the line was a local command (never sent to the
+        model). Unknown ``/`` lines fall through to normal chat.
+        """
+        body = text.strip()[1:]
+        parts = body.split(None, 1)
+        command = parts[0].lower() if parts else ""
+        args = parts[1].strip() if len(parts) > 1 else ""
+
+        if command in ("key", "keys"):
+            if command == "keys" or args.lower() in ("list", "ls"):
+                self._list_keys()
+                return True
+            pair = args.split(None, 1)
+            if len(pair) < 2:
+                self._key_dialog(pair[0] if pair else "")
+                return True
+            self._save_key(pair[0], pair[1])
+            return True
+        if command in ("clear", "new", "reset"):
+            self._clear_chat()
+            return True
+        if command in ("help", "commands"):
+            self._set_status(
+                "Commands: /key — add an API key · /keys — list saved keys · /clear — new chat"
+            )
+            return True
+        return False
+
+    def _key_dialog(self, provider: str = "") -> None:
+        """Open the paste-a-key dialog (Actions menu, /key, or setup hint)."""
+        dialog = _KeyDialog(self, provider)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        provider_id, key = dialog.values()
+        self._save_key(provider_id, key)
+
+    def _save_key(self, provider: str, key: str) -> None:
+        """Persist a key to the shared .env, then make it usable immediately."""
+        from core import credentials
+
+        if not key:
+            self._set_status("No key entered — nothing saved.")
+            return
+        result = credentials.set_api_key(provider, key)
+        if not result.get("ok"):
+            self._set_status(str(result.get("message", "Could not save the key.")))
+            return
+        label = html.escape(credentials.provider_display(provider))
+        message = html.escape(str(result.get("message", "Key saved.")))
+        self._append(f"<b>🔑 {label}</b> — {message}")
+        self._reload_bridge()
+
+    def _list_keys(self) -> None:
+        """Show which providers already have a saved key (masked)."""
+        from core import credentials
+
+        rows = credentials.configured()
+        if not rows:
+            self._set_status("No API keys saved yet. Type /key to add one.")
+            return
+        lines = ["<b>Saved API keys</b>"]
+        for row in rows:
+            lines.append(
+                f"<code>{html.escape(row['provider'])}</code> — {html.escape(row['masked'])}"
+            )
+        path = html.escape(str(credentials.user_env_path()))
+        lines.append(f"<span style='color:{_tok('muted')}'>{path}</span>")
+        self._append("<br>".join(lines))
+
+    def _reload_bridge(self) -> None:
+        """Rebuild AIBridge so a newly pasted key appears without a restart."""
+        saved_models = self._mw.settings.get("ai_model_overrides", {}) or {}
+        self.bridge = AIBridge()
+        if isinstance(saved_models, dict):
+            for pname, pmodel in saved_models.items():
+                self.bridge.set_model_override(str(pname), str(pmodel))
+
+        self.provider_box.blockSignals(True)
+        current = self.provider_box.currentData()
+        self.provider_box.clear()
+        self.provider_box.addItem("✨ Auto (recommended)", None)
+        usable = getattr(self.bridge, "usable_providers", None)
+        ordered = list(usable()) if callable(usable) else list(self.bridge.providers())
+        default = self.bridge.default_provider()
+        if default in ordered:
+            ordered.remove(default)
+            ordered.insert(0, default)
+        for name in ordered:
+            self.provider_box.addItem(
+                f"{self._provider_label(name)} — {self.bridge.model_for(name)}", name
+            )
+        idx = self.provider_box.findData(current)
+        if idx >= 0:
+            self.provider_box.setCurrentIndex(idx)
+        self.provider_box.blockSignals(False)
+        if self._setup_hint is not None and self.bridge.providers():
+            self._setup_hint.setVisible(False)
+        self._set_status(
+            self._auto_status_note()
+            if self._selected_provider() is None
+            else "Key saved — provider is ready."
+        )
 
     def _pull_default_ollama_model(self, model: str = "llama3.2:3b") -> None:
         """Trigger a background `ollama pull` from the setup hint."""

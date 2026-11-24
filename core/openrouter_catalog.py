@@ -23,6 +23,7 @@ import os
 import time
 import urllib.request
 from pathlib import Path
+from typing import Any
 
 MODELS_URL = "https://openrouter.ai/api/v1/models"
 CACHE_TTL_SECONDS = 24 * 60 * 60
@@ -47,7 +48,7 @@ def cache_path() -> Path:
     return Path(__file__).resolve().parent.parent / "data" / "openrouter_models.json"
 
 
-def _read_cache() -> dict[str, object]:
+def _read_cache() -> dict[str, Any]:
     try:
         raw = cache_path().read_text(encoding="utf-8")
         data = json.loads(raw)

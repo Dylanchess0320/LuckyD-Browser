@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import getpass
 import json
 import os
 import subprocess
@@ -328,9 +329,7 @@ def _openrouter_all_models(live: bool = False) -> list[str]:
     free = [m for m in ids if m == "openrouter/free" or m.lower().endswith(":free")]
     # Free ids first (router pinned), then the rest of the paid catalog.
     free_sorted = [m for m in ids if m == "openrouter/free"]
-    free_sorted += sorted(
-        {m for m in free if m != "openrouter/free"}, key=str.lower
-    )
+    free_sorted += sorted({m for m in free if m != "openrouter/free"}, key=str.lower)
     return free_sorted + paid_ids(ids)
 
 
@@ -347,9 +346,7 @@ def _is_free_provider_available(pid: str, pinfo: dict) -> bool:
     return bool(os.environ.get(env_key, "").strip())
 
 
-def _build_free_groups(
-    free_only: bool, cline_free: list[str], live: bool = False
-) -> list[dict]:
+def _build_free_groups(free_only: bool, cline_free: list[str], live: bool = False) -> list[dict]:
     # Build free groups from providers_config.json (single source of truth for $0 models)
     free_providers = _load_free_providers()
     # Providers with no $0 tier (e.g. keyed OpenCode Zen — restored to the
@@ -889,9 +886,7 @@ def _resolve_provider(provider_hint: str | None, model_name: str) -> dict:
             )
         base_url = (os.environ.get(env_base, "") or "").strip() or default_base
         resolved_model = (
-            model_name
-            or (os.environ.get(env_model, "") or "").strip()
-            or default_model
+            model_name or (os.environ.get(env_model, "") or "").strip() or default_model
         )
         if not resolved_model:
             ui.warn(f"{provider} model name required. Try: /model {provider} <name>")
@@ -1092,9 +1087,7 @@ async def handle_model_command(agent: CodingAgent, cmd: str) -> bool:
     raw = cmd[len("model") :].strip()
     low = raw.lower()
 
-    def _flat_for_catalog(
-        free_only: bool, live: bool = False
-    ) -> dict[int, tuple[str, str]]:
+    def _flat_for_catalog(free_only: bool, live: bool = False) -> dict[int, tuple[str, str]]:
         """Build the same number→(provider,model) map that ui.show_models() uses."""
         from core.providers import provider_key_from_label
 
@@ -1309,6 +1302,65 @@ async def handle_model_command(agent: CodingAgent, cmd: str) -> bool:
     return False
 
 
+def _handle_key_command(raw: str) -> None:
+    """``/key [provider] [key]`` -- paste a provider key into the shared .env.
+
+    Saves to %LOCALAPPDATA%/LuckyDBrowser/.env, the same file the browser AI
+    assistant reads, so one paste connects both LuckyD Code and the browser.
+    With no key argument the key is read with hidden input (never echoed or
+    stored in shell history). ``/keys`` lists what is already saved.
+    """
+    _ensure_ui()
+    from core import credentials
+
+    body = raw[1:].strip()  # drop the leading '/'
+    parts = body.split(None, 1)
+    sub = parts[0].lower() if parts else ""
+    rest = parts[1].strip() if len(parts) > 1 else ""
+
+    if sub == "keys" or (sub == "key" and rest.lower() in ("list", "ls")):
+        rows = credentials.configured()
+        if not rows:
+            ui.warn("No API keys saved yet. Run /key openrouter and paste one.")
+            return
+        ui.info("Providers with a saved API key:")
+        for row in rows:
+            print(f"  {row['provider']:<12} {row['env_var']:<22} {row['masked']}")
+        print(f"  file: {credentials.user_env_path()}")
+        return
+
+    provider = ""
+    key = ""
+    if rest:
+        pair = rest.split(None, 1)
+        provider = pair[0]
+        key = pair[1].strip() if len(pair) > 1 else ""
+    else:
+        ui.info("Providers that accept a key: " + ", ".join(credentials.key_providers()))
+        provider = ui.prompt_text("Provider", default="openrouter")
+    provider = (provider or "").strip()
+    if not provider:
+        ui.warn("Usage: /key <provider> [key]   ·   /keys to list saved keys")
+        return
+    if not key:
+        label = credentials.provider_display(provider)
+        print(f"  Paste the {label} API key (input hidden, Enter to cancel):")
+        try:
+            key = getpass.getpass("  key: ")
+        except (KeyboardInterrupt, EOFError):
+            ui.warn("Cancelled -- no key saved.")
+            return
+
+    result = credentials.set_api_key(provider, key)
+    if result.get("ok"):
+        ui.success(str(result.get("message", "Key saved.")))
+        if result.get("verified") is not False:
+            pid = result.get("provider", provider)
+            ui.info(f"Use it now with /model {pid} (or restart) -- no .env editing needed.")
+    else:
+        ui.error(str(result.get("message", "Could not save the key.")))
+
+
 async def handle_command(agent: CodingAgent, cmd: str) -> bool:
     """
     Handle a slash command. Returns True if the REPL should exit,
@@ -1404,6 +1456,11 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
 
         ui.show_providers(list_providers())
 
+    elif cmd in ("key", "keys") or cmd.startswith("key "):
+        # Paste a provider API key into the shared per-user .env (10.9.2).
+        # Parse from `raw`: `cmd` is lowercased, and keys are case-sensitive.
+        _handle_key_command(raw)
+
     elif cmd == "refresh":
         invalidate_cache()
         _switch_model(agent, model_name="auto")
@@ -1489,7 +1546,7 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
             ui.warn("MCP not configured or no servers connected")
 
     elif cmd == "version":
-        agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v10.9.1")
+        agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v10.9.2")
         agent_name = os.environ.get("LUCKYD_AGENT_NAME", "Agent 1")
         ui.info(f"LuckyD Code {agent_version} ({agent_name})")
 
@@ -2556,7 +2613,7 @@ def _dispatch_early_subcommands(args: list[str]) -> bool:
 
 def _print_version() -> None:
     """Print the LuckyD Code version line (fast path: no config needed)."""
-    agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v10.9.1")
+    agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v10.9.2")
     agent_name = os.environ.get("LUCKYD_AGENT_NAME", "")
     label = f"LuckyD Code {agent_version}" + (f" ({agent_name})" if agent_name else "")
     print(label)
@@ -2569,8 +2626,8 @@ def _print_help() -> None:
 LuckyD Code — AI Coding Agent
 
 Usage:
-  lucky-code                       Interactive REPL (Agent 1 · v10.9.1)
-  lucky-code --agent 2             Interactive REPL (Agent 2 · v10.9.1)
+  lucky-code                       Interactive REPL (Agent 1 · v10.9.2)
+  lucky-code --agent 2             Interactive REPL (Agent 2 · v10.9.2)
   lucky-code providers           List AI providers — status, cost tier, current
   lucky-code doctor [--json]     Check provider & Multi Agent Terminal backend health + tiers
   lucky-code model <name>        Switch model (fuzzy Cline-style picker)
@@ -2582,7 +2639,7 @@ Usage:
   lucky-code --resume <id>         Resume specific session
 
 Options:
-  --agent 1|2        Select agent slot (1 = v10.9.1 Nuitka, 2 = v10.9.1)
+  --agent 1|2        Select agent slot (1 = v10.9.2 Nuitka, 2 = v10.9.2)
   --model NAME       Model: auto (default), flash, pro, or specific name
   --provider NAME    Set provider (see: lucky-code providers): ollama, clinepass,
                      cline-usage, openrouter, groq, deepseek,
@@ -2687,11 +2744,11 @@ def _parse_agent_args(args: list[str], cfg: dict) -> tuple[dict, str, float, str
             if slot == "2":
                 os.environ["LUCKYD_AGENT_SLOT"] = "2"
                 os.environ["LUCKYD_AGENT_NAME"] = "Agent 2"
-                os.environ["LUCKYD_AGENT_VERSION"] = "v10.9.1"
+                os.environ["LUCKYD_AGENT_VERSION"] = "v10.9.2"
             else:
                 os.environ["LUCKYD_AGENT_SLOT"] = "1"
                 os.environ["LUCKYD_AGENT_NAME"] = "Agent 1"
-                os.environ["LUCKYD_AGENT_VERSION"] = "v10.9.1"
+                os.environ["LUCKYD_AGENT_VERSION"] = "v10.9.2"
             i += 2
         elif args[i] in ("-v", "--version"):
             _print_version()

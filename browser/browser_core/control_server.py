@@ -162,6 +162,12 @@ _ROUTES = (
         "POST /onboarding/ollama-setup",
         '{"model": "llama3.2:3b"} — alias for /onboarding/ollama-pull',
     ),
+    ("GET  /keys", "providers with a saved API key (masked) + the shared .env path"),
+    (
+        "POST /keys",
+        '{"provider": "openrouter", "key": "…"} — save a key to the shared per-user .env '
+        "(same store as LuckyD Code's /key)",
+    ),
     ("GET  /terminal", "live LuckyD Code terminal in a tab (xterm.js + PTY)"),
     ("GET  /status", "browser state + harness/AI reachability"),
     ("GET  /tabs", "open tabs (index, url, title, active)"),
@@ -551,6 +557,13 @@ def make_handler(
 
                         status = AIBridge().onboarding_status()
                     return self._ok(**status)
+                if path == "/keys":
+                    from core import credentials
+
+                    return self._ok(
+                        keys=credentials.configured(),
+                        env_path=str(credentials.user_env_path()),
+                    )
                 if path == "/undo/stack":
                     stack = backend.undo_stack() if hasattr(backend, "undo_stack") else []
                     return self._ok(stack=stack)
@@ -713,6 +726,19 @@ def make_handler(
                     res = AIBridge.start_ollama_pull(model)
                     if not res.get("started") and "invalid" in str(res.get("error", "")):
                         return self._send(400, {"ok": False, **res})
+                    return self._ok(**res)
+                if path == "/keys":
+                    # Same store as LuckyD Code's /key: the shared per-user .env.
+                    from core import credentials
+
+                    key_provider = str(body.get("provider", "")).strip()
+                    key_value = str(body.get("key", "")).strip()
+                    if not key_provider or not key_value:
+                        return self._send(400, {"ok": False, "error": "provider and key required"})
+                    verify_key = body.get("verify", True)
+                    res = credentials.set_api_key(key_provider, key_value, verify=bool(verify_key))
+                    if not res.get("ok"):
+                        return self._send(400, res)
                     return self._ok(**res)
                 if path == "/eval":
                     js = str(body.get("js", ""))

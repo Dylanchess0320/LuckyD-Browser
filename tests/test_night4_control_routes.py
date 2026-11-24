@@ -580,3 +580,44 @@ def test_export_env_to_os_survives_loader_failure(monkeypatch) -> None:
 
     monkeypatch.setattr(ai_bridge, "_load_env", _boom)
     control_server._export_env_to_os()  # must not raise
+
+
+# ── API keys (10.9.2): /keys reads and writes the shared per-user .env ──
+
+
+def test_keys_get_lists_masked(server, monkeypatch, tmp_path) -> None:
+    import core.credentials as credentials
+
+    monkeypatch.setenv(credentials.ENV_PATH_OVERRIDE, str(tmp_path / "user.env"))
+    monkeypatch.setenv("OPENROUTER_API_KEY", "iiiiiiiiiiii9999")
+    status, _, _, data = _req(server, "GET", "/keys", headers=_authz())
+    assert status == 200
+    payload = json.loads(data)
+    assert payload["ok"] is True
+    assert payload["env_path"].endswith("user.env")
+    assert any(row["provider"] == "openrouter" for row in payload["keys"])
+    assert "iiiiiiiiiiii9999" not in data.decode()
+
+
+def test_keys_post_saves(server, monkeypatch, tmp_path) -> None:
+    import core.credentials as credentials
+
+    env_file = tmp_path / "user.env"
+    monkeypatch.setenv(credentials.ENV_PATH_OVERRIDE, str(env_file))
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    status, _, _, data = _req(
+        server,
+        "POST",
+        "/keys",
+        body={"provider": "openrouter", "key": "jjjjjjjjjjjj0000", "verify": False},
+        headers=_authz(),
+    )
+    assert status == 200
+    assert json.loads(data)["ok"] is True
+    assert "OPENROUTER_API_KEY=jjjjjjjjjjjj0000" in env_file.read_text(encoding="utf-8")
+
+
+def test_keys_post_requires_fields(server) -> None:
+    status, _, _, data = _req(server, "POST", "/keys", body={}, headers=_authz())
+    assert status == 400
+    assert json.loads(data)["ok"] is False

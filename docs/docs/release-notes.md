@@ -1,6 +1,23 @@
 # LuckyD Browser — Release Notes
 
-## [10.9] - Local-first Chat - 2026-11-17
+## [10.9.2] — Paste API keys without editing .env — 2026-11-24
+
+**[`LuckyDBrowserSetup-10.9.2.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.9.2/LuckyDBrowserSetup-10.9.2.exe)** — Windows 10/11 x64 · per-user install · no admin needed.
+**[`LuckyDBrowser-Portable-10.9.2.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.9.2/LuckyDBrowser-Portable-10.9.2.zip)** — unzip and run, for locked-down PCs.
+
+- **`/key` in LuckyD Code** — `/key openrouter` asks for the key with hidden input, checks it against the provider, and saves it to the shared per-user `.env` (`%LOCALAPPDATA%/LuckyDBrowser/.env`). `/keys` lists saved providers (masked); `/key <provider> <key>` works inline for scripts.
+- **`/key` in the browser AI Assistant** — type `/key` in the chat input, or use Actions → 🔑 Add API key…, to paste a key without leaving the browser. The provider picker refreshes immediately — no restart.
+- **One key store for both apps** — LuckyD Code and the browser read the same file, so a key pasted in either surface connects both. Existing keys keep working.
+- **`GET /keys` and `POST /keys`** on the local Browser Control API for scripted setup.
+
+### Reliability
+
+- Fixed the CI quality gate (ruff format, unused `noqa`, mypy) so the full pipeline runs again.
+- Corrected the OpenRouter catalog cache typing; no behavior change.
+
+On top of everything from 10.9.1 below.
+
+## [10.9.0] - Local-first Chat - 2026-11-17
 
 **[`LuckyDBrowserSetup-10.9.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.9/LuckyDBrowserSetup-10.9.exe)** - Windows 10/11 x64 · per-user install · no admin needed.
 **[`LuckyDBrowser-Portable-10.9.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.9/LuckyDBrowser-Portable-10.9.zip)** - unzip and run, for locked-down PCs.

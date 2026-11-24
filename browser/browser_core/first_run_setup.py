@@ -135,7 +135,7 @@ def launch_first_run_setup(settings) -> bool:
         groups,
     ]
     try:
-        subprocess.Popen(  # noqa: S603 - fixed argv, bundled script path
+        subprocess.Popen(
             command,
             cwd=str(script.parent),
             creationflags=getattr(subprocess, "CREATE_NEW_CONSOLE", 0),

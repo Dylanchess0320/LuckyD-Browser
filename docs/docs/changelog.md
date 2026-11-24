@@ -15,6 +15,22 @@ Local-first Chat: Hub and Claw are optional.
 - Dropped the stale Puck bridge row from the Chat status line; the status block now covers only connected services.
 - A configured-but-offline Hub or Claw shows one plain line naming the route to the fix.
 
+## [10.9.2] - 2026-11-24
+
+Paste API keys in LuckyD Code and the browser AI Assistant — /key saves to the shared .env, so OpenRouter and every provider connect without manual edits.
+
+### Paste API keys without editing .env
+
+- **`/key` in LuckyD Code** — `/key openrouter` asks for the key with hidden input, checks it against the provider, and saves it to the shared per-user `.env` (`%LOCALAPPDATA%/LuckyDBrowser/.env`). `/keys` lists saved providers (masked); `/key <provider> <key>` works inline for scripts.
+- **`/key` in the browser AI Assistant** — type `/key` in the chat input, or use Actions → 🔑 Add API key…, to paste a key without leaving the browser. The provider picker refreshes immediately — no restart.
+- **One key store for both apps** — LuckyD Code and the browser read the same file, so a key pasted in either surface connects both. Existing keys keep working.
+- **`GET /keys` and `POST /keys`** on the local Browser Control API for scripted setup.
+
+### Reliability
+
+- Fixed the CI quality gate (ruff format, unused `noqa`, mypy) so the full pipeline runs again.
+- Corrected the OpenRouter catalog cache typing; no behavior change.
+
 ## [10.8.9] - 2026-11-11
 
 Agent setup built into the installer, plus crash and fullscreen stability fixes.

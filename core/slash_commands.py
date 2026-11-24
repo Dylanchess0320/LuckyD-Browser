@@ -29,6 +29,8 @@ BUILTIN_COMMANDS: dict[str, str] = {
     "goal": "Set/show the active objective: /goal <text> | /goal budget=50K | /goal pause|resume|edit|clear|status",
     "steer": "Guide the current response mid-run: /steer <guidance>",
     "btw": "Queue a follow-up after the current response: /btw <text>",
+    "key": "Paste a provider API key into the shared .env: /key <provider> [key]",
+    "keys": "List providers that already have a saved API key",
 }
 
 
@@ -177,6 +179,32 @@ def _handle_btw(agent: Any, args: str) -> str:
         return f"Could not queue follow-up: {e}."
 
 
+def _handle_key(command: str, args: str) -> str:
+    """Save or list provider API keys in the shared per-user .env.
+
+    The interactive REPL (main.py) prompts for a missing key with hidden
+    input; this path covers one-shot/JSON callers that already passed the
+    key inline.
+    """
+    from core import credentials
+
+    if command == "keys" or args.strip().lower() in ("list", "ls"):
+        rows = credentials.configured()
+        if not rows:
+            return "No API keys saved yet. Use: /key <provider> <key>"
+        lines = ["Providers with a saved API key:"]
+        for row in rows:
+            lines.append(f"  {row['provider']:<12} {row['env_var']:<22} {row['masked']}")
+        lines.append(f"  file: {credentials.user_env_path()}")
+        return "\n".join(lines)
+
+    parts = (args or "").strip().split(None, 1)
+    if len(parts) < 2:
+        return "Usage: /key <provider> <key>\nProviders: " + ", ".join(credentials.key_providers())
+    result = credentials.set_api_key(parts[0], parts[1])
+    return str(result.get("message", "Could not save the key."))
+
+
 def handle_slash(text: str, agent: Any = None) -> tuple[bool, str | None]:
     """Handle a ``/command args`` line.
 
@@ -203,6 +231,8 @@ def handle_slash(text: str, agent: Any = None) -> tuple[bool, str | None]:
         return True, _handle_steer(agent, args)
     if command == "btw":
         return True, _handle_btw(agent, args)
+    if command in ("key", "keys"):
+        return True, _handle_key(command, args)
     if command in ("init", "review"):
         fallback = (
             f"(No {command}.md template found.)\n\n/{command} args: {args}"
