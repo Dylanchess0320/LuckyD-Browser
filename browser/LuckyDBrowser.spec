@@ -144,6 +144,7 @@ a = Analysis(
         'core.goals',
         'core.plugins',
         'core.custom_providers',
+        'core.credentials',
         'cline_session',
     ],
     hookspath=[],

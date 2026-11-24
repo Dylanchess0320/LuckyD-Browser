@@ -79,6 +79,7 @@ a = Analysis(
         'core.goals',
         'core.plugins',
         'core.custom_providers',
+        'core.credentials',
         'tools.minimax_cli',
         # Rich powers the real terminal experience here (unlike
         # luckyd-code.spec, which excludes it -- that exe never renders a

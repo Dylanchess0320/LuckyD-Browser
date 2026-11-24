@@ -120,6 +120,7 @@ a = Analysis(
         'core.goals',
         'core.plugins',
         'core.custom_providers',
+        'core.credentials',
         'tools.minimax_cli',
     ] + _swarm_hidden + _pd_hidden,
     hookspath=[],
