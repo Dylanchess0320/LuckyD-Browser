@@ -15,6 +15,7 @@ import contextlib
 import json
 import os
 import re
+import sys
 import time
 from pathlib import Path
 from typing import Any
@@ -552,18 +553,42 @@ _CLINE_USAGE_PAID = frozenset(set(_CLINE_USAGE_CATALOG) - set(_CLINE_USAGE_FREE_
 _CLINE_GATEWAY_CATALOG = list(_CLINE_USAGE_CATALOG) + list(_CLINEPASS_CATALOG)
 
 
+def _env_paths() -> list[Path]:
+    """Every .env a browser should read, lowest priority first.
+
+    The bundled ``_internal/.env`` is the clean template.  The per-user
+    ``%LOCALAPPDATA%/LuckyDBrowser/.env`` is where real keys belong: it
+    survives reinstalls (Inno overwrites the bundled template) and is shared
+    with the terminal CLI.  A source checkout reads the user .env first, then
+    the repo .env (ENV_PATH), so tests can point ``ENV_PATH`` at a temporary file.
+    """
+    local = (os.environ.get("LOCALAPPDATA", "") or "").strip()
+    user_env = (
+        Path(local) / "LuckyDBrowser" / ".env"
+        if local
+        else Path.home() / "AppData" / "Local" / "LuckyDBrowser" / ".env"
+    )
+    if not getattr(sys, "frozen", False):
+        return [user_env, ENV_PATH]
+    base = Path(sys.executable).resolve().parent
+    paths = [base / "_internal" / ".env", base / ".env", user_env]
+    return list(dict.fromkeys(paths))
+
+
 def _load_env() -> dict[str, str]:
     env: dict[str, str] = {}
-    try:
-        if ENV_PATH.exists():
-            for line in ENV_PATH.read_text(encoding="utf-8").splitlines():
+    for path in _env_paths():
+        try:
+            if not path.exists():
+                continue
+            for line in path.read_text(encoding="utf-8-sig").splitlines():
                 line = line.strip()
                 if not line or line.startswith("#") or "=" not in line:
                     continue
                 key, _, value = line.partition("=")
                 env[key.strip()] = value.strip().strip('"').strip("'")
-    except Exception:
-        pass
+        except Exception:
+            continue
     for key, value in os.environ.items():
         env[key] = value
     return env
@@ -1278,9 +1303,13 @@ class AIBridge:
             and model in _CLINE_GATEWAY_CATALOG
         ) or (model not in models and self.is_opencode_zen(provider) and model in _ZEN_CATALOG):
             models.insert(0, model)
-        if provider == "openrouter" and len(models) > 1:
-            # The "openrouter/free" meta-router heads the curated list; keep
-            # it first, then the :free models, then anything else.
+        if provider == "openrouter":
+            # The "openrouter/free" meta-router heads the live catalog; keep
+            # it first, then the :free models, then anything else. The router
+            # id is not part of OpenRouter's /models payload, so pin it.
+            if "openrouter/free" in models:
+                models.remove("openrouter/free")
+            models.insert(0, "openrouter/free")
             models = sorted(models, key=lambda m: (m != "openrouter/free", not m.endswith(":free")))
         # For the Cline gateway, pin top order: _CLINE_GATEWAY_TOP_MODELS first
         if self.is_cline_gateway(provider):

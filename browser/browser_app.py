@@ -100,6 +100,17 @@ class BrowserApp:
         if bool(self.settings.get("harness_autostart", True)):
             self.boot_harness_async()
 
+        # 10.9.1: new users get the agent tools automatically. The installer
+        # leaves an opt-in marker; this launches the bundled idempotent
+        # bootstrap once in its own console so downloads stay visible while
+        # the browser remains usable. Source checkouts are skipped.
+        try:
+            from browser_core.first_run_setup import launch_first_run_setup
+
+            launch_first_run_setup(self.settings)
+        except Exception as exc:  # setup must never block startup
+            print(f"[browser] first-run setup skipped: {exc}")
+
     def new_window(self, incognito: bool = False, url=None) -> MainWindow:
         win = MainWindow(self, incognito=incognito)
         self.windows.append(win)

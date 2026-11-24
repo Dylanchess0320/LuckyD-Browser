@@ -29,13 +29,32 @@ def _project_dir() -> Path:
 
 PROJECT_DIR = _project_dir()
 BASE_ENV_FILE = PROJECT_DIR / ".env"
+# Per-user credentials (OpenRouter and other keys).  A frozen install's
+# bundled .env is a clean template that every upgrade overwrites, so real
+# keys live in %LOCALAPPDATA%/LuckyDBrowser/.env and survive reinstalls.  The
+# browser's AI bridge reads the same file.
+_local_appdata = (os.environ.get("LOCALAPPDATA", "") or "").strip()
+USER_ENV_FILE = (
+    Path(_local_appdata) / "LuckyDBrowser" / ".env"
+    if _local_appdata
+    else Path.home() / "AppData" / "Local" / "LuckyDBrowser" / ".env"
+)
 # The browser gives its two terminal agents distinct slots.  A slot-specific
 # overlay preserves each agent's live /model choice without changing the
 # other agent or the shared provider credentials in .env.
 _agent_slot = "".join(
     c for c in os.environ.get("LUCKYD_AGENT_SLOT", "") if c.isalnum() or c in "-_"
 )
-ENV_FILE = PROJECT_DIR / f".luckyd-agent-{_agent_slot}.env" if _agent_slot else BASE_ENV_FILE
+# Writable credential/selection file.  A frozen install must persist /model
+# choices to the per-user file (the bundled _internal/.env is a template that
+# upgrades overwrite).  Slot overlays stay per-agent in the same directory.
+_env_dir = USER_ENV_FILE.parent if getattr(sys, "frozen", False) else PROJECT_DIR
+if _agent_slot:
+    ENV_FILE = _env_dir / f".luckyd-agent-{_agent_slot}.env"
+elif getattr(sys, "frozen", False):
+    ENV_FILE = USER_ENV_FILE
+else:
+    ENV_FILE = BASE_ENV_FILE
 
 # Runtime data lives under data/ so the repo root stays clean
 DATA_DIR = PROJECT_DIR / "data"
@@ -55,8 +74,10 @@ def load_env() -> None:
     Uses utf-8-sig to safely strip a leading BOM.
     """
     # Shared credentials/config first, then this terminal agent's model
-    # overlay.  In a normal standalone CLI run both paths are the same.
-    for path in dict.fromkeys((BASE_ENV_FILE, ENV_FILE)):
+    # overlay. Both source checkouts and frozen installs fall back to the
+    # per-user credentials file (%LOCALAPPDATA%/LuckyDBrowser/.env).
+    paths = [USER_ENV_FILE, BASE_ENV_FILE, ENV_FILE]
+    for path in dict.fromkeys(paths):
         if not path.exists():
             continue
         raw = path.read_text(encoding="utf-8-sig")

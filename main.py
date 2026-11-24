@@ -120,9 +120,14 @@ _PROVIDER_DISPLAY_NAMES = {
     "zai": "Z.ai",
     "groq": "Groq",
     "openrouter": "OpenRouter",
+    "opencode": "OpenCode Zen",
     "clinepass": "ClinePass",
     "cline-usage": "Cline (usage)",
     "cline": "Cline (usage)",
+    "xai": "xAI (Grok)",
+    "moonshot": "Moonshot (Kimi)",
+    "meta": "Meta (Muse)",
+    "mistral": "Mistral AI",
 }
 
 # ── Cline model catalogs ───────────────────────────────────────────────
@@ -218,6 +223,21 @@ _CLINE_USAGE_FREE_TIER = frozenset(
 # flat-subscription quota.
 _CLINEPASS_FREE_TIER = frozenset()
 
+# Curated OpenRouter fallback used only when the live catalog has never been
+# fetched (offline first run). The picker normally uses the full live roster
+# from core.openrouter_catalog, which matches the browser sidebar.
+_OPENROUTER_CURATED_MODELS = [
+    "openrouter/free",
+    "deepseek/deepseek-v4.1-flash-1017",
+    "meta/muse-ember",
+    "moonshotai/kimi-k3.1-pro",
+    "anthropic/claude-sonnet-5.5",
+    "openai/gpt-6.1-sol",
+    "google/gemini-4-argon",
+    "anthropic/claude-opus-5.5",
+    "meta/muse-wonder",
+]
+
 # OpenCode Zen is keyed-only since 2026-09 (its $0 tier is gone) but back in
 # the mesh as a paid provider. 10.8.8 (Dylan 2026-11-10): the FREE default is
 # no longer Cline — Cline is stopping free credits. The default is Dylan's
@@ -268,6 +288,52 @@ def _load_free_providers() -> dict:
         return {}
 
 
+def _openrouter_live_models(live: bool = False) -> list[str]:
+    """OpenRouter's live catalog (cached); empty when it has never loaded."""
+    try:
+        from core.openrouter_catalog import models as _or_models
+
+        return [str(m) for m in _or_models(live=live) if str(m).strip()]
+    except Exception:
+        return []
+
+
+def _openrouter_free_models(live: bool = False) -> list[str]:
+    """All $0 OpenRouter models, pinned router first.
+
+    Falls back to the curated providers_config.json free list when the live
+    catalog is unavailable, so the free picker never loses OpenRouter.
+    """
+    ids = _openrouter_live_models(live)
+    if ids:
+        from core.openrouter_catalog import free_ids
+
+        live_free = free_ids(ids)
+        if live_free:
+            return live_free
+    pinfo = _load_free_providers().get("openrouter", {}) or {}
+    models = [str(m) for m in (pinfo.get("free_models") or []) if str(m).strip()]
+    if "openrouter/free" in models:
+        models.remove("openrouter/free")
+    return ["openrouter/free", *models]
+
+
+def _openrouter_all_models(live: bool = False) -> list[str]:
+    """Every OpenRouter model id, pinned router first, for the full picker."""
+    ids = _openrouter_live_models(live)
+    if not ids:
+        return list(_OPENROUTER_CURATED_MODELS)
+    from core.openrouter_catalog import paid_ids
+
+    free = [m for m in ids if m == "openrouter/free" or m.lower().endswith(":free")]
+    # Free ids first (router pinned), then the rest of the paid catalog.
+    free_sorted = [m for m in ids if m == "openrouter/free"]
+    free_sorted += sorted(
+        {m for m in free if m != "openrouter/free"}, key=str.lower
+    )
+    return free_sorted + paid_ids(ids)
+
+
 def _is_free_provider_available(pid: str, pinfo: dict) -> bool:
     """Check if a provider's free models would actually work (key present or local)."""
     if pinfo.get("local"):
@@ -281,7 +347,9 @@ def _is_free_provider_available(pid: str, pinfo: dict) -> bool:
     return bool(os.environ.get(env_key, "").strip())
 
 
-def _build_free_groups(free_only: bool, cline_free: list[str]) -> list[dict]:
+def _build_free_groups(
+    free_only: bool, cline_free: list[str], live: bool = False
+) -> list[dict]:
     # Build free groups from providers_config.json (single source of truth for $0 models)
     free_providers = _load_free_providers()
     # Providers with no $0 tier (e.g. keyed OpenCode Zen — restored to the
@@ -298,6 +366,11 @@ def _build_free_groups(free_only: bool, cline_free: list[str]) -> list[dict]:
         seen_models: set[str] = set()
         for pid, pinfo in sorted(free_providers.items(), key=_sort_key):
             models = pinfo.get("free_models", [])
+            if pid == "openrouter":
+                # The browser picker already uses OpenRouter's live roster;
+                # Code now offers the same $0 models instead of a stale
+                # hardcoded slice.
+                models = _openrouter_free_models(live)
             if not models:
                 continue
             # Only include free tier that is marked free_tier=true
@@ -353,7 +426,9 @@ def _build_free_groups(free_only: bool, cline_free: list[str]) -> list[dict]:
     return free_groups
 
 
-def _build_paid_groups(cline_paid: list[str], clinepass_paid: list[str]) -> list[dict]:
+def _build_paid_groups(
+    cline_paid: list[str], clinepass_paid: list[str], live: bool = False
+) -> list[dict]:
     # 10.8.8 Pareto refresh (verified live 2026-11-10): GPT-6.1 Sol replaces
     # GPT-6 Sol, Sonnet 5.5 + Gemini 4 Argon join the $2/$10 tier, DeepSeek
     # V4.1 Flash replaces V4/V4-flash, OpenRouter lists the verified Pareto
@@ -389,18 +464,11 @@ def _build_paid_groups(cline_paid: list[str], clinepass_paid: list[str]) -> list
         },
         {"provider": "Z.ai", "models": ["glm-5.3", "glm-5.3-flash"]},
         {
-            "provider": "OpenRouter",
-            "models": [
-                "openrouter/free",
-                "deepseek/deepseek-v4.1-flash-1017",
-                "meta/muse-ember",
-                "moonshotai/kimi-k3.1-pro",
-                "anthropic/claude-sonnet-5.5",
-                "openai/gpt-6.1-sol",
-                "google/gemini-4-argon",
-                "anthropic/claude-opus-5.5",
-                "meta/muse-wonder",
-            ],
+            # Full live roster (free + paid), matching the browser picker.
+            # Falls back to the curated Pareto list on a cold offline start.
+            "provider": "OpenRouter (live catalog)",
+            "models": _openrouter_all_models(live),
+            "provider_key": "openrouter",
         },
         {
             "provider": "Cline Usage (Muse Spark)",
@@ -412,12 +480,16 @@ def _build_paid_groups(cline_paid: list[str], clinepass_paid: list[str]) -> list
     ]
 
 
-def model_catalog(free_only: bool = False) -> list[dict]:
+def model_catalog(free_only: bool = False, live: bool = False) -> list[dict]:
     """Tiered model catalog for ui.show_models() and the web /api/models panel.
 
     Returns a list of sections, each with a cost ``tier`` ("free" | "paid"),
     a human ``label``, and ``groups`` of {provider, models}. Free covers local
-    Ollama + all $0 models from browser/models/providers_config.json.
+    Ollama + all $0 models from browser/models/providers_config.json, and
+    OpenRouter's live catalog (cached for 24 hours).
+
+    ``live=True`` refreshes the OpenRouter catalog before building the list;
+    the default never touches the network so tests and cold starts stay fast.
 
     When ``free_only`` is True, returns only the free tier — filtered to
     providers where the free models would actually work (API key present or
@@ -427,7 +499,7 @@ def model_catalog(free_only: bool = False) -> list[dict]:
     cline_paid = [m for m in _CLINE_USAGE_CATALOG if m not in _CLINE_USAGE_FREE_TIER]
     clinepass_paid = list(_CLINEPASS_CATALOG)
 
-    free_groups = _build_free_groups(free_only, cline_free)
+    free_groups = _build_free_groups(free_only, cline_free, live=live)
 
     free_section = {
         "tier": "free",
@@ -437,7 +509,7 @@ def model_catalog(free_only: bool = False) -> list[dict]:
     if free_only:
         return [free_section]
 
-    paid_groups = _build_paid_groups(cline_paid, clinepass_paid)
+    paid_groups = _build_paid_groups(cline_paid, clinepass_paid, live=live)
 
     return [
         free_section,
@@ -498,12 +570,13 @@ def _match_cline_model(desired: str) -> tuple[str, str] | None:
 # ── Free-model fuzzy matching (Cline-style picker) ─────────────────────
 
 
-def _free_entries() -> list[tuple[str, str]]:
+def _free_entries(live: bool = False) -> list[tuple[str, str]]:
     """Every free model that actually works: (provider, model_id).
 
     Aggregates browser/models/providers_config.json + Cline free tier.
     Deduplicated by model id (first provider wins). This is the single
-    source of truth for ``/model <fuzzy>``.
+    source of truth for ``/model <fuzzy>``. ``live=True`` refreshes the
+    OpenRouter free roster first (same catalog the browser picker shows).
     """
     seen: set[str] = set()
     entries: list[tuple[str, str]] = []
@@ -516,6 +589,8 @@ def _free_entries() -> list[tuple[str, str]]:
             if not pinfo.get("free_tier"):
                 continue
             models = pinfo.get("free_models", [])
+            if pid == "openrouter":
+                models = _openrouter_free_models(live)
             for mid in models:
                 key = mid.lower()
                 if key in seen:
@@ -595,9 +670,10 @@ def _fuzzy_score(query: str, model_id: str, provider: str) -> float:
     return max(ratio, ratio2) * 52.0
 
 
-def _fuzzy_match_free(query: str, limit: int = 8) -> list[tuple[str, str, float]]:
-    """Ranked free-model matches for query. Returns [(provider, model, score)...] sorted desc."""
-    entries = _free_entries()
+def _fuzzy_match_entries(
+    query: str, entries: list[tuple[str, str]], limit: int = 8
+) -> list[tuple[str, str, float]]:
+    """Ranked matches for query across arbitrary (provider, model) entries."""
     scored: list[tuple[str, str, float]] = []
     for prov, mid in entries:
         s = _fuzzy_score(query, mid, prov)
@@ -605,6 +681,13 @@ def _fuzzy_match_free(query: str, limit: int = 8) -> list[tuple[str, str, float]
             scored.append((prov, mid, s))
     scored.sort(key=lambda t: t[2], reverse=True)
     return scored[:limit]
+
+
+def _fuzzy_match_free(
+    query: str, limit: int = 8, live: bool = False
+) -> list[tuple[str, str, float]]:
+    """Ranked free-model matches for query. Returns [(provider, model, score)...] sorted desc."""
+    return _fuzzy_match_entries(query, _free_entries(live=live), limit=limit)
 
 
 def _handle_no_free_candidates(query: str) -> None:
@@ -626,8 +709,11 @@ def _handle_no_free_candidates(query: str) -> None:
 def _get_high_confidence_free_match(
     candidates: list[tuple[str, str, float]],
 ) -> tuple[str, str] | None:
-    # High-confidence single winner: score gap + absolute threshold
+    # Exact match (100.0) always wins immediately.
     top_score = candidates[0][2]
+    if top_score >= 99.0:
+        return candidates[0][0], candidates[0][1]
+    # High-confidence single winner: score gap + absolute threshold
     second_score = candidates[1][2] if len(candidates) > 1 else 0.0
     if top_score >= 84.0 and (top_score - second_score) >= 12.0:
         return candidates[0][0], candidates[0][1]
@@ -669,15 +755,19 @@ def _show_ambiguous_free_matches(query: str, candidates: list[tuple[str, str, fl
     print(f"  Pick one: /model {top[0][1]}  or  /model 1  (number from list above)")
 
 
-def _resolve_free_query(query: str) -> tuple[str, str] | None:
+def _resolve_free_query(
+    query: str, live: bool = False, warn_missing: bool = True
+) -> tuple[str, str] | None:
     """Fuzzy-resolve query to a single free model. On ambiguity shows a picker.
 
     Returns (provider, model) on a confident match, otherwise None after
-    printing disambiguation. Never guesses.
+    printing disambiguation. Never guesses. ``warn_missing=False`` keeps a
+    caller that falls through to the paid OpenRouter catalog quiet.
     """
-    candidates = _fuzzy_match_free(query, limit=8)
+    candidates = _fuzzy_match_free(query, limit=8, live=live)
     if not candidates:
-        _handle_no_free_candidates(query)
+        if warn_missing:
+            _handle_no_free_candidates(query)
         return None
 
     match = _get_high_confidence_free_match(candidates)
@@ -689,6 +779,25 @@ def _resolve_free_query(query: str) -> tuple[str, str] | None:
 
     _show_ambiguous_free_matches(query, candidates)
     # If exactly 2-3 and scores close, don't auto-pick — let user choose
+    return None
+
+
+def _openrouter_entries(live: bool = False) -> list[tuple[str, str]]:
+    """(openrouter, model_id) for every model in the live catalog."""
+    return [("openrouter", m) for m in _openrouter_all_models(live)]
+
+
+def _resolve_openrouter_query(query: str, live: bool = True) -> tuple[str, str] | None:
+    """Fuzzy-resolve a query against the full live OpenRouter catalog."""
+    candidates = _fuzzy_match_entries(query, _openrouter_entries(live), limit=8)
+    if not candidates:
+        return None
+    match = _get_high_confidence_free_match(candidates)
+    if match:
+        return match
+    if len(candidates) == 1:
+        return candidates[0][0], candidates[0][1]
+    _show_ambiguous_free_matches(query, candidates)
     return None
 
 
@@ -741,26 +850,24 @@ def _resolve_provider(provider_hint: str | None, model_name: str) -> dict:
     _ensure_ui()
     cfg = get_config()
 
-    # Map provider names to their alias + env vars
-    provider_map = {
-        "openai": ("OPENAI_API_KEY", "OPENAI_BASE_URL", "OPENAI_MODEL"),
-        "anthropic": ("ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL", "ANTHROPIC_MODEL"),
-        "google": ("GOOGLE_API_KEY", "GOOGLE_BASE_URL", "GOOGLE_MODEL"),
-        "ollama": (None, "OLLAMA_HOST", "OLLAMA_MODEL"),
-        "zai": ("ZAI_API_KEY", "ZAI_BASE_URL", "ZAI_MODEL"),
-        "groq": ("GROQ_API_KEY", "GROQ_BASE_URL", "GROQ_MODEL"),
-        "openrouter": ("OPENROUTER_API_KEY", "OPENROUTER_BASE_URL", "OPENROUTER_MODEL"),
-        "clinepass": ("CLINEPASS_API_KEY", "CLINEPASS_BASE_URL", "CLINEPASS_MODEL"),
-        # Same gateway + auth as ClinePass; only the model env var differs.
-        "cline-usage": ("CLINEPASS_API_KEY", "CLINEPASS_BASE_URL", "CLINE_USAGE_MODEL"),
-    }
+    # Single source of truth for provider env vars, base URLs and defaults.
+    # The old hand-written map silently left OpenRouter's base URL empty, so
+    # "/model openrouter <id>" could never work.
+    from core.providers import PROVIDER_DEFAULTS, normalize_provider_id
 
-    if provider_hint and provider_hint in provider_map:
-        env_key, env_base, env_model = provider_map[provider_hint]
+    provider = normalize_provider_id(provider_hint)
+    defaults = PROVIDER_DEFAULTS.get(provider) if provider else None
+
+    if provider and defaults:
+        env_key = defaults.get("env_key")
+        env_base = str(defaults.get("env_base") or "")
+        env_model = str(defaults.get("env_model") or "")
+        default_base = str(defaults.get("default_base") or "")
+        default_model = str(defaults.get("default_model") or "")
         api_key = os.environ.get(env_key, "") if env_key else ""
         # ClinePass: no key set -> try the logged-in Cline CLI session before
         # ever prompting for a raw API key (mirrors core/providers.py).
-        if provider_hint in ("clinepass", "cline-usage") and not api_key:
+        if provider in ("clinepass", "cline-usage") and not api_key:
             try:
                 from pathlib import Path as _Path
 
@@ -778,29 +885,22 @@ def _resolve_provider(provider_hint: str | None, model_name: str) -> dict:
         if env_key and not api_key and sys.stdin.isatty():
             api_key = _prompt_and_save_api_key(
                 env_key,
-                _PROVIDER_DISPLAY_NAMES.get(provider_hint, provider_hint),
+                _PROVIDER_DISPLAY_NAMES.get(provider, provider),
             )
-        _base_defaults = {
-            "clinepass": "https://api.cline.bot/api/v1",
-            "cline-usage": "https://api.cline.bot/api/v1",
-        }
-        base_url = os.environ.get(env_base, "") or _base_defaults.get(provider_hint, "")
-        _model_defaults = {
-            "clinepass": "cline-pass/kimi-k3",
-            # 10.8.3: was deepseek/deepseek-chat (upstream 404 on the gateway).
-            "cline-usage": "minimax/minimax-m2.5",
-        }
+        base_url = (os.environ.get(env_base, "") or "").strip() or default_base
         resolved_model = (
-            model_name or os.environ.get(env_model, "") or _model_defaults.get(provider_hint, "")
+            model_name
+            or (os.environ.get(env_model, "") or "").strip()
+            or default_model
         )
         if not resolved_model:
-            ui.warn(f"{provider_hint} model name required. Try: /model {provider_hint} <name>")
+            ui.warn(f"{provider} model name required. Try: /model {provider} <name>")
             return None
         return {
             "api_key": api_key,
             "base_url": base_url,
             "model": resolved_model,
-            "provider": provider_hint,
+            "provider": provider,
             "thinking": False,
         }
 
@@ -992,11 +1092,13 @@ async def handle_model_command(agent: CodingAgent, cmd: str) -> bool:
     raw = cmd[len("model") :].strip()
     low = raw.lower()
 
-    def _flat_for_catalog(free_only: bool) -> dict[int, tuple[str, str]]:
+    def _flat_for_catalog(
+        free_only: bool, live: bool = False
+    ) -> dict[int, tuple[str, str]]:
         """Build the same number→(provider,model) map that ui.show_models() uses."""
         from core.providers import provider_key_from_label
 
-        sections = model_catalog(free_only=free_only)
+        sections = model_catalog(free_only=free_only, live=live)
         flat: dict[int, tuple[str, str]] = {}
         idx = 0
         for section in sections or []:
@@ -1010,64 +1112,89 @@ async def handle_model_command(agent: CodingAgent, cmd: str) -> bool:
                     flat[idx] = (pkey, str(m))
         return flat
 
-    # ── No args → browse free catalog + interactive picker
-    if not raw:
-        sections = model_catalog(free_only=True)
+    def _openrouter_sections() -> list[dict]:
+        """Only OpenRouter groups, free + paid, from the live catalog."""
+        sections = model_catalog(free_only=False, live=True)
+        out: list[dict] = []
+        for section in sections or []:
+            groups = [
+                g
+                for g in section.get("groups", []) or []
+                if str(g.get("provider_key") or "").lower() == "openrouter"
+                or "openrouter" in str(g.get("provider", "")).lower()
+            ]
+            if groups:
+                out.append(
+                    {
+                        "tier": section.get("tier", "free"),
+                        "label": f"{section.get('label', 'Models')} · OpenRouter",
+                        "groups": groups,
+                    }
+                )
+        return out
+
+    async def _pick_from(sections: list[dict]) -> None:
+        """Show a catalog and switch to the numbered/fuzzy pick."""
         flat = ui.show_models(
             sections,
             current_model=getattr(agent, "model", "") or "",
         )
-        # Built-in terminal picker — no separate bat file needed
-        if sys.stdin.isatty():
-            try:
-                choice = await asyncio.to_thread(
-                    ui.prompt_text, "Select model (number / name, Enter to cancel)"
-                )
-            except Exception:
-                choice = ""
-            choice = (choice or "").strip()
-            if not choice:
-                return False
-            if choice.isdigit():
-                n = int(choice)
-                hit = flat.get(n)
-                if hit:
-                    _switch_model(agent, provider=hit[0], model_name=hit[1])
-                else:
-                    ui.warn(f"No model #{n} — pick 1…{len(flat)}")
-                return False
-            # Text choice → try provider-prefixed first, then fuzzy
-            prov = None
-            des = choice
-            for p in (
-                "cline-usage",
-                "cline-pass",
-                "clinepass",
-                "cline",
-                "openrouter",
-                "groq",
-                "zai",
-                "google",
-                "ollama",
-                "deepseek",
-                "openai",
-                "anthropic",
-            ):
-                if choice.lower().startswith(p + " "):
-                    prov = _PROVIDER_ALIASES.get(p, p)
-                    des = choice[len(p) + 1 :].strip()
-                    break
-            if prov:
-                _switch_model(agent, provider=prov, model_name=des)
+        if not sys.stdin.isatty():
+            return
+        try:
+            choice = await asyncio.to_thread(
+                ui.prompt_text, "Select model (number / name, Enter to cancel)"
+            )
+        except Exception:
+            choice = ""
+        choice = (choice or "").strip()
+        if not choice:
+            return
+        if choice.isdigit():
+            hit = flat.get(int(choice))
+            if hit:
+                _switch_model(agent, provider=hit[0], model_name=hit[1])
             else:
-                hit = _resolve_free_query(choice)
-                if hit is None:
-                    # also try legacy cline exact (covers paid ClinePass picks)
-                    hit2 = _match_cline_model(choice)
-                    if hit2:
-                        _switch_model(agent, provider=hit2[0], model_name=hit2[1])
-                else:
-                    _switch_model(agent, provider=hit[0], model_name=hit[1])
+                ui.warn(f"No model #{choice} — pick 1…{len(flat)}")
+            return
+        for p in (
+            "cline-usage",
+            "cline-pass",
+            "clinepass",
+            "cline",
+            "openrouter",
+            "groq",
+            "zai",
+            "google",
+            "ollama",
+            "deepseek",
+            "openai",
+            "anthropic",
+            "xai",
+            "moonshot",
+            "meta",
+            "mistral",
+            "opencode",
+        ):
+            if choice.lower().startswith(p + " "):
+                _switch_model(
+                    agent,
+                    provider=_PROVIDER_ALIASES.get(p, p),
+                    model_name=choice[len(p) + 1 :].strip(),
+                )
+                return
+        hit = _resolve_free_query(choice, live=True, warn_missing=False)
+        if hit is None:
+            hit = _resolve_openrouter_query(choice, live=True)
+        if hit is None:
+            # Legacy exact Cline match (covers subscription picks like kimi-k3)
+            hit = _match_cline_model(choice)
+        if hit:
+            _switch_model(agent, provider=hit[0], model_name=hit[1])
+
+    # ── No args → browse free catalog + interactive picker
+    if not raw:
+        await _pick_from(model_catalog(free_only=True, live=True))
         return False
 
     # Explicit browse variants
@@ -1080,42 +1207,28 @@ async def handle_model_command(agent: CodingAgent, cmd: str) -> bool:
         "free list",
         "list free",
     ):
-        sections = model_catalog(free_only=True)
-        flat = ui.show_models(
-            sections,
-            current_model=getattr(agent, "model", "") or "",
-        )
-        if sys.stdin.isatty():
-            try:
-                choice = await asyncio.to_thread(
-                    ui.prompt_text, "Select model (number / name, Enter to cancel)"
-                )
-            except Exception:
-                choice = ""
-            choice = (choice or "").strip()
-            if choice.isdigit() and choice:
-                hit = flat.get(int(choice))
-                if hit:
-                    _switch_model(agent, provider=hit[0], model_name=hit[1])
-                else:
-                    ui.warn(f"No model #{choice}")
-            elif choice:
-                hit = _resolve_free_query(choice)
-                if hit:
-                    _switch_model(agent, provider=hit[0], model_name=hit[1])
+        await _pick_from(model_catalog(free_only=True, live=True))
+        return False
+
+    # "/model openrouter" → every live OpenRouter model, free + paid
+    if low in ("openrouter", "openrouter list", "openrouter all"):
+        await _pick_from(_openrouter_sections())
         return False
 
     if low in ("all", "paid", "free all", "all free", "show all", "full"):
         ui.show_models(
-            model_catalog(free_only=False),
+            model_catalog(free_only=False, live=True),
             current_model=getattr(agent, "model", "") or "",
         )
-        ui.info("Tip: /model <name> fuzzy-switches free models · /model free for free-only picker")
+        ui.info(
+            "Tip: /model openrouter for the full live roster · "
+            "/model <name> fuzzy-switches · /model free for free-only"
+        )
         return False
 
     # Numeric pick without prior browse: "/model 12"
     if low.isdigit():
-        flat = _flat_for_catalog(free_only=True)
+        flat = _flat_for_catalog(free_only=True, live=True)
         n = int(low)
         hit = flat.get(n)
         if hit:
@@ -1124,7 +1237,7 @@ async def handle_model_command(agent: CodingAgent, cmd: str) -> bool:
             ui.warn(f"No model #{n} — run /model to see 1…{len(flat)}")
             # Show catalog to help
             ui.show_models(
-                model_catalog(free_only=True),
+                model_catalog(free_only=True, live=True),
                 current_model=getattr(agent, "model", "") or "",
             )
         return False
@@ -1143,6 +1256,7 @@ async def handle_model_command(agent: CodingAgent, cmd: str) -> bool:
         "deepseek",
         "openai",
         "google",
+        "gemini",
         "ollama",
         "zai",
         "minimax",
@@ -1150,22 +1264,44 @@ async def handle_model_command(agent: CodingAgent, cmd: str) -> bool:
         "moonshot",
         "meta",
         "mistral",
+        "opencode",
     ):
         if low.startswith(p + " "):
             provider = _PROVIDER_ALIASES.get(p, p)
             desired = raw[len(p) + 1 :].strip()
             break
     if provider:
+        if provider == "openrouter" and desired:
+            # Fuzzy-match the full live roster (paid and free), the same way
+            # the browser picker does. Exact ids win immediately.
+            hit_or = _resolve_openrouter_query(desired, live=True)
+            if hit_or:
+                _switch_model(agent, provider=hit_or[0], model_name=hit_or[1])
+                return False
+            if "/" in desired:
+                # Exact id not in the cached roster (or the live fetch failed):
+                # let OpenRouter decide rather than blocking a valid override.
+                _switch_model(agent, provider="openrouter", model_name=desired)
+                return False
+            ui.warn(
+                f"No OpenRouter model matches '{desired}'. "
+                "Run /model openrouter to browse the live catalog."
+            )
+            return False
         _switch_model(agent, provider=provider, model_name=desired)
         return False
 
     # ── Fuzzy free-model resolve (the main Cline-style path) ──
     # "/model kimi" / "/model qwen" / "/model spark" etc.
-    hit = _resolve_free_query(raw)
+    hit = _resolve_free_query(raw, live=True, warn_missing=False)
     if hit:
         _switch_model(agent, provider=hit[0], model_name=hit[1])
         return False
-    # Fallback: legacy exact Cline match (covers subscription picks like kimi-k3)
+    # Any live OpenRouter model (paid included), then the legacy Cline catalog.
+    hit_or = _resolve_openrouter_query(raw, live=True)
+    if hit_or:
+        _switch_model(agent, provider=hit_or[0], model_name=hit_or[1])
+        return False
     hit2 = _match_cline_model(raw)
     if hit2:
         _switch_model(agent, provider=hit2[0], model_name=hit2[1])
@@ -1353,7 +1489,7 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
             ui.warn("MCP not configured or no servers connected")
 
     elif cmd == "version":
-        agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v10.9")
+        agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v10.9.1")
         agent_name = os.environ.get("LUCKYD_AGENT_NAME", "Agent 1")
         ui.info(f"LuckyD Code {agent_version} ({agent_name})")
 
@@ -2420,7 +2556,7 @@ def _dispatch_early_subcommands(args: list[str]) -> bool:
 
 def _print_version() -> None:
     """Print the LuckyD Code version line (fast path: no config needed)."""
-    agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v10.9")
+    agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v10.9.1")
     agent_name = os.environ.get("LUCKYD_AGENT_NAME", "")
     label = f"LuckyD Code {agent_version}" + (f" ({agent_name})" if agent_name else "")
     print(label)
@@ -2433,8 +2569,8 @@ def _print_help() -> None:
 LuckyD Code — AI Coding Agent
 
 Usage:
-  lucky-code                       Interactive REPL (Agent 1 · v10.9)
-  lucky-code --agent 2             Interactive REPL (Agent 2 · v10.9)
+  lucky-code                       Interactive REPL (Agent 1 · v10.9.1)
+  lucky-code --agent 2             Interactive REPL (Agent 2 · v10.9.1)
   lucky-code providers           List AI providers — status, cost tier, current
   lucky-code doctor [--json]     Check provider & Multi Agent Terminal backend health + tiers
   lucky-code model <name>        Switch model (fuzzy Cline-style picker)
@@ -2446,7 +2582,7 @@ Usage:
   lucky-code --resume <id>         Resume specific session
 
 Options:
-  --agent 1|2        Select agent slot (1 = v10.9 Nuitka, 2 = v10.9)
+  --agent 1|2        Select agent slot (1 = v10.9.1 Nuitka, 2 = v10.9.1)
   --model NAME       Model: auto (default), flash, pro, or specific name
   --provider NAME    Set provider (see: lucky-code providers): ollama, clinepass,
                      cline-usage, openrouter, groq, deepseek,
@@ -2551,11 +2687,11 @@ def _parse_agent_args(args: list[str], cfg: dict) -> tuple[dict, str, float, str
             if slot == "2":
                 os.environ["LUCKYD_AGENT_SLOT"] = "2"
                 os.environ["LUCKYD_AGENT_NAME"] = "Agent 2"
-                os.environ["LUCKYD_AGENT_VERSION"] = "v10.9"
+                os.environ["LUCKYD_AGENT_VERSION"] = "v10.9.1"
             else:
                 os.environ["LUCKYD_AGENT_SLOT"] = "1"
                 os.environ["LUCKYD_AGENT_NAME"] = "Agent 1"
-                os.environ["LUCKYD_AGENT_VERSION"] = "v10.9"
+                os.environ["LUCKYD_AGENT_VERSION"] = "v10.9.1"
             i += 2
         elif args[i] in ("-v", "--version"):
             _print_version()

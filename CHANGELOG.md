@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [10.9.1] - 2026-11-23
+
+### Restored
+- Restored 10.8.9-style automatic new-user setup: the installer marks first-run setup as selected by default (`.first-run-setup`), and the browser initiates the bundled idempotent `LuckyD-Bootstrap.ps1` (`-Groups core,free,ollama`) in a dedicated console window on first launch using `-ExecutionPolicy RemoteSigned`.
+- Retained Start Menu shortcuts for running or repairing agent tools and local AI at any time.
+
+### Added
+- LuckyD Code live OpenRouter catalog: `/model` now accesses the full live OpenRouter roster (400+ models) matching the browser AI assistant, with 24-hour disk caching and `openrouter/free` pinned first.
+- Support for selecting any OpenRouter model via `/model <name>` or `/model openrouter <name>` with high-confidence fuzzy and exact matching.
+- Shared credential resolution: `%LOCALAPPDATA%\LuckyDBrowser\.env` is loaded automatically by both LuckyD Code and LuckyD Browser, keeping API keys persistent and out of public release artifacts.
+
+### Performance
+- Optimized fuzzy model matching, clean process handling, and removed build/cache bloat.
+
 ## [10.9] - 2026-11-17
 
 Local-first Chat: Hub and Claw are optional.

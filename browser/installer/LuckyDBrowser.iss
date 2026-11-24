@@ -2,7 +2,7 @@
 ; LuckyD Browser - Windows installer script (Inno Setup 6)
 ;
 ; Produces a single, shareable setup file:
-;   browser\installer\output\LuckyDBrowserSetup-10.9.exe
+;   browser\installer\output\LuckyDBrowserSetup-10.9.1.exe
 ;
 ; Anyone can run it - it installs per-user (no admin needed) to
 ; %LOCALAPPDATA%\Programs\LuckyDBrowser with Start Menu / Desktop
@@ -13,7 +13,7 @@
 ; -----------------------------------------------------------------------------
 
 #define AppName      "LuckyD Browser"
-#define AppVersion   "10.9"
+#define AppVersion   "10.9.1"
 #define AppPublisher "LuckyD"
 #define AppExeName   "LuckyDBrowser.exe"
 #define AppURL       "https://github.com/Dylanchess0320/LuckyD-Browser"
@@ -27,11 +27,11 @@ AppPublisher={#AppPublisher}
 AppPublisherURL={#AppURL}
 AppSupportURL={#AppURL}
 AppUpdatesURL={#AppURL}
-VersionInfoVersion=10.9.0.0
+VersionInfoVersion=10.9.1.0
 VersionInfoCompany={#AppPublisher}
 VersionInfoDescription={#AppName} Setup
 VersionInfoProductName={#AppName}
-VersionInfoProductVersion=10.9.0.0
+VersionInfoProductVersion=10.9.1.0
 ; Per-user install - no admin rights required (admin users may opt into all-users).
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
@@ -42,7 +42,7 @@ MinVersion=10.0
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir=output
-OutputBaseFilename=LuckyDBrowserSetup-10.9
+OutputBaseFilename=LuckyDBrowserSetup-10.9.1
 SetupIconFile=..\assets\professional_icon.ico
 CloseApplications=yes
 RestartApplications=no
@@ -53,16 +53,22 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: checkedonce
+; 10.9.1: checked by default so a brand-new install is ready on first
+; launch. The browser reads .first-run-setup and runs the bundled,
+; idempotent bootstrap once. Unchecking writes "0" and setup stays manual.
+Name: "agentsetup"; Description: "Set up agent tools automatically on first launch (recommended)"; GroupDescription: "New-user setup:"; Flags: checkedonce
 
 [Files]
 ; Everything PyInstaller produced - LuckyDBrowser.exe plus the _internal
 ; folder (Qt WebEngine runtime, assets, bundled luckyd-code.exe backend).
 Source: "..\dist\LuckyDBrowser\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-; Free local AI bootstrap - bundled for manual opt-in only. The installer
-; never runs it; use Start Menu > Set up Local AI after installation.
+; Free local AI bootstrap - bundled and run by the browser's one-time
+; first-launch setup (installer task "agentsetup"), never by the installer
+; itself.
 Source: "ollama_setup.ps1"; DestDir: "{app}"; Flags: ignoreversion
-; New-user automation (10.8.9): idempotent bootstrap plus the setup guide.
-; No secrets are stored; run it manually from Start Menu > Agent Setup.
+; New-user automation (10.8.9 behavior restored in 10.9.1): the browser runs
+; this idempotent bootstrap once on first launch. No secrets are stored, and
+; Start Menu > Agent Setup re-runs it any time.
 Source: "LuckyD-Bootstrap.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "LuckyD-Browser-Setup-Guide.md"; DestDir: "{app}"; Flags: ignoreversion
 
@@ -104,9 +110,10 @@ Root: HKCU; Subkey: "Software\Classes\LuckyDHTML\DefaultIcon"; ValueType: string
 Root: HKCU; Subkey: "Software\Classes\LuckyDHTML\shell\open\command"; ValueType: string; ValueData: """{app}\{#AppExeName}"" ""%1"""; Flags: uninsdeletekey
 
 [Run]
-; 10.9: no post-install downloads. Agent setup is manual from the Start Menu
-; shortcuts above (Agent Setup / Set up Local AI / Install Agent Mesh CLIs)
-; or from the bundled setup guide.
+; 10.9.1: the installer itself still downloads nothing and runs no
+; PowerShell (a post-install fetch is a behavioral security flag). Agent
+; setup is queued for the browser's first launch via the "agentsetup" task,
+; and the Start Menu shortcuts above re-run it any time.
 Filename: "{app}\{#AppExeName}"; Description: "Launch {#AppName}"; Flags: nowait postinstall skipifsilent
 
 [Code]
@@ -127,6 +134,27 @@ function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
   KillRunningApp;
   Result := '';
+end;
+
+{ 10.9.1: persist the new-user setup choice for the browser's first launch.
+  "1" = run the bundled bootstrap once; "0" = stay manual. }
+procedure WriteFirstRunMarker;
+var
+  MarkerPath: String;
+  Value: String;
+begin
+  MarkerPath := ExpandConstant('{app}\.first-run-setup');
+  if WizardIsTaskSelected('agentsetup') then
+    Value := '1'
+  else
+    Value := '0';
+  SaveStringToFile(MarkerPath, Value, False);
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep = ssPostInstall then
+    WriteFirstRunMarker;
 end;
 
 

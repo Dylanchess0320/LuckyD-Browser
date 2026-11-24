@@ -75,6 +75,8 @@ Then start chatting. That's it. Want everything on your own machine? Add Ollama 
 
 ## What's new
 
+**v10.9.1** — Auto-setup restored & live OpenRouter in LuckyD Code: 10.8.9-style new-user auto-setup is restored so fresh installs are immediately ready, LuckyD Code now offers the full live OpenRouter catalog (400+ models) with disk cache fallback and openrouter/free pinned first, and shared user credentials in %LOCALAPPDATA%\LuckyDBrowser\.env power both Code and browser seamlessly.
+
 **v10.9** - Local-first Chat: Hub chat and Claw tasks are optional extras now. The Chat page shows the local provider pick and shared handoff note immediately, and only renders the Hub or Claw panel when that service has both an address and a token in Settings > Connections. No personal LAN or Tailscale addresses ship with the app any more, the stale Puck row is gone from the status line, and a panel that is configured but offline still shows one plain line with the route to the fix.
 
 **v10.8.8** — Model refresh + Cline fix: LuckyD models (Ollama luckyd:8b) are now the default, live free detection probes the free gateways at startup (24h cache) and auto-routes the free rotation, the model catalog is re-ranked on live benchmarks (best overall, best bang-for-buck, cheapest), the sidebar auto-routes to working providers, and Cline usage is only offered when it actually has credits — exhausted means hidden

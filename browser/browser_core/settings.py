@@ -75,6 +75,12 @@ DEFAULTS = {
     # sidebar, and that choice is persisted separately from auto-start.
     "harness_mode": True,
     "harness_autostart": True,
+    # 10.9.1 new-user setup: the browser runs the bundled LuckyD-Bootstrap.ps1
+    # once on first launch (installer marker opt-in), then records it here so
+    # it never repeats. Users can re-run it from Start Menu > Agent Setup.
+    "first_run_setup": True,
+    "first_run_setup_done": False,
+    "first_run_setup_groups": "core,free,ollama",
     # Auto-update: silently check for a newer release shortly after launch.
     "update_auto_check": True,
     # A version tag the user chose to skip (don't prompt for it again).
