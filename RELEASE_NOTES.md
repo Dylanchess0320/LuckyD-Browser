@@ -1,35 +1,44 @@
-# LuckyD Browser v10.9.1 - Release Notes
+# LuckyD Browser v10.9.2 - Release Notes
 
-> **New-user auto-setup restored + full live OpenRouter model catalog in LuckyD Code.**
-> Zero-friction first launch, live access to 400+ OpenRouter models, and shared credential support.
+> **Paste an API key in either app — no more editing `.env` by hand.**
+> `/key` in LuckyD Code and in the browser AI Assistant saves, verifies, and shares the key instantly.
 
-**[⬇ Download `LuckyDBrowserSetup-10.9.1.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.9.1/LuckyDBrowserSetup-10.9.1.exe)** - Windows 10/11 x64 · per-user install · no admin needed
+**[⬇ Download `LuckyDBrowserSetup-10.9.2.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.9.2/LuckyDBrowserSetup-10.9.2.exe)** - Windows 10/11 x64 · per-user install · no admin needed
 
-**[`LuckyDBrowser-Portable-10.9.1.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.9.1/LuckyDBrowser-Portable-10.9.1.zip)** - unzip and run, for locked-down PCs.
+**[`LuckyDBrowser-Portable-10.9.2.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.9.2/LuckyDBrowser-Portable-10.9.2.zip)** - unzip and run, for locked-down PCs.
 
 ---
 
-## What's new in 10.9.1
+## What's new in 10.9.2
 
-- **Restored 10.8.9-style new-user auto-setup:**
-  - Installs are ready at first launch out of the box.
-  - The installer includes an "agentsetup" task (checked by default) that signals first-run readiness via `.first-run-setup`.
-  - On first launch, the browser runs the bundled idempotent `LuckyD-Bootstrap.ps1` (`-Groups core,free,ollama`) with `-ExecutionPolicy RemoteSigned` in its own console window so progress is transparent while the browser remains responsive.
-  - Keeps installer `[Run]` safe and compliant with behavioral anti-malware (no PowerShell in `[Run]`, no `-ExecutionPolicy Bypass`).
-  - Start Menu shortcuts ("Agent Setup", "Set up Local AI", "Install Agent Mesh CLIs") remain available for re-running setup at any time.
+- **`/key` in LuckyD Code**
+  - `/key openrouter` asks for the key with hidden input, verifies it against the provider, and saves it to the shared per-user `.env` (`%LOCALAPPDATA%/LuckyDBrowser/.env`).
+  - `/keys` lists the providers you have configured, with keys masked.
+  - `/key <provider> <key>` works inline for scripts.
+  - No restart is required: switch with `/model openrouter` and go.
 
-- **Full live OpenRouter support in LuckyD Code:**
-  - LuckyD Code now matches the browser AI assistant's live model picker, offering the complete live OpenRouter catalog (400+ models) with disk cache fallback and `openrouter/free` pinned first.
-  - Free and paid models are clearly categorized in `/model`.
-  - Instant exact-model matching and fuzzy resolution across all OpenRouter models via `/model <name>` or `/model openrouter <name>`.
+- **`/key` in the browser AI Assistant**
+  - Type `/key` in the chat input, or use **Actions → 🔑 Add API key…**, to paste a key without leaving the browser.
+  - The provider picker refreshes immediately and the key is ready to use.
 
-- **Shared credential loading:**
-  - Shared credentials and provider configs in `%LOCALAPPDATA%\LuckyDBrowser\.env` are seamlessly loaded by both LuckyD Code and the browser.
-  - Real API keys survive application updates and reinstalls without ever being bundled into public release binaries.
+- **One key store for both apps**
+  - LuckyD Code and the browser read the same per-user file, so a key pasted in either surface connects both.
+  - Existing keys keep working; upgrades never overwrite them.
 
-- **Performance & workspace cleanup:**
-  - Fast startup, responsive fuzzy matching, eliminated cache bloat, and optimized terminal session handling.
+- **Browser Control API**
+  - New `GET /keys` (masked list) and `POST /keys` (save + verify) endpoints for scripted setup.
+
+- **Reliability**
+  - Fixed the CI quality gate (ruff format, unused `noqa`, mypy) so the full pipeline runs again.
+  - Corrected OpenRouter catalog cache typing and synced stale installer/User-Agent/agent labels to 10.9.2.
+
+## Connecting OpenRouter
+
+1. Open LuckyD Code and run `/key openrouter` (or type `/key` in the browser AI Assistant).
+2. Paste a key from [openrouter.ai/keys](https://openrouter.ai/keys).
+3. LuckyD verifies it and saves it to the shared `.env`.
+4. Run `/model openrouter` in Code, or pick OpenRouter in the Assistant — `openrouter/free` is pinned first.
 
 ## Upgrading
 
-Run `LuckyDBrowserSetup-10.9.1.exe` over your existing install — profiles, tabs, settings, workspaces, and stored keys are preserved automatically.
+Run `LuckyDBrowserSetup-10.9.2.exe` over your existing install — profiles, tabs, settings, workspaces, and stored keys are preserved automatically.
