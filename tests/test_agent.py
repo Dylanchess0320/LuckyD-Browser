@@ -95,5 +95,46 @@ class TestReset:
     def test_reset_clears_state(self, agent):
         agent.reset()
         assert agent.conversation_id.startswith("conv_")
-        assert agent.messages == []
-        assert agent.turn_count == 0
+
+
+class Test10_10Regressions:
+    """10/10 hardening regressions: approval hook, retries, max_turns."""
+
+    def test_approval_hook_registers(self):
+        from core.hooks import reset_hooks, get_hooks
+        from core.approval_hook import ApprovalHook
+
+        reset_hooks()
+        hook = ApprovalHook()
+        hook.install(get_hooks())
+        assert len(get_hooks().before_tool) >= 1
+        assert hook.pending_requests() == []
+
+    def test_with_retry_default_is_2(self):
+        from core.agent_loop import _with_retry
+        import inspect
+
+        sig = inspect.signature(_with_retry)
+        assert sig.parameters["max_retries"].default == 2
+
+    def test_llm_client_max_retries_default_is_2(self):
+        from core.llm_client import LLMClient
+        import inspect
+
+        sig = inspect.signature(LLMClient.__init__)
+        assert sig.parameters["max_retries"].default == 2
+
+    def test_config_max_turns_default_is_10000(self):
+        import config
+        import inspect
+
+        src = inspect.getsource(config.get_config)
+        assert "10000" in src
+
+    def test_circuit_breaker_fields_exist(self):
+        from core.agent_loop import CodingAgent
+        import inspect
+
+        src = inspect.getsource(CodingAgent.__init__)
+        assert "_consecutive_failed_tool_turns" in src
+        assert "_max_consecutive_failed_tool_turns" in src

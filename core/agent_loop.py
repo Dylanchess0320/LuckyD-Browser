@@ -209,7 +209,7 @@ def _monotonic() -> float:
     return time.monotonic()
 
 
-def _with_retry(fn, max_retries: int = 5):
+def _with_retry(fn, max_retries: int = 2):
     """Wrap an async provider-call callable with classified retry.
 
     Exponential backoff 1s -> 30s (1, 2, 4, 8, 16, then capped at 30s),
@@ -382,6 +382,14 @@ class CodingAgent:
             pass
         self.message_builder = MessageBuilder()
         self.hooks = get_hooks()
+        # Register ApprovalHook in the main agent path so user
+        # approvals (A clicks) actually gate dangerous tools.
+        try:
+            from core.approval_hook import ApprovalHook
+
+            register_plugin(ApprovalHook())
+        except Exception:
+            pass
 
         # Advanced tool result processing
         try:
