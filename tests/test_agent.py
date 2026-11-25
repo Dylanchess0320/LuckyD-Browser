@@ -98,47 +98,42 @@ class TestReset:
 
 
 class TestTenTenRegressions:
-    """10/10 hardening regressions: approval hook, retries, max_turns."""
+    """10.9.3 hardening contracts: approval ownership, retries, turn ceiling."""
 
-    def test_approval_hook_registers(self):
+    def test_coding_agent_does_not_install_a_bare_approval_hook(self):
+        # The entry point (main / web_server / acp_server) owns the configured
+        # ApprovalHook. A bare duplicate parks approvals in the queue with no
+        # callback and blocks for 300s, so CodingAgent must not install one.
         from core.approval_hook import ApprovalHook
         from core.hooks import get_hooks, reset_hooks
 
         reset_hooks()
-        hook = ApprovalHook()
-        hook.install(get_hooks())
-        assert len(get_hooks().before_tool) >= 1
-        assert hook.pending_requests() == []
+        with patch("llm.ProviderRouter"):
+            from agent import CodingAgent
 
-    def test_with_retry_default_is_2(self):
-        import inspect
+            CodingAgent(
+                api_key=TEST_API_KEY,
+                model="test-model",
+                temperature=0.0,
+                max_tokens=100,
+            )
+        installed = [getattr(hook, "__self__", hook) for hook in get_hooks().before_tool]
+        assert not any(isinstance(hook, ApprovalHook) for hook in installed)
 
-        from core.agent_loop import _with_retry
+    def test_agent_llm_client_uses_two_retries(self, agent):
+        assert agent.max_retries == 2
+        assert agent.llm_client.max_retries == 2
 
-        sig = inspect.signature(_with_retry)
-        assert sig.parameters["max_retries"].default == 2
-
-    def test_llm_client_max_retries_default_is_2(self):
-        import inspect
-
-        from core.llm_client import LLMClient
-
-        sig = inspect.signature(LLMClient.__init__)
-        assert sig.parameters["max_retries"].default == 2
-
-    def test_config_max_turns_default_is_10000(self):
-        import inspect
-
+    def test_config_max_turns_default_and_override(self, monkeypatch):
         import config
 
-        src = inspect.getsource(config.get_config)
-        assert "10000" in src
+        monkeypatch.setattr(config, "resolve_provider_config", lambda: {})
+        monkeypatch.delenv("CODING_AGENT_MAX_TURNS", raising=False)
+        assert config.get_config()["max_turns"] == 10000
+        monkeypatch.setenv("CODING_AGENT_MAX_TURNS", "42")
+        assert config.get_config()["max_turns"] == 42
 
-    def test_circuit_breaker_fields_exist(self):
-        import inspect
+    def test_edit_requires_approval(self):
+        from tools.file_tools import EditTool
 
-        from core.agent_loop import CodingAgent
-
-        src = inspect.getsource(CodingAgent.__init__)
-        assert "_consecutive_failed_tool_turns" in src
-        assert "_max_consecutive_failed_tool_turns" in src
+        assert EditTool.permission_level == "REQUIRES_APPROVAL"

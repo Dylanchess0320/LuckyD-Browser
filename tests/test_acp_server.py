@@ -1,6 +1,31 @@
 from unittest.mock import MagicMock
 
-from acp_server import ACP_VERSION, AGENT_NAME, AGENT_VERSION, AcpServer
+import pytest
+
+import core.trust as trust_mod
+from acp_server import ACP_VERSION, AGENT_NAME, AGENT_VERSION, AcpServer, _acp_approval
+from core.types import HookContext, ToolApprovalRequest
+
+
+@pytest.fixture()
+def trust_tmp(monkeypatch, tmp_path):
+    """Isolate TrustPolicy/audit state from the developer's real profile."""
+    monkeypatch.setenv("LUCKYD_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(trust_mod, "_policy", None)
+    monkeypatch.setattr(trust_mod, "_audit_log", None)
+    yield tmp_path
+    monkeypatch.setattr(trust_mod, "_policy", None)
+    monkeypatch.setattr(trust_mod, "_audit_log", None)
+
+
+def _approval_request(tool_name="Bash"):
+    return ToolApprovalRequest(
+        tool_name=tool_name,
+        tool_args={"command": "echo hi"},
+        call_id="call-1",
+        session_id="acp",
+        turn=0,
+    )
 
 
 def test_handle_invalid_request_not_dict():
@@ -165,3 +190,73 @@ def test_serve_forever_write_failed():
     server._emit = MagicMock(side_effect=Exception("Test write failure"))  # type: ignore
 
     assert server.serve_forever() == 1
+
+
+# ── approval wiring (10.9.3) ─────────────────────────────────────────────
+
+
+def test_acp_approval_denies_by_default(monkeypatch, trust_tmp):
+    monkeypatch.delenv("LUCKYD_ACP_AUTO_APPROVE", raising=False)
+    result = _acp_approval(_approval_request())
+    assert result.approved is False
+    assert "LUCKYD_ACP_AUTO_APPROVE" in result.reason
+    assert "shell" in result.reason
+
+
+def test_acp_approval_env_opt_in(monkeypatch, trust_tmp):
+    monkeypatch.setenv("LUCKYD_ACP_AUTO_APPROVE", "1")
+    result = _acp_approval(_approval_request())
+    assert result.approved is True
+    assert "LUCKYD_ACP_AUTO_APPROVE" in result.reason
+
+
+def test_get_agent_registers_one_approval_hook(monkeypatch, trust_tmp):
+    from core.approval_hook import ApprovalHook
+    from core.hooks import get_hooks, reset_hooks
+
+    class FakeAgent:
+        conversation_id = "conv_acp_test"
+
+    reset_hooks()
+    try:
+        # `import agent` must resolve to the repo-root shim (agent.py), not
+        # browser/browser_core/agent.py. Other tests put the browser dir on
+        # sys.path, so pin the repo root first and evict any cached
+        # wrong-module entry; monkeypatch restores both after the test.
+        import sys
+        from pathlib import Path
+
+        repo_root = str(Path(__file__).resolve().parent.parent)
+        monkeypatch.syspath_prepend(repo_root)
+        monkeypatch.delitem(sys.modules, "agent", raising=False)
+        import agent as agent_mod
+
+        monkeypatch.setattr(agent_mod, "CodingAgent", FakeAgent)
+        server = AcpServer()
+        assert server._get_agent() is not None
+        assert server._get_agent() is not None  # cached, no duplicate hook
+
+        hooks = [getattr(hook, "__self__", hook) for hook in get_hooks().before_tool]
+        acp_hooks = [
+            hook
+            for hook in hooks
+            if isinstance(hook, ApprovalHook) and hook.session_id == "conv_acp_test"
+        ]
+        assert len(acp_hooks) == 1
+        assert acp_hooks[0].approval_callback is _acp_approval
+    finally:
+        reset_hooks()
+
+
+def test_acp_hook_denies_dangerous_tool(monkeypatch, trust_tmp):
+    from core.approval_hook import ApprovalHook
+
+    monkeypatch.delenv("LUCKYD_ACP_AUTO_APPROVE", raising=False)
+    hook = ApprovalHook(approval_callback=_acp_approval, session_id="acp")
+    result = hook.before_tool(
+        "Bash", {"command": "echo hi", "_id": "call-9"}, HookContext(turn=0, messages=[])
+    )
+    assert result is not None
+    assert result["tool_call_id"] == "call-9"
+    assert "denied" in result["content"].lower()
+    assert "LUCKYD_ACP_AUTO_APPROVE" in result["content"]

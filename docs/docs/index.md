@@ -5,7 +5,7 @@
 <p class="tagline">The AI browser that runs <em>your</em> models — local, unlimited, offline — plus a full coding agent and real terminals in one window.</p>
 
 <div class="cta-row" markdown>
-[⬇ Download v10.9.2](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.9.2/LuckyDBrowserSetup-10.9.2.exe){ .luckyd-btn }
+[⬇ Download v10.9.3](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.9.3/LuckyDBrowserSetup-10.9.3.exe){ .luckyd-btn }
 [Getting started](getting-started.md){ .luckyd-btn-ghost }
 [What's new](release-notes.md){ .luckyd-btn-ghost }
 </div>
@@ -76,12 +76,12 @@
 
 ## Install in 10 seconds
 
-1. Get [**LuckyDBrowserSetup-10.9.2.exe**](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.9.2/LuckyDBrowserSetup-10.9.2.exe)
+1. Get [**LuckyDBrowserSetup-10.9.3.exe**](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.9.3/LuckyDBrowserSetup-10.9.3.exe)
 2. Run it — per-user, **no admin**, installs to `%LOCALAPPDATA%\Programs\LuckyDBrowser`
 3. Optional: run `ollama_setup.ps1` from the install folder → Ollama + `llama3.2:3b` (~2 GB, one time)
 4. `Ctrl+Shift+A` → chat offline. Or bring your own keys (Gemini, Groq, DeepSeek, OpenAI, Anthropic, Z.ai, OpenRouter, Cline, OpenCode)
 
-Windows 10/11 x64 only. Silent install: `LuckyDBrowserSetup-10.9.2.exe /VERYSILENT /NORESTART`
+Windows 10/11 x64 only. Silent install: `LuckyDBrowserSetup-10.9.3.exe /VERYSILENT /NORESTART`
 
 ## Why LuckyD
 
@@ -98,13 +98,17 @@ Most "AI browsers" rent you a chatbot behind an account. LuckyD is a **real Chro
 
 > The others rent you their AI. **LuckyD runs yours.**
 
-## New in 10.9 - Local-first Chat
+## New in 10.9.3 — Hardening: approvals, retries, terminal isolation
 
-Hub chat and Claw tasks are optional extras now. The Chat page opens with the local provider pick and shared handoff note, and only shows a Hub or Claw panel when that service has both an address and a token in Settings > Connections. No personal LAN or Tailscale addresses ship with the app, the stale Puck row is gone from the status line, and a configured-but-offline service shows one plain line with the route to the fix.
+Approval gates are wired once at every entry point (CLI, HQ web server, ACP), and Edit now asks like Write/Bash. Retries stop at two with a 120s cap, a stuck tool loop trips the circuit breaker, and `CODING_AGENT_MAX_TURNS` defaults to 10,000 for long autonomous runs. PTY spawn strips inherited `LUCKYD_AGENT_*`/`LUCKYD_HUB_URL`, so a browser opened from an agent shell no longer brands plain terminal tabs as agents. ACP denies dangerous tools by default unless you set `LUCKYD_ACP_AUTO_APPROVE=1` or allow the scope in the Trust policy.
 
 ## New in 10.9.2 — Paste API keys without editing .env
 
 New /key command in LuckyD Code and the browser AI Assistant saves a provider key to the shared per-user .env, verifies it, and connects both apps instantly.
+
+## New in 10.9 - Local-first Chat
+
+Hub chat and Claw tasks are optional extras now. The Chat page opens with the local provider pick and shared handoff note, and only shows a Hub or Claw panel when that service has both an address and a token in Settings > Connections. No personal LAN or Tailscale addresses ship with the app, the stale Puck row is gone from the status line, and a configured-but-offline service shows one plain line with the route to the fix.
 
 ## New in 10.8.7 — Hub unification
 
@@ -242,6 +246,6 @@ A hardened foundation: every local service now authenticates with HttpOnly sessi
 
 <p align="center">
   <b>MIT © LuckyD</b> · Chromium · Ollama · Qt · xterm.js · pywinpty · PyInstaller · Inno Setup<br>
-  <a href="https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.9.2/LuckyDBrowserSetup-10.9.2.exe">Download v10.9.2</a>
+  <a href="https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.9.3/LuckyDBrowserSetup-10.9.3.exe">Download v10.9.3</a>
   · <a href="https://www.youtube.com/@LuckyDYoutube">YouTube</a>
 </p>

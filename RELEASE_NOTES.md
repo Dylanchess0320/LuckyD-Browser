@@ -1,44 +1,58 @@
-# LuckyD Browser v10.9.2 - Release Notes
+# LuckyD Browser v10.9.3 - Release Notes
 
-> **Paste an API key in either app — no more editing `.env` by hand.**
-> `/key` in LuckyD Code and in the browser AI Assistant saves, verifies, and shares the key instantly.
+> **The hardening release: approval gates that actually gate, retries that
+> stop, and terminals that can't impersonate an agent.**
 
-**[⬇ Download `LuckyDBrowserSetup-10.9.2.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.9.2/LuckyDBrowserSetup-10.9.2.exe)** - Windows 10/11 x64 · per-user install · no admin needed
+**[`LuckyDBrowserSetup-10.9.3.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.9.3/LuckyDBrowserSetup-10.9.3.exe)** - Windows 10/11 x64 - per-user install - no admin needed
 
-**[`LuckyDBrowser-Portable-10.9.2.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.9.2/LuckyDBrowser-Portable-10.9.2.zip)** - unzip and run, for locked-down PCs.
+**[`LuckyDBrowser-Portable-10.9.3.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.9.3/LuckyDBrowser-Portable-10.9.3.zip)** - unzip and run, for locked-down PCs.
 
 ---
 
-## What's new in 10.9.2
+## What's new in 10.9.3
 
-- **`/key` in LuckyD Code**
-  - `/key openrouter` asks for the key with hidden input, verifies it against the provider, and saves it to the shared per-user `.env` (`%LOCALAPPDATA%/LuckyDBrowser/.env`).
-  - `/keys` lists the providers you have configured, with keys masked.
-  - `/key <provider> <key>` works inline for scripts.
-  - No restart is required: switch with `/model openrouter` and go.
+### Approval gates work everywhere
 
-- **`/key` in the browser AI Assistant**
-  - Type `/key` in the chat input, or use **Actions → 🔑 Add API key…**, to paste a key without leaving the browser.
-  - The provider picker refreshes immediately and the key is ready to use.
+- **One configured hook per entry point.** The CLI, HQ web server, and ACP
+  server each register the approval hook with the right callback. The agent
+  no longer installs a second bare hook that parked every Write/Bash/Edit in
+  the pending queue and blocked for five minutes.
+- **Edit asks like Write and Bash.** `Edit` is now `REQUIRES_APPROVAL`, so an
+  agent can't rewrite a file through the edit path while the write path is
+  gated.
+- **ACP is deny-by-default.** ACP has no interactive approval UI, so
+  approval-requiring tools are denied with a clear message instead of running
+  ungated. Opt in explicitly with `LUCKYD_ACP_AUTO_APPROVE=1`, or allow the
+  relevant scope in the Trust policy.
 
-- **One key store for both apps**
-  - LuckyD Code and the browser read the same per-user file, so a key pasted in either surface connects both.
-  - Existing keys keep working; upgrades never overwrite them.
+### Retries and turn limits are consistent
 
-- **Browser Control API**
-  - New `GET /keys` (masked list) and `POST /keys` (save + verify) endpoints for scripted setup.
+- **Two retries, 120 seconds.** `_with_retry`, `LLMClient`, and the agent all
+  use the same 2-retry (3-attempt) policy with a 120s elapsed cap. No more
+  hidden 3-retry path in the agent loop.
+- **Circuit breaker.** Four consecutive turns where every tool call fails stop
+  the run instead of spinning to the turn ceiling.
+- **10,000-turn ceiling for long autonomous runs.** `CODING_AGENT_MAX_TURNS`
+  now defaults to 10000. The one-shot cost preview estimates a typical
+  30-turn task rather than printing a meaningless 10,000-turn price.
 
-- **Reliability**
-  - Fixed the CI quality gate (ruff format, unused `noqa`, mypy) so the full pipeline runs again.
-  - Corrected OpenRouter catalog cache typing and synced stale installer/User-Agent/agent labels to 10.9.2.
+### Terminal and test isolation
 
-## Connecting OpenRouter
+- **No agent identity leak.** Spawning a plain PowerShell/CMD terminal now
+  strips inherited `LUCKYD_AGENT_*` and `LUCKYD_HUB_URL` variables, so a
+  browser opened from an agent shell doesn't label every tab as Agent 1/2.
+- **Hermetic tests.** Local settings files, a logged-in Cline session, a
+  running Ollama daemon, and an installed `jedi` no longer change test
+  results. The no-jedi, rotation, provider, and version tests force their own
+  environment.
 
-1. Open LuckyD Code and run `/key openrouter` (or type `/key` in the browser AI Assistant).
-2. Paste a key from [openrouter.ai/keys](https://openrouter.ai/keys).
-3. LuckyD verifies it and saves it to the shared `.env`.
-4. Run `/model openrouter` in Code, or pick OpenRouter in the Assistant — `openrouter/free` is pinned first.
+### Version unification
+
+- Browser, installer, UI labels, package metadata, and documentation all
+  report **10.9.3**.
 
 ## Upgrading
 
-Run `LuckyDBrowserSetup-10.9.2.exe` over your existing install — profiles, tabs, settings, workspaces, and stored keys are preserved automatically.
+Run `LuckyDBrowserSetup-10.9.3.exe` over your existing install - profiles,
+tabs, settings, workspaces, and stored keys are preserved automatically. The
+portable ZIP is the same build with no installer.

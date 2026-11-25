@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [10.9.3] - 2026-11-25
+
+Hardening release: approval gates are wired exactly once at every entry
+point, retries and turn limits are consistent, and the test suite is
+hermetic.
+
+### Security
+
+- **Approval gating fixed** - `CodingAgent` no longer installs a bare
+  `ApprovalHook`. The CLI, HQ web server, and ACP server each register one
+  configured hook, so dangerous tools are gated without a duplicate hook
+  that parked approvals in the queue for 300s.
+- **Edit requires approval** - `EditTool.permission_level` is now
+  `REQUIRES_APPROVAL`, matching `Write` and `Bash`.
+- **ACP deny-by-default** - the ACP stdio server has no interactive
+  approval channel, so it now denies approval-requiring tools with an
+  actionable message. Operators can opt in with
+  `LUCKYD_ACP_AUTO_APPROVE=1` or by configuring the Trust policy (mode
+  `auto` or an `allow` scope rule).
+- **Terminal identity isolation** - spawning any PTY now strips inherited
+  `LUCKYD_AGENT_SLOT`, `LUCKYD_AGENT_NAME`, `LUCKYD_AGENT_VERSION`, and
+  `LUCKYD_HUB_URL`, so a browser launched from an agent terminal no longer
+  brands plain PowerShell/CMD tabs as agent sessions.
+
+### Changed
+
+- **Retry policy unified** - `_with_retry`, `LLMClient`, and
+  `CodingAgent` all default to 2 retries (3 attempts) with the 120s
+  elapsed cap. Previously the agent silently used 3 while the client
+  defaults said 2.
+- **Long-run turn ceiling** - `CODING_AGENT_MAX_TURNS` defaults to 10000
+  for long autonomous runs. The one-shot cost preview now estimates a
+  typical 30-turn task instead of printing a 10,000-turn price.
+- **Version unification** - browser, installer, UI labels, docs, and
+  package metadata all report 10.9.3.
+
+### Tests
+
+- Replaced `inspect.getsource` version/field assertions with behavioral
+  tests for approval ownership, retry alignment, the turn ceiling, and
+  the Edit permission level.
+- Made LSP tests force the no-jedi path, rotation tests stub the Ollama
+  probe, and provider/control tests isolate local settings and Cline
+  session state from the developer machine.
+- Added regressions for the PTY env leak and ACP approval wiring.
+
 ## [10.9.2] - 2026-11-24
 
 Paste API keys in LuckyD Code and the browser AI Assistant — /key saves to the shared .env, so OpenRouter and every provider connect without manual edits.

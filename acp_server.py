@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import io
 import json
+import os
 import sys
 import traceback
 from typing import Any
@@ -13,10 +14,53 @@ ACP_VERSION = "0.1"
 AGENT_NAME = "LuckyD Code"
 AGENT_VERSION = "v10.9.3"
 
+_TRUTHY = ("1", "true", "yes", "on")
+
 
 def _log(msg: str) -> None:
     """Diagnostics go to stderr only — stdout is reserved for responses."""
     print(f"[acp] {msg}", file=sys.stderr, flush=True)
+
+
+def _acp_approval(request: Any) -> Any:
+    """Approval callback for ACP sessions.
+
+    ACP is a programmatic stdio protocol with no interactive approval
+    channel, so a dangerous tool cannot wait for a human click. Deny by
+    default with an actionable message; the operator can opt in explicitly
+    with ``LUCKYD_ACP_AUTO_APPROVE=1`` or by configuring the Trust policy
+    (mode ``auto`` or an ``allow`` rule for the tool's scope, both of which
+    ApprovalHook applies before this callback runs).
+    """
+    from core.trust import scope_of
+    from core.types import ToolApprovalResult
+
+    if (os.environ.get("LUCKYD_ACP_AUTO_APPROVE", "") or "").strip().lower() in _TRUTHY:
+        return ToolApprovalResult(
+            approved=True,
+            reason="ACP auto-approve enabled by LUCKYD_ACP_AUTO_APPROVE",
+        )
+    scope = scope_of(request.tool_name)
+    return ToolApprovalResult(
+        approved=False,
+        reason=(
+            f"ACP sessions have no interactive approval channel. Allow the "
+            f"'{scope}' scope in the Trust policy, set trust mode to auto, or "
+            f"set LUCKYD_ACP_AUTO_APPROVE=1 to permit tool calls."
+        ),
+    )
+
+
+def _ensure_approval_hook(session_id: str) -> None:
+    """Register exactly one ACP ApprovalHook for this process."""
+    from core.approval_hook import ApprovalHook
+    from core.hooks import get_hooks, register_plugin
+
+    for hook in get_hooks().before_tool:
+        target = getattr(hook, "__self__", hook)
+        if isinstance(target, ApprovalHook) and target.session_id == session_id:
+            return
+    register_plugin(ApprovalHook(approval_callback=_acp_approval, session_id=session_id))
 
 
 def _ok(result: Any, msg_id: Any) -> dict[str, Any]:
@@ -41,6 +85,9 @@ class AcpServer:
             from agent import CodingAgent
 
             self._agent = CodingAgent()
+            # Without this hook the ACP entry point would be the one agent
+            # surface that executes Write/Bash/Git with no approval gate.
+            _ensure_approval_hook(getattr(self._agent, "conversation_id", "") or "acp")
         return self._agent
 
     def _emit(self, payload: dict[str, Any]) -> None:

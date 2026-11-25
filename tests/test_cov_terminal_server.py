@@ -697,7 +697,7 @@ def test_spawn_pty_agent_gets_workspace_cwd_and_env(monkeypatch, tmp_path) -> No
     parts = _env_parts(kw["env"])
     assert "LUCKYD_AGENT_SLOT=1" in parts
     assert "LUCKYD_AGENT_NAME=Agent 1" in parts
-    assert "LUCKYD_AGENT_VERSION=v10.9.2" in parts
+    assert "LUCKYD_AGENT_VERSION=v10.9.3" in parts
 
 
 def test_spawn_pty_agent2_gets_slot2_env(monkeypatch, tmp_path) -> None:
@@ -712,7 +712,7 @@ def test_spawn_pty_agent2_gets_slot2_env(monkeypatch, tmp_path) -> None:
     parts = _env_parts(kw["env"])
     assert "LUCKYD_AGENT_SLOT=2" in parts
     assert "LUCKYD_AGENT_NAME=Agent 2" in parts
-    assert "LUCKYD_AGENT_VERSION=v10.9.2" in parts
+    assert "LUCKYD_AGENT_VERSION=v10.9.3" in parts
 
 
 def test_spawn_pty_agent_gets_hub_url_env(monkeypatch, tmp_path) -> None:
@@ -739,6 +739,38 @@ def test_spawn_pty_system_shell_gets_no_hub_url(monkeypatch) -> None:
     _spawn_pty(shell="powershell", hub_url="http://127.0.0.1:9999")
     parts = _env_parts(_FakePTYFactory.instances[-1].spawn_kwargs["env"])
     assert not any(p.startswith("LUCKYD_HUB_URL=") for p in parts)
+
+
+def test_spawn_pty_strips_inherited_agent_identity(monkeypatch) -> None:
+    """A browser launched from an agent shell must not brand plain terminals."""
+    _install_fake_winpty(monkeypatch)
+    monkeypatch.setenv("LUCKYD_AGENT_SLOT", "2")
+    monkeypatch.setenv("LUCKYD_AGENT_NAME", "Agent 2")
+    monkeypatch.setenv("LUCKYD_AGENT_VERSION", "v10.9.2")
+    monkeypatch.setenv("LUCKYD_HUB_URL", "http://127.0.0.1:9999")
+    _spawn_pty(shell="powershell")
+    parts = _env_parts(_FakePTYFactory.instances[-1].spawn_kwargs["env"])
+    assert not any(
+        p.startswith(
+            ("LUCKYD_AGENT_SLOT=", "LUCKYD_AGENT_NAME=", "LUCKYD_AGENT_VERSION=", "LUCKYD_HUB_URL=")
+        )
+        for p in parts
+    )
+
+
+def test_spawn_pty_agent_overrides_inherited_identity(monkeypatch, tmp_path) -> None:
+    _install_fake_winpty(monkeypatch)
+    exe = tmp_path / "cli.exe"
+    exe.touch()
+    monkeypatch.setenv("LUCKYD_AGENT_SLOT", "2")
+    monkeypatch.setenv("LUCKYD_AGENT_NAME", "Agent 2")
+    monkeypatch.setenv("LUCKYD_AGENT_VERSION", "v10.9.2")
+    _spawn_pty(shell="agent", cli_path=str(exe))
+    parts = _env_parts(_FakePTYFactory.instances[-1].spawn_kwargs["env"])
+    assert "LUCKYD_AGENT_SLOT=1" in parts
+    assert "LUCKYD_AGENT_NAME=Agent 1" in parts
+    assert "LUCKYD_AGENT_VERSION=v10.9.3" in parts
+    assert "LUCKYD_AGENT_SLOT=2" not in parts
 
 
 def test_spawn_pty_env_block_sanitizes_bad_entries(monkeypatch) -> None:

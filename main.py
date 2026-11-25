@@ -1542,7 +1542,7 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
             ui.warn("MCP not configured or no servers connected")
 
     elif cmd == "version":
-        agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v10.9.2")
+        agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v10.9.3")
         agent_name = os.environ.get("LUCKYD_AGENT_NAME", "Agent 1")
         ui.info(f"LuckyD Code {agent_version} ({agent_name})")
 
@@ -2609,7 +2609,7 @@ def _dispatch_early_subcommands(args: list[str]) -> bool:
 
 def _print_version() -> None:
     """Print the LuckyD Code version line (fast path: no config needed)."""
-    agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v10.9.2")
+    agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v10.9.3")
     agent_name = os.environ.get("LUCKYD_AGENT_NAME", "")
     label = f"LuckyD Code {agent_version}" + (f" ({agent_name})" if agent_name else "")
     print(label)
@@ -2622,8 +2622,8 @@ def _print_help() -> None:
 LuckyD Code — AI Coding Agent
 
 Usage:
-  lucky-code                       Interactive REPL (Agent 1 · v10.9.2)
-  lucky-code --agent 2             Interactive REPL (Agent 2 · v10.9.2)
+  lucky-code                       Interactive REPL (Agent 1 · v10.9.3)
+  lucky-code --agent 2             Interactive REPL (Agent 2 · v10.9.3)
   lucky-code providers           List AI providers — status, cost tier, current
   lucky-code doctor [--json]     Check provider & Multi Agent Terminal backend health + tiers
   lucky-code model <name>        Switch model (fuzzy Cline-style picker)
@@ -2635,7 +2635,7 @@ Usage:
   lucky-code --resume <id>         Resume specific session
 
 Options:
-  --agent 1|2        Select agent slot (1 = v10.9.2 Nuitka, 2 = v10.9.2)
+  --agent 1|2        Select agent slot (1 = v10.9.3 Nuitka, 2 = v10.9.3)
   --model NAME       Model: auto (default), flash, pro, or specific name
   --provider NAME    Set provider (see: lucky-code providers): ollama, clinepass,
                      cline-usage, openrouter, groq, deepseek,
@@ -2740,11 +2740,11 @@ def _parse_agent_args(args: list[str], cfg: dict) -> tuple[dict, str, float, str
             if slot == "2":
                 os.environ["LUCKYD_AGENT_SLOT"] = "2"
                 os.environ["LUCKYD_AGENT_NAME"] = "Agent 2"
-                os.environ["LUCKYD_AGENT_VERSION"] = "v10.9.2"
+                os.environ["LUCKYD_AGENT_VERSION"] = "v10.9.3"
             else:
                 os.environ["LUCKYD_AGENT_SLOT"] = "1"
                 os.environ["LUCKYD_AGENT_NAME"] = "Agent 1"
-                os.environ["LUCKYD_AGENT_VERSION"] = "v10.9.2"
+                os.environ["LUCKYD_AGENT_VERSION"] = "v10.9.3"
             i += 2
         elif args[i] in ("-v", "--version"):
             _print_version()
@@ -2876,8 +2876,12 @@ def _run_agent(
     # Upfront cost visibility before a multi-turn one-shot run
     if one_shot and not json_mode and hasattr(agent, "cost_tracker"):
         max_turns = int(os.environ.get("CODING_AGENT_MAX_TURNS", cfg.get("max_turns", 30)) or 30)
-        if max_turns >= 10:
-            est_line = agent.cost_tracker.estimate_summary(model=model, turns=max_turns)
+        # max_turns is a safety ceiling (10.9.3 default: 10000), not a cost
+        # forecast. Estimate a typical task instead of printing a meaningless
+        # 10,000-turn price before every one-shot run.
+        estimate_turns = min(max_turns, 30)
+        if estimate_turns >= 10:
+            est_line = agent.cost_tracker.estimate_summary(model=model, turns=estimate_turns)
             print(f"  [Cost] {est_line}")
 
     try:

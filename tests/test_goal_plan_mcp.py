@@ -166,6 +166,7 @@ class TestMcpConnect:
         ag.llm_client = FakeLLMClient([{"content": "done"}])
         with (
             patch("main._connect_mcp", new=AsyncMock()) as mcp,
+            patch("main.run_exclusive"),
             patch.object(main.ui, "play_done_sound", lambda: None),
         ):
             await main.run_one_shot(ag, "hi")
@@ -176,7 +177,10 @@ class TestMcpConnect:
 
         ag = _make_agent()
         ag.llm_client = FakeLLMClient([{"content": "done"}])
-        with patch("main._connect_mcp", new=AsyncMock()) as mcp:
+        with (
+            patch("main._connect_mcp", new=AsyncMock()) as mcp,
+            patch("main.run_exclusive"),
+        ):
             await main.run_one_shot_json(ag, "hi")
         mcp.assert_awaited_once()
         assert '{"type": "done"}' in capsys.readouterr().out

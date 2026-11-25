@@ -41,7 +41,7 @@ to run its core features.
 
 1. Obtain the installer from the author's official release channel. The expected
    filename is `LuckyDBrowserSetup-<version>.exe` (for example,
-   `LuckyDBrowserSetup-10.9.exe`), or use the portable ZIP if one is provided.
+   `LuckyDBrowserSetup-10.9.3.exe`), or use the portable ZIP if one is provided.
 2. Run the installer. It is a per-user install and does not require admin.
 3. Windows SmartScreen will show "Unknown publisher" because the executable is
    not code-signed. Choose **More info -> Run anyway** only if you trust the

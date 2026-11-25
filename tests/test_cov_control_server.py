@@ -1436,16 +1436,20 @@ def test_status_harness_probe_success(monkeypatch):
     assert be.status()["harness"] is True
 
 
-def test_ai_info_builds_bridge_lazily():
+def test_ai_info_builds_bridge_lazily(monkeypatch):
     be, *_ = _qt_backend()
     assert be._ai is None
+    # Hermetic: force "no Cline auth" so the dead-gateway assertion below
+    # holds on machines with a logged-in Cline CLI session on disk.
+    monkeypatch.setattr("browser_core.ai_bridge.cline_session.has_session", lambda: False)
+    monkeypatch.setattr("browser_core.ai_bridge.AIBridge._cline_usable", lambda self: False)
     info = be.ai_info()
     assert be._ai is not None  # real AIBridge constructed and cached
     assert set(info) == {"ai_providers", "ai_default", "ai_local_status"}
-    # 10.8.8: the usable list never offers a dead Cline gateway — this
-    # environment has no Cline session/key, so cline-usage must be absent
-    # from the reported providers even though it stays registered for the
-    # model-catalog fallback.
+    # 10.8.8: the usable list never offers a dead Cline gateway — with no
+    # Cline session/key, cline-usage must be absent from the reported
+    # providers even though it stays registered for the model-catalog
+    # fallback.
     assert "cline-usage" not in info["ai_providers"]
     assert "clinepass" not in info["ai_providers"]
 

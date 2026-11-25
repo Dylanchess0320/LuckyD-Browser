@@ -141,6 +141,10 @@ def _freeze_sys(monkeypatch, tmp_path: Path):
     """Pretend to be the frozen exe rooted at tmp_path."""
     monkeypatch.setattr(sys, "frozen", True, raising=False)
     monkeypatch.setattr(sys, "executable", str(tmp_path / "LuckyD.exe"), raising=False)
+    # _assistant_browser_settings() checks %LOCALAPPDATA%/LuckyDBrowser/
+    # settings.json FIRST when frozen — redirect it to the empty tmp dir
+    # so a developer's real settings file can't leak into the test.
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
 
 
 # ── detect_provider ──────────────────────────────────────────────────────

@@ -75,7 +75,9 @@ Then start chatting. That's it. Want everything on your own machine? Add Ollama 
 
 ## What's new
 
-**v10.9.2** — Paste API keys in LuckyD Code and the browser AI Assistant — /key saves to the shared .env, so OpenRouter and every provider connect without manual edits.
+**v10.9.3** - Hardening release: approval gates now work at every entry point (CLI, HQ web server, ACP), Edit asks like Write/Bash, retries stop at two with a 120s cap, a stuck tool loop trips the circuit breaker, long autonomous runs can use up to 10,000 turns, and agent identity no longer leaks into plain terminal tabs.
+
+**v10.9.2** - Paste API keys in LuckyD Code and the browser AI Assistant - /key saves to the shared .env, so OpenRouter and every provider connect without manual edits.
 
 **v10.9** - Local-first Chat: Hub chat and Claw tasks are optional extras now. The Chat page shows the local provider pick and shared handoff note immediately, and only renders the Hub or Claw panel when that service has both an address and a token in Settings > Connections. No personal LAN or Tailscale addresses ship with the app any more, the stale Puck row is gone from the status line, and a panel that is configured but offline still shows one plain line with the route to the fix.
 

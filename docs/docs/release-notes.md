@@ -1,6 +1,23 @@
-# LuckyD Browser — Release Notes
+# LuckyD Browser - Release Notes
 
-## [10.9.2] — Paste API keys without editing .env — 2026-11-24
+## [10.9.3] - Hardening: approvals, retries, terminal isolation - 2026-11-25
+
+**[`LuckyDBrowserSetup-10.9.3.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.9.3/LuckyDBrowserSetup-10.9.3.exe)** - Windows 10/11 x64 - per-user install - no admin needed.
+**[`LuckyDBrowser-Portable-10.9.3.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.9.3/LuckyDBrowser-Portable-10.9.3.zip)** - unzip and run, for locked-down PCs.
+
+- **Approval gates fixed at every entry point** - the CLI, HQ web server, and ACP server each register one configured `ApprovalHook`. The agent no longer installs a duplicate bare hook that parked Write/Bash/Edit for 300s.
+- **Edit requires approval** - `Edit` now matches `Write` and `Bash`, so the edit path can't bypass the write gate.
+- **ACP deny-by-default** - ACP sessions have no interactive approval channel, so approval-requiring tools are denied with an actionable message. Opt in with `LUCKYD_ACP_AUTO_APPROVE=1` or allow the scope in the Trust policy.
+- **Retry policy unified** - `_with_retry`, `LLMClient`, and `CodingAgent` all use 2 retries (3 attempts) with a 120s cap.
+- **Stuck-loop circuit breaker** - four consecutive all-failed tool turns stop the run.
+- **Long autonomous runs** - `CODING_AGENT_MAX_TURNS` defaults to 10000; the one-shot cost preview estimates a typical 30-turn task instead of a 10,000-turn price.
+- **Terminal identity isolation** - PTY spawn strips inherited `LUCKYD_AGENT_*` and `LUCKYD_HUB_URL`, so plain shells never look like agent sessions.
+- **Hermetic tests** - local settings, Cline sessions, Ollama, and jedi no longer change test results.
+- **Version unification** - browser, installer, UI labels, package metadata, and docs all report 10.9.3.
+
+On top of everything from 10.9.2 below.
+
+## [10.9.2] - Paste API keys without editing .env - 2026-11-24
 
 **[`LuckyDBrowserSetup-10.9.2.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.9.2/LuckyDBrowserSetup-10.9.2.exe)** — Windows 10/11 x64 · per-user install · no admin needed.
 **[`LuckyDBrowser-Portable-10.9.2.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.9.2/LuckyDBrowser-Portable-10.9.2.zip)** — unzip and run, for locked-down PCs.

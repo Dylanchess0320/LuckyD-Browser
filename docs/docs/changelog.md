@@ -5,15 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [10.9] - 2026-11-17
+## [10.9.3] - 2026-11-25
 
-Local-first Chat: Hub and Claw are optional.
+Hardening release: approval gates are wired exactly once at every entry point, retries and turn limits are consistent, and the test suite is hermetic.
+
+### Security
+- Fixed approval gating: the CLI, HQ web server, and ACP server each register one configured `ApprovalHook`; the agent no longer installs a duplicate bare hook that parked approvals for 300s.
+- `Edit` now requires approval, matching `Write` and `Bash`.
+- ACP sessions deny approval-requiring tools by default (no interactive channel). Opt in with `LUCKYD_ACP_AUTO_APPROVE=1` or a Trust-policy allow rule.
+- PTY spawn strips inherited `LUCKYD_AGENT_*` and `LUCKYD_HUB_URL`, so plain terminal tabs are not branded as agent sessions.
 
 ### Changed
-- LuckyD Chat opens in a local-only state: the provider pick and shared handoff note are always available, while the Hub chat and Claw task panels only render after both an address and a token are set in Settings → Connections. Unconfigured is treated as normal, not an error.
-- Removed the baked-in Tailscale/LAN service defaults (`100.96.167.54`) and the matching placeholder addresses from Settings → Connections, so a shipped build never points at a personal machine.
-- Dropped the stale Puck bridge row from the Chat status line; the status block now covers only connected services.
-- A configured-but-offline Hub or Claw shows one plain line naming the route to the fix.
+- Unified retry policy at 2 retries (3 attempts) with a 120s elapsed cap across `_with_retry`, `LLMClient`, and `CodingAgent`.
+- `CODING_AGENT_MAX_TURNS` defaults to 10000 for long autonomous runs; the one-shot cost preview estimates a typical 30-turn task.
+- Version references across the browser, installer, UI, package metadata, and docs now agree on 10.9.3.
+
+### Tests
+- Replaced source-inspection assertions with behavioral tests for approval ownership, retry alignment, the turn ceiling, and the Edit permission level.
+- Made LSP, rotation, provider, and control-server tests independent of the developer machine's jedi install, Ollama daemon, settings file, and Cline session.
+- Added regressions for the PTY env leak and ACP approval wiring.
 
 ## [10.9.2] - 2026-11-24
 
@@ -30,6 +40,16 @@ Paste API keys in LuckyD Code and the browser AI Assistant — /key saves to the
 
 - Fixed the CI quality gate (ruff format, unused `noqa`, mypy) so the full pipeline runs again.
 - Corrected the OpenRouter catalog cache typing; no behavior change.
+
+## [10.9] - 2026-11-17
+
+Local-first Chat: Hub and Claw are optional.
+
+### Changed
+- LuckyD Chat opens in a local-only state: the provider pick and shared handoff note are always available, while the Hub chat and Claw task panels only render after both an address and a token are set in Settings → Connections. Unconfigured is treated as normal, not an error.
+- Removed the baked-in Tailscale/LAN service defaults (`100.96.167.54`) and the matching placeholder addresses from Settings → Connections, so a shipped build never points at a personal machine.
+- Dropped the stale Puck bridge row from the Chat status line; the status block now covers only connected services.
+- A configured-but-offline Hub or Claw shows one plain line naming the route to the fix.
 
 ## [10.8.9] - 2026-11-11
 

@@ -41,6 +41,11 @@ def lw_state(monkeypatch, tmp_path):
         "GROQ_API_KEY",
     ):
         monkeypatch.delenv(var, raising=False)
+    # Hermetic rotation order: a developer's running Ollama would otherwise
+    # be pinned first (10.8.8) and these cloud-preference assertions fail.
+    import core.free_rotation as free_rotation
+
+    monkeypatch.setattr(free_rotation, "_ollama_reachable", lambda: False)
     return state
 
 

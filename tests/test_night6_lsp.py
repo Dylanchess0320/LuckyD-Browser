@@ -1,6 +1,8 @@
 """Night-6 wave-2 tests: tools/lsp_tools.py.
 
-jedi is NOT installed in this environment, so these tests cover:
+The no-jedi paths are forced with a monkeypatched ``_get_jedi`` / a
+``None`` entry in ``sys.modules``, so the suite behaves the same whether or
+not the optional ``jedi`` dependency is installed. These tests cover:
   1. The real no-jedi error paths (every tool degrades to an error ToolOutput).
   2. _resolve_path behavior.
   3. Output formatting / parsing / rename-mutation logic with a stubbed
@@ -30,16 +32,27 @@ def _tool(name):
     return t
 
 
-# ── no-jedi behavior (jedi genuinely missing here) ─────────────────────
+# ── no-jedi behavior (forced, independent of the environment) ──────────
+
+
+def _missing_jedi():
+    raise RuntimeError("jedi not installed. Run: pip install jedi")
+
+
+@pytest.fixture
+def no_jedi(monkeypatch):
+    """Make both ``import jedi`` and ``_get_jedi()`` fail deterministically."""
+    monkeypatch.setitem(sys.modules, "jedi", None)
+    monkeypatch.setattr(lsp_mod, "_get_jedi", _missing_jedi)
 
 
 class TestNoJedi:
-    def test_get_jedi_raises_runtime_error(self):
-        assert "jedi" not in sys.modules
+    def test_get_jedi_raises_runtime_error(self, monkeypatch):
+        monkeypatch.setitem(sys.modules, "jedi", None)
         with pytest.raises(RuntimeError, match="jedi not installed"):
             lsp_mod._get_jedi()
 
-    async def test_all_tools_error_without_jedi(self, tmp_path):
+    async def test_all_tools_error_without_jedi(self, tmp_path, no_jedi):
         f = tmp_path / "x.py"
         f.write_text("x = 1\n")
         cases = [
@@ -57,12 +70,12 @@ class TestNoJedi:
             assert not _ok(r), name
             assert "jedi not installed" in r.text, name
 
-    async def test_workspace_symbols_errors_without_jedi(self):
+    async def test_workspace_symbols_errors_without_jedi(self, no_jedi):
         r = await _tool("LspWorkspaceSymbols").execute(query="x")
         assert not _ok(r)
         assert "jedi" in r.text.lower()
 
-    async def test_definition_missing_file(self, tmp_path):
+    async def test_definition_missing_file(self, tmp_path, no_jedi):
         # _get_jedi() runs before the file-exists check, so without jedi the
         # import error wins even for a missing file.
         r = await _tool("LspDefinition").execute(file_path=str(tmp_path / "nope.py"), line=1)

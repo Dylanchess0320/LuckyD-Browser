@@ -32,7 +32,7 @@ from tools.registry import registry
 
 from .compaction import maybe_compact
 from .goals import GoalStore, goal_from_session
-from .hooks import get_hooks, register_plugin
+from .hooks import get_hooks
 from .llm_client import LLMClient
 from .message_builder import MessageBuilder
 from .rules_loader import load_project_rules
@@ -309,8 +309,9 @@ class CodingAgent:
             "yes",
         )
 
-        # Retry state
-        self.max_retries = 3
+        # Retry state. Keep this aligned with LLMClient/_with_retry defaults
+        # (10.9.3): two retries (three attempts) with a 120s elapsed cap.
+        self.max_retries = 2
         self.base_delay = 1.0
 
         # Track consecutive turns with no tool calls to detect premature stopping
