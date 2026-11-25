@@ -1036,15 +1036,15 @@ def _persist_model_selection(provider: str, model: str) -> None:
 # ── Approval callback ───────────────────────────────────────────────
 
 
-def _console_approval(request) -> type(None):
-    """Prompt user for tool approval in REPL. Returns None to proceed; returning a dict blocks the tool.
+def _console_approval(request):
+    """Prompt user for tool approval in REPL. Returns ToolApprovalResult.
 
     Note: When using the interactive REPL, type your response when you see the box below.
     For non-interactive use, approvals follow the trust policy (the legacy
     --auto-approve / CODING_AGENT_AUTO_APPROVE=1 blanket bypass is inert since 6.1).
     """
     _ensure_all_heavy()
-    from core.types import ToolPermissionLevel
+    from core.types import ToolApprovalResult, ToolPermissionLevel
 
     preview = request.tool_args.get("command", request.tool_name)[:120]
     print(f"\n  [APPROVAL] {request.tool_name}: {preview}")
@@ -1063,15 +1063,11 @@ def _console_approval(request) -> type(None):
                 p.set_permission(request.tool_name, ToolPermissionLevel.ALWAYS_ALLOW)
                 break
         print("  > Tool auto-approved for future calls")
-        return None
+        return ToolApprovalResult(approved=True, reason="always allow")
     if ans in ("y", "yes"):
-        return None
+        return ToolApprovalResult(approved=True)
     print("  > Tool execution denied.")
-    return {
-        "role": "tool",
-        "tool_call_id": request.call_id,
-        "content": "Tool execution denied by user.",
-    }
+    return ToolApprovalResult(approved=False, reason="denied by user")
 
 
 async def handle_model_command(agent: CodingAgent, cmd: str) -> bool:

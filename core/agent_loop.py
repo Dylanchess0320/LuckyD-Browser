@@ -382,14 +382,10 @@ class CodingAgent:
             pass
         self.message_builder = MessageBuilder()
         self.hooks = get_hooks()
-        # Register ApprovalHook in the main agent path so user
-        # approvals (A clicks) actually gate dangerous tools.
-        try:
-            from core.approval_hook import ApprovalHook
-
-            register_plugin(ApprovalHook())
-        except Exception:
-            pass
+        # ApprovalHook is registered by the entry point (main._run_agent /
+        # web_server) with the appropriate callback. Registering a bare
+        # ApprovalHook() here would create a duplicate hook with no callback
+        # that parks approvals in the pending queue and blocks for 300s.
 
         # Advanced tool result processing
         try:

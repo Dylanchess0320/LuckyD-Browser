@@ -154,7 +154,7 @@ class WriteTool(ToolBase):
 class EditTool(ToolBase):
     name = "Edit"
     description = "Edit an existing file by replacing text. Performs an exact string replacement."
-    permission_level = "NORMAL"
+    permission_level = "REQUIRES_APPROVAL"
     tracks_files = True
     parameters = {
         "file_path": {"type": "string", "description": "Absolute path to the file to edit"},

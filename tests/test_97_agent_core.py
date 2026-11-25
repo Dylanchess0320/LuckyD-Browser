@@ -377,8 +377,8 @@ class TestRetryClassification:
 
         with pytest.raises(httpx.HTTPStatusError):
             await _with_retry(always_down)()
-        assert calls["n"] == 6  # initial attempt + 5 retries
-        assert sleeps == [1.0, 2.0, 4.0, 8.0, 16.0]
+        assert calls["n"] == 3  # initial attempt + 2 retries (default max_retries=2)
+        assert sleeps == [1.0, 2.0]
 
     async def test_with_retry_respects_elapsed_cap(self, monkeypatch):
         from core.agent_loop import _with_retry
