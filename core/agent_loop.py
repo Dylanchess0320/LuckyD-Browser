@@ -32,7 +32,7 @@ from tools.registry import registry
 
 from .compaction import maybe_compact
 from .goals import GoalStore, goal_from_session
-from .hooks import get_hooks
+from .hooks import get_hooks, register_plugin
 from .llm_client import LLMClient
 from .message_builder import MessageBuilder
 from .rules_loader import load_project_rules
