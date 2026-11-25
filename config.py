@@ -101,7 +101,7 @@ def get_config() -> dict:
 
     return {
         **provider_cfg,
-        "max_turns": int(os.environ.get("CODING_AGENT_MAX_TURNS", "30")),
+        "max_turns": int(os.environ.get("CODING_AGENT_MAX_TURNS", "10000")),
         "temperature": float(os.environ.get("CODING_AGENT_TEMP", "0.0")),
         "max_tokens": int(os.environ.get("CODING_AGENT_MAX_TOKENS", "8192")),
         "timeout_sec": int(os.environ.get("CODING_AGENT_TIMEOUT", "120")),

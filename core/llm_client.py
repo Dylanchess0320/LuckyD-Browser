@@ -75,7 +75,7 @@ class LLMClient:
         temperature: float = 0.0,
         max_tokens: int = 8192,
         timeout_sec: int = 120,
-        max_retries: int = 5,
+        max_retries: int = 2,
         base_delay: float = 1.0,
         retry_time_cap: float = 120.0,
         context_manager: ContextManager | None = None,
