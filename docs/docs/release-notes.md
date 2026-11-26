@@ -1,5 +1,12 @@
 # LuckyD Browser - Release Notes
 
+## [10.9.4] - Sidebar fullscreen fix, version unification - 2026-11-26
+
+**[`LuckyDBrowserSetup-10.9.4.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.9.4/LuckyDBrowserSetup-10.9.4.exe)** - Windows 10/11 x64 - per-user install - no admin needed.
+
+- **Sidebar fullscreen glitch/crash fixed** - searching with the AI sidebar open no longer crashes when a page requests fullscreen. The sidebar is hidden first and the layout settles before `showFullScreen()`, and dock restore is deferred so it never re-shows in the same turn as `showNormal()/showMaximized()`.
+- **Version unification** - browser, installer, UI labels, and docs all report 10.9.4.
+
 ## [10.9.3] - Hardening: approvals, retries, terminal isolation - 2026-11-25
 
 **[`LuckyDBrowserSetup-10.9.3.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.9.3/LuckyDBrowserSetup-10.9.3.exe)** - Windows 10/11 x64 - per-user install - no admin needed.
