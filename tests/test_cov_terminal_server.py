@@ -769,7 +769,7 @@ def test_spawn_pty_agent_overrides_inherited_identity(monkeypatch, tmp_path) -> 
     parts = _env_parts(_FakePTYFactory.instances[-1].spawn_kwargs["env"])
     assert "LUCKYD_AGENT_SLOT=1" in parts
     assert "LUCKYD_AGENT_NAME=Agent 1" in parts
-    assert "LUCKYD_AGENT_VERSION=v10.9.3" in parts
+    assert "LUCKYD_AGENT_VERSION=v10.9.4" in parts
     assert "LUCKYD_AGENT_SLOT=2" not in parts
 
 
