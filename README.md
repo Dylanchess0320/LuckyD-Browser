@@ -75,6 +75,8 @@ Then start chatting. That's it. Want everything on your own machine? Add Ollama 
 
 ## What's new
 
+**v10.9.4** — Fixed a crash when searching with the AI assistant sidebar open: the web tab is now isolated from the sidebar during fullscreen video, so searching no longer glitches or crashes.
+
 **v10.9.3** - Hardening release: approval gates now work at every entry point (CLI, HQ web server, ACP), Edit asks like Write/Bash, retries stop at two with a 120s cap, a stuck tool loop trips the circuit breaker, long autonomous runs can use up to 10,000 turns, and agent identity no longer leaks into plain terminal tabs.
 
 **v10.9.2** - Paste API keys in LuckyD Code and the browser AI Assistant - /key saves to the shared .env, so OpenRouter and every provider connect without manual edits.

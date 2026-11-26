@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [10.9.4] - 2026-11-25
+
+### Fixed
+
+- **Sidebar-open search fullscreen crash** — searching with the AI assistant sidebar open could glitch in fullscreen and crash. The web tab is now isolated from the sidebar during element fullscreen: the sidebar is hidden before fullscreen video starts and restored after the window settles, so the dock is never shown/hidden mid-`showFullScreen()`.
+
 ## [10.9.3] - 2026-11-25
 
 Hardening release: approval gates are wired exactly once at every entry
