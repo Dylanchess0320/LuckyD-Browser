@@ -31,7 +31,7 @@ from browser_core.updater import (  # noqa: F401
 #: timing), so every update path below just opens this page in a tab.
 RELEASES_PAGE_URL = "https://github.com/Dylanchess0320/LuckyD-Browser/releases"
 from browser_core.zoom import clamp_zoom, origin_key, remember, zoom_for
-from PySide6.QtCore import QEvent, QSize, Qt, QUrl, Signal
+from PySide6.QtCore import QEvent, QSize, Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QAction, QGuiApplication, QIcon, QImage, QKeySequence, QShortcut
 from PySide6.QtWebEngineCore import QWebEnginePage
 from PySide6.QtWebEngineWidgets import QWebEngineView
@@ -195,12 +195,18 @@ class MainWindow(QMainWindow):
         if self.ai_sidebar.isVisible():
             self.ai_sidebar.hide()
         else:
+            # Never show a dock while element fullscreen is active: hiding /
+            # showing docks mid-showFullScreen() is the glitch/crash path.
+            if self._video_fs:
+                return
             self.ai_sidebar.show()
             self.ai_sidebar.raise_()
             self.ai_sidebar.input.setFocus()
 
     def show_assistant(self) -> None:
         """Show the AI assistant sidebar and focus the input."""
+        if self._video_fs:
+            return
         self.ai_sidebar.show()
         self.ai_sidebar.raise_()
         self.ai_sidebar.input.setFocus()
@@ -1282,8 +1288,14 @@ class MainWindow(QMainWindow):
         self._fs_view = view
         self._fs_prev_state = self._window_state_snapshot(self)
         self._fs_hidden = [w for w in self._fullscreen_chrome() if w.isVisible()]
-        for w in self._fs_hidden:
-            w.hide()
+        # Hide the AI sidebar FIRST and let the layout settle before going
+        # fullscreen — hiding a dock in the same turn as showFullScreen()
+        # is what glitched/crashed the web tab when the sidebar was open.
+        sidebar = getattr(self, "ai_sidebar", None)
+        if sidebar is not None and sidebar in self._fs_hidden:
+            sidebar.hide()
+            QTimer.singleShot(0, self._do_show_fullscreen)
+            return
         self.showFullScreen()
 
     def _exit_video_fullscreen(self, view=None, exit_page: bool = True) -> None:
@@ -1309,14 +1321,29 @@ class MainWindow(QMainWindow):
         # Restore only the surfaces that WERE visible. Blindly show()-ing
         # every dock used to re-open the AI assistant after the user closed
         # it, changing the window layout when the video ended.
-        for w in hidden:
-            with contextlib.suppress(RuntimeError):
-                w.show()
+        # Deferred one turn: re-showing a dock in the same turn as
+        # showNormal()/showMaximized() is the glitch/crash path.
+        QTimer.singleShot(0, self._restore_fs_chrome, hidden)
         # Let the page drop its own fullscreen flag. The resulting toggleOff
         # request is harmless: _video_fs is already False.
         if exit_page and owner is not None:
             with contextlib.suppress(Exception):
                 owner.page().triggerAction(QWebEnginePage.WebAction.ExitFullScreen)
+
+    def _do_show_fullscreen(self) -> None:
+        """Second half of _enter_video_fullscreen (sidebar already hidden)."""
+        if not self._video_fs:
+            return
+        for w in self._fs_hidden:
+            with contextlib.suppress(RuntimeError):
+                w.hide()
+        self.showFullScreen()
+
+    def _restore_fs_chrome(self, hidden) -> None:
+        """Re-show fullscreen-hidden chrome one turn after window restore."""
+        for w in hidden:
+            with contextlib.suppress(RuntimeError):
+                w.show()
 
     def _enter_window_fullscreen(self) -> None:
         if self.isFullScreen():
