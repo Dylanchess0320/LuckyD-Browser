@@ -178,6 +178,17 @@ On top of everything from 10.8.6 below.
 
 # LuckyD Browser — Release Notes
 
+## [10.9.5] — Sidebar Task Review & API Key Setup — 2026-11-26
+
+**[`LuckyDBrowserSetup-10.9.5.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.9.5/LuckyDBrowserSetup-10.9.5.exe)** — Windows 10/11 x64 · per-user install · no admin needed.
+**[`LuckyDBrowser-Portable-10.9.5.zip`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.9.5/LuckyDBrowser-Portable-10.9.5.zip)** — unzip and run, for locked-down PCs.
+
+﻿- **AI Sidebar Task Review**: Added pre-execution review confirmation when running autonomous browser agents, prompting users to inspect plans before driving open tabs.
+- **Interactive `/apikey` Command**: Securely paste, save, and activate provider API keys with masked input prompt, provider aliases, and atomic `.env` management.
+- **Unified 10.9.5 Runtime**: Full version unification across LuckyD Browser, LuckyD Code REPL, and Multi-Agent Terminal backend.
+
+On top of everything from 10.9.4 below.
+
 ## [10.7.8] — Polished UI + reliable HQ — 2026-10-21
 
 **[`LuckyDBrowserSetup-10.7.8.exe`](https://github.com/Dylanchess0320/LuckyD-Browser/releases/download/v10.7.8/LuckyDBrowserSetup-10.7.8.exe)** — Windows 10/11 x64 · per-user install · no admin needed.

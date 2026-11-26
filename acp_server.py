@@ -12,7 +12,7 @@ from typing import Any
 
 ACP_VERSION = "0.1"
 AGENT_NAME = "LuckyD Code"
-AGENT_VERSION = "v10.9.3"
+AGENT_VERSION = "v10.9.5"
 
 _TRUTHY = ("1", "true", "yes", "on")
 

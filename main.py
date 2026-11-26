@@ -798,43 +798,284 @@ def _resolve_openrouter_query(query: str, live: bool = True) -> tuple[str, str] 
     return None
 
 
+_API_KEY_PROVIDER_ALIASES = {
+    "claude": "anthropic",
+    "gpt": "openai",
+    "glm": "zai",
+    "kimi": "moonshot",
+    "grok": "xai",
+    "muse": "meta",
+}
+
+
+def _api_key_target(provider: str) -> tuple[str, str, str] | None:
+    """Resolve a provider name to (id, env var, display name).
+
+    Built-in providers come from ``core.providers.PROVIDER_DEFAULTS``; custom
+    providers use their stored ``api_key_env``.  Returns None when unknown.
+    """
+    from core.providers import PROVIDER_DEFAULTS, PROVIDER_NAMES, normalize_provider_id
+
+    raw = (provider or "").strip().lower()
+    pid = normalize_provider_id(_API_KEY_PROVIDER_ALIASES.get(raw, raw))
+    defaults = PROVIDER_DEFAULTS.get(pid)
+    if defaults is not None:
+        return pid, str(defaults.get("env_key") or ""), PROVIDER_NAMES.get(pid, pid)
+    try:
+        from core.custom_providers import get_provider
+
+        custom = get_provider(pid)
+        if custom is not None:
+            return custom.id, (custom.api_key_env or "").strip(), custom.name or custom.id
+    except Exception:
+        pass
+    return None
+
+
+def _save_env_values(values: dict[str, str]) -> Path:
+    """Write values to the active .env atomically, preserving comments.
+
+    A frozen install writes ``%LOCALAPPDATA%/LuckyDBrowser/.env`` (see
+    ``config.ENV_FILE``), so keys and model choices survive installer
+    upgrades; a source checkout writes its repo ``.env``.  Values also go into
+    ``os.environ`` immediately, so the running session can use them without a
+    restart.
+    """
+    from config import ENV_FILE
+
+    lines = ENV_FILE.read_text(encoding="utf-8-sig").splitlines() if ENV_FILE.exists() else []
+    for key, value in values.items():
+        lines = _set_env_key(lines, key, value)
+    ENV_FILE.parent.mkdir(parents=True, exist_ok=True)
+    tmp = ENV_FILE.with_name(ENV_FILE.name + ".tmp")
+    tmp.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    tmp.replace(ENV_FILE)
+    for key, value in values.items():
+        os.environ[key] = value
+    return ENV_FILE
+
+
+def _remove_env_key(key: str) -> bool:
+    """Delete ``key=...`` from the active .env. Returns True when removed."""
+    from config import ENV_FILE
+
+    os.environ.pop(key, None)
+    if not ENV_FILE.exists():
+        return False
+    lines = ENV_FILE.read_text(encoding="utf-8-sig").splitlines()
+    prefix = key + "="
+    kept = [
+        line
+        for line in lines
+        if not (line.strip().startswith(prefix) and not line.lstrip().startswith("#"))
+    ]
+    if len(kept) == len(lines):
+        return False
+    tmp = ENV_FILE.with_name(ENV_FILE.name + ".tmp")
+    tmp.write_text("\n".join(kept) + "\n", encoding="utf-8")
+    tmp.replace(ENV_FILE)
+    return True
+
+
+def _masked_secret_prompt(label: str) -> str:
+    """Read a secret without echoing it. Empty string means cancelled."""
+    import getpass
+
+    try:
+        return getpass.getpass(label).strip()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return ""
+    except Exception:
+        # Some embedded consoles do not implement getpass; fall back to a
+        # normal read rather than crashing the REPL.
+        print(label, end="", flush=True)
+        try:
+            return sys.stdin.readline().strip()
+        except (EOFError, KeyboardInterrupt):
+            return ""
+
+
+def _api_key_rows() -> list[tuple[str, str, str, str]]:
+    """(provider id, name, env var, status) for the /apikey table."""
+    from core.providers import list_providers
+
+    pairs = _read_env_pairs()
+    rows: list[tuple[str, str, str, str]] = []
+    for entry in list_providers():
+        env_key = str(entry.get("env_key") or "")
+        pid = str(entry.get("id") or "")
+        name = str(entry.get("name") or pid)
+        if not env_key:
+            status = "local - no key"
+        elif (pairs.get(env_key) or os.environ.get(env_key, "")).strip():
+            status = "set"
+        elif entry.get("key_present"):
+            status = "session"
+        else:
+            status = "missing"
+        rows.append((pid, name, env_key or "-", status))
+    return rows
+
+
+def _show_api_keys() -> None:
+    _ensure_ui()
+    from config import ENV_FILE
+
+    rows = _api_key_rows()
+    try:
+        cur_model, cur_provider = _current_model_and_provider()
+    except Exception:
+        cur_model, cur_provider = "", ""
+    lines = [
+        f"**API keys** - saved to `{ENV_FILE}`",
+        f"Active: `{cur_provider or '?'}` / `{cur_model or '?'}`",
+        "",
+        "| Provider | Key variable | Status |",
+        "| --- | --- | --- |",
+    ]
+    for pid, _name, env_key, status in rows:
+        lines.append(f"| `{pid}` | `{env_key}` | {status} |")
+    lines += [
+        "",
+        "Paste a key (hidden input, saved + enabled): `/apikey <provider>`",
+        "One-shot paste: `/apikey <provider> <key>`",
+        "Save without switching: `/apikey <provider> --keep`",
+        "Remove: `/apikey remove <provider>`",
+    ]
+    ui.markdown("\n".join(lines))
+
+
+def _remove_api_key(provider_arg: str) -> None:
+    _ensure_ui()
+    from config import ENV_FILE
+
+    target = _api_key_target(provider_arg)
+    if target is None:
+        ui.warn(f"Unknown provider: {provider_arg}. Run /apikey to see providers.")
+        return
+    pid, env_key, name = target
+    if not env_key:
+        ui.info(f"{name} does not use an API key.")
+        return
+    removed = _remove_env_key(env_key)
+    if removed:
+        ui.success(f"Removed {env_key} from {ENV_FILE}.")
+    else:
+        ui.warn(f"{env_key} was not saved in {ENV_FILE} - nothing to remove.")
+    if env_key == "CLINEPASS_API_KEY":
+        ui.info("That key is shared by ClinePass and Cline Usage.")
+    try:
+        from core.providers import resolve_provider_config
+
+        active = str(resolve_provider_config().get("provider") or "")
+    except Exception:
+        active = ""
+    if active == pid:
+        ui.warn(f"{name} is the active provider - pick another with /model or paste a new key.")
+
+
+def _activate_provider_env(pid: str) -> bool:
+    """Persist CODING_AGENT_PROVIDER + its default model (no live agent)."""
+    from core.providers import PROVIDER_DEFAULTS
+
+    defaults = PROVIDER_DEFAULTS.get(pid)
+    if defaults is None:
+        return False
+    env_model = str(defaults.get("env_model") or "")
+    model = (os.environ.get(env_model, "") if env_model else "").strip()
+    model = model or str(defaults.get("default_model") or "")
+    values = {"CODING_AGENT_PROVIDER": pid}
+    if env_model and model:
+        values[env_model] = model
+    _save_env_values(values)
+    return True
+
+
+def _handle_apikey_command(agent, raw: str) -> None:
+    """``/apikey`` - paste, save and enable provider API keys."""
+    _ensure_ui()
+    raw_tokens = raw[1:].strip().split()
+    cmd_tokens = [
+        t for t in raw_tokens[1:] if t.lower() not in ("--keep", "keep", "--no-switch", "no-switch")
+    ]
+    keep = len(cmd_tokens) < len(raw_tokens[1:])
+    if not cmd_tokens or cmd_tokens[0].lower() in ("list", "show", "status"):
+        _show_api_keys()
+        return
+    if cmd_tokens[0].lower() in ("remove", "delete", "unset", "clear"):
+        if len(cmd_tokens) < 2:
+            ui.warn("Usage: /apikey remove <provider>")
+            return
+        _remove_api_key(cmd_tokens[1])
+        return
+
+    provider_arg = cmd_tokens[0]
+    key = cmd_tokens[1].strip().strip('"').strip("'") if len(cmd_tokens) > 1 else ""
+
+    target = _api_key_target(provider_arg)
+    if target is None:
+        ui.warn(f"Unknown provider: {provider_arg}. Run /apikey to see providers.")
+        return
+    pid, env_key, name = target
+    if not env_key:
+        if pid == "ollama":
+            ui.info("Ollama runs locally and needs no API key.")
+        else:
+            ui.warn(f"{name} has no API key variable configured.")
+        return
+
+    if not key:
+        if not sys.stdin.isatty():
+            ui.warn("Paste the key in the same command: /apikey <provider> <key>")
+            return
+        print()
+        ui.info(f"Paste the {name} API key below. Input is hidden; Enter alone cancels.")
+        key = _masked_secret_prompt(f"  {env_key}: ")
+        if not key:
+            ui.info("Cancelled - no key saved.")
+            return
+    if len(key) < 8 or any(ch.isspace() for ch in key):
+        ui.warn("That does not look like an API key (too short or contains spaces). Nothing saved.")
+        return
+
+    try:
+        path = _save_env_values({env_key: key})
+    except OSError as exc:
+        ui.error(f"Could not save {env_key}: {exc}")
+        return
+    ui.success(f"Saved {env_key} to {path}")
+
+    if keep:
+        ui.info(f"{name} key saved. Current provider unchanged - /model {pid} to use it.")
+        return
+    from core.providers import PROVIDER_DEFAULTS
+
+    if pid not in PROVIDER_DEFAULTS:
+        ui.info(
+            f"{name} key saved. Activate the custom provider with "
+            f"`lucky-code custom-provider use {pid}`."
+        )
+        return
+    _switch_model(agent, provider=pid)
+
+
 def _prompt_and_save_api_key(env_var: str, provider_name: str) -> str:
     """Interactively prompt the user for an API key and persist it to .env."""
     _ensure_ui()
     ui.warn(f"No API key found for {provider_name}.")
-    print(f"  Paste your {provider_name} API key below (or press Enter to cancel):")
-    print(f"    {env_var}= ", end="")
-    key = sys.stdin.readline().strip()
+    print(f"  Paste your {provider_name} API key below (input hidden, Enter to cancel):")
+    key = _masked_secret_prompt(f"  {env_var}: ")
     if not key:
         ui.error("No key provided -- cannot continue without an API key.")
         sys.exit(1)
 
-    env_path = PROJECT_DIR / ".env"
-    if env_path.exists():
-        lines = env_path.read_text(encoding="utf-8").splitlines(keepends=True)
-    else:
-        lines = []
-
-    key_prefix = f"{env_var}="
-    replaced = False
-    new_lines = []
-    for line in lines:
-        stripped = line.strip()
-        if stripped.startswith(key_prefix) and not stripped.startswith("#"):
-            new_lines.append(f"{env_var}={key}\n")
-            replaced = True
-        else:
-            new_lines.append(line)
-
-    if not replaced:
-        if new_lines and new_lines[-1].strip() != "":
-            new_lines.append("\n")
-        new_lines.append(f"# {provider_name}\n")
-        new_lines.append(f"{env_var}={key}\n")
-
-    env_path.write_text("".join(new_lines), encoding="utf-8")
-    os.environ[env_var] = key
-    ui.success(f"Saved {env_var} to .env  (available now -- no restart needed)")
+    try:
+        env_path = _save_env_values({env_var: key})
+    except OSError as exc:
+        ui.error(f"Could not save {env_var}: {exc}")
+        sys.exit(1)
+    ui.success(f"Saved {env_var} to {env_path}  (available now -- no restart needed)")
     return key
 
 
@@ -1398,6 +1639,9 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
     elif cmd == "tools":
         ui.show_tools(sorted(registry.list_tools()))
 
+    elif cmd == "apikey" or cmd.startswith("apikey "):
+        _handle_apikey_command(agent, raw)
+
     elif cmd == "memory":
         try:
             from memory.store import get_memory
@@ -1542,7 +1786,7 @@ async def handle_command(agent: CodingAgent, cmd: str) -> bool:
             ui.warn("MCP not configured or no servers connected")
 
     elif cmd == "version":
-        agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v10.9.3")
+        agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v10.9.5")
         agent_name = os.environ.get("LUCKYD_AGENT_NAME", "Agent 1")
         ui.info(f"LuckyD Code {agent_version} ({agent_name})")
 
@@ -2138,6 +2382,87 @@ def _print_model_switch_health(provider: str, picked: str) -> None:
     print("Tip: a running REPL switches instantly with /model <name> — same picker.")
 
 
+def _cli_apikey(args: list[str]) -> None:
+    """lucky-code apikey - paste, save and enable a provider API key."""
+    _ensure_ui()
+    raw_args = list(args)
+    keep = any(a.lower() in ("--keep", "keep", "--no-switch", "no-switch") for a in raw_args)
+    cmd_args = [
+        a for a in raw_args if a.lower() not in ("--keep", "keep", "--no-switch", "no-switch")
+    ]
+    if cmd_args and cmd_args[0] in ("-h", "--help", "help"):
+        print(
+            """
+lucky-code apikey - save and enable a provider API key
+
+Usage:
+  lucky-code apikey                     List providers and key status
+  lucky-code apikey <provider>          Prompt for a key (input hidden)
+  lucky-code apikey <provider> <key>    Save a key non-interactively
+  lucky-code apikey <provider> --keep   Save without switching providers
+  lucky-code apikey remove <provider>   Remove a saved key
+
+Keys are written to the active .env (installed builds use
+%LOCALAPPDATA%\\LuckyDBrowser\\.env) and applied immediately. The key is
+never echoed or logged. Inside the REPL use the same command: /apikey.
+"""
+        )
+        return
+    if not cmd_args or cmd_args[0].lower() in ("list", "show", "status"):
+        _show_api_keys()
+        return
+    if cmd_args[0].lower() in ("remove", "delete", "unset", "clear"):
+        if len(cmd_args) < 2:
+            print("Usage: lucky-code apikey remove <provider>")
+            return
+        _remove_api_key(cmd_args[1])
+        return
+
+    provider_arg = cmd_args[0]
+    key = cmd_args[1].strip().strip('"').strip("'") if len(cmd_args) > 1 else ""
+
+    target = _api_key_target(provider_arg)
+    if target is None:
+        print(f"Unknown provider: {provider_arg}. Run: lucky-code apikey")
+        return
+    pid, env_key, name = target
+    if not env_key:
+        print(f"{name} does not use an API key.")
+        return
+    if not key:
+        if not sys.stdin.isatty():
+            print("Paste the key in the same command: lucky-code apikey <provider> <key>")
+            return
+        print(f"Paste the {name} API key below. Input is hidden; Enter alone cancels.")
+        key = _masked_secret_prompt(f"  {env_key}: ")
+        if not key:
+            print("Cancelled - no key saved.")
+            return
+    if len(key) < 8 or any(ch.isspace() for ch in key):
+        print("That does not look like an API key (too short or contains spaces). Nothing saved.")
+        return
+
+    try:
+        path = _save_env_values({env_key: key})
+    except OSError as exc:
+        print(f"Could not save {env_key}: {exc}")
+        return
+    print(f"Saved {env_key} to {path}")
+    if keep:
+        print(f"{name} key saved. Current provider unchanged.")
+        return
+    if _activate_provider_env(pid):
+        from core.providers import PROVIDER_DEFAULTS
+
+        defaults = PROVIDER_DEFAULTS[pid]
+        env_model = str(defaults.get("env_model") or "")
+        model = (os.environ.get(env_model, "") if env_model else "").strip()
+        model = model or str(defaults.get("default_model") or "")
+        print(f"Enabled {name} ({model}).")
+    else:
+        print(f"{name} key saved. Activate it with: lucky-code custom-provider use {pid}")
+
+
 def _cli_providers(args):
     """lucky-code providers — list every AI provider with live status.
 
@@ -2588,6 +2913,9 @@ def _dispatch_early_subcommands(args: list[str]) -> bool:
     if cmd in ("providers", "provider"):
         _cli_providers(args[1:])
         return True
+    if cmd in ("apikey", "key"):
+        _cli_apikey(args[1:])
+        return True
     if cmd in ("doctor", "mesh-doctor"):
         _cli_doctor(args[1:])
         return True
@@ -2609,7 +2937,7 @@ def _dispatch_early_subcommands(args: list[str]) -> bool:
 
 def _print_version() -> None:
     """Print the LuckyD Code version line (fast path: no config needed)."""
-    agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v10.9.3")
+    agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v10.9.5")
     agent_name = os.environ.get("LUCKYD_AGENT_NAME", "")
     label = f"LuckyD Code {agent_version}" + (f" ({agent_name})" if agent_name else "")
     print(label)
@@ -2622,11 +2950,12 @@ def _print_help() -> None:
 LuckyD Code — AI Coding Agent
 
 Usage:
-  lucky-code                       Interactive REPL (Agent 1 · v10.9.3)
-  lucky-code --agent 2             Interactive REPL (Agent 2 · v10.9.3)
+  lucky-code                       Interactive REPL (Agent 1 · v10.9.5)
+  lucky-code --agent 2             Interactive REPL (Agent 2 · v10.9.5)
   lucky-code providers           List AI providers — status, cost tier, current
   lucky-code doctor [--json]     Check provider & Multi Agent Terminal backend health + tiers
   lucky-code model <name>        Switch model (fuzzy Cline-style picker)
+  lucky-code apikey <provider>   Paste & enable a provider API key (saved to .env)
   lucky-code plugin list --available   List/install plugins
   lucky-code custom-provider list      List user-defined providers
   lucky-code --acp               ACP stdio server (for editor extensions)
@@ -2635,7 +2964,7 @@ Usage:
   lucky-code --resume <id>         Resume specific session
 
 Options:
-  --agent 1|2        Select agent slot (1 = v10.9.3 Nuitka, 2 = v10.9.3)
+  --agent 1|2        Select agent slot (1 = v10.9.5 Nuitka, 2 = v10.9.5)
   --model NAME       Model: auto (default), flash, pro, or specific name
   --provider NAME    Set provider (see: lucky-code providers): ollama, clinepass,
                      cline-usage, openrouter, groq, deepseek,
@@ -2740,11 +3069,11 @@ def _parse_agent_args(args: list[str], cfg: dict) -> tuple[dict, str, float, str
             if slot == "2":
                 os.environ["LUCKYD_AGENT_SLOT"] = "2"
                 os.environ["LUCKYD_AGENT_NAME"] = "Agent 2"
-                os.environ["LUCKYD_AGENT_VERSION"] = "v10.9.3"
+                os.environ["LUCKYD_AGENT_VERSION"] = "v10.9.5"
             else:
                 os.environ["LUCKYD_AGENT_SLOT"] = "1"
                 os.environ["LUCKYD_AGENT_NAME"] = "Agent 1"
-                os.environ["LUCKYD_AGENT_VERSION"] = "v10.9.3"
+                os.environ["LUCKYD_AGENT_VERSION"] = "v10.9.5"
             i += 2
         elif args[i] in ("-v", "--version"):
             _print_version()

@@ -1323,7 +1323,7 @@ class MainWindow(QMainWindow):
         # it, changing the window layout when the video ended.
         # Deferred one turn: re-showing a dock in the same turn as
         # showNormal()/showMaximized() is the glitch/crash path.
-        QTimer.singleShot(0, self._restore_fs_chrome, hidden)
+        QTimer.singleShot(0, lambda: self._restore_fs_chrome(hidden))
         # Let the page drop its own fullscreen flag. The resulting toggleOff
         # request is harmless: _video_fs is already False.
         if exit_page and owner is not None:

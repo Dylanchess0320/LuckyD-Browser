@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [10.9.5] - 2026-11-26
+
+Agent task review safety gate and interactive /apikey provider setup.
+
+﻿- **AI Sidebar Task Review**: Added pre-execution review confirmation when running autonomous browser agents, prompting users to inspect plans before driving open tabs.
+- **Interactive `/apikey` Command**: Securely paste, save, and activate provider API keys with masked input prompt, provider aliases, and atomic `.env` management.
+- **Unified 10.9.5 Runtime**: Full version unification across LuckyD Browser, LuckyD Code REPL, and Multi-Agent Terminal backend.
+
+
 ## [10.9.4] - 2026-11-25
 
 ### Fixed

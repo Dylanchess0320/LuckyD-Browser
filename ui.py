@@ -159,6 +159,9 @@ SLASH_COMMANDS: list[tuple[str, str]] = [
     ("/model <name>", "Fuzzy switch — e.g. /model nemotron, /model kimi, /model qwen"),
     ("/model <n>", "Pick by number from the catalog"),
     ("/providers", "List AI providers — status, cost tier, current"),
+    ("/apikey", "Paste & enable a provider API key (saved to .env)"),
+    ("/apikey <provider>", "Hidden input - e.g. /apikey openrouter"),
+    ("/apikey remove <provider>", "Remove a saved API key"),
     ("/refresh", "Refresh model cache"),
     ("/save", "Save conversation to JSON"),
     ("/cost", "Show token usage and cost"),
@@ -263,7 +266,7 @@ class TerminalUI:
         """Clean startup banner."""
         header = self._session_header()
         tip = "Type a task, or /help for commands"
-        agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v10.9.3").strip()
+        agent_version = os.environ.get("LUCKYD_AGENT_VERSION", "v10.9.5").strip()
         agent_name = os.environ.get("LUCKYD_AGENT_NAME", "").strip()
         ver_label = f"{agent_version}" + (f" ({agent_name})" if agent_name else "")
 

@@ -477,8 +477,7 @@ class AiSidebar(QDockWidget):
         self.agent_btn.setText("Agent")
         self.agent_btn.setCheckable(True)
         self.agent_btn.setToolTip(
-            "Agent mode — Enter runs the text as an autonomous task: the "
-            "agent drives your open tabs and reports its findings back here"
+            "Agent mode — review your task before letting the agent interact with the browser"
         )
         self.agent_btn.clicked.connect(lambda: self._set_mode("agent"))
         row.addWidget(self.ask_btn)
@@ -543,12 +542,13 @@ class AiSidebar(QDockWidget):
                 f"background:{_tok('accent')};color:#ffffff;font-weight:700;" if active else ""
             )
         if agent:
+            self.send_btn.setText("Review task")
+            self.send_btn.setToolTip("Review task before starting (Enter)")
             self.input.setPlaceholderText("Describe a task for the agent…")
-            self.input.setToolTip(
-                "Agent mode: Enter runs this as an autonomous task — the "
-                "agent drives your open tabs and reports its findings here."
-            )
+            self.input.setToolTip("Agent mode: Enter opens a review before starting the task.")
         else:
+            self.send_btn.setText("Ask")
+            self.send_btn.setToolTip("Send question (Enter)")
             self.input.setPlaceholderText("Ask about this page or anything…")
             self.input.setToolTip(
                 "Ask mode: Enter to ask (the current page is always included "

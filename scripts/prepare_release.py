@@ -139,11 +139,12 @@ def main() -> None:
         f'_APP_VERSION = "{new}"',
     )
     plan_sub("web_server.py", f'_HARNESS_VERSION = "{old}"', f'_HARNESS_VERSION = "{new}"')
-    for f in ("main.py", "ui.py", "acp_server.py", "browser/browser_core/terminal_server.py"):
-        plan_sub(f, f"v{old}", f"v{new}")
+    for f in ("main.py", "ui.py", "acp_server.py"):
+        plan_sub_re(f, r"v10\.9\.[34]", f"v{new}")
+    plan_sub("browser/browser_core/terminal_server.py", f"v{old}", f"v{new}")
     # HQ dashboard agent-tab labels ("Agent 1 (v10.6.1)"). terminal_page.py
     # needs no entry: it derives the version from browser.__version__ at runtime.
-    plan_sub("apps/luckyd-ui/src/views/Agents.tsx", f"(v{old})", f"(v{new})")
+    plan_sub_re("apps/luckyd-ui/src/views/Agents.tsx", r"\(v10\.9\.[34]\)", f"(v{new})")
 
     t = "tests/test_security_40.py"
     plan_sub(t, f'browser.__version__ == "{old}"', f'browser.__version__ == "{new}"')
@@ -213,11 +214,24 @@ def main() -> None:
         )
 
     # Install guides: exe names + download URLs must track the release.
-    for doc in ("docs/docs/getting-started.md", "README-LuckyD-Browser.md"):
-        plan_sub(doc, f"LuckyDBrowserSetup-{old}.exe", f"LuckyDBrowserSetup-{new}.exe")
-        # URL pattern is not present in every guide (some link /releases/latest).
-        if f"/releases/download/v{old}/" in (ROOT / doc).read_text(encoding="utf-8"):
-            plan_sub(doc, f"/releases/download/v{old}/", f"/releases/download/v{new}/")
+    plan_sub(
+        "docs/docs/getting-started.md",
+        f"LuckyDBrowserSetup-{old}.exe",
+        f"LuckyDBrowserSetup-{new}.exe",
+    )
+    if f"/releases/download/v{old}/" in (ROOT / "docs/docs/getting-started.md").read_text(
+        encoding="utf-8"
+    ):
+        plan_sub(
+            "docs/docs/getting-started.md",
+            f"/releases/download/v{old}/",
+            f"/releases/download/v{new}/",
+        )
+    plan_sub_re(
+        "README-LuckyD-Browser.md",
+        r"LuckyDBrowserSetup-10\.9\.[34]\.exe",
+        f"LuckyDBrowserSetup-{new}.exe",
+    )
 
     # README "What's new" section — skip if the new version is already documented.
     readme = ROOT / "README.md"

@@ -75,7 +75,7 @@ Then start chatting. That's it. Want everything on your own machine? Add Ollama 
 
 ## What's new
 
-**v10.9.4** — Fixed a crash when searching with the AI assistant sidebar open: the web tab is now isolated from the sidebar during fullscreen video, so searching no longer glitches or crashes.
+**v10.9.5** — Agent task review safety gate and interactive /apikey provider setup
 
 **v10.9.3** - Hardening release: approval gates now work at every entry point (CLI, HQ web server, ACP), Edit asks like Write/Bash, retries stop at two with a 120s cap, a stuck tool loop trips the circuit breaker, long autonomous runs can use up to 10,000 turns, and agent identity no longer leaks into plain terminal tabs.
 
